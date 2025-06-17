@@ -1,0 +1,163 @@
+.app {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  overflow: hidden; /* Ensure no scrollbars */
+}
+
+.app-header {
+  /* Removed as per new layout */
+  display: none;
+}
+
+.app-content {
+  /* Removed as per new layout */
+  display: none;
+}
+
+.simulation-canvas {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 浮动控制面板样式 */
+.control-panel-container {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 320px; /* 面板展开时的宽度 */
+  background-color: rgba(255, 255, 255, 0.95); /* 半透明背景 */
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
+  transform: translateX(100%); /* 默认隐藏在右侧 */
+  transition: transform 0.3s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  gap: 20px;
+  box-sizing: border-box;
+  z-index: 1000;
+}
+
+.control-panel-container.open {
+  transform: translateX(0); /* 展开时滑入 */
+}
+
+.panel-toggle-btn {
+  position: absolute;
+  top: 50%;
+  right: 0; /* 默认贴在屏幕右边缘 */
+  transform: translateY(-50%) translateX(-320px); /* 默认位于收起面板的左侧 */
+  width: 40px;
+  height: 60px;
+  background-color: #3498db; /* 与按钮颜色保持一致 */
+  color: white;
+  border: none;
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+  cursor: pointer;
+  font-size: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: -2px 0 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease-in-out, background-color 0.2s ease; /* 添加transform过渡 */
+  z-index: 1001; /* 确保按钮在面板之上 */
+}
+
+.panel-toggle-btn.panel-open {
+  transform: translateY(-50%) translateX(-320px); /* 面板展开时，按钮移动到面板左侧 */
+}
+
+.panel-toggle-btn.panel-closed {
+  transform: translateY(-50%) translateX(-40px); /* 面板收起时，按钮移动到自身宽度左侧 */
+}
+
+.panel-toggle-btn:hover {
+  background-color: #2980b9;
+}
+
+.control-panel-content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto; /* 如果内容过多，允许滚动 */
+  padding-right: 5px; /* 为滚动条留出空间 */
+}
+
+/* 适配小屏幕 */
+@media (max-width: 900px) {
+  .control-panel-container {
+    width: 280px;
+  }
+
+  .panel-toggle-btn.panel-open {
+    transform: translateY(-50%) translateX(-280px); /* 面板展开时，按钮移动到面板左侧 */
+  }
+}
+
+@media (max-width: 768px) {
+  .control-panel-container {
+    width: 100vw;
+    left: 0;
+    right: auto;
+    transform: translateY(100%);
+    top: auto;
+    bottom: 0;
+    height: 60vh; /* 在小屏幕上从底部升起，占据一半高度 */
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .control-panel-container.open {
+    transform: translateY(0);
+  }
+
+  .panel-toggle-btn {
+    bottom: 60vh; /* 按钮在面板上方，与面板底部对齐 */
+    left: 50%;
+    top: auto; /* 重置top */
+    right: auto; /* 重置right */
+    transform: translateX(-50%) rotate(90deg); /* 旋转箭头 */
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .panel-toggle-btn.panel-open {
+    transform: translateX(-50%) rotate(90deg); /* 展开时旋转，与面板顶部对齐 */
+    bottom: 60vh; /* 保持在面板上方 */
+  }
+
+  .panel-toggle-btn.panel-closed {
+    transform: translateX(-50%) rotate(-90deg); /* 收起时旋转，并向下移动 */
+    bottom: 0; /* 贴紧底部 */
+  }
+
+  .app-header {
+    display: block;
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    text-align: left;
+    z-index: 10;
+  }
+
+  .app-header h1 {
+    font-size: 1.5em;
+  }
+
+  .app-header p {
+    font-size: 0.9em;
+  }
+} 

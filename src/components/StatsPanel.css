@@ -1,0 +1,108 @@
+.stats-panel {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e1e8ed;
+}
+
+.stats-panel h3 {
+  margin: 0 0 20px 0;
+  color: #2c3e50;
+  font-size: 1.2em;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 25px;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.stat-label {
+  display: block;
+  font-size: 12px;
+  color: #6c757d;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.stat-value {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.stat-value.positive {
+  color: #27ae60;
+}
+
+.stat-value.negative {
+  color: #e74c3c;
+}
+
+.emotion-stats h4 {
+  margin: 0 0 15px 0;
+  color: #2c3e50;
+  font-size: 1em;
+  border-top: 1px solid #ecf0f1;
+  padding-top: 20px;
+}
+
+.emotion-bar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.emotion-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.emotion-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #5d6d7e;
+  min-width: 50px;
+}
+
+.bar-track {
+  flex: 1;
+  height: 8px;
+  background-color: #ecf0f1;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.bar-fill.pleasure {
+  background: linear-gradient(90deg, #f39c12, #e67e22);
+}
+
+.bar-fill.arousal {
+  background: linear-gradient(90deg, #e74c3c, #c0392b);
+}
+
+.emotion-value {
+  font-size: 11px;
+  font-weight: 600;
+  color: #2c3e50;
+  min-width: 35px;
+  text-align: right;
+} 
