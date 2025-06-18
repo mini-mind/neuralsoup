@@ -13,6 +13,7 @@ export class SimulationEngine {
   private renderer: WorldRenderer;
   private isRunning: boolean = false;
   private isPaused: boolean = false;
+  private gameLoopRunning: boolean = false;
   private lastTime: number = 0;
   private fps: number = 0;
   private simulationTime: number = 0;
@@ -29,6 +30,10 @@ export class SimulationEngine {
   
   // 键盘输入状态
   private keyStates: { [key: string]: boolean } = {};
+  
+  // 脚本控制
+  private scriptCode: string = '';
+  private compiledScript: Function | null = null;
   
   // 世界参数
   private worldWidth: number = 1600;
@@ -70,6 +75,17 @@ export class SimulationEngine {
   public updateWorldDimensions(newWidth: number, newHeight: number): void {
     this.worldWidth = newWidth;
     this.worldHeight = newHeight;
+  }
+
+  // 设置脚本代码
+  public setScriptCode(code: string): void {
+    this.scriptCode = code;
+    try {
+      this.compiledScript = new Function('inputs', code);
+    } catch (e) {
+      console.error('脚本编译错误:', e);
+      this.compiledScript = null;
+    }
   }
 
   initialize(): void {
@@ -249,7 +265,7 @@ export class SimulationEngine {
     this.updateVisualInput(agent);
     
     // 仅对主智能体添加调试信息
-    if (agent.controlType === 'snn' && this.frameCount % 60 === 0) {
+    if (agent.id === 0 && this.frameCount % 60 === 0) {
       const allElementsInRange: Array<{type: string, id: number, distance: string}> = [];
       const elementsInVision: Array<{type: string, id: number, distance: string, angle: string}> = [];
       
@@ -733,21 +749,32 @@ export class SimulationEngine {
   }
 
   start(): void {
-    if (this.isRunning) return;
     console.log('启动仿真...');
     this.isRunning = true;
     this.isPaused = false;
     this.lastTime = performance.now();
-    this.gameLoop();
+    if (!this.gameLoopRunning) {
+      this.gameLoopRunning = true;
+      this.gameLoop();
+    }
   }
 
   pause(): void {
-    this.isPaused = !this.isPaused;
+    console.log('暂停仿真...');
+    this.isPaused = true;
+  }
+
+  resume(): void {
+    console.log('恢复仿真...');
+    this.isPaused = false;
+    this.lastTime = performance.now(); // 重置时间以避免大的deltaTime
   }
 
   stop(): void {
+    console.log('停止仿真...');
     this.isRunning = false;
     this.isPaused = false;
+    this.gameLoopRunning = false;
   }
 
   reset(): void {
@@ -768,13 +795,14 @@ export class SimulationEngine {
   }
 
   private gameLoop = (): void => {
-    if (!this.isRunning) return;
+    if (!this.gameLoopRunning) return;
 
     const currentTime = performance.now();
-    const deltaTime = Math.min((currentTime - this.lastTime) / 1000, 0.033); // 限制最大deltaTime
-    this.lastTime = currentTime;
-
-    if (!this.isPaused) {
+    
+    if (this.isRunning && !this.isPaused) {
+      const deltaTime = Math.min((currentTime - this.lastTime) / 1000, 0.033); // 限制最大deltaTime
+      this.lastTime = currentTime;
+      
       this.updateSimulation(deltaTime);
       this.simulationTime += deltaTime;
       this.frameCount++;
@@ -782,9 +810,12 @@ export class SimulationEngine {
       if (this.frameCount % 60 === 0) {
         this.fps = Math.round(1 / deltaTime);
       }
+    } else if (this.isPaused) {
+      // 暂停时更新lastTime以避免恢复时的大deltaTime
+      this.lastTime = currentTime;
     }
 
-    // 渲染
+    // 渲染（始终进行渲染以保持界面更新）
     this.renderer.renderWorld({
       width: this.worldWidth,
       height: this.worldHeight,
@@ -837,6 +868,10 @@ export class SimulationEngine {
     
     if (agent.controlType === 'snn') {
       this.updateSNNAgent(agent, deltaTime);
+    } else if (agent.controlType === 'keyboard') {
+      this.updateKeyboardAgent(agent, deltaTime);
+    } else if (agent.controlType === 'script') {
+      this.updateScriptAgent(agent, deltaTime);
     } else {
       this.updateRandomAgent(agent, deltaTime);
     }
@@ -852,6 +887,52 @@ export class SimulationEngine {
     // 情绪衰减
     agent.pleasure *= 0.99;
     agent.arousal = Math.max(0.1, agent.arousal * 0.995);
+  }
+
+  private updateKeyboardAgent(agent: Agent, deltaTime: number): void {
+    const keyboardAction = this.getKeyboardAction();
+    
+    const output = [0, 0, 0];
+    switch (keyboardAction.action) {
+      case 'turnLeft':
+        output[0] = 1;
+        break;
+      case 'turnRight':
+        output[2] = 1;
+        break;
+      case 'moveForward':
+        output[1] = 1;
+        break;
+    }
+    
+    this.applyAction(agent, output, deltaTime);
+  }
+
+  private updateScriptAgent(agent: Agent, deltaTime: number): void {
+    if (!this.compiledScript) {
+      // 如果脚本无效，使用键盘控制作为后备
+      this.updateKeyboardAgent(agent, deltaTime);
+      return;
+    }
+    
+    try {
+      const result = this.compiledScript(agent.visualInput);
+      
+      // 添加调试信息
+      if (this.frameCount % 60 === 0) {
+        console.log('Script result:', result, 'Type:', typeof result, 'Array?', Array.isArray(result));
+      }
+      
+      if (Array.isArray(result) && result.length === 3) {
+        this.applyAction(agent, result, deltaTime);
+      } else {
+        console.warn('脚本返回值格式错误，应返回[左转, 前进, 右转]数组');
+        this.updateKeyboardAgent(agent, deltaTime);
+      }
+    } catch (e) {
+      console.error('脚本执行错误:', e);
+      this.updateKeyboardAgent(agent, deltaTime);
+    }
   }
 
   private updateSNNAgent(agent: Agent, deltaTime: number): void {
@@ -874,10 +955,10 @@ export class SimulationEngine {
           output[0] = 1;
           break;
         case 'turnRight':
-          output[1] = 1;
+          output[2] = 1;
           break;
         case 'moveForward':
-          output[2] = 1;
+          output[1] = 1;
           break;
       }
       this.applyAction(agent, output, deltaTime);
@@ -938,7 +1019,7 @@ export class SimulationEngine {
   }
 
   private applyAction(agent: Agent, output: number[], deltaTime: number): void {
-    const [turnLeft, turnRight, moveForward] = output;
+    const [turnLeft, moveForward, turnRight] = output;
     
     // 转向 - 使用更平滑的控制
     const turnSpeed = 3.0;
@@ -1027,7 +1108,8 @@ export class SimulationEngine {
 
   // 获取主智能体用于镜头跟随
   getMainAgent(): Agent | null {
-    return this.agents.find(agent => agent.id === this.mainAgentId) || null;
+    // 主智能体始终是ID为0的智能体，不管其控制类型
+    return this.agents.find(agent => agent.id === 0) || null;
   }
 
   // 设置镜头跟随目标

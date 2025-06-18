@@ -1,163 +1,330 @@
 .app {
-  width: 100vw;
-  height: 100vh;
   display: flex;
-  justify-content: center;
-  align-items: center;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: #1a1a1a;
+  color: #ffffff;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* 左侧游戏区域 (60%) */
+.game-area {
+  flex: 0 0 60%;
   position: relative;
-  overflow: hidden; /* Ensure no scrollbars */
+  background: #000;
+  overflow: hidden;
 }
 
-.app-header {
-  /* Removed as per new layout */
-  display: none;
+/* 右侧控制区域 (40%) */
+.control-area {
+  flex: 0 0 40%;
+  background: #2a2a2a;
+  border-left: 1px solid #444;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.app-content {
-  /* Removed as per new layout */
-  display: none;
+/* 统一控制行：包含所有控件 */
+.unified-control-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #333;
+  border-bottom: 1px solid #444;
+  min-height: 60px;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
+.stats-section {
+  display: flex;
+  gap: 16px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: #aaa;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.stat-value.positive {
+  color: #4ade80;
+}
+
+.control-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  min-width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-primary {
+  background: #6366f1;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #5855eb;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: #6b7280;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #5b6471;
+  transform: translateY(-1px);
+}
+
+/* 情绪值显示 */
+.emotion-values {
+  display: flex;
+  gap: 12px;
+}
+
+.emotion-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.emotion-label {
+  font-size: 11px;
+  color: #aaa;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.emotion-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f59e0b;
+}
+
+.control-mode-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.control-mode-selector label {
+  font-size: 12px;
+  color: #ccc;
+  white-space: nowrap;
+}
+
+.mode-select {
+  padding: 6px 10px;
+  background: #444;
+  border: 1px solid #555;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mode-select:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+/* 内容区域 */
+.content-area {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+/* 手动控制样式 */
+.manual-control h4 {
+  margin: 0 0 16px 0;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.control-instructions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.instruction-section h5 {
+  margin: 0 0 8px 0;
+  color: #4ade80;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.instruction-section ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.instruction-section li {
+  margin-bottom: 4px;
+  color: #ccc;
+}
+
+kbd {
+  background: #444;
+  border: 1px solid #666;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-family: monospace;
+  font-size: 11px;
+  color: #fff;
+}
+
+/* 脚本控制样式 */
+.script-control h4 {
+  margin: 0 0 16px 0;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.script-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: calc(100vh - 200px);
+}
+
+.script-textarea {
+  flex: 1;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 12px;
+  color: #fff;
+  font-family: 'Fira Code', 'Monaco', 'Menlo', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+}
+
+.script-textarea:focus {
+  border-color: #6366f1;
+}
+
+.script-info {
+  background: #333;
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 12px;
+}
+
+.script-info p {
+  margin: 0 0 6px 0;
+  color: #ccc;
+}
+
+.script-info strong {
+  color: #4ade80;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  background: #6366f1;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.btn-small:hover {
+  background: #5855eb;
+}
+
+/* SNN控制样式 */
+.snn-control {
+  height: calc(100vh - 120px);
+  overflow: hidden;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+  }
+  
+  .game-area {
+    flex: 0 0 50%;
+  }
+  
+  .control-area {
+    flex: 0 0 50%;
+    border-left: none;
+    border-top: 1px solid #444;
+  }
+  
+  .unified-control-row {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+  
+  .stats-section {
+    justify-content: center;
+  }
+  
+  .control-instructions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 仿真画布样式 */
 .simulation-canvas {
   width: 100%;
   height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  display: block;
 }
 
-/* 浮动控制面板样式 */
-.control-panel-container {
-  position: absolute;
-  top: 0;
-  right: 0;
-  height: 100vh;
-  width: 320px; /* 面板展开时的宽度 */
-  background-color: rgba(255, 255, 255, 0.95); /* 半透明背景 */
-  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
-  transform: translateX(100%); /* 默认隐藏在右侧 */
-  transition: transform 0.3s ease-in-out;
-  display: flex;
-  flex-direction: column;
-  padding: 20px;
-  gap: 20px;
-  box-sizing: border-box;
-  z-index: 1000;
+.simulation-canvas canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
 }
 
-.control-panel-container.open {
-  transform: translateX(0); /* 展开时滑入 */
-}
-
-.panel-toggle-btn {
-  position: absolute;
-  top: 50%;
-  right: 0; /* 默认贴在屏幕右边缘 */
-  transform: translateY(-50%) translateX(-320px); /* 默认位于收起面板的左侧 */
-  width: 40px;
-  height: 60px;
-  background-color: #3498db; /* 与按钮颜色保持一致 */
-  color: white;
-  border: none;
-  border-top-left-radius: 8px;
-  border-bottom-left-radius: 8px;
-  cursor: pointer;
-  font-size: 24px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  box-shadow: -2px 0 6px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease-in-out, background-color 0.2s ease; /* 添加transform过渡 */
-  z-index: 1001; /* 确保按钮在面板之上 */
-}
-
-.panel-toggle-btn.panel-open {
-  transform: translateY(-50%) translateX(-320px); /* 面板展开时，按钮移动到面板左侧 */
-}
-
-.panel-toggle-btn.panel-closed {
-  transform: translateY(-50%) translateX(-40px); /* 面板收起时，按钮移动到自身宽度左侧 */
-}
-
-.panel-toggle-btn:hover {
-  background-color: #2980b9;
-}
-
-.control-panel-content {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  overflow-y: auto; /* 如果内容过多，允许滚动 */
-  padding-right: 5px; /* 为滚动条留出空间 */
-}
-
-/* 适配小屏幕 */
-@media (max-width: 900px) {
-  .control-panel-container {
-    width: 280px;
-  }
-
-  .panel-toggle-btn.panel-open {
-    transform: translateY(-50%) translateX(-280px); /* 面板展开时，按钮移动到面板左侧 */
-  }
-}
-
-@media (max-width: 768px) {
-  .control-panel-container {
-    width: 100vw;
-    left: 0;
-    right: auto;
-    transform: translateY(100%);
-    top: auto;
-    bottom: 0;
-    height: 60vh; /* 在小屏幕上从底部升起，占据一半高度 */
-    border-top-left-radius: 12px;
-    border-top-right-radius: 12px;
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
-  }
-
-  .control-panel-container.open {
-    transform: translateY(0);
-  }
-
-  .panel-toggle-btn {
-    bottom: 60vh; /* 按钮在面板上方，与面板底部对齐 */
-    left: 50%;
-    top: auto; /* 重置top */
-    right: auto; /* 重置right */
-    transform: translateX(-50%) rotate(90deg); /* 旋转箭头 */
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
-  }
-
-  .panel-toggle-btn.panel-open {
-    transform: translateX(-50%) rotate(90deg); /* 展开时旋转，与面板顶部对齐 */
-    bottom: 60vh; /* 保持在面板上方 */
-  }
-
-  .panel-toggle-btn.panel-closed {
-    transform: translateX(-50%) rotate(-90deg); /* 收起时旋转，并向下移动 */
-    bottom: 0; /* 贴紧底部 */
-  }
-
-  .app-header {
-    display: block;
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    text-align: left;
-    z-index: 10;
-  }
-
-  .app-header h1 {
-    font-size: 1.5em;
-  }
-
-  .app-header p {
-    font-size: 0.9em;
-  }
-} 
+ 

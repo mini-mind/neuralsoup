@@ -1,53 +1,80 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import SimulationCanvas from './components/SimulationCanvas';
-import ControlPanel from './components/ControlPanel';
+import SNNTopologyEditor from './components/SNNTopologyEditor';
 import { SimulationEngine } from './engine/SimulationEngine';
 import './App.css';
+
+type ControlMode = 'manual' | 'script' | 'snn';
 
 const App: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [controlMode, setControlMode] = useState<ControlMode>('manual');
+  const [scriptCode, setScriptCode] = useState(`// 脚本控制示例
+// inputs: 视觉输入数组 (108维)
+// 返回: [左转, 前进, 右转] 概率数组
+function control(inputs) {
+  // 简单示例：检测前方是否有食物
+  const frontInputs = inputs.slice(45, 63); // 前方区域
+  const hasFood = frontInputs.some(input => input > 0.5);
+  
+  if (hasFood) {
+    return [0, 1, 0]; // 前进
+  } else {
+    return [0.3, 0.4, 0.3]; // 随机移动
+  }
+}`);
+  
   const [stats, setStats] = useState({
     fps: 0,
     totalReward: 0,
     collisionCount: 0,
-    emotionState: { pleasure: 0, arousal: 0 }
+    emotionState: { pleasure: 1, arousal: 1 }
   });
-  const [isPanelOpen, setIsPanelOpen] = useState(true); // 默认展开面板
   
-  const [canvasWidth, setCanvasWidth] = useState(window.innerWidth);
+  const [canvasWidth, setCanvasWidth] = useState(window.innerWidth * 0.6);
   const [canvasHeight, setCanvasHeight] = useState(window.innerHeight);
 
   const engineRef = useRef<SimulationEngine | null>(null);
 
   // 计算画布尺寸
   const calculateCanvasDimensions = useCallback(() => {
-    // 画布始终占满整个视口，面板将浮动在其上方
-    const newWidth = window.innerWidth;
+    const newWidth = window.innerWidth * 0.6;
     const newHeight = window.innerHeight;
     setCanvasWidth(newWidth);
     setCanvasHeight(newHeight);
-  }, []); // 移除对 isPanelOpen 的依赖
+  }, []);
 
   useEffect(() => {
-    calculateCanvasDimensions(); // 首次渲染时计算
+    calculateCanvasDimensions();
     window.addEventListener('resize', calculateCanvasDimensions);
     return () => {
       window.removeEventListener('resize', calculateCanvasDimensions);
     };
   }, [calculateCanvasDimensions]);
 
-  const handleStart = useCallback(() => {
-    setIsRunning(true);
-    setIsPaused(false);
-  }, []);
-
-  const handlePause = useCallback(() => {
-    setIsPaused(!isPaused);
-    if (engineRef.current) {
-      engineRef.current.pause();
+  const handleStartPause = useCallback(() => {
+    if (!isRunning) {
+      // 开始运行
+      setIsRunning(true);
+      setIsPaused(false);
+      if (engineRef.current) {
+        engineRef.current.start();
+      }
+    } else if (isPaused) {
+      // 从暂停状态恢复
+      setIsPaused(false);
+      if (engineRef.current) {
+        (engineRef.current as any).resume();
+      }
+    } else {
+      // 暂停
+      setIsPaused(true);
+      if (engineRef.current) {
+        engineRef.current.pause();
+      }
     }
-  }, [isPaused]);
+  }, [isRunning, isPaused]);
 
   const handleReset = useCallback(() => {
     setIsRunning(false);
@@ -56,7 +83,7 @@ const App: React.FC = () => {
       fps: 0,
       totalReward: 0,
       collisionCount: 0,
-      emotionState: { pleasure: 0, arousal: 0 }
+      emotionState: { pleasure: 1, arousal: 1 }
     });
     if (engineRef.current) {
       engineRef.current.reset();
@@ -71,46 +98,180 @@ const App: React.FC = () => {
     engineRef.current = engine;
   }, []);
 
-  const togglePanel = useCallback(() => {
-    setIsPanelOpen(prev => !prev);
-  }, []);
+  const formatNumber = (num: number): string => {
+    return num.toLocaleString();
+  };
+
+  const renderControlContent = () => {
+    switch (controlMode) {
+      case 'manual':
+        return (
+          <div className="manual-control">
+            <h4>手动控制说明</h4>
+            <div className="control-instructions">
+              <div className="instruction-section">
+                <h5>键盘控制</h5>
+                <ul>
+                  <li><kbd>W</kbd> 或 <kbd>↑</kbd> - 前进</li>
+                  <li><kbd>A</kbd> 或 <kbd>←</kbd> - 左转</li>
+                  <li><kbd>D</kbd> 或 <kbd>→</kbd> - 右转</li>
+                </ul>
+              </div>
+              
+              <div className="instruction-section">
+                <h5>视觉系统</h5>
+                <ul>
+                  <li>120度前方视野</li>
+                  <li>36个感受格子</li>
+                  <li>每格子RGB颜色输入</li>
+                  <li>共108维输入向量</li>
+                </ul>
+              </div>
+              
+              <div className="instruction-section">
+                <h5>环境元素</h5>
+                <ul>
+                  <li>🟢 绿色：食物（正奖励）</li>
+                  <li>⚫ 黑色：移动障碍物</li>
+                  <li>⚪ 灰色：静止障碍物</li>
+                  <li>🔵 蓝色：其他智能体</li>
+                </ul>
+              </div>
+              
+              <div className="instruction-section">
+                <h5>情绪系统</h5>
+                <ul>
+                  <li>愉悦度：食物奖励增加</li>
+                  <li>唤醒度：碰撞刺激增加</li>
+                  <li>情绪影响智能体行为</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        );
+        
+      case 'script':
+        return (
+          <div className="script-control">
+            <h4>脚本控制</h4>
+            <div className="script-editor">
+              <textarea
+                value={scriptCode}
+                onChange={(e) => setScriptCode(e.target.value)}
+                placeholder="输入JavaScript控制脚本..."
+                className="script-textarea"
+              />
+              <div className="script-info">
+                <p><strong>输入参数:</strong> inputs (108维视觉数组)</p>
+                <p><strong>返回值:</strong> [左转, 前进, 右转] 概率数组</p>
+                <button className="btn-small" onClick={() => {
+                  try {
+                    new Function('inputs', scriptCode);
+                    alert('脚本语法检查通过！');
+                  } catch (e) {
+                    alert('脚本语法错误：' + (e as Error).message);
+                  }
+                }}>
+                  语法检查
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+        
+      case 'snn':
+        return (
+          <div className="snn-control">
+            <SNNTopologyEditor 
+              width={window.innerWidth * 0.4 - 40} 
+              height={window.innerHeight - 80}
+            />
+          </div>
+        );
+        
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="app">
-      {/* 顶部标题，仅在小屏幕显示 */}
-      <div className="app-header">
-        <h1>DYNN - 浮游生物智能体仿真</h1>
-        <p>基于脉冲神经网络的具身智能体在2D环境中的学习与适应</p>
-        <p style={{ fontSize: '0.9em', color: '#666' }}>
-          键盘控制：W/↑前进，A/←左转，D/→右转 | 蓝色智能体为主控，其他为随机游走
-        </p>
+      {/* 左侧游戏区域 */}
+      <div className="game-area">
+        <SimulationCanvas 
+          width={canvasWidth}
+          height={canvasHeight}
+          isRunning={isRunning && !isPaused}
+          controlMode={controlMode}
+          scriptCode={scriptCode}
+          onStatsUpdate={handleStatsUpdate}
+          onEngineReady={handleEngineReady}
+        />
       </div>
-
-      {/* 仿真画布区域 */}
-      <SimulationCanvas 
-        width={canvasWidth}
-        height={canvasHeight}
-        isRunning={isRunning && !isPaused}
-        onStatsUpdate={handleStatsUpdate}
-        onEngineReady={handleEngineReady}
-      />
       
-      {/* 浮动控制面板切换按钮 */}
-      <button className={`panel-toggle-btn ${isPanelOpen ? 'panel-open' : 'panel-closed'}`} onClick={togglePanel}>
-        {isPanelOpen ? '❯' : '❮'} {/* 箭头方向修正：展开时向右，收起时向左 */}
-      </button>
+      {/* 右侧控制区域 */}
+      <div className="control-area">
+        {/* 统一控制行：FPS、奖励、按钮、情绪、控制方式 */}
+        <div className="unified-control-row">
+          <div className="stats-section">
+            <div className="stat-item">
+              <span className="stat-label">FPS</span>
+              <span className="stat-value">{stats.fps.toFixed(1)}</span>
+            </div>
+            
+            <div className="stat-item">
+              <span className="stat-label">奖励</span>
+              <span className="stat-value positive">{formatNumber(stats.totalReward)}</span>
+            </div>
+          </div>
+          
+          <div className="control-buttons">
+            <button 
+              onClick={handleStartPause}
+              className="btn btn-primary"
+              title={isRunning ? (isPaused ? '继续' : '暂停') : '开始'}
+            >
+              {isRunning ? (isPaused ? '▶' : '⏸') : '▶'}
+            </button>
+            
+            <button 
+              onClick={handleReset}
+              className="btn btn-secondary"
+              title="重置"
+            >
+              ⏹
+            </button>
+          </div>
+          
+          <div className="emotion-values">
+            <div className="emotion-item">
+              <span className="emotion-label">愉悦</span>
+              <span className="emotion-value">{stats.emotionState.pleasure.toFixed(1)}x</span>
+            </div>
+            
+            <div className="emotion-item">
+              <span className="emotion-label">唤醒</span>
+              <span className="emotion-value">{stats.emotionState.arousal.toFixed(1)}x</span>
+            </div>
+          </div>
+          
+          <div className="control-mode-selector">
+            <label>控制方式：</label>
+            <select 
+              value={controlMode} 
+              onChange={(e) => setControlMode(e.target.value as ControlMode)}
+              className="mode-select"
+            >
+              <option value="manual">手动控制</option>
+              <option value="script">脚本控制</option>
+              <option value="snn">SNN控制</option>
+            </select>
+          </div>
+        </div>
 
-      {/* 浮动控制面板 */}
-      <div className={`control-panel-container ${isPanelOpen ? 'open' : 'closed'}`}>
-        <div className="control-panel-content">
-          <ControlPanel 
-            isRunning={isRunning}
-            isPaused={isPaused}
-            onStart={handleStart}
-            onPause={handlePause}
-            onReset={handleReset}
-            stats={stats}
-          />
+        {/* 动态内容区域 */}
+        <div className="content-area">
+          {renderControlContent()}
         </div>
       </div>
     </div>

@@ -2,8 +2,12 @@ import React, { useRef, useEffect } from 'react';
 import * as PIXI from 'pixi.js';
 import { SimulationEngine } from '../engine/SimulationEngine';
 
+type ControlMode = 'manual' | 'script' | 'snn';
+
 interface SimulationCanvasProps {
   isRunning: boolean;
+  controlMode: ControlMode;
+  scriptCode: string;
   onStatsUpdate: (stats: any) => void;
   onEngineReady: (engine: SimulationEngine) => void;
   width: number;
@@ -12,6 +16,8 @@ interface SimulationCanvasProps {
 
 const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   isRunning,
+  controlMode,
+  scriptCode,
   onStatsUpdate,
   onEngineReady,
   width,
@@ -22,12 +28,17 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   const appRef = useRef<PIXI.Application | null>(null);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current) {
+      console.log('Canvas ref not available');
+      return;
+    }
 
+    console.log('Canvas ref available, initializing PIXI app');
     const app = appRef.current;
     const engine = engineRef.current;
 
     if (!app) {
+      console.log('Creating new PIXI app with dimensions:', width, height);
       const newApp = new PIXI.Application({
         width: width,
         height: height,
@@ -37,12 +48,22 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         autoDensity: true,
       });
 
+      console.log('PIXI app created, canvas view:', newApp.view);
+      console.log('Canvas container before append:', canvasRef.current);
+      console.log('Canvas container children before:', canvasRef.current.children.length);
+      
       canvasRef.current.appendChild(newApp.view as HTMLCanvasElement);
       appRef.current = newApp;
+      
+      console.log('Canvas element appended to DOM');
+      console.log('Canvas container children after:', canvasRef.current.children.length);
+      console.log('Canvas view dimensions:', (newApp.view as HTMLCanvasElement).width, (newApp.view as HTMLCanvasElement).height);
+      console.log('Canvas view style:', (newApp.view as HTMLCanvasElement).style.cssText);
 
       // 创建仿真引擎 - 设置一个更大的固定世界尺寸
-      const fixedWorldWidth = 4000; // 示例：更大的世界宽度
-      const fixedWorldHeight = 3000; // 示例：更大的世界高度
+      const fixedWorldWidth = 3000;
+      const fixedWorldHeight = 3000;
+      console.log('Creating simulation engine with world size:', fixedWorldWidth, fixedWorldHeight);
       const newEngine = new SimulationEngine(newApp, fixedWorldWidth, fixedWorldHeight);
       newEngine.onStatsUpdate = onStatsUpdate;
       engineRef.current = newEngine;
@@ -51,18 +72,22 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       // 设置镜头跟随主智能体
       const mainAgent = newEngine.getMainAgent();
       if (mainAgent) {
+        console.log('Setting camera target to main agent:', mainAgent.id);
         newEngine.setCameraTarget(mainAgent);
       }
       
       onEngineReady(newEngine);
+      console.log('Simulation engine initialized and ready');
     } else {
       // 如果已存在，则只更新渲染器尺寸，世界尺寸保持不变
+      console.log('Resizing existing app to:', width, height);
       app.renderer.resize(width, height);
       // 不再调用 engine?.updateWorldDimensions(width, height); 因为世界尺寸是固定的
     }
 
     return () => {
       if (appRef.current && !canvasRef.current?.isConnected) {
+        console.log('Cleaning up PIXI app and engine');
         engineRef.current?.destroy();
         appRef.current?.destroy();
         appRef.current = null;
@@ -71,24 +96,42 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     };
   }, [width, height, onStatsUpdate, onEngineReady]);
 
+  // 移除自动启动/暂停逻辑，由App.tsx直接控制
+
+  // 当控制模式或脚本代码改变时，更新引擎
   useEffect(() => {
     const engine = engineRef.current;
     if (!engine) return;
 
-    if (isRunning) {
-      engine.start();
-    } else {
-      engine.pause();
+    const mainAgent = engine.getMainAgent();
+    if (!mainAgent) return;
+
+    // 先设置脚本代码（无论控制模式如何）
+    if (typeof (engine as any).setScriptCode === 'function') {
+      (engine as any).setScriptCode(scriptCode);
     }
-  }, [isRunning]);
+
+    // 根据控制模式设置智能体的控制类型
+    switch (controlMode) {
+      case 'manual':
+        mainAgent.controlType = 'keyboard';
+        break;
+      case 'script':
+        mainAgent.controlType = 'script';
+        break;
+      case 'snn':
+        mainAgent.controlType = 'snn';
+        break;
+    }
+  }, [controlMode, scriptCode]);
 
   return (
     <div 
       ref={canvasRef} 
       className="simulation-canvas"
       style={{ 
-        width: '100vw', 
-        height: '100vh', 
+        width: '100%', 
+        height: '100%', 
         overflow: 'hidden',
         position: 'relative'
       }}

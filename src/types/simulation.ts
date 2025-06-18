@@ -26,7 +26,7 @@ export interface Agent {
   visualInput: number[]; // 24维视觉输入(8格子 × 3颜色)
   
   // 控制类型
-  controlType: 'snn' | 'random'; // SNN控制或随机游走
+  controlType: 'snn' | 'random' | 'keyboard' | 'script'; // SNN控制、随机游走、键盘控制或脚本控制
   
   // 情绪状态
   pleasure: number; // 愉悦度 [-1, 1]

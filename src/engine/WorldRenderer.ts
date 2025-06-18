@@ -76,7 +76,7 @@ export class WorldRenderer {
     this.updateCamera();
 
     // 渲染大范围视野扇形 (透明实线)
-    const mainAgent = world.agents.find(agent => agent.controlType === 'snn');
+    const mainAgent = world.agents.find(agent => agent.id === 0);
     if (mainAgent) {
       this.visionFanGraphics.clear();
       this.visionFanGraphics.lineStyle(2, 0xFFFFFF, 0.15); // 透明实线，颜色和透明度可调 (更透明)
@@ -186,7 +186,7 @@ export class WorldRenderer {
     
     // 对于主控智能体，朝向指示器始终朝上（因为世界会旋转）
     // 对于其他智能体，需要计算相对于主控智能体的朝向
-    if (agent.controlType === 'snn') {
+    if (agent.id === 0) {
       // 主控智能体始终朝上
       graphics.lineTo(0, -20);
     } else {
@@ -198,7 +198,7 @@ export class WorldRenderer {
     graphics.lineStyle(0); // 重置线条样式
     
     // 如果是主控智能体，添加特殊标记
-    if (agent.controlType === 'snn') {
+    if (agent.id === 0) {
       graphics.lineStyle(3, 0xFFD700, 1.0); // 金色边框，更粗更明显
       graphics.drawCircle(0, 0, 18); // 稍微大一点的边框
       graphics.lineStyle(0); // 重置线条样式
@@ -210,7 +210,7 @@ export class WorldRenderer {
     }
     
     // 绘制主控智能体的环绕式视野格子
-    if (agent.controlType === 'snn' && agent.visionCells && agent.visionCells.length > 0) {
+    if (agent.id === 0 && agent.visionCells && agent.visionCells.length > 0) {
       const agentRadius = 15; // 智能体半径
               const visionRingRadius = 22; // 视野环的半径，比智能体大一些
         const cellCount = agent.visionCells.length;
@@ -271,7 +271,7 @@ export class WorldRenderer {
     graphics.rotation = -this.worldContainer.rotation; // 将精灵自身旋转设置为抵消世界容器的旋转
 
     // 调试日志：仅对主智能体打印其全局位置
-    if (agent.controlType === 'snn' && this.app.ticker.count % 60 === 0) {
+    if (agent.id === 0 && this.app.ticker.count % 60 === 0) {
       const globalPos = graphics.getGlobalPosition();
       console.log('Main Agent Global Position:', { id: agent.id, x: globalPos.x, y: globalPos.y });
     }
