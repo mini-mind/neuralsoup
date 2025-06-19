@@ -8,6 +8,7 @@ interface SimulationCanvasProps {
   isRunning: boolean;
   controlMode: ControlMode;
   scriptCode: string;
+  enablePlayerInputInScript: boolean;
   onStatsUpdate: (stats: any) => void;
   onEngineReady: (engine: SimulationEngine) => void;
   width: number;
@@ -18,6 +19,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   isRunning,
   controlMode,
   scriptCode,
+  enablePlayerInputInScript,
   onStatsUpdate,
   onEngineReady,
   width,
@@ -103,27 +105,47 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     const engine = engineRef.current;
     if (!engine) return;
 
-    const mainAgent = engine.getMainAgent();
-    if (!mainAgent) return;
-
     // 先设置脚本代码（无论控制模式如何）
     if (typeof (engine as any).setScriptCode === 'function') {
       (engine as any).setScriptCode(scriptCode);
     }
 
-    // 根据控制模式设置智能体的控制类型
-    switch (controlMode) {
-      case 'manual':
-        mainAgent.controlType = 'keyboard';
-        break;
-      case 'script':
-        mainAgent.controlType = 'script';
-        break;
-      case 'snn':
-        mainAgent.controlType = 'snn';
-        break;
+    // 设置脚本模式下的玩家输入开关
+    if (typeof (engine as any).setEnablePlayerInputInScript === 'function') {
+      (engine as any).setEnablePlayerInputInScript(enablePlayerInputInScript);
     }
-  }, [controlMode, scriptCode]);
+
+    // 使用新的setControlMode方法进行平滑切换
+    if (typeof (engine as any).setControlMode === 'function') {
+      switch (controlMode) {
+        case 'manual':
+          (engine as any).setControlMode('keyboard');
+          break;
+        case 'script':
+          (engine as any).setControlMode('script');
+          break;
+        case 'snn':
+          (engine as any).setControlMode('snn');
+          break;
+      }
+    } else {
+      // 向后兼容：直接设置controlType
+      const mainAgent = engine.getMainAgent();
+      if (mainAgent) {
+        switch (controlMode) {
+          case 'manual':
+            mainAgent.controlType = 'keyboard';
+            break;
+          case 'script':
+            mainAgent.controlType = 'script';
+            break;
+          case 'snn':
+            mainAgent.controlType = 'snn';
+            break;
+        }
+      }
+    }
+  }, [controlMode, scriptCode, enablePlayerInputInScript]);
 
   return (
     <div 

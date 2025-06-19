@@ -34,6 +34,11 @@ export class SimulationEngine {
   // 脚本控制
   private scriptCode: string = '';
   private compiledScript: Function | null = null;
+  private enablePlayerInputInScript: boolean = false;
+  
+  // 控制状态维护 - 用于平滑切换
+  private lastControlMode: 'snn' | 'random' | 'keyboard' | 'script' = 'snn';
+  private controlTransitionTime: number = 0;
   
   // 世界参数
   private worldWidth: number = 1600;
@@ -88,8 +93,16 @@ export class SimulationEngine {
     }
   }
 
+  // 设置脚本模式下是否启用玩家输入
+  public setEnablePlayerInputInScript(enable: boolean): void {
+    this.enablePlayerInputInScript = enable;
+  }
+
   initialize(): void {
     console.log('初始化仿真系统...');
+    
+    // 设置渲染器的世界尺寸
+    this.renderer.setWorldDimensions(this.worldWidth, this.worldHeight);
     
     this.createAgents();
     this.generateFood();
@@ -118,6 +131,14 @@ export class SimulationEngine {
   private createAgents(): void {
     const agentCount = 5;
     
+    // 获取墙内区域的范围（根据generateObstacles方法中的参数）
+    const wallMargin = 100; // 围墙距离世界边缘的距离
+    const wallThickness = 20; // 围墙厚度
+    const innerLeftBound = wallMargin + wallThickness;
+    const innerRightBound = this.worldWidth - wallMargin - wallThickness;
+    const innerTopBound = wallMargin + wallThickness;
+    const innerBottomBound = this.worldHeight - wallMargin - wallThickness;
+    
     for (let i = 0; i < agentCount; i++) {
       let x, y;
       
@@ -126,9 +147,9 @@ export class SimulationEngine {
         x = this.worldWidth / 2 + (Math.random() - 0.5) * 200;
         y = this.worldHeight / 2 + (Math.random() - 0.5) * 200;
       } else {
-        // 其他智能体随机位置
-        x = Math.random() * this.worldWidth;
-        y = Math.random() * this.worldHeight;
+        // 野生智能体在墙内随机位置
+        x = innerLeftBound + Math.random() * (innerRightBound - innerLeftBound);
+        y = innerTopBound + Math.random() * (innerBottomBound - innerTopBound);
       }
       
       const agent: Agent = {
@@ -168,6 +189,7 @@ export class SimulationEngine {
     
     console.log('Total agents created:', this.agents.length);
     console.log('Main agent (SNN):', this.getMainAgent());
+    console.log('Wall inner bounds:', { left: innerLeftBound, right: innerRightBound, top: innerTopBound, bottom: innerBottomBound });
   }
 
   private initializeVisionCells(agent: Agent): void {
@@ -621,14 +643,24 @@ export class SimulationEngine {
     this.foods = [];
     const foodCount = 15;
     
+    // 获取墙内区域的范围（与createAgents保持一致）
+    const wallMargin = 100; // 围墙距离世界边缘的距离
+    const wallThickness = 20; // 围墙厚度
+    const innerLeftBound = wallMargin + wallThickness;
+    const innerRightBound = this.worldWidth - wallMargin - wallThickness;
+    const innerTopBound = wallMargin + wallThickness;
+    const innerBottomBound = this.worldHeight - wallMargin - wallThickness;
+    
     // 获取主智能体位置（用于测试）
     const mainAgent = this.agents.find(agent => agent.controlType === 'snn');
     
     for (let i = 0; i < foodCount; i++) {
       let x, y;
       
-      // 前5个食物用于测试视野角度限制
-      if (i < 5 && mainAgent) {
+      // 前5个食物用于测试视野角度限制（如果主agent在墙内）
+      if (i < 5 && mainAgent && 
+          mainAgent.x >= innerLeftBound && mainAgent.x <= innerRightBound &&
+          mainAgent.y >= innerTopBound && mainAgent.y <= innerBottomBound) {
         if (i === 0) {
           // 正前方
           const angle = mainAgent.angle;
@@ -661,13 +693,13 @@ export class SimulationEngine {
           y = mainAgent.y + Math.sin(angle) * distance;
         }
         
-        // 确保在世界范围内
-        x = Math.max(50, Math.min(this.worldWidth - 50, x));
-        y = Math.max(50, Math.min(this.worldHeight - 50, y));
+        // 确保在墙内范围内
+        x = Math.max(innerLeftBound, Math.min(innerRightBound, x));
+        y = Math.max(innerTopBound, Math.min(innerBottomBound, y));
       } else {
-        // 其他食物随机分布
-        x = Math.random() * this.worldWidth;
-        y = Math.random() * this.worldHeight;
+        // 其他食物在墙内随机分布
+        x = innerLeftBound + Math.random() * (innerRightBound - innerLeftBound);
+        y = innerTopBound + Math.random() * (innerBottomBound - innerTopBound);
       }
       
       this.foods.push({
@@ -680,6 +712,7 @@ export class SimulationEngine {
     }
     
     console.log('Generated foods:', this.foods.length);
+    console.log('Food spawn area:', { left: innerLeftBound, right: innerRightBound, top: innerTopBound, bottom: innerBottomBound });
     if (mainAgent) {
       console.log('Main agent at:', { x: mainAgent.x.toFixed(1), y: mainAgent.y.toFixed(1), angle: (mainAgent.angle * 180 / Math.PI).toFixed(1) });
       console.log('Test foods positions:', this.foods.slice(0, 5).map(food => ({
@@ -890,28 +923,34 @@ export class SimulationEngine {
   }
 
   private updateKeyboardAgent(agent: Agent, deltaTime: number): void {
-    const keyboardAction = this.getKeyboardAction();
-    
-    const output = [0, 0, 0];
-    switch (keyboardAction.action) {
-      case 'turnLeft':
-        output[0] = 1;
-        break;
-      case 'turnRight':
-        output[2] = 1;
-        break;
-      case 'moveForward':
-        output[1] = 1;
-        break;
-    }
-    
-    this.applyAction(agent, output, deltaTime);
+    const keyboardInputs = this.getKeyboardInputs();
+    this.applyAction(agent, keyboardInputs, deltaTime);
   }
 
   private updateScriptAgent(agent: Agent, deltaTime: number): void {
+    // 检查是否启用玩家输入
+    let scriptOutput = [0, 0, 0];
+    let hasKeyboardInput = false;
+    
+    if (this.enablePlayerInputInScript) {
+      const keyboardInputs = this.getKeyboardInputs();
+      hasKeyboardInput = keyboardInputs[0] > 0 || keyboardInputs[1] > 0 || keyboardInputs[2] > 0;
+      
+      if (hasKeyboardInput) {
+        // 键盘输入优先级最高
+        this.applyAction(agent, keyboardInputs, deltaTime);
+        return;
+      }
+    }
+    
     if (!this.compiledScript) {
-      // 如果脚本无效，使用键盘控制作为后备
-      this.updateKeyboardAgent(agent, deltaTime);
+      // 如果脚本无效，使用随机游走（避免完全静止）
+      const randomOutput = [
+        (Math.random() - 0.5) * 0.2, // 轻微随机左转
+        0.3, // 缓慢前进
+        (Math.random() - 0.5) * 0.2  // 轻微随机右转
+      ];
+      this.applyAction(agent, randomOutput, deltaTime);
       return;
     }
     
@@ -920,18 +959,28 @@ export class SimulationEngine {
       
       // 添加调试信息
       if (this.frameCount % 60 === 0) {
-        console.log('Script result:', result, 'Type:', typeof result, 'Array?', Array.isArray(result));
+        console.log('Script Control:', {
+          inputLength: agent.visualInput.length,
+          result: result,
+          type: typeof result,
+          isArray: Array.isArray(result),
+          validOutput: Array.isArray(result) && result.length === 3
+        });
       }
       
       if (Array.isArray(result) && result.length === 3) {
-        this.applyAction(agent, result, deltaTime);
+        // 确保输出值在合理范围内
+        const clampedResult = result.map(val => Math.max(0, Math.min(1, Number(val) || 0)));
+        this.applyAction(agent, clampedResult, deltaTime);
       } else {
-        console.warn('脚本返回值格式错误，应返回[左转, 前进, 右转]数组');
-        this.updateKeyboardAgent(agent, deltaTime);
+        console.warn('脚本返回值格式错误，应返回[左转, 前进, 右转]强度数组，实际返回:', result);
+        // 使用安全的默认行为
+        this.applyAction(agent, [0, 0.2, 0], deltaTime);
       }
     } catch (e) {
       console.error('脚本执行错误:', e);
-      this.updateKeyboardAgent(agent, deltaTime);
+      // 使用安全的默认行为而不是切换到键盘控制
+      this.applyAction(agent, [0, 0.2, 0], deltaTime);
     }
   }
 
@@ -944,24 +993,13 @@ export class SimulationEngine {
     const thresholdAdjustment = (agent.arousal - 0.5) * 10; // [-5, 5]
     corticalColumn.applyEmotionModulation(synapticScaling, thresholdAdjustment);
     
-    // 处理键盘输入
-    const keyboardAction = this.getKeyboardAction();
+    // 处理键盘输入 - 优先级高于神经网络
+    const keyboardInputs = this.getKeyboardInputs();
+    const hasKeyboardInput = keyboardInputs[0] > 0 || keyboardInputs[1] > 0 || keyboardInputs[2] > 0;
     
-    if (keyboardAction.action !== 'none') {
-      // 直接设置神经元输出
-      const output = [0, 0, 0];
-      switch (keyboardAction.action) {
-        case 'turnLeft':
-          output[0] = 1;
-          break;
-        case 'turnRight':
-          output[2] = 1;
-          break;
-        case 'moveForward':
-          output[1] = 1;
-          break;
-      }
-      this.applyAction(agent, output, deltaTime);
+    if (hasKeyboardInput) {
+      // 手动控制时使用强度值1.0
+      this.applyAction(agent, keyboardInputs, deltaTime);
     } else {
       // 使用神经网络决策 - 运行多次迭代获得稳定输出
       let output = [0, 0, 0];
@@ -975,7 +1013,7 @@ export class SimulationEngine {
         }
       }
       
-      // 平均化输出
+      // 平均化输出 - 这些已经是强度值
       output = output.map(val => val / iterations);
       
       // 添加调试信息（每秒一次）
@@ -991,6 +1029,39 @@ export class SimulationEngine {
       
       this.applyAction(agent, output, deltaTime);
     }
+  }
+
+  /**
+   * 获取键盘输入强度，支持多键同时按下
+   * @returns [左转强度, 前进强度, 右转强度]
+   */
+  private getKeyboardInputs(): [number, number, number] {
+    let turnLeft = 0;
+    let moveForward = 0;
+    let turnRight = 0;
+    
+    // 检测前进键（W或Up）
+    if (this.keyStates['arrowup'] || this.keyStates['w']) {
+      moveForward = 1.0;
+    }
+    
+    // 检测左转键（A或Left）
+    if (this.keyStates['arrowleft'] || this.keyStates['a']) {
+      turnLeft = 1.0;
+    }
+    
+    // 检测右转键（D或Right）
+    if (this.keyStates['arrowright'] || this.keyStates['d']) {
+      turnRight = 1.0;
+    }
+    
+    // 处理A和D同时按下的抵消逻辑
+    if (turnLeft > 0 && turnRight > 0) {
+      turnLeft = 0;
+      turnRight = 0;
+    }
+    
+    return [turnLeft, moveForward, turnRight];
   }
 
   private getKeyboardAction(): { action: string } {
@@ -1145,5 +1216,36 @@ export class SimulationEngine {
   destroy(): void {
     this.stop();
     this.renderer.destroy();
+  }
+
+  /**
+   * 设置主智能体的控制模式，支持平滑切换
+   * @param newMode 新的控制模式
+   */
+  public setControlMode(newMode: 'snn' | 'random' | 'keyboard' | 'script'): void {
+    const mainAgent = this.getMainAgent();
+    if (!mainAgent) return;
+    
+    // 记录切换时间和上一个模式
+    if (mainAgent.controlType !== newMode) {
+      this.lastControlMode = mainAgent.controlType;
+      this.controlTransitionTime = this.simulationTime;
+      
+      console.log(`控制模式切换: ${this.lastControlMode} -> ${newMode}`);
+      
+      // 立即切换控制类型
+      mainAgent.controlType = newMode;
+      
+      // 如果切换到SNN模式，确保神经网络存在
+      if (newMode === 'snn' && !this.corticalColumns.has(mainAgent.id)) {
+        this.corticalColumns.set(mainAgent.id, new CorticalColumn({
+          inputSize: 108,
+          hiddenSizes: [128, 64, 32],
+          outputSize: 3,
+          dt: 0.01
+        }));
+        console.log('为主智能体创建SNN网络');
+      }
+    }
   }
 } 

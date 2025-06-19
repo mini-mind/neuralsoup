@@ -10,19 +10,30 @@ const App: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [controlMode, setControlMode] = useState<ControlMode>('manual');
+  const [enablePlayerInputInScript, setEnablePlayerInputInScript] = useState(false);
   const [scriptCode, setScriptCode] = useState(`// 脚本控制示例
 // inputs: 视觉输入数组 (108维)
-// 返回: [左转, 前进, 右转] 概率数组
-function control(inputs) {
-  // 简单示例：检测前方是否有食物
-  const frontInputs = inputs.slice(45, 63); // 前方区域
-  const hasFood = frontInputs.some(input => input > 0.5);
-  
-  if (hasFood) {
-    return [0, 1, 0]; // 前进
-  } else {
-    return [0.3, 0.4, 0.3]; // 随机移动
-  }
+// 返回: [左转, 前进, 右转] 强度数组 (0-1)
+
+// 分析前方视野区域
+const leftArea = inputs.slice(0, 36);   // 左侧视野
+const centerArea = inputs.slice(36, 72); // 中央视野  
+const rightArea = inputs.slice(72, 108); // 右侧视野
+
+// 检测食物（绿色值高）
+const leftFood = leftArea.filter((_, i) => i % 3 === 1).reduce((a, b) => a + b, 0);
+const centerFood = centerArea.filter((_, i) => i % 3 === 1).reduce((a, b) => a + b, 0);
+const rightFood = rightArea.filter((_, i) => i % 3 === 1).reduce((a, b) => a + b, 0);
+
+// 简单的食物追踪逻辑
+if (centerFood > 5) {
+  return [0, 1, 0]; // 前方有食物，直接前进
+} else if (leftFood > rightFood) {
+  return [0.8, 0.6, 0]; // 左侧食物多，左转前进
+} else if (rightFood > leftFood) {
+  return [0, 0.6, 0.8]; // 右侧食物多，右转前进
+} else {
+  return [0.2, 0.8, 0.2]; // 没找到食物，缓慢前进并轻微摆动
 }`);
   
   const [stats, setStats] = useState({
@@ -115,6 +126,8 @@ function control(inputs) {
                   <li><kbd>W</kbd> 或 <kbd>↑</kbd> - 前进</li>
                   <li><kbd>A</kbd> 或 <kbd>←</kbd> - 左转</li>
                   <li><kbd>D</kbd> 或 <kbd>→</kbd> - 右转</li>
+                  <li>支持多键同时按下（如W+A边前进边左转）</li>
+                  <li>A+D同时按下会抵消转向</li>
                 </ul>
               </div>
               
@@ -153,7 +166,19 @@ function control(inputs) {
       case 'script':
         return (
           <div className="script-control">
-            <h4>脚本控制</h4>
+            <div className="script-header">
+              <h4>脚本控制</h4>
+              <div className="script-options">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={enablePlayerInputInScript}
+                    onChange={(e) => setEnablePlayerInputInScript(e.target.checked)}
+                  />
+                  启用玩家控制信号
+                </label>
+              </div>
+            </div>
             <div className="script-editor">
               <textarea
                 value={scriptCode}
@@ -163,7 +188,8 @@ function control(inputs) {
               />
               <div className="script-info">
                 <p><strong>输入参数:</strong> inputs (108维视觉数组)</p>
-                <p><strong>返回值:</strong> [左转, 前进, 右转] 概率数组</p>
+                <p><strong>返回值:</strong> [左转, 前进, 右转] 强度数组 (0-1)</p>
+                <p><strong>玩家控制:</strong> {enablePlayerInputInScript ? 'W/A/D键可覆盖脚本输出' : '仅脚本控制'}</p>
                 <button className="btn-small" onClick={() => {
                   try {
                     new Function('inputs', scriptCode);
@@ -204,6 +230,7 @@ function control(inputs) {
           isRunning={isRunning && !isPaused}
           controlMode={controlMode}
           scriptCode={scriptCode}
+          enablePlayerInputInScript={enablePlayerInputInScript}
           onStatsUpdate={handleStatsUpdate}
           onEngineReady={handleEngineReady}
         />

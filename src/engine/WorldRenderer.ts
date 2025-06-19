@@ -7,18 +7,25 @@ import { World, Agent, Food, Obstacle, VisionCell } from '../types/simulation';
 
 export class WorldRenderer {
   private app: PIXI.Application;
-  private worldContainer: PIXI.Container;
-  private agentContainer: PIXI.Container;
-  private foodContainer: PIXI.Container;
-  private obstacleContainer: PIXI.Container;
-  private visionContainer: PIXI.Container;
+  private worldContainer!: PIXI.Container;
+  private backgroundContainer!: PIXI.Container; // 新增：背景噪声容器
+  private agentContainer!: PIXI.Container;
+  private foodContainer!: PIXI.Container;
+  private obstacleContainer!: PIXI.Container;
+  private visionContainer!: PIXI.Container;
   
   // 对象池
   private agentSprites: Map<number, PIXI.Graphics> = new Map();
   private foodSprites: Map<number, PIXI.Graphics> = new Map();
   private obstacleSprites: Map<number, PIXI.Graphics> = new Map();
   private visionSprites: Map<number, PIXI.Graphics[]> = new Map();
-  private visionFanGraphics: PIXI.Graphics; // 重新添加：用于绘制大范围视野扇形
+  private visionFanGraphics!: PIXI.Graphics; // 重新添加：用于绘制大范围视野扇形
+  
+  // 背景噪声相关
+  private backgroundNoise!: PIXI.Graphics;
+  private noiseGenerated: boolean = false;
+  private worldWidth: number = 3000;
+  private worldHeight: number = 3000;
   
   // 镜头跟随参数
   private cameraTarget: Agent | null = null;
@@ -35,16 +42,22 @@ export class WorldRenderer {
     this.app.stage.addChild(this.worldContainer);
     
     // 创建各层容器
+    this.backgroundContainer = new PIXI.Container(); // 背景噪声层
     this.visionContainer = new PIXI.Container();
     this.foodContainer = new PIXI.Container();
     this.obstacleContainer = new PIXI.Container();
     this.agentContainer = new PIXI.Container();
     
+    // 初始化背景噪声
+    this.backgroundNoise = new PIXI.Graphics();
+    this.backgroundContainer.addChild(this.backgroundNoise);
+    
     // 重新添加：初始化大范围视野扇形的Graphics对象，并添加到visionContainer
     this.visionFanGraphics = new PIXI.Graphics();
     this.visionContainer.addChild(this.visionFanGraphics);
 
-    // 按层级顺序添加（视野在最底层）
+    // 按层级顺序添加（背景在最底层，视野在上层）
+    this.worldContainer.addChild(this.backgroundContainer); // 最底层
     this.worldContainer.addChild(this.visionContainer);
     this.worldContainer.addChild(this.foodContainer);
     this.worldContainer.addChild(this.obstacleContainer);
@@ -72,6 +85,9 @@ export class WorldRenderer {
   }
 
   renderWorld(world: World): void {
+    // 生成背景噪声（只生成一次）
+    this.generateOceanNoise();
+    
     // 更新镜头位置
     this.updateCamera();
 
@@ -372,5 +388,71 @@ export class WorldRenderer {
       this.app.stage.removeChild(this.worldContainer);
       this.worldContainer.destroy({ children: true });
     }
+  }
+
+  /**
+   * 生成海洋风格的背景噪声
+   */
+  private generateOceanNoise(): void {
+    if (this.noiseGenerated) return;
+    
+    this.backgroundNoise.clear();
+    
+    // 噪声参数
+    const tileSize = 40; // 噪声格子大小
+    const tilesX = Math.ceil(this.worldWidth / tileSize) + 2; // 多生成一些确保覆盖
+    const tilesY = Math.ceil(this.worldHeight / tileSize) + 2;
+    
+    // 基础颜色 - 天空蓝 #87CEEB
+    const baseR = 0x87;
+    const baseG = 0xCE;
+    const baseB = 0xEB;
+    
+    for (let x = 0; x < tilesX; x++) {
+      for (let y = 0; y < tilesY; y++) {
+        // 简单的噪声：多个频率的正弦波叠加
+        const worldX = (x - 1) * tileSize;
+        const worldY = (y - 1) * tileSize;
+        
+        // 使用多个频率创建更自然的噪声
+        const noise1 = Math.sin(worldX * 0.005 + worldY * 0.003) * 0.5;
+        const noise2 = Math.sin(worldX * 0.012 + worldY * 0.008) * 0.3;
+        const noise3 = Math.sin(worldX * 0.025 + worldY * 0.02) * 0.2;
+        const combinedNoise = (noise1 + noise2 + noise3) * 0.5; // 归一化到 [-0.5, 0.5]
+        
+        // 颜色变化幅度 - 很小的变化以保持背景效果
+        const variation = combinedNoise * 20; // 最大变化±20
+        
+        const r = Math.max(0, Math.min(255, baseR + variation));
+        const g = Math.max(0, Math.min(255, baseG + variation));
+        const b = Math.max(0, Math.min(255, baseB + variation));
+        
+        const color = (Math.floor(r) << 16) | (Math.floor(g) << 8) | Math.floor(b);
+        
+        // 绘制噪声格子
+        this.backgroundNoise.beginFill(color, 0.8); // 设置透明度确保不会完全遮挡
+        this.backgroundNoise.drawRect(worldX, worldY, tileSize, tileSize);
+        this.backgroundNoise.endFill();
+      }
+    }
+    
+    this.noiseGenerated = true;
+    console.log('海洋背景噪声生成完成');
+  }
+
+  /**
+   * 设置世界尺寸并重新生成背景噪声
+   */
+  public setWorldDimensions(width: number, height: number): void {
+    this.worldWidth = width;
+    this.worldHeight = height;
+    this.noiseGenerated = false; // 标记需要重新生成噪声
+  }
+
+  /**
+   * 强制重新生成背景噪声
+   */
+  public regenerateNoise(): void {
+    this.noiseGenerated = false;
   }
 } 

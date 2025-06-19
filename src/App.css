@@ -214,11 +214,41 @@ kbd {
 }
 
 /* 脚本控制样式 */
+.script-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
 .script-control h4 {
-  margin: 0 0 16px 0;
+  margin: 0;
   color: #fff;
   font-size: 16px;
   font-weight: 600;
+}
+
+.script-options {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #ccc;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #6366f1;
+  cursor: pointer;
 }
 
 .script-editor {
