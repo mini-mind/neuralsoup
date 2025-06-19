@@ -81,6 +81,48 @@ export class SimulationEngine {
   }
 
   /**
+   * 更新智能体参数配置
+   */
+  public updateAgentParameters(params: {
+    visionCells?: number;
+    visionRange?: number;
+    visionAngle?: number;
+  }): void {
+    // 更新视觉系统配置
+    this.visionSystem.updateConfiguration(params);
+    
+    // 为所有智能体重新初始化视野格子
+    for (const agent of this.agents) {
+      this.visionSystem.initializeVisionCells(agent);
+      
+      // 如果是SNN控制的智能体，更新皮质柱配置
+      if (agent.controlType === 'snn' && params.visionCells) {
+        this.agentController.updateCorticalColumnConfiguration(agent.id, params.visionCells);
+      }
+    }
+    
+    // 立即重新渲染世界，确保即使在暂停状态下也能看到变化
+    this.renderWorld();
+    
+    console.log('智能体参数已更新:', params);
+  }
+
+  /**
+   * 获取当前智能体参数配置
+   */
+  public getAgentParameters(): {
+    visionCells: number;
+    visionRange: number;
+    visionAngle: number;
+  } {
+    return {
+      visionCells: this.visionSystem.getVisionCells(),
+      visionRange: this.visionSystem.getVisionRange(),
+      visionAngle: Math.round((this.visionSystem.getVisionAngle() * 180) / Math.PI) // 转换为度数
+    };
+  }
+
+  /**
    * 初始化仿真系统
    */
   initialize(): void {
@@ -100,7 +142,7 @@ export class SimulationEngine {
       
       // 为SNN控制的智能体创建神经网络
       if (agent.controlType === 'snn') {
-        this.agentController.createCorticalColumn(agent.id);
+        this.agentController.createCorticalColumn(agent.id, this.visionSystem.getVisionCells());
         console.log('Created SNN agent:', agent.id, 'at position:', agent.x, agent.y);
       }
     }

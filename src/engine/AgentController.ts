@@ -32,13 +32,27 @@ export class AgentController {
   /**
    * 为SNN智能体创建皮质柱
    */
-  public createCorticalColumn(agentId: number): void {
+  public createCorticalColumn(agentId: number, visionCells: number = 36): void {
+    const inputSize = visionCells * 3; // 视野格子数量 × 3个颜色通道
     this.corticalColumns.set(agentId, new CorticalColumn({
-      inputSize: 108, // 36个格子 × 3个颜色通道 = 108
+      inputSize: inputSize,
       hiddenSizes: [128, 64, 32],
       outputSize: 3,
       dt: 0.01
     }));
+  }
+
+  /**
+   * 更新智能体的皮质柱配置
+   */
+  public updateCorticalColumnConfiguration(agentId: number, visionCells: number): void {
+    // 删除旧的皮质柱
+    if (this.corticalColumns.has(agentId)) {
+      this.corticalColumns.delete(agentId);
+    }
+    
+    // 创建新的皮质柱
+    this.createCorticalColumn(agentId, visionCells);
   }
 
   /**

@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import SimulationCanvas from './components/SimulationCanvas';
 import SNNTopologyEditor from './components/SNNTopologyEditor';
+import AgentParametersModal, { AgentParameters } from './components/AgentParametersModal';
 import { SimulationEngine } from './engine/SimulationEngine';
 import './App.css';
 
@@ -12,13 +13,17 @@ const App: React.FC = () => {
   const [controlMode, setControlMode] = useState<ControlMode>('manual');
   const [enablePlayerInputInScript, setEnablePlayerInputInScript] = useState(false);
   const [scriptCode, setScriptCode] = useState(`// 脚本控制示例
-// inputs: 视觉输入数组 (108维)
+// inputs: 视觉输入数组 (动态维度，取决于视野格子数量 × 3)
 // 返回: [左转, 前进, 右转] 强度数组 (0-1)
 
+// 获取视野格子数量
+const cellCount = inputs.length / 3;
+const cellsPerSection = Math.floor(cellCount / 3);
+
 // 分析前方视野区域
-const leftArea = inputs.slice(0, 36);   // 左侧视野
-const centerArea = inputs.slice(36, 72); // 中央视野  
-const rightArea = inputs.slice(72, 108); // 右侧视野
+const leftArea = inputs.slice(0, cellsPerSection * 3);                    // 左侧视野
+const centerArea = inputs.slice(cellsPerSection * 3, cellsPerSection * 6); // 中央视野  
+const rightArea = inputs.slice(cellsPerSection * 6);                       // 右侧视野
 
 // 检测食物（绿色值高）
 const leftFood = leftArea.filter((_, i) => i % 3 === 1).reduce((a, b) => a + b, 0);
@@ -26,7 +31,7 @@ const centerFood = centerArea.filter((_, i) => i % 3 === 1).reduce((a, b) => a +
 const rightFood = rightArea.filter((_, i) => i % 3 === 1).reduce((a, b) => a + b, 0);
 
 // 简单的食物追踪逻辑
-if (centerFood > 5) {
+if (centerFood > 2) {
   return [0, 1, 0]; // 前方有食物，直接前进
 } else if (leftFood > rightFood) {
   return [0.8, 0.6, 0]; // 左侧食物多，左转前进
@@ -45,6 +50,14 @@ if (centerFood > 5) {
   
   const [canvasWidth, setCanvasWidth] = useState(window.innerWidth * 0.6);
   const [canvasHeight, setCanvasHeight] = useState(window.innerHeight);
+  
+  // 智能体参数状态
+  const [showAgentParamsModal, setShowAgentParamsModal] = useState(false);
+  const [agentParameters, setAgentParameters] = useState<AgentParameters>({
+    visionCells: 36,
+    visionRange: 250,
+    visionAngle: 120
+  });
 
   const engineRef = useRef<SimulationEngine | null>(null);
 
@@ -107,6 +120,21 @@ if (centerFood > 5) {
 
   const handleEngineReady = useCallback((engine: SimulationEngine) => {
     engineRef.current = engine;
+    
+    // 获取并设置初始参数
+    if (typeof (engine as any).getAgentParameters === 'function') {
+      const initialParams = (engine as any).getAgentParameters();
+      setAgentParameters(initialParams);
+    }
+  }, []);
+
+  const handleAgentParametersApply = useCallback((params: AgentParameters) => {
+    setAgentParameters(params);
+    
+    // 更新引擎参数
+    if (engineRef.current && typeof (engineRef.current as any).updateAgentParameters === 'function') {
+      (engineRef.current as any).updateAgentParameters(params);
+    }
   }, []);
 
   const formatNumber = (num: number): string => {
@@ -134,10 +162,11 @@ if (centerFood > 5) {
               <div className="instruction-section">
                 <h5>视觉系统</h5>
                 <ul>
-                  <li>120度前方视野</li>
-                  <li>36个感受格子</li>
+                  <li>{agentParameters.visionAngle}度前方视野</li>
+                  <li>{agentParameters.visionCells}个感受格子</li>
                   <li>每格子RGB颜色输入</li>
-                  <li>共108维输入向量</li>
+                  <li>共{agentParameters.visionCells * 3}维输入向量</li>
+                  <li>视野范围：{agentParameters.visionRange}像素</li>
                 </ul>
               </div>
               
@@ -187,7 +216,7 @@ if (centerFood > 5) {
                 className="script-textarea"
               />
               <div className="script-info">
-                <p><strong>输入参数:</strong> inputs (108维视觉数组)</p>
+                <p><strong>输入参数:</strong> inputs ({agentParameters.visionCells * 3}维视觉数组)</p>
                 <p><strong>返回值:</strong> [左转, 前进, 右转] 强度数组 (0-1)</p>
                 <p><strong>玩家控制:</strong> {enablePlayerInputInScript ? 'W/A/D键可覆盖脚本输出' : '仅脚本控制'}</p>
                 <button className="btn-small" onClick={() => {
@@ -205,15 +234,16 @@ if (centerFood > 5) {
           </div>
         );
         
-      case 'snn':
-        return (
-          <div className="snn-control">
-            <SNNTopologyEditor 
-              width={window.innerWidth * 0.4 - 40} 
-              height={window.innerHeight - 80}
-            />
-          </div>
-        );
+              case 'snn':
+          return (
+            <div className="snn-control">
+              <SNNTopologyEditor 
+                width={window.innerWidth * 0.4} 
+                height={window.innerHeight - 80}
+                visionCells={agentParameters.visionCells}
+              />
+            </div>
+          );
         
       default:
         return null;
@@ -268,6 +298,14 @@ if (centerFood > 5) {
             >
               ⏹
             </button>
+            
+            <button 
+              onClick={() => setShowAgentParamsModal(true)}
+              className="btn btn-secondary"
+              title="智能体参数设置"
+            >
+              ⚙️
+            </button>
           </div>
           
           <div className="emotion-values">
@@ -291,16 +329,24 @@ if (centerFood > 5) {
             >
               <option value="manual">手动控制</option>
               <option value="script">脚本控制</option>
-              <option value="snn">SNN控制</option>
+              <option value="snn">模型控制</option>
             </select>
           </div>
         </div>
 
         {/* 动态内容区域 */}
-        <div className="content-area">
+        <div className={`content-area ${controlMode === 'snn' ? 'snn-mode' : ''}`}>
           {renderControlContent()}
         </div>
       </div>
+      
+      {/* 智能体参数设置模态框 */}
+      <AgentParametersModal
+        isOpen={showAgentParamsModal}
+        onClose={() => setShowAgentParamsModal(false)}
+        onApply={handleAgentParametersApply}
+        currentParams={agentParameters}
+      />
     </div>
   );
 };

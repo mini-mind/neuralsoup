@@ -6,22 +6,42 @@
 import { Agent, VisionCell, Food, Obstacle } from '../types/simulation';
 
 export class VisionSystem {
-  private readonly VISION_RANGE = 250;
-  private readonly VISION_ANGLE = Math.PI * 2 / 3; // 120度视野
-  private readonly VISION_CELLS = 36; // 36个视野格子
+  private visionRange: number = 250;
+  private visionAngle: number = Math.PI * 2 / 3; // 120度视野
+  private visionCells: number = 36; // 36个视野格子
+
+  /**
+   * 更新视觉系统配置
+   */
+  public updateConfiguration(config: {
+    visionRange?: number;
+    visionAngle?: number;
+    visionCells?: number;
+  }): void {
+    if (config.visionRange !== undefined) {
+      this.visionRange = config.visionRange;
+    }
+    if (config.visionAngle !== undefined) {
+      // 将角度从度数转换为弧度
+      this.visionAngle = (config.visionAngle * Math.PI) / 180;
+    }
+    if (config.visionCells !== undefined) {
+      this.visionCells = config.visionCells;
+    }
+  }
 
   /**
    * 初始化智能体的视野格子
    */
   public initializeVisionCells(agent: Agent): void {
     agent.visionCells = [];
-    const angleStep = this.VISION_ANGLE / this.VISION_CELLS;
-    const startAngle = -this.VISION_ANGLE / 2;
+    const angleStep = this.visionAngle / this.visionCells;
+    const startAngle = -this.visionAngle / 2;
     
     // 视野格子渲染时与智能体中心的偏移量
     const renderingOffset = 13; 
 
-    for (let i = 0; i < this.VISION_CELLS; i++) {
+    for (let i = 0; i < this.visionCells; i++) {
       const cellAngle = startAngle + i * angleStep + angleStep / 2;
       const worldAngleForRendering = agent.angle + cellAngle;
       
@@ -46,12 +66,12 @@ export class VisionSystem {
       return;
     }
 
-    const angleStep = this.VISION_ANGLE / this.VISION_CELLS;
-    const startAngleOfVisionCone = -this.VISION_ANGLE / 2;
+    const angleStep = this.visionAngle / this.visionCells;
+    const startAngleOfVisionCone = -this.visionAngle / 2;
     const renderingOffset = 22;
 
     // 1. 初始化所有视野格子
-    for (let i = 0; i < this.VISION_CELLS; i++) {
+    for (let i = 0; i < this.visionCells; i++) {
       const cell = agent.visionCells[i];
       const cellCenterAngle = startAngleOfVisionCone + i * angleStep + angleStep / 2;
       
@@ -75,13 +95,13 @@ export class VisionSystem {
       const elementRadius = element.type === 'agent' ? 15 : element.radius;
       const angularRange = this.getAngularRangeOfElement(agent.angle, agent.x, agent.y, element.x, element.y, elementRadius);
 
-      for (let i = 0; i < this.VISION_CELLS; i++) {
+      for (let i = 0; i < this.visionCells; i++) {
         const cell = agent.visionCells[i];
         const cellStartAngle = this.normalizeAngle(startAngleOfVisionCone + i * angleStep);
         const cellEndAngle = this.normalizeAngle(startAngleOfVisionCone + (i + 1) * angleStep);
         
         if (this.anglesOverlap(angularRange.start, angularRange.end, cellStartAngle, cellEndAngle) &&
-            distance - elementRadius <= this.VISION_RANGE) {
+            distance - elementRadius <= this.visionRange) {
 
           if (distance < cell.closestDistance!) {
             cell.closestDistance = distance;
@@ -114,11 +134,11 @@ export class VisionSystem {
       const dy = otherAgent.y - agent.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
       
-      if (distance <= this.VISION_RANGE + 15) {
+      if (distance <= this.visionRange + 15) {
         const angleToOther = Math.atan2(dy, dx);
         const relativeAngle = this.normalizeAngle(angleToOther - agent.angle);
         
-        if (Math.abs(relativeAngle) <= this.VISION_ANGLE / 2) {
+        if (Math.abs(relativeAngle) <= this.visionAngle / 2) {
           visibleElements.push({
             x: otherAgent.x,
             y: otherAgent.y,
@@ -137,11 +157,11 @@ export class VisionSystem {
       const dy = food.y - agent.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
       
-      if (distance <= this.VISION_RANGE + food.radius) {
+      if (distance <= this.visionRange + food.radius) {
         const angleToFood = Math.atan2(dy, dx);
         const relativeAngle = this.normalizeAngle(angleToFood - agent.angle);
         
-        if (Math.abs(relativeAngle) <= this.VISION_ANGLE / 2) {
+        if (Math.abs(relativeAngle) <= this.visionAngle / 2) {
           visibleElements.push({
             x: food.x,
             y: food.y,
@@ -160,11 +180,11 @@ export class VisionSystem {
       const dy = obstacle.y - agent.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
       
-      if (distance <= this.VISION_RANGE + obstacle.radius) {
+      if (distance <= this.visionRange + obstacle.radius) {
         const angleToObstacle = Math.atan2(dy, dx);
         const relativeAngle = this.normalizeAngle(angleToObstacle - agent.angle);
         
-        if (Math.abs(relativeAngle) <= this.VISION_ANGLE / 2) {
+        if (Math.abs(relativeAngle) <= this.visionAngle / 2) {
           const color = obstacle.isMoving ? 
             { r: 0.5, g: 0.5, b: 0.5 } : 
             { r: 0.3, g: 0.3, b: 0.3 };
@@ -293,15 +313,15 @@ export class VisionSystem {
   }
 
   // Getters
-  public get visionRange(): number {
-    return this.VISION_RANGE;
+  public getVisionRange(): number {
+    return this.visionRange;
   }
 
-  public get visionAngle(): number {
-    return this.VISION_ANGLE;
+  public getVisionAngle(): number {
+    return this.visionAngle;
   }
 
-  public get visionCells(): number {
-    return this.VISION_CELLS;
+  public getVisionCells(): number {
+    return this.visionCells;
   }
 } 

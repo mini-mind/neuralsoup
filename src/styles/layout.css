@@ -1,0 +1,52 @@
+/* 主布局样式 */
+.app {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: #1a1a1a;
+  color: #ffffff;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* 左侧游戏区域 (60%) */
+.game-area {
+  flex: 0 0 60%;
+  position: relative;
+  background: #000;
+  overflow: hidden;
+}
+
+/* 右侧控制区域 (40%) */
+.control-area {
+  flex: 0 0 40%;
+  background: #2a2a2a;
+  border-left: 1px solid #444;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 内容区域 */
+.content-area {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+  }
+
+  .game-area {
+    flex: 0 0 50%;
+  }
+
+  .control-area {
+    flex: 0 0 50%;
+    border-left: none;
+    border-top: 1px solid #444;
+  }
+} 

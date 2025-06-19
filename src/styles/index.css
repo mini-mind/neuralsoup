@@ -1,0 +1,98 @@
+/* 样式模块索引 */
+
+/* 基础布局 */
+@import './layout.css';
+
+/* 控制组件 */
+@import './controls.css';
+
+/* 按钮样式 */
+@import './buttons.css';
+
+/* 仿真画布 */
+.simulation-canvas {
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #000;
+}
+
+.simulation-canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* SNN控制区域 */
+.snn-control {
+  margin-top: 16px;
+}
+
+/* 脚本控制样式 */
+.script-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.script-control h4 {
+  margin: 0 0 16px 0;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.script-options {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #ccc;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  accent-color: #6366f1;
+}
+
+.script-editor {
+  margin-top: 12px;
+}
+
+.script-textarea {
+  width: 100%;
+  height: 120px;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #fff;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  padding: 8px;
+  resize: vertical;
+}
+
+.script-textarea:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+.script-info {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #999;
+}
+
+.script-info p {
+  margin: 2px 0;
+}
+
+.script-info strong {
+  color: #4ade80;
+} 

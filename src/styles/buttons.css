@@ -1,0 +1,58 @@
+/* 按钮样式 */
+
+.btn {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  min-width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-primary {
+  background: #6366f1;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #5855eb;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: #6b7280;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #5b6471;
+  transform: translateY(-1px);
+}
+
+.btn-small {
+  padding: 6px 10px;
+  font-size: 12px;
+  min-width: 32px;
+  height: 32px;
+  border-radius: 4px;
+}
+
+.btn-small:hover {
+  transform: translateY(-1px);
+}
+
+/* 键盘样式 */
+kbd {
+  background: #4b5563;
+  border: 1px solid #6b7280;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: #e5e7eb;
+} 
