@@ -1,5 +1,5 @@
 /**
- * 仿真引擎核心类 - 重构版本
+ * 重构后的仿真引擎核心类
  * 基于PixiJS的浮游生物智能体仿真系统
  * 使用模块化组件管理不同功能
  */
@@ -12,7 +12,7 @@ import { AgentController } from './AgentController';
 import { WorldManager } from './WorldManager';
 import { CollisionDetector } from './CollisionDetector';
 
-export class SimulationEngine {
+export class SimulationEngineRefactored {
   // 核心系统
   private app: PIXI.Application;
   private renderer: WorldRenderer;
@@ -84,7 +84,7 @@ export class SimulationEngine {
    * 初始化仿真系统
    */
   initialize(): void {
-    console.log('初始化仿真系统...');
+    console.log('初始化重构版仿真系统...');
     
     // 设置渲染器的世界尺寸
     this.renderer.setWorldDimensions(this.worldManager.width, this.worldManager.height);
@@ -112,14 +112,14 @@ export class SimulationEngine {
     }
     
     this.renderWorld();
-    console.log(`仿真系统初始化完成: ${this.agents.length}个智能体`);
+    console.log(`重构版仿真系统初始化完成: ${this.agents.length}个智能体`);
   }
 
   /**
    * 启动仿真
    */
   start(): void {
-    console.log('启动仿真...');
+    console.log('启动重构版仿真...');
     this.isRunning = true;
     this.isPaused = false;
     this.lastTime = performance.now();
