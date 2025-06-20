@@ -97,9 +97,10 @@ export class AgentController {
     agent.x += agent.velocity.x * deltaTime;
     agent.y += agent.velocity.y * deltaTime;
 
-    // 情绪衰减
-    agent.pleasure *= 0.99;
-    agent.arousal = Math.max(0.1, agent.arousal * 0.995);
+    // 神经状态衰减
+    agent.motivation *= 0.99;
+    agent.stress = Math.max(0.1, agent.stress * 0.995);
+    agent.homeostasis = 0.5 + (agent.homeostasis - 0.5) * 0.98; // 向稳态平衡值回归
   }
 
   /**
@@ -159,9 +160,9 @@ export class AgentController {
     const corticalColumn = this.corticalColumns.get(agent.id);
     if (!corticalColumn) return;
     
-    // 应用情绪调节到神经网络
-    const synapticScaling = 0.8 + agent.pleasure * 0.4;
-    const thresholdAdjustment = (agent.arousal - 0.5) * 10;
+    // 应用神经状态调节到神经网络
+    const synapticScaling = 0.8 + agent.motivation * 0.4;
+    const thresholdAdjustment = (agent.stress - 0.5) * 10;
     corticalColumn.applyEmotionModulation(synapticScaling, thresholdAdjustment);
     
     // 处理键盘输入 - 优先级高于神经网络

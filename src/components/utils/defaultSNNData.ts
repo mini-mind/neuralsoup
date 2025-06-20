@@ -104,20 +104,30 @@ export const createDefaultEffector = (): Effector => {
       lastUpdateTime: Date.now()
     },
     { 
-      id: 'output-pleasure', 
+      id: 'output-motivation', 
       x: 230, 
       y: 25, 
-      label: '愉悦度', 
+      label: '动机', 
       signal: 0,
       pulseAccumulation: 0,
       decayRate: 0.85,
       lastUpdateTime: Date.now()
     },
     { 
-      id: 'output-arousal', 
+      id: 'output-stress', 
       x: 300, 
       y: 25, 
-      label: '唤醒度', 
+      label: '压力', 
+      signal: 0,
+      pulseAccumulation: 0,
+      decayRate: 0.85,
+      lastUpdateTime: Date.now()
+    },
+    { 
+      id: 'output-homeostasis', 
+      x: 370, 
+      y: 25, 
+      label: '稳态', 
       signal: 0,
       pulseAccumulation: 0,
       decayRate: 0.85,
@@ -129,7 +139,7 @@ export const createDefaultEffector = (): Effector => {
     id: 'effector-1',
     x: 0,
     y: 0,
-    width: 340, // 增加宽度以容纳新的输出
+    width: 410, // 增加宽度以容纳新的输出
     height: 60, // 固定高度60px，与渲染器一致
     outputs: defaultEffectorOutputs
   };

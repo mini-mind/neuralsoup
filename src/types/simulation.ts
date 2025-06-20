@@ -7,9 +7,10 @@ export interface Position {
   y: number;
 }
 
-export interface EmotionState {
-  pleasure: number;   // 愉悦度 [0-1]
-  arousal: number;    // 唤醒度 [0-1]
+export interface NeuralState {
+  motivation: number;   // 动机 [0-1] 
+  stress: number;       // 压力 [0-1]
+  homeostasis: number;  // 稳态 [0-1]
 }
 
 // IZ神经元参数
@@ -121,9 +122,10 @@ export interface Agent {
   // 控制类型
   controlType: 'snn' | 'random' | 'keyboard' | 'script'; // SNN控制、随机游走、键盘控制或脚本控制
   
-  // 情绪状态
-  pleasure: number; // 愉悦度 [-1, 1]
-  arousal: number;  // 唤醒度 [0, 1]
+  // 神经状态
+  motivation: number; // 动机 [0, 1]
+  stress: number;     // 压力 [0, 1] 
+  homeostasis: number; // 稳态 [0, 1]
   
   // 统计数据
   totalReward: number;
@@ -165,7 +167,7 @@ export interface World {
 export interface SimulationStats {
   totalRewards: number;
   totalCollisions: number;
-  averageEmotionState: EmotionState;
+  averageNeuralState: NeuralState;
 }
 
 export interface SimulationState {
@@ -182,9 +184,10 @@ export interface SimulationState {
     fps: number;
     totalReward: number;
     collisionCount: number;
-    emotionState: {
-      pleasure: number;
-      arousal: number;
+    neuralState: {
+      motivation: number;
+      stress: number;
+      homeostasis: number;
     };
   };
 }

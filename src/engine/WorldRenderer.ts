@@ -183,12 +183,12 @@ export class WorldRenderer {
     // 智能体基础颜色（蓝色）- 简化颜色计算
     let agentColor = 0x3498DB; // 基础蓝色
     
-    // 根据情绪状态微调颜色（可选）
-    if (agent.pleasure > 0.1) {
-      agentColor = 0x52C4F0; // 稍微亮一点的蓝色（愉悦时）
+    // 根据神经状态微调颜色（可选）
+    if (agent.motivation > 0.1) {
+      agentColor = 0x52C4F0; // 稍微亮一点的蓝色（高动机时）
     }
-    if (agent.arousal > 0.7) {
-      agentColor = 0x2E86AB; // 稍微深一点的蓝色（高唤醒时）
+    if (agent.stress > 0.7) {
+      agentColor = 0x2E86AB; // 稍微深一点的蓝色（高压力时）
     }
     
     // 绘制智能体身体 - 增大尺寸

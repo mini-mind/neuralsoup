@@ -45,7 +45,7 @@ if (centerFood > 2) {
     fps: 0,
     totalReward: 0,
     collisionCount: 0,
-    emotionState: { pleasure: 1, arousal: 1 }
+    neuralState: { motivation: 0, stress: 0, homeostasis: 0.5 }
   });
   
   const [canvasWidth, setCanvasWidth] = useState(window.innerWidth * 0.6);
@@ -107,7 +107,7 @@ if (centerFood > 2) {
       fps: 0,
       totalReward: 0,
       collisionCount: 0,
-      emotionState: { pleasure: 1, arousal: 1 }
+      neuralState: { motivation: 0, stress: 0, homeostasis: 0.5 }
     });
     if (engineRef.current) {
       engineRef.current.reset();
@@ -181,11 +181,12 @@ if (centerFood > 2) {
               </div>
               
               <div className="instruction-section">
-                <h5>情绪系统</h5>
+                <h5>神经系统</h5>
                 <ul>
-                  <li>愉悦度：食物奖励增加</li>
-                  <li>唤醒度：碰撞刺激增加</li>
-                  <li>情绪影响智能体行为</li>
+                  <li>动机（多巴胺）：奖励预测误差</li>
+                  <li>压力（去甲肾上腺素）：环境不确定性</li>
+                  <li>稳态（血清素）：风险规避阈值</li>
+                  <li>神经信号调节行为策略</li>
                 </ul>
               </div>
             </div>
@@ -308,17 +309,7 @@ if (centerFood > 2) {
             </button>
           </div>
           
-          <div className="emotion-values">
-            <div className="emotion-item">
-              <span className="emotion-label">愉悦</span>
-              <span className="emotion-value">{stats.emotionState.pleasure.toFixed(1)}x</span>
-            </div>
-            
-            <div className="emotion-item">
-              <span className="emotion-label">唤醒</span>
-              <span className="emotion-value">{stats.emotionState.arousal.toFixed(1)}x</span>
-            </div>
-          </div>
+
           
           <div className="control-mode-selector">
             <label>控制方式：</label>

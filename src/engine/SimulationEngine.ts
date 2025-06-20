@@ -42,7 +42,7 @@ export class SimulationEngine {
   private stats = {
     totalRewards: 0,
     totalCollisions: 0,
-    averageEmotionState: { pleasure: 0, arousal: 0 }
+    averageNeuralState: { motivation: 0, stress: 0, homeostasis: 0.5 }
   };
 
   // 回调函数
@@ -208,7 +208,7 @@ export class SimulationEngine {
     this.stats = {
       totalRewards: 0,
       totalCollisions: 0,
-      averageEmotionState: { pleasure: 0, arousal: 0 }
+      averageNeuralState: { motivation: 0, stress: 0, homeostasis: 0.5 }
     };
     
     this.agents = [];
@@ -287,8 +287,8 @@ export class SimulationEngine {
       agents: this.agents,
       foods: this.foods,
       obstacles: this.obstacles,
-      visionRange: this.visionSystem.visionRange,
-      visionAngle: this.visionSystem.visionAngle
+      visionRange: this.visionSystem.getVisionRange(),
+      visionAngle: this.visionSystem.getVisionAngle()
     });
   }
 
@@ -296,17 +296,20 @@ export class SimulationEngine {
    * 更新统计数据
    */
   private updateStats(): void {
-    let totalPleasure = 0;
-    let totalArousal = 0;
+    let totalMotivation = 0;
+    let totalStress = 0;
+    let totalHomeostasis = 0;
     
     for (const agent of this.agents) {
-      totalPleasure += agent.pleasure;
-      totalArousal += agent.arousal;
+      totalMotivation += agent.motivation;
+      totalStress += agent.stress;
+      totalHomeostasis += agent.homeostasis;
     }
     
-    this.stats.averageEmotionState = {
-      pleasure: this.agents.length > 0 ? totalPleasure / this.agents.length : 0,
-      arousal: this.agents.length > 0 ? totalArousal / this.agents.length : 0
+    this.stats.averageNeuralState = {
+      motivation: this.agents.length > 0 ? totalMotivation / this.agents.length : 0,
+      stress: this.agents.length > 0 ? totalStress / this.agents.length : 0,
+      homeostasis: this.agents.length > 0 ? totalHomeostasis / this.agents.length : 0.5
     };
 
     // 触发统计更新回调
@@ -315,7 +318,7 @@ export class SimulationEngine {
         fps: this.fps,
         totalReward: this.stats.totalRewards,
         collisionCount: this.stats.totalCollisions,
-        emotionState: this.stats.averageEmotionState
+        neuralState: this.stats.averageNeuralState
       });
     }
   }
@@ -352,7 +355,7 @@ export class SimulationEngine {
         fps: this.fps,
         totalReward: this.stats.totalRewards,
         collisionCount: this.stats.totalCollisions,
-        emotionState: this.stats.averageEmotionState
+        neuralState: this.stats.averageNeuralState
       }
     };
   }

@@ -31,11 +31,8 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
   useEffect(() => {
     if (!canvasRef.current) {
-      console.log('Canvas ref not available');
-      return;
+            return;
     }
-
-    console.log('Canvas ref available, initializing PIXI app');
     const app = appRef.current;
     const engine = engineRef.current;
 

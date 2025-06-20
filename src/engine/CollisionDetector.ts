@@ -61,9 +61,9 @@ export class CollisionDetector {
         // 碰撞检测成功
         foodsToRemove.push(food);
         
-        // 增加奖励和愉悦度
+        // 增加奖励和动机
         agent.totalReward += food.nutritionValue;
-        agent.pleasure = Math.min(1, agent.pleasure + 0.3);
+        agent.motivation = Math.min(1, agent.motivation + 0.3);
         agent.health = Math.min(100, agent.health + food.nutritionValue);
         agent.energy = Math.min(100, agent.energy + food.nutritionValue);
         
@@ -96,9 +96,9 @@ export class CollisionDetector {
         agent.x += Math.cos(pushAngle) * pushDistance;
         agent.y += Math.sin(pushAngle) * pushDistance;
         
-        // 减少健康值和增加唤醒度
+        // 减少健康值和增加压力
         agent.health = Math.max(0, agent.health - 5);
-        agent.arousal = Math.min(1, agent.arousal + 0.2);
+        agent.stress = Math.min(1, agent.stress + 0.2);
         agent.collisionCount++;
         
         collisions++;
@@ -134,9 +134,9 @@ export class CollisionDetector {
         otherAgent.x -= Math.cos(pushAngle) * pushDistance;
         otherAgent.y -= Math.sin(pushAngle) * pushDistance;
         
-        // 增加唤醒度
-        agent.arousal = Math.min(1, agent.arousal + 0.1);
-        otherAgent.arousal = Math.min(1, otherAgent.arousal + 0.1);
+        // 增加压力
+        agent.stress = Math.min(1, agent.stress + 0.1);
+        otherAgent.stress = Math.min(1, otherAgent.stress + 0.1);
         
         agent.collisionCount++;
         otherAgent.collisionCount++;

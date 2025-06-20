@@ -61,8 +61,9 @@ export class WorldManager {
         visionCells: [],
         visualInput: new Array(108).fill(0),
         controlType: i === 0 ? 'snn' : 'random',
-        pleasure: 0,
-        arousal: 0.5,
+              motivation: 0,
+      stress: 0,
+      homeostasis: 0.5,
         totalReward: 0,
         collisionCount: 0
       };
