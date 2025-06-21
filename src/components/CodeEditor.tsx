@@ -17,15 +17,15 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   language = "javascript"
 }) => {
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  const highlighterRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
 
   // 同步滚动
   const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
     const target = e.target as HTMLTextAreaElement;
-    const highlighter = target.parentElement?.querySelector('.syntax-highlighter') as HTMLElement;
-    if (highlighter) {
-      highlighter.scrollTop = target.scrollTop;
-      highlighter.scrollLeft = target.scrollLeft;
+    if (highlighterRef.current) {
+      highlighterRef.current.scrollTop = target.scrollTop;
+      highlighterRef.current.scrollLeft = target.scrollLeft;
     }
   };
 
@@ -47,24 +47,42 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     }
   };
 
+  // 统一的样式配置，确保文本区域和语法高亮完全一致
+  const editorStyles = {
+    fontFamily: "'Fira Code', 'Monaco', 'Menlo', 'Consolas', monospace",
+    fontSize: '14px',
+    lineHeight: '1.5',
+    padding: '16px',
+    margin: 0,
+    tabSize: 2,
+    MozTabSize: 2,
+    letterSpacing: '0px',
+    wordSpacing: '0px'
+  };
+
   return (
     <div className="code-editor">
       <div className="code-editor-container">
         {/* 语法高亮背景层 */}
-        <div className="syntax-highlighter-wrapper">
+        <div 
+          ref={highlighterRef}
+          className="syntax-highlighter-wrapper"
+          style={editorStyles}
+        >
           <SyntaxHighlighter
             language={language}
             style={vscDarkPlus}
             customStyle={{
-              margin: 0,
-              padding: '16px',
+              ...editorStyles,
               background: 'transparent',
-              fontSize: '13px',
-              lineHeight: '1.6',
-              fontFamily: "'Fira Code', 'Monaco', 'Menlo', 'Consolas', monospace",
+              border: 'none',
+              overflow: 'visible'
             }}
             codeTagProps={{
-              style: { fontFamily: "'Fira Code', 'Monaco', 'Menlo', 'Consolas', monospace" }
+              style: {
+                ...editorStyles,
+                background: 'transparent'
+              }
             }}
             className="syntax-highlighter"
           >
@@ -83,6 +101,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
           onBlur={() => setIsFocused(false)}
           placeholder={placeholder}
           className={`code-textarea ${isFocused ? 'focused' : ''}`}
+          style={editorStyles}
           spellCheck={false}
           autoComplete="off"
           autoCorrect="off"

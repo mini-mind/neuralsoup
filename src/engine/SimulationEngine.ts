@@ -77,11 +77,13 @@ export class SimulationEngine {
   }
 
   /**
-   * 设置脚本模式下是否启用玩家输入
+   * 应用脚本 - 执行脚本初始化
    */
-  public setEnablePlayerInputInScript(enable: boolean): void {
-    this.agentController.setEnablePlayerInputInScript(enable);
+  public applyScript(): boolean {
+    return this.agentController.applyScript();
   }
+
+
 
   /**
    * 更新智能体参数配置
@@ -216,24 +218,7 @@ export class SimulationEngine {
     this.gameLoopRunning = false;
   }
 
-  /**
-   * 重置仿真
-   */
-  reset(): void {
-    this.stop();
-    this.simulationTime = 0;
-    this.frameCount = 0;
-    this.stats = {
-      totalRewards: 0,
-      totalCollisions: 0,
-      averageNeuralState: { motivation: 0, stress: 0, homeostasis: 0.5 }
-    };
-    
-    this.agents = [];
-    this.foods = [];
-    this.obstacles = [];
-    this.initialize();
-  }
+
 
   /**
    * 游戏主循环
@@ -381,12 +366,19 @@ export class SimulationEngine {
   /**
    * 设置控制模式
    */
-  public setControlMode(newMode: 'snn' | 'random' | 'keyboard' | 'script'): void {
+  public setControlMode(newMode: 'snn' | 'random' | 'script'): void {
     const mainAgent = this.getMainAgent();
     if (mainAgent) {
       mainAgent.controlType = newMode;
       console.log(`Control mode changed to: ${newMode}`);
     }
+  }
+
+  /**
+   * 设置是否启用手动控制覆盖
+   */
+  public setEnablePlayerInputInScript(enable: boolean): void {
+    this.agentController.setEnablePlayerInputInScript(enable);
   }
 
   /**

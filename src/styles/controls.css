@@ -105,8 +105,8 @@
   gap: 8px;
 }
 
-/* 手动控制样式 */
-.manual-control h4 {
+/* 移除了历史包袱的手动控制样式 */
+.removed-manual-control h4 {
   margin: 0 0 16px 0;
   color: #fff;
   font-size: 16px;

@@ -5,53 +5,42 @@
 
 import { Agent } from '../types/simulation';
 import { CorticalColumn } from './CorticalColumn';
+import { KeyboardController } from './controllers/KeyboardController';
+import { ScriptController } from './controllers/ScriptController';
 
 export class AgentController {
   private corticalColumns: Map<number, CorticalColumn> = new Map();
-  private keyStates: { [key: string]: boolean } = {};
-  private compiledScript: Function | null = null;
+  private keyboardController: KeyboardController;
+  private scriptController: ScriptController;
   private enablePlayerInputInScript: boolean = false;
 
   constructor() {
-    this.setupKeyboardControls();
+    this.keyboardController = new KeyboardController();
+    this.scriptController = new ScriptController();
   }
 
   /**
-   * 设置键盘控制监听
-   */
-  private setupKeyboardControls(): void {
-    window.addEventListener('keydown', (e) => {
-      this.keyStates[e.key.toLowerCase()] = true;
-    });
-    
-    window.addEventListener('keyup', (e) => {
-      this.keyStates[e.key.toLowerCase()] = false;
-    });
-  }
-
-  /**
-   * 为SNN智能体创建皮质柱
+   * 创建皮质柱
    */
   public createCorticalColumn(agentId: number, visionCells: number = 36): void {
-    const inputSize = visionCells * 3; // 视野格子数量 × 3个颜色通道
-    this.corticalColumns.set(agentId, new CorticalColumn({
-      inputSize: inputSize,
-      hiddenSizes: [128, 64, 32],
-      outputSize: 3,
-      dt: 0.01
-    }));
+    if (!this.corticalColumns.has(agentId)) {
+      const inputSize = visionCells * 3; // 视野格子数量 × 3个颜色通道
+      const corticalColumn = new CorticalColumn({
+        inputSize: inputSize,
+        hiddenSizes: [128, 64, 32],
+        outputSize: 3,
+        dt: 0.01
+      });
+      this.corticalColumns.set(agentId, corticalColumn);
+      console.log(`为智能体 ${agentId} 创建了皮质柱，视觉输入维度：${inputSize}`);
+    }
   }
 
   /**
-   * 更新智能体的皮质柱配置
+   * 更新皮质柱配置
    */
   public updateCorticalColumnConfiguration(agentId: number, visionCells: number): void {
-    // 删除旧的皮质柱
-    if (this.corticalColumns.has(agentId)) {
-      this.corticalColumns.delete(agentId);
-    }
-    
-    // 创建新的皮质柱
+    this.corticalColumns.delete(agentId);
     this.createCorticalColumn(agentId, visionCells);
   }
 
@@ -59,19 +48,21 @@ export class AgentController {
    * 设置脚本代码
    */
   public setScriptCode(code: string): void {
-    try {
-      this.compiledScript = new Function('inputs', code);
-    } catch (e) {
-      console.error('脚本编译错误:', e);
-      this.compiledScript = null;
-    }
+    this.scriptController.setScriptCode(code);
   }
 
   /**
-   * 设置脚本模式下是否启用玩家输入
+   * 设置是否启用玩家输入覆盖
    */
   public setEnablePlayerInputInScript(enable: boolean): void {
     this.enablePlayerInputInScript = enable;
+  }
+
+  /**
+   * 应用脚本
+   */
+  public applyScript(): boolean {
+    return this.scriptController.applyScript();
   }
 
   /**
@@ -81,9 +72,6 @@ export class AgentController {
     switch (agent.controlType) {
       case 'snn':
         this.updateSNNAgent(agent, deltaTime);
-        break;
-      case 'keyboard':
-        this.updateKeyboardAgent(agent, deltaTime);
         break;
       case 'script':
         this.updateScriptAgent(agent, deltaTime);
@@ -104,21 +92,13 @@ export class AgentController {
   }
 
   /**
-   * 更新键盘控制的智能体
-   */
-  private updateKeyboardAgent(agent: Agent, deltaTime: number): void {
-    const keyboardInputs = this.getKeyboardInputs();
-    this.applyAction(agent, keyboardInputs, deltaTime);
-  }
-
-  /**
    * 更新脚本控制的智能体
    */
   private updateScriptAgent(agent: Agent, deltaTime: number): void {
-    // 检查是否启用玩家输入
+    // 检查是否启用手动控制覆盖
     if (this.enablePlayerInputInScript) {
-      const keyboardInputs = this.getKeyboardInputs();
-      const hasKeyboardInput = keyboardInputs[0] > 0 || keyboardInputs[1] > 0 || keyboardInputs[2] > 0;
+      const keyboardInputs = this.keyboardController.getKeyboardInputs();
+      const hasKeyboardInput = keyboardInputs[0] > 0 || keyboardInputs[1] > 0 || keyboardInputs[2] > 0 || keyboardInputs[3] > 0;
       
       if (hasKeyboardInput) {
         this.applyAction(agent, keyboardInputs, deltaTime);
@@ -126,31 +106,7 @@ export class AgentController {
       }
     }
     
-    if (!this.compiledScript) {
-      // 如果脚本无效，使用随机游走
-      const randomOutput = [
-        (Math.random() - 0.5) * 0.2,
-        0.3,
-        (Math.random() - 0.5) * 0.2
-      ];
-      this.applyAction(agent, randomOutput, deltaTime);
-      return;
-    }
-    
-    try {
-      const result = this.compiledScript(agent.visualInput);
-      
-      if (Array.isArray(result) && result.length === 3) {
-        const clampedResult = result.map(val => Math.max(0, Math.min(1, Number(val) || 0)));
-        this.applyAction(agent, clampedResult, deltaTime);
-      } else {
-        console.warn('脚本返回值格式错误，应返回[左转, 前进, 右转]强度数组');
-        this.applyAction(agent, [0, 0.2, 0], deltaTime);
-      }
-    } catch (e) {
-      console.error('脚本执行错误:', e);
-      this.applyAction(agent, [0, 0.2, 0], deltaTime);
-    }
+    this.scriptController.updateAgent(agent, deltaTime, this.applyAction.bind(this));
   }
 
   /**
@@ -165,27 +121,30 @@ export class AgentController {
     const thresholdAdjustment = (agent.stress - 0.5) * 10;
     corticalColumn.applyEmotionModulation(synapticScaling, thresholdAdjustment);
     
-    // 处理键盘输入 - 优先级高于神经网络
-    const keyboardInputs = this.getKeyboardInputs();
-    const hasKeyboardInput = keyboardInputs[0] > 0 || keyboardInputs[1] > 0 || keyboardInputs[2] > 0;
-    
-    if (hasKeyboardInput) {
-      this.applyAction(agent, keyboardInputs, deltaTime);
-    } else {
-      // 使用神经网络决策
-      let output = [0, 0, 0];
-      const iterations = 5;
+    // 检查手动控制覆盖（仅在启用时）
+    if (this.enablePlayerInputInScript) {
+      const keyboardInputs = this.keyboardController.getKeyboardInputs();
+      const hasKeyboardInput = keyboardInputs[0] > 0 || keyboardInputs[1] > 0 || keyboardInputs[2] > 0 || keyboardInputs[3] > 0;
       
-      for (let i = 0; i < iterations; i++) {
-        const iterOutput = corticalColumn.forward(agent.visualInput);
-        for (let j = 0; j < 3; j++) {
-          output[j] += iterOutput[j];
-        }
+      if (hasKeyboardInput) {
+        this.applyAction(agent, keyboardInputs, deltaTime);
+        return;
       }
-      
-      output = output.map(val => val / iterations);
-      this.applyAction(agent, output, deltaTime);
     }
+    
+    // 使用神经网络决策
+    let output = [0, 0, 0];
+    const iterations = 5;
+    
+    for (let i = 0; i < iterations; i++) {
+      const iterOutput = corticalColumn.forward(agent.visualInput);
+      for (let j = 0; j < 3; j++) {
+        output[j] += iterOutput[j];
+      }
+    }
+    
+    output = output.map(val => val / iterations);
+    this.applyAction(agent, output, deltaTime);
   }
 
   /**
@@ -202,39 +161,11 @@ export class AgentController {
   }
 
   /**
-   * 获取键盘输入强度
-   */
-  private getKeyboardInputs(): [number, number, number] {
-    let turnLeft = 0;
-    let moveForward = 0;
-    let turnRight = 0;
-    
-    if (this.keyStates['arrowup'] || this.keyStates['w']) {
-      moveForward = 1.0;
-    }
-    
-    if (this.keyStates['arrowleft'] || this.keyStates['a']) {
-      turnLeft = 1.0;
-    }
-    
-    if (this.keyStates['arrowright'] || this.keyStates['d']) {
-      turnRight = 1.0;
-    }
-    
-    // 处理A和D同时按下的抵消逻辑
-    if (turnLeft > 0 && turnRight > 0) {
-      turnLeft = 0;
-      turnRight = 0;
-    }
-    
-    return [turnLeft, moveForward, turnRight];
-  }
-
-  /**
-   * 应用动作到智能体
+   * 应用动作到智能体 - 支持4维控制
    */
   private applyAction(agent: Agent, output: number[], deltaTime: number): void {
-    const [turnLeft, moveForward, turnRight] = output;
+    // 兼容3维和4维输入
+    const [turnLeft, moveForward, turnRight, moveBackward = 0] = output;
     
     // 转向
     const turnSpeed = 3.0;
@@ -247,7 +178,7 @@ export class AgentController {
       agent.angle += turnSpeed * turnRight * deltaTime;
     }
     
-    // 前进
+    // 移动（前进/后退）
     const maxSpeed = 60;
     const moveThreshold = 0.2;
     
@@ -255,6 +186,11 @@ export class AgentController {
       const speed = maxSpeed * moveForward;
       agent.velocity.x = Math.cos(agent.angle) * speed;
       agent.velocity.y = Math.sin(agent.angle) * speed;
+    } else if (moveBackward > moveThreshold) {
+      // 后退：反方向运动
+      const speed = maxSpeed * moveBackward;
+      agent.velocity.x = -Math.cos(agent.angle) * speed;
+      agent.velocity.y = -Math.sin(agent.angle) * speed;
     } else {
       agent.velocity.x = 0;
       agent.velocity.y = 0;

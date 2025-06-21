@@ -2,12 +2,9 @@ import React, { useRef, useEffect } from 'react';
 import * as PIXI from 'pixi.js';
 import { SimulationEngine } from '../engine/SimulationEngine';
 
-// 支持手动控制和脚本控制两种模式
-type ControlMode = 'manual' | 'script';
-
 interface SimulationCanvasProps {
   isRunning: boolean;
-  controlMode: ControlMode;
+  isScriptMode: boolean;
   scriptCode: string;
   enablePlayerInputInScript: boolean;
   onStatsUpdate: (stats: any) => void;
@@ -19,7 +16,7 @@ interface SimulationCanvasProps {
 
 const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   isRunning,
-  controlMode,
+  isScriptMode,
   scriptCode,
   enablePlayerInputInScript,
   onStatsUpdate,
@@ -98,19 +95,17 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     };
   }, [width, height, onStatsUpdate, onEngineReady]);
 
-  // 移除自动启动/暂停逻辑，由App.tsx直接控制
-
-  // 当控制模式或脚本代码改变时，更新引擎
+  // 当控制模式或其他设置改变时，更新引擎配置
   useEffect(() => {
     const engine = engineRef.current;
     if (!engine) return;
 
-    // 先设置脚本代码（无论控制模式如何）
+    // 仅设置脚本代码，不执行应用（应用由用户点击按钮触发）
     if (typeof (engine as any).setScriptCode === 'function') {
       (engine as any).setScriptCode(scriptCode);
     }
 
-    // 设置脚本模式下的玩家输入开关
+    // 设置手动控制开关
     if (typeof (engine as any).setEnablePlayerInputInScript === 'function') {
       (engine as any).setEnablePlayerInputInScript(enablePlayerInputInScript);
     }
@@ -119,32 +114,24 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     if (typeof (engine as any).setFogOfWar === 'function') {
       (engine as any).setFogOfWar(enableFogOfWar);
     }
+  }, [scriptCode, enablePlayerInputInScript, enableFogOfWar]);
 
-    // 使用新的setControlMode方法进行平滑切换
+  // 当脚本模式改变时，设置控制模式
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    // 直接设置控制模式：脚本模式或SNN模式
     if (typeof (engine as any).setControlMode === 'function') {
-      switch (controlMode) {
-        case 'manual':
-          (engine as any).setControlMode('keyboard');
-          break;
-        case 'script':
-          (engine as any).setControlMode('script');
-          break;
-      }
+      (engine as any).setControlMode(isScriptMode ? 'script' : 'snn');
     } else {
       // 向后兼容：直接设置controlType
       const mainAgent = engine.getMainAgent();
       if (mainAgent) {
-        switch (controlMode) {
-          case 'manual':
-            mainAgent.controlType = 'keyboard';
-            break;
-          case 'script':
-            mainAgent.controlType = 'script';
-            break;
-        }
+        mainAgent.controlType = isScriptMode ? 'script' : 'snn';
       }
     }
-  }, [controlMode, scriptCode, enablePlayerInputInScript, enableFogOfWar]);
+  }, [isScriptMode]);
 
   return (
     <div 

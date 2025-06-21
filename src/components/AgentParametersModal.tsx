@@ -27,13 +27,7 @@ const AgentParametersModal: React.FC<AgentParametersModalProps> = ({
     onClose();
   };
 
-  const handleReset = () => {
-    setParams({
-      visionCells: 36,
-      visionRange: 250,
-      visionAngle: 120
-    });
-  };
+
 
   if (!isOpen) return null;
 
@@ -139,9 +133,6 @@ const AgentParametersModal: React.FC<AgentParametersModalProps> = ({
         </div>
 
         <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={handleReset}>
-            重置默认值
-          </button>
           <div className="footer-buttons">
             <button className="btn btn-secondary" onClick={onClose}>
               取消

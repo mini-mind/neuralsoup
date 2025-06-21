@@ -1,58 +1,199 @@
-/* 按钮样式 */
+/* 现代化按钮样式 - 美观大气设计 */
 
 .btn {
-  padding: 8px 12px;
+  position: relative;
+  padding: 12px 20px;
   border: none;
-  border-radius: 6px;
+  border-radius: 12px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
-  transition: all 0.2s ease;
-  min-width: 40px;
-  height: 40px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
 }
 
+.btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.btn:hover::before {
+  left: 100%;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 25px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+}
+
+.btn:active {
+  transform: translateY(-1px);
+  transition: all 0.1s;
+}
+
+/* 主要按钮 - 渐变蓝色 */
 .btn-primary {
-  background: #6366f1;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
+  box-shadow: 
+    0 4px 12px rgba(102, 126, 234, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
 }
 
 .btn-primary:hover {
-  background: #5855eb;
-  transform: translateY(-1px);
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+  box-shadow: 
+    0 8px 25px rgba(102, 126, 234, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.15) inset;
 }
 
+/* 次要按钮 - 现代灰色 */
 .btn-secondary {
-  background: #6b7280;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  opacity: 0.7;
   color: white;
+  box-shadow: 
+    0 4px 12px rgba(107, 114, 128, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
 }
 
 .btn-secondary:hover {
-  background: #5b6471;
-  transform: translateY(-1px);
+  opacity: 1;
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+  box-shadow: 
+    0 8px 25px rgba(107, 114, 128, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.15) inset;
 }
 
+/* 警告/激活状态按钮 - 橙色渐变 */
+.btn-warning {
+  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+  color: white;
+  box-shadow: 
+    0 4px 12px rgba(255, 107, 53, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+}
+
+.btn-warning:hover {
+  background: linear-gradient(135deg, #e55a2b 0%, #de841a 100%);
+  box-shadow: 
+    0 8px 25px rgba(255, 107, 53, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+}
+
+/* 应用按钮 - 金色渐变 */
+.btn-apply {
+  background: linear-gradient(135deg, #ffd700 0%, #ffb347 100%);
+  color: #1a1a1a;
+  font-weight: 700;
+  box-shadow: 
+    0 4px 12px rgba(255, 215, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+}
+
+.btn-apply:hover {
+  background: linear-gradient(135deg, #ffed4e 0%, #ffa500 100%);
+  box-shadow: 
+    0 8px 25px rgba(255, 215, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.25) inset;
+}
+
+/* 小号按钮 */
 .btn-small {
-  padding: 6px 10px;
+  padding: 8px 14px;
   font-size: 12px;
-  min-width: 32px;
-  height: 32px;
-  border-radius: 4px;
+  min-width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  gap: 6px;
 }
 
-.btn-small:hover {
-  transform: translateY(-1px);
+/* 图标按钮特殊样式 */
+.btn[title*="手动控制"] {
+  font-size: 18px;
 }
 
-/* 键盘样式 */
+.btn[title*="智能体参数"] {
+  font-size: 16px;
+}
+
+/* 按钮组容器样式 */
+.game-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 键盘快捷键样式 */
 kbd {
-  background: #4b5563;
-  border: 1px solid #6b7280;
-  border-radius: 3px;
-  padding: 2px 6px;
+  background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 3px 8px;
   font-size: 11px;
   color: #e5e7eb;
+  font-weight: 600;
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+}
+
+/* 按钮加载状态 */
+.btn.loading {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.btn.loading::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .btn {
+    padding: 10px 16px;
+    height: 44px;
+    min-width: 44px;
+    font-size: 13px;
+  }
+  
+  .game-controls {
+    gap: 8px;
+    padding: 6px;
+  }
 } 

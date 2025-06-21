@@ -120,7 +120,7 @@ export interface Agent {
   visualInput: number[]; // 24维视觉输入(8格子 × 3颜色)
   
   // 控制类型
-  controlType: 'snn' | 'random' | 'keyboard' | 'script'; // SNN控制、随机游走、键盘控制或脚本控制
+  controlType: 'snn' | 'random' | 'script'; // SNN控制、随机游走或脚本控制
   
   // 神经状态
   motivation: number; // 动机 [0, 1]
