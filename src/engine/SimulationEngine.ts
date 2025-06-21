@@ -48,6 +48,9 @@ export class SimulationEngine {
   // 回调函数
   public onStatsUpdate?: (stats: any) => void;
 
+  // 战争迷雾设置
+  private fogOfWarEnabled: boolean = false;
+
   constructor(app: PIXI.Application, initialWidth: number = 1600, initialHeight: number = 1200) {
     this.app = app;
     
@@ -120,6 +123,21 @@ export class SimulationEngine {
       visionRange: this.visionSystem.getVisionRange(),
       visionAngle: Math.round((this.visionSystem.getVisionAngle() * 180) / Math.PI) // 转换为度数
     };
+  }
+
+  /**
+   * 设置战争迷雾效果
+   */
+  public setFogOfWar(enabled: boolean): void {
+    this.fogOfWarEnabled = enabled;
+    this.renderer.setFogOfWar(enabled);
+  }
+
+  /**
+   * 强制重绘，用于在暂停状态下更新画布尺寸等
+   */
+  public forceRender(): void {
+    this.renderWorld();
   }
 
   /**

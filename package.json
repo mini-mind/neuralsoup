@@ -8,19 +8,27 @@
     "build": "vite build",
     "preview": "vite preview"
   },
-  "keywords": ["pixi.js", "react", "snn", "embodied-ai", "simulation"],
+  "keywords": [
+    "pixi.js",
+    "react",
+    "snn",
+    "embodied-ai",
+    "simulation"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "pixi.js": "^7.4.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "pixi.js": "^7.4.0"
+    "react-syntax-highlighter": "^15.6.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.0.0",
-    "vite": "^5.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
   }
-} 
+}

@@ -31,6 +31,10 @@ export class WorldRenderer {
   private cameraTarget: Agent | null = null;
   private cameraLerpFactor = 1.0; // 提高响应速度，从0.3改为1.0 (立即跟随，用于调试)
 
+  // 战争迷雾
+  private fogOfWarEnabled: boolean = false;
+  private fogOverlay: PIXI.Graphics | null = null;
+
   constructor(app: PIXI.Application) {
     this.app = app;
     this.initializeContainers();
@@ -56,12 +60,16 @@ export class WorldRenderer {
     this.visionFanGraphics = new PIXI.Graphics();
     this.visionContainer.addChild(this.visionFanGraphics);
 
+    // 初始化战争迷雾覆盖层
+    this.fogOverlay = new PIXI.Graphics();
+
     // 按层级顺序添加（背景在最底层，视野在上层）
     this.worldContainer.addChild(this.backgroundContainer); // 最底层
     this.worldContainer.addChild(this.visionContainer);
     this.worldContainer.addChild(this.foodContainer);
     this.worldContainer.addChild(this.obstacleContainer);
     this.worldContainer.addChild(this.agentContainer);
+    this.worldContainer.addChild(this.fogOverlay); // 战争迷雾在最顶层
   }
 
   setCameraTarget(agent: Agent | null): void {
@@ -111,6 +119,9 @@ export class WorldRenderer {
     this.renderAgents(world.agents, world.visionAngle);
     this.renderFoods(world.foods);
     this.renderObstacles(world.obstacles);
+    
+    // 渲染战争迷雾效果
+    this.renderFogOfWar(mainAgent, world.visionRange, world.visionAngle);
   }
 
   private updateCamera(): void {
@@ -446,13 +457,55 @@ export class WorldRenderer {
   public setWorldDimensions(width: number, height: number): void {
     this.worldWidth = width;
     this.worldHeight = height;
-    this.noiseGenerated = false; // 标记需要重新生成噪声
+    this.noiseGenerated = false;
   }
 
   /**
-   * 强制重新生成背景噪声
+   * 设置战争迷雾效果
    */
+  public setFogOfWar(enabled: boolean): void {
+    this.fogOfWarEnabled = enabled;
+  }
+
+  /**
+   * 渲染战争迷雾效果
+   */
+  private renderFogOfWar(mainAgent: Agent | undefined, visionRange: number, visionAngle: number): void {
+    if (!this.fogOfWarEnabled || !this.fogOverlay || !mainAgent) {
+      if (this.fogOverlay) {
+        this.fogOverlay.clear();
+      }
+      return;
+    }
+
+    this.fogOverlay.clear();
+    
+    // 创建全屏遮罩
+    this.fogOverlay.beginFill(0x000000, 0.8); // 黑色遮罩，80%透明度
+    this.fogOverlay.drawRect(-this.worldWidth, -this.worldHeight, this.worldWidth * 2, this.worldHeight * 2);
+    this.fogOverlay.endFill();
+    
+    // 在智能体位置切出扇形可见区域
+    this.fogOverlay.beginHole();
+    
+    // 绘制扇形区域
+    const startAngle = mainAgent.angle - visionAngle / 2;
+    const endAngle = mainAgent.angle + visionAngle / 2;
+    
+    // 移动到智能体中心
+    this.fogOverlay.moveTo(mainAgent.x, mainAgent.y);
+    
+    // 绘制扇形
+    this.fogOverlay.arc(mainAgent.x, mainAgent.y, visionRange, startAngle, endAngle, false);
+    
+    // 回到中心点闭合扇形
+    this.fogOverlay.lineTo(mainAgent.x, mainAgent.y);
+    
+    this.fogOverlay.endHole();
+  }
+
   public regenerateNoise(): void {
     this.noiseGenerated = false;
+    this.generateOceanNoise();
   }
 } 

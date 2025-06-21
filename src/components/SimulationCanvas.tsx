@@ -2,7 +2,8 @@ import React, { useRef, useEffect } from 'react';
 import * as PIXI from 'pixi.js';
 import { SimulationEngine } from '../engine/SimulationEngine';
 
-type ControlMode = 'manual' | 'script' | 'snn';
+// 支持手动控制和脚本控制两种模式
+type ControlMode = 'manual' | 'script';
 
 interface SimulationCanvasProps {
   isRunning: boolean;
@@ -13,6 +14,7 @@ interface SimulationCanvasProps {
   onEngineReady: (engine: SimulationEngine) => void;
   width: number;
   height: number;
+  enableFogOfWar?: boolean;
 }
 
 const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
@@ -23,7 +25,8 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   onStatsUpdate,
   onEngineReady,
   width,
-  height
+  height,
+  enableFogOfWar = false
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<SimulationEngine | null>(null);
@@ -112,6 +115,11 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       (engine as any).setEnablePlayerInputInScript(enablePlayerInputInScript);
     }
 
+    // 设置战争迷雾效果
+    if (typeof (engine as any).setFogOfWar === 'function') {
+      (engine as any).setFogOfWar(enableFogOfWar);
+    }
+
     // 使用新的setControlMode方法进行平滑切换
     if (typeof (engine as any).setControlMode === 'function') {
       switch (controlMode) {
@@ -120,9 +128,6 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
           break;
         case 'script':
           (engine as any).setControlMode('script');
-          break;
-        case 'snn':
-          (engine as any).setControlMode('snn');
           break;
       }
     } else {
@@ -136,13 +141,10 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
           case 'script':
             mainAgent.controlType = 'script';
             break;
-          case 'snn':
-            mainAgent.controlType = 'snn';
-            break;
         }
       }
     }
-  }, [controlMode, scriptCode, enablePlayerInputInScript]);
+  }, [controlMode, scriptCode, enablePlayerInputInScript, enableFogOfWar]);
 
   return (
     <div 
