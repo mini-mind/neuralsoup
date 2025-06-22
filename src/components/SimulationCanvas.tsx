@@ -38,12 +38,22 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
     if (!app) {
       console.log('Creating new PIXI app with dimensions:', width, height);
+      
+      // 检测是否为移动端，并计算适当的分辨率
+      const isMobile = window.innerWidth <= 768;
+      let resolution = window.devicePixelRatio || 1;
+      
+      // 移动端使用较低的分辨率以提升性能，同时增加世界缩放
+      if (isMobile) {
+        resolution = Math.min(resolution, 2); // 限制移动端分辨率
+      }
+      
       const newApp = new PIXI.Application({
         width: width,
         height: height,
         backgroundColor: 0x87CEEB, // 天空蓝背景
         antialias: true,
-        resolution: window.devicePixelRatio || 1,
+        resolution: resolution,
         autoDensity: true,
       });
 
@@ -80,6 +90,17 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       if (mainAgent) {
         console.log('Setting camera target to main agent:', mainAgent.id);
         newEngine.setCameraTarget(mainAgent);
+        
+        // 移动端应用额外的缩放，确保视野完整显示
+        if (isMobile && typeof (newEngine as any).setMobileScale === 'function') {
+          // 根据实际视野范围计算合适的缩放比例
+          const agentParams = newEngine.getAgentParameters();
+          const visionRange = agentParams.visionRange;
+          const screenMin = Math.min(width, height);
+          const optimalScale = Math.min(1.0, screenMin / (visionRange * 2.2)); // 2.2倍视野范围作为参考
+          (newEngine as any).setMobileScale(optimalScale);
+          console.log('Applied mobile scale:', optimalScale, 'for vision range:', visionRange);
+        }
       }
       
       onEngineReady(newEngine);
@@ -88,16 +109,40 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       // 如果已存在，则只更新渲染器尺寸，世界尺寸保持不变
       console.log('Resizing existing app to:', width, height);
       app.renderer.resize(width, height);
+      
+             // 移动端重新计算缩放
+       const isMobile = window.innerWidth <= 768;
+       if (isMobile && engineRef.current && typeof (engineRef.current as any).setMobileScale === 'function') {
+         const agentParams = engineRef.current.getAgentParameters();
+         const visionRange = agentParams.visionRange;
+         const screenMin = Math.min(width, height);
+         const optimalScale = Math.min(1.0, screenMin / (visionRange * 2.2));
+         (engineRef.current as any).setMobileScale(optimalScale);
+         console.log('Updated mobile scale on resize:', optimalScale, 'for vision range:', visionRange);
+       }
       // 不再调用 engine?.updateWorldDimensions(width, height); 因为世界尺寸是固定的
     }
 
     return () => {
       if (appRef.current && !canvasRef.current?.isConnected) {
         console.log('Cleaning up PIXI app and engine');
-        engineRef.current?.destroy();
-        appRef.current?.destroy();
-        appRef.current = null;
-        engineRef.current = null;
+        // 添加安全检查，防止重复销毁
+        if (engineRef.current) {
+          try {
+            engineRef.current.destroy();
+          } catch (error) {
+            console.warn('Error destroying engine:', error);
+          }
+          engineRef.current = null;
+        }
+        if (appRef.current) {
+          try {
+            appRef.current.destroy();
+          } catch (error) {
+            console.warn('Error destroying PIXI app:', error);
+          }
+          appRef.current = null;
+        }
       }
     };
   }, [width, height, onStatsUpdate, onEngineReady]);
@@ -150,6 +195,16 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         if (appRef.current && containerWidth > 0 && containerHeight > 0) {
           console.log('Container resized to:', containerWidth, containerHeight);
           appRef.current.renderer.resize(containerWidth, containerHeight);
+          
+                     // 移动端重新计算缩放
+           const isMobile = window.innerWidth <= 768;
+           if (isMobile && engineRef.current && typeof (engineRef.current as any).setMobileScale === 'function') {
+             const agentParams = engineRef.current.getAgentParameters();
+             const visionRange = agentParams.visionRange;
+             const screenMin = Math.min(containerWidth, containerHeight);
+             const optimalScale = Math.min(1.0, screenMin / (visionRange * 2.2));
+             (engineRef.current as any).setMobileScale(optimalScale);
+           }
           
           // 强制重绘
           if (engineRef.current && typeof (engineRef.current as any).forceRender === 'function') {

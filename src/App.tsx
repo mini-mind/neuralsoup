@@ -20,6 +20,7 @@ const App: React.FC = () => {
   const [enableManualOverride, setEnableManualOverride] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [mobileFullscreenTab, setMobileFullscreenTab] = useState<string | null>(null);
+  const [isScriptApplied, setIsScriptApplied] = useState(false); // 脚本应用状态
 
   
   // 拖拽分割条状态
@@ -27,42 +28,36 @@ const App: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   
   // onFrame函数代码
-  const [onFrameCode, setOnFrameCode] = useState(`// 实现每帧的智能体控制逻辑
-// 这段代码会在点击"应用脚本"时执行一次进行初始化
-// 之后每帧只调用onFrame函数
+  const [onFrameCode, setOnFrameCode] = useState(`// 智能体控制脚本 - 极简示例
+// 这段代码在点击"应用脚本"时执行一次进行初始化
+// 之后每帧调用onFrame函数
 
-// 全局变量（在脚本应用时初始化一次）
+// 全局变量
 let stepCount = 0;
-let memory = {};
-let lastDirection = 0;
 
-// state: 主智能体的感受器数据
+// agent: 智能体对象，包含：
 //   - vision: number[] - 视觉数据 (n个单元格 × 3通道 RGB)
-//   - gotReward: boolean - 上一帧是否获得奖励
-// action: 效应器控制对象
-//   - move(direction): void - 移动函数，direction为[前进, 左转, 右转]的强度数组
+//   - reward: number - 上一帧获得的奖励数值
+//   - move(direction): void - 移动函数，direction为[前进, 左转, 右转, 后退]
 
-function onFrame(state, action) {
-  stepCount++; // 记录步数
+function onFrame(agent) {
+  stepCount++;
   
-  // 示例：简单的前进行为
-  action.move([0.5, 0, 0]); // 50%速度前进
+  // 基础行为：前进
+  agent.move([0.6, 0, 0, 0]); // [前进0.6, 左转0, 右转0, 后退0]
   
-  // 示例：检测奖励
-  if (state.gotReward) {
-    console.log('获得奖励！步数:', stepCount);
-    if (!memory.totalReward) memory.totalReward = 0;
-    memory.totalReward++;
+  // 获得奖励时加速
+  if (agent.reward > 0) {
+    console.log('获得奖励:', agent.reward);
+    agent.move([1.0, 0, 0, 0]); // 全速前进
   }
   
-  // 示例：基于视觉的简单反应
-  // const avgRed = state.vision.filter((_, i) => i % 3 === 0).reduce((a, b) => a + b) / (state.vision.length / 3);
-  // if (avgRed > 0.5) {
-  //   action.move([0, 0.3, 0]); // 看到红色时左转
-  // }
-  
-  return null;
-}`);
+  // 每100步随机转向
+  if (stepCount % 100 === 0) {
+    const turn = Math.random() > 0.5 ? [0.3, 0.5, 0, 0] : [0.3, 0, 0.5, 0];
+    agent.move(turn); // [前进, 左转, 右转, 后退]
+  }
+}`)
   
   const [stats, setStats] = useState({
     fps: 0,
@@ -184,17 +179,26 @@ function onFrame(state, action) {
         if (success) {
           // 脚本应用成功，切换到脚本模式
           setIsScriptMode(true);
+          setIsScriptApplied(true);
           console.log('脚本已成功应用并切换到脚本模式');
         } else {
+          setIsScriptApplied(false);
           alert('脚本应用失败：未找到onFrame函数或脚本执行出错');
         }
       } else {
+        setIsScriptApplied(false);
         alert('引擎不支持脚本应用功能');
       }
       
     } catch (e) {
+      setIsScriptApplied(false);
       alert('脚本应用失败：' + (e as Error).message);
     }
+  }, [onFrameCode]);
+
+  // 监听脚本代码变化，重置应用状态
+  useEffect(() => {
+    setIsScriptApplied(false);
   }, [onFrameCode]);
 
   // 拖拽处理函数
@@ -250,10 +254,10 @@ function onFrame(state, action) {
         <div className="script-actions">
           <button 
             onClick={handleApplyScript}
-            className="btn btn-apply"
-            title={t('tooltip.apply-script')}
+            className={`btn ${isScriptApplied ? 'btn-success' : 'btn-apply'}`}
+            title={isScriptApplied ? '脚本已应用' : t('tooltip.apply-script')}
           >
-            {t('btn.apply-script')}
+            {isScriptApplied ? '✓ 已应用' : t('btn.apply-script')}
           </button>
         </div>
       </div>

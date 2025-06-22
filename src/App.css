@@ -338,11 +338,16 @@
   }
   
   .game-area {
-    height: calc(100vh - 100px);
+    height: 70vh; /* 游戏区域基础高度 */
     width: 100% !important;
     min-height: 300px;
     position: relative;
     overflow: hidden;
+  }
+  
+  /* 当移动端没有全屏标签页时，游戏区域占据更多空间 */
+  .app:not(.mobile-fullscreen) .game-area {
+    height: calc(100vh - 100px); /* 100px给控制头部和标签页头部 */
   }
   
   .simulation-canvas {
@@ -356,6 +361,7 @@
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
+    transform-origin: center center;
   }
   
   .game-stats-overlay {
@@ -383,17 +389,43 @@
   }
   
   .control-area {
+    /* 移动端正常模式：只显示头部和标签页导航，不显示内容 */
     height: auto;
-    min-height: 100px;
+    min-height: 80px; /* 最小高度容纳头部和标签页 */
     width: 100% !important;
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
   
-  /* 移动端正常模式下只显示标签页头部 */
+  /* 移动端全屏模式下的控制区域布局 */
+  .mobile-fullscreen .control-area {
+    height: 100vh !important;
+  }
+  
+  .mobile-fullscreen .control-area .content-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  
+  .mobile-fullscreen .control-area .tab-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  
+  .mobile-fullscreen .control-area .tab-content {
+    flex: 1;
+    overflow: hidden;
+  }
+  
+  /* 移动端正常模式下的控制区域 */
   .control-area .content-area {
-    flex: 0 0 auto;
+    flex: 0 0 auto; /* 不占用多余空间 */
+    overflow: hidden;
   }
   
   .control-area .tab-panel {
@@ -480,12 +512,13 @@
   }
   
   .game-area {
-    height: 50vh;
-    min-height: 250px;
+    height: 65vh; /* 在超小屏幕上略微减少游戏区域高度 */
+    min-height: 250px; /* 减少最小高度 */
   }
   
   .control-area {
-    height: 50vh;
+    height: 35vh; /* 相应增加控制区域高度以容纳必要控件 */
+    min-height: 140px; /* 适当增加最小高度 */
   }
   
   .simulation-canvas {
@@ -519,10 +552,11 @@
 
 /* 移动端全屏模式下的标签页内容 */
 @media (max-width: 768px) {
-  .mobile-fullscreen .script-tab-content,
-  .mobile-fullscreen .agent-params-tab-content {
-    height: 100vh;
-    overflow-y: auto;
+  .mobile-fullscreen .script-tab-content {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
   
   .mobile-fullscreen .script-tab-content .script-control {
@@ -530,12 +564,47 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
+    overflow: hidden;
   }
   
   .mobile-fullscreen .script-tab-content .onframe-section {
     flex: 1;
+    display: flex;
+    flex-direction: column;
     margin: 8px;
     min-height: 0;
+    overflow: hidden;
+  }
+  
+  /* 确保代码编辑器在移动端全屏模式下正确填充空间 */
+  .mobile-fullscreen .script-tab-content .onframe-section .code-editor {
+    flex: 1;
+    min-height: 0;
+  }
+  
+  .mobile-fullscreen .script-tab-content .script-actions {
+    flex-shrink: 0;
+    padding: 12px 16px 24px; /* 增加底部边距以避免被系统UI遮盖 */
+    background: #1e293b;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    /* 添加安全边距支持 */
+    padding-bottom: max(24px, env(safe-area-inset-bottom, 24px));
+  }
+  
+  .mobile-fullscreen .script-tab-content .script-actions .btn {
+    padding: 12px 24px;
+    font-size: 14px;
+    min-width: 120px;
+  }
+  
+  /* 移动端全屏模式下的智能体参数标签页 */
+  .mobile-fullscreen .agent-params-tab-content {
+    height: 100%;
+    overflow-y: auto;
+    padding: 16px;
   }
 }
 
@@ -561,6 +630,7 @@
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .agent-params-tab-content {

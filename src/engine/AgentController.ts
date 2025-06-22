@@ -13,6 +13,11 @@ export class AgentController {
   private keyboardController: KeyboardController;
   private scriptController: ScriptController;
   private enablePlayerInputInScript: boolean = false;
+  
+  // 添加性能优化变量
+  private lastKeyboardCheckTime: number = 0;
+  private keyboardCheckInterval: number = 16; // 约60fps时检查键盘输入
+  private hasRecentKeyboardInput: boolean = false;
 
   constructor() {
     this.keyboardController = new KeyboardController();
@@ -69,6 +74,13 @@ export class AgentController {
    * 更新智能体控制
    */
   public updateAgent(agent: Agent, deltaTime: number): void {
+    // 更新键盘输入检查（减少检查频率）
+    const currentTime = performance.now();
+    if (this.enablePlayerInputInScript && currentTime - this.lastKeyboardCheckTime > this.keyboardCheckInterval) {
+      this.hasRecentKeyboardInput = this.keyboardController.hasKeyboardInput();
+      this.lastKeyboardCheckTime = currentTime;
+    }
+    
     switch (agent.controlType) {
       case 'snn':
         this.updateSNNAgent(agent, deltaTime);
@@ -95,18 +107,47 @@ export class AgentController {
    * 更新脚本控制的智能体
    */
   private updateScriptAgent(agent: Agent, deltaTime: number): void {
-    // 检查是否启用手动控制覆盖
-    if (this.enablePlayerInputInScript) {
-      const keyboardInputs = this.keyboardController.getKeyboardInputs();
-      const hasKeyboardInput = keyboardInputs[0] > 0 || keyboardInputs[1] > 0 || keyboardInputs[2] > 0 || keyboardInputs[3] > 0;
-      
-      if (hasKeyboardInput) {
-        this.applyAction(agent, keyboardInputs, deltaTime);
-        return;
-      }
-    }
+    // 先获取脚本计算结果
+    const scriptOutput = this.scriptController.computeScriptOutput(agent, deltaTime);
     
-    this.scriptController.updateAgent(agent, deltaTime, this.applyAction.bind(this));
+    // 检查是否启用手动控制覆盖
+    if (this.enablePlayerInputInScript && this.hasRecentKeyboardInput) {
+      const keyboardInputs = this.keyboardController.getKeyboardInputs();
+      
+      // 用手动控制结果覆盖脚本结果的对应维度
+      // scriptOutput: [左转, 前进, 右转] (3维)
+      // keyboardInputs: [左转, 前进, 右转, 后退] (4维)
+      const finalOutput = [...scriptOutput]; // 复制脚本结果作为基础
+      
+      // 覆盖左转/右转（互斥操作）
+      if (keyboardInputs[0] > 0) { // 手动左转
+        finalOutput[0] = keyboardInputs[0];
+        finalOutput[2] = 0; // 取消右转
+      } else if (keyboardInputs[2] > 0) { // 手动右转
+        finalOutput[2] = keyboardInputs[2];
+        finalOutput[0] = 0; // 取消左转
+      }
+      
+      // 前进/后退的抵消计算（加减运算）
+      let netForward = finalOutput[1]; // 脚本的前进值
+      
+      if (keyboardInputs[1] > 0) { // 手动前进
+        // 如果脚本和手动都是前进，取较大值
+        netForward = Math.max(netForward, keyboardInputs[1]);
+      } else if (keyboardInputs[3] > 0) { // 手动后退
+        // 手动后退应该减少前进速度，实现抵消效果
+        netForward = netForward - keyboardInputs[3];
+      }
+      
+      // 限制在合理范围内
+      finalOutput[1] = Math.max(-1.0, Math.min(1.0, netForward));
+      
+      // 应用最终的混合结果
+      this.applyAction(agent, finalOutput, deltaTime);
+    } else {
+      // 没有手动控制覆盖，直接应用脚本结果
+      this.applyAction(agent, scriptOutput, deltaTime);
+    }
   }
 
   /**
@@ -121,30 +162,57 @@ export class AgentController {
     const thresholdAdjustment = (agent.stress - 0.5) * 10;
     corticalColumn.applyEmotionModulation(synapticScaling, thresholdAdjustment);
     
-    // 检查手动控制覆盖（仅在启用时）
-    if (this.enablePlayerInputInScript) {
-      const keyboardInputs = this.keyboardController.getKeyboardInputs();
-      const hasKeyboardInput = keyboardInputs[0] > 0 || keyboardInputs[1] > 0 || keyboardInputs[2] > 0 || keyboardInputs[3] > 0;
-      
-      if (hasKeyboardInput) {
-        this.applyAction(agent, keyboardInputs, deltaTime);
-        return;
-      }
-    }
-    
     // 使用神经网络决策
-    let output = [0, 0, 0];
+    let snnOutput = [0, 0, 0];
     const iterations = 5;
     
     for (let i = 0; i < iterations; i++) {
       const iterOutput = corticalColumn.forward(agent.visualInput);
       for (let j = 0; j < 3; j++) {
-        output[j] += iterOutput[j];
+        snnOutput[j] += iterOutput[j];
       }
     }
     
-    output = output.map(val => val / iterations);
-    this.applyAction(agent, output, deltaTime);
+    snnOutput = snnOutput.map(val => val / iterations);
+    
+    // 检查手动控制覆盖（仅在启用时）
+    if (this.enablePlayerInputInScript && this.hasRecentKeyboardInput) {
+      const keyboardInputs = this.keyboardController.getKeyboardInputs();
+      
+      // 用手动控制结果覆盖SNN结果的对应维度
+      // snnOutput: [左转, 前进, 右转] (3维)
+      // keyboardInputs: [左转, 前进, 右转, 后退] (4维)
+      const finalOutput = [...snnOutput]; // 复制SNN结果作为基础
+      
+      // 覆盖左转/右转（互斥操作）
+      if (keyboardInputs[0] > 0) { // 手动左转
+        finalOutput[0] = keyboardInputs[0];
+        finalOutput[2] = 0; // 取消右转
+      } else if (keyboardInputs[2] > 0) { // 手动右转
+        finalOutput[2] = keyboardInputs[2];
+        finalOutput[0] = 0; // 取消左转
+      }
+      
+      // 前进/后退的抵消计算（加减运算）
+      let netForward = finalOutput[1]; // SNN的前进值
+      
+      if (keyboardInputs[1] > 0) { // 手动前进
+        // 如果SNN和手动都是前进，取较大值
+        netForward = Math.max(netForward, keyboardInputs[1]);
+      } else if (keyboardInputs[3] > 0) { // 手动后退
+        // 手动后退应该减少前进速度，实现抵消效果
+        netForward = netForward - keyboardInputs[3];
+      }
+      
+      // 限制在合理范围内
+      finalOutput[1] = Math.max(-1.0, Math.min(1.0, netForward));
+      
+      // 应用最终的混合结果
+      this.applyAction(agent, finalOutput, deltaTime);
+    } else {
+      // 没有手动控制覆盖，直接应用SNN结果
+      this.applyAction(agent, snnOutput, deltaTime);
+    }
   }
 
   /**
@@ -161,7 +229,7 @@ export class AgentController {
   }
 
   /**
-   * 应用动作到智能体 - 支持4维控制
+   * 应用动作到智能体 - 支持3维和4维控制，支持负值前进（表示后退）
    */
   private applyAction(agent: Agent, output: number[], deltaTime: number): void {
     // 兼容3维和4维输入
@@ -182,12 +250,14 @@ export class AgentController {
     const maxSpeed = 60;
     const moveThreshold = 0.2;
     
-    if (moveForward > moveThreshold) {
-      const speed = maxSpeed * moveForward;
-      agent.velocity.x = Math.cos(agent.angle) * speed;
-      agent.velocity.y = Math.sin(agent.angle) * speed;
+    // 支持负值前进（表示后退）
+    if (Math.abs(moveForward) > moveThreshold) {
+      const speed = maxSpeed * Math.abs(moveForward);
+      const direction = moveForward >= 0 ? 1 : -1; // 正值前进，负值后退
+      agent.velocity.x = Math.cos(agent.angle) * speed * direction;
+      agent.velocity.y = Math.sin(agent.angle) * speed * direction;
     } else if (moveBackward > moveThreshold) {
-      // 后退：反方向运动
+      // 保持向后兼容：4维输入的后退维度
       const speed = maxSpeed * moveBackward;
       agent.velocity.x = -Math.cos(agent.angle) * speed;
       agent.velocity.y = -Math.sin(agent.angle) * speed;

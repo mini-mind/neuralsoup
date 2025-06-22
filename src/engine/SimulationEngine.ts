@@ -136,6 +136,13 @@ export class SimulationEngine {
   }
 
   /**
+   * 设置移动端缩放比例
+   */
+  public setMobileScale(scale: number): void {
+    this.renderer.setMobileScale(scale);
+  }
+
+  /**
    * 强制重绘，用于在暂停状态下更新画布尺寸等
    */
   public forceRender(): void {

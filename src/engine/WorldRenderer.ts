@@ -35,6 +35,9 @@ export class WorldRenderer {
   // 世界尺寸
   private worldWidth: number = 3000;
   private worldHeight: number = 3000;
+  
+  // 移动端缩放
+  private mobileScale: number = 1.0;
 
   constructor(app: PIXI.Application) {
     this.app = app;
@@ -53,15 +56,19 @@ export class WorldRenderer {
     this.foodContainer = new PIXI.Container();
     this.obstacleContainer = new PIXI.Container();
     this.agentContainer = new PIXI.Container();
+    
+    // 战争迷雾层放在stage顶层，不受世界变换影响
     this.fogOverlay = new PIXI.Graphics();
 
-    // 按层级顺序添加
+    // 按层级顺序添加到世界容器
     this.worldContainer.addChild(this.backgroundContainer);
     this.worldContainer.addChild(this.visionContainer);
     this.worldContainer.addChild(this.foodContainer);
     this.worldContainer.addChild(this.obstacleContainer);
     this.worldContainer.addChild(this.agentContainer);
-    this.worldContainer.addChild(this.fogOverlay);
+    
+    // 将战争迷雾层添加到stage顶层
+    this.app.stage.addChild(this.fogOverlay);
   }
 
   private initializeRenderers(): void {
@@ -69,7 +76,7 @@ export class WorldRenderer {
     this.agentRenderer = new AgentRenderer(this.agentContainer);
     this.foodRenderer = new FoodRenderer(this.foodContainer);
     this.obstacleRenderer = new ObstacleRenderer(this.obstacleContainer);
-    this.visionRenderer = new VisionRenderer(this.visionContainer, this.fogOverlay);
+    this.visionRenderer = new VisionRenderer(this.visionContainer, this.fogOverlay, this.app);
   }
 
   public setCameraTarget(agent: Agent | null): void {
@@ -83,7 +90,14 @@ export class WorldRenderer {
       this.worldContainer.x = screenWidth / 2;
       this.worldContainer.y = screenHeight / 2;
       this.worldContainer.rotation = -agent.angle - Math.PI / 2; 
+      this.worldContainer.scale.set(this.mobileScale);
     }
+  }
+
+  public setMobileScale(scale: number): void {
+    this.mobileScale = scale;
+    this.worldContainer.scale.set(scale);
+    console.log('Applied mobile scale to world container:', scale);
   }
 
   public renderWorld(world: World): void {
@@ -122,9 +136,10 @@ export class WorldRenderer {
     let shortestAngle = (targetRotation - this.worldContainer.rotation + Math.PI * 3) % (Math.PI * 2) - Math.PI;
     this.worldContainer.rotation += shortestAngle * this.cameraLerpFactor;
 
-    // 将世界容器固定在屏幕中心
+    // 将世界容器固定在屏幕中心，保持移动端缩放
     this.worldContainer.x = screenWidth / 2;
     this.worldContainer.y = screenHeight / 2;
+    this.worldContainer.scale.set(this.mobileScale);
   }
 
   public setWorldDimensions(width: number, height: number): void {
@@ -142,15 +157,39 @@ export class WorldRenderer {
   }
 
   public destroy(): void {
-    this.backgroundRenderer.destroy();
-    this.agentRenderer.destroy();
-    this.foodRenderer.destroy();
-    this.obstacleRenderer.destroy();
-    this.visionRenderer.destroy();
+    // 添加空指针检查，防止重复销毁
+    if (this.backgroundRenderer) {
+      this.backgroundRenderer.destroy();
+      this.backgroundRenderer = null as any;
+    }
+    if (this.agentRenderer) {
+      this.agentRenderer.destroy();
+      this.agentRenderer = null as any;
+    }
+    if (this.foodRenderer) {
+      this.foodRenderer.destroy();
+      this.foodRenderer = null as any;
+    }
+    if (this.obstacleRenderer) {
+      this.obstacleRenderer.destroy();
+      this.obstacleRenderer = null as any;
+    }
+    if (this.visionRenderer) {
+      this.visionRenderer.destroy();
+      this.visionRenderer = null as any;
+    }
     
-    if (this.worldContainer) {
+    if (this.worldContainer && this.app.stage) {
       this.app.stage.removeChild(this.worldContainer);
       this.worldContainer.destroy({ children: true });
+      this.worldContainer = null as any;
+    }
+    
+    // 清理stage上的战争迷雾层
+    if (this.fogOverlay && this.app.stage) {
+      this.app.stage.removeChild(this.fogOverlay);
+      this.fogOverlay.destroy();
+      this.fogOverlay = null as any;
     }
   }
 } 

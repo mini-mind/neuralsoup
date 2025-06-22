@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './TabPanel.css';
 
 interface Tab {
@@ -34,9 +34,17 @@ const TabPanel: React.FC<TabPanelProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState(defaultActiveTab || tabs[0]?.id);
 
+  // 在移动端全屏模式下，同步外部的mobileFullscreenTab到内部的activeTab
+  useEffect(() => {
+    if (isMobile && mobileFullscreenTab) {
+      setActiveTab(mobileFullscreenTab);
+    }
+  }, [isMobile, mobileFullscreenTab]);
+
   const handleTabClick = (tabId: string) => {
     if (isMobile && !mobileFullscreenTab) {
-      // 移动端正常模式：点击标签页进入全屏模式
+      // 移动端正常模式：点击标签页进入全屏模式，同时设置activeTab
+      setActiveTab(tabId);
       onMobileTabClick?.(tabId);
     } else {
       // 桌面端或移动端全屏模式：正常切换标签页

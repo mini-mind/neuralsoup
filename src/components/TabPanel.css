@@ -72,6 +72,9 @@
     overflow-x: auto;
     scrollbar-width: none; /* Firefox */
     -ms-overflow-style: none; /* IE and Edge */
+    background: #1e293b;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
   }
   
   /* 移动端正常模式下不显示内容时的样式 */
@@ -95,6 +98,20 @@
     min-width: 44px;
     flex-shrink: 0;
   }
+  
+  /* 全屏模式下的收起按钮样式优化 */
+  .collapse-button {
+    background: rgba(245, 158, 11, 0.1) !important;
+    border: 1px solid rgba(245, 158, 11, 0.3) !important;
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+  }
+  
+  .collapse-button:hover {
+    background: rgba(245, 158, 11, 0.2) !important;
+    border-color: rgba(245, 158, 11, 0.5) !important;
+  }
 }
 
 @media (max-width: 480px) {
@@ -106,5 +123,10 @@
   .settings-button, .collapse-button {
     padding: 8px 10px;
     min-width: 40px;
+  }
+  
+  .collapse-button {
+    font-size: 12px !important;
+    border-radius: 4px !important;
   }
 } 
