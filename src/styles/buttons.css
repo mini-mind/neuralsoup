@@ -133,6 +133,23 @@
     0 0 0 1px rgba(255, 255, 255, 0.25) inset;
 }
 
+/* 危险按钮 - 红色渐变 */
+.btn-danger {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  font-weight: 700;
+  box-shadow: 
+    0 4px 12px rgba(239, 68, 68, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+}
+
+.btn-danger:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  box-shadow: 
+    0 8px 25px rgba(239, 68, 68, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.25) inset;
+}
+
 /* 小号按钮 */
 .btn-small {
   padding: 8px 14px;
@@ -145,7 +162,8 @@
 
 /* 图标按钮特殊样式 */
 .btn[title*="手动控制"] {
-  font-size: 18px;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .btn[title*="智能体参数"] {
@@ -249,7 +267,8 @@ kbd {
   }
   
   .btn[title*="手动控制"] {
-    font-size: 16px;
+    font-size: 10px;
+    font-weight: 700;
   }
   
   .btn[title*="智能体参数"] {

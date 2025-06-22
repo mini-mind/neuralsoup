@@ -338,16 +338,20 @@
   }
   
   .game-area {
-    height: 70vh; /* 游戏区域基础高度 */
     width: 100% !important;
-    min-height: 300px;
     position: relative;
     overflow: hidden;
+    /* 默认高度，会被后面的规则覆盖 */
+    height: 70vh;
+    min-height: 300px;
   }
   
   /* 当移动端没有全屏标签页时，游戏区域占据更多空间 */
   .app:not(.mobile-fullscreen) .game-area {
-    height: calc(100vh - 100px); /* 100px给控制头部和标签页头部 */
+    /* 使用flex自动填充剩余空间 */
+    flex: 1;
+    height: auto; /* 让flex控制高度 */
+    min-height: 250px; /* 设置合理的最小高度 */
   }
   
   .simulation-canvas {
@@ -389,13 +393,13 @@
   }
   
   .control-area {
-    /* 移动端正常模式：只显示头部和标签页导航，不显示内容 */
+    /* 移动端正常模式：自动高度，不限制最大高度 */
     height: auto;
-    min-height: 80px; /* 最小高度容纳头部和标签页 */
     width: 100% !important;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    flex-shrink: 0; /* 防止被压缩 */
   }
   
   /* 移动端全屏模式下的控制区域布局 */
@@ -432,13 +436,19 @@
     height: auto;
   }
   
+  /* 移动端正常模式下，标签页内容不显示 */
+  .app:not(.mobile-fullscreen) .control-area .tab-content {
+    display: none;
+  }
+  
   .control-header {
     flex-direction: row;
     gap: 8px;
     align-items: center;
     min-height: auto;
-    padding: 8px 12px;
+    padding: 6px 12px; /* 减少内边距 */
     flex-shrink: 0;
+    justify-content: space-between; /* 确保左右分布 */
   }
   
   .header-left {
@@ -447,7 +457,7 @@
   }
   
   .app-title {
-    font-size: 16px;
+    font-size: 15px; /* 稍微减小字体 */
     margin: 0;
     white-space: nowrap;
     overflow: hidden;
@@ -460,12 +470,14 @@
   
   .game-controls {
     gap: 4px;
+    display: flex;
+    align-items: center;
   }
   
   .btn {
-    padding: 6px 12px;
+    padding: 5px 10px; /* 减小按钮内边距 */ 
     font-size: 12px;
-    min-width: 36px;
+    min-width: 32px; /* 减小最小宽度 */
   }
   
   .content-area {
@@ -484,41 +496,41 @@
 /* 超小屏幕适配 */
 @media (max-width: 480px) {
   .control-header {
-    flex-direction: column;
-    gap: 8px;
-    align-items: stretch;
-    padding: 8px;
+    flex-direction: row; /* 保持水平布局，不要换成垂直 */
+    gap: 6px; /* 减少间距 */
+    align-items: center;
+    padding: 6px 8px; /* 进一步减少内边距以节省空间 */
+    justify-content: space-between;
   }
   
   .header-left {
-    text-align: center;
+    flex: 1;
+    min-width: 0;
+    /* 不要居中对齐 */
   }
   
   .app-title {
-    font-size: 14px;
+    font-size: 13px; /* 进一步减小字体以节省空间 */
   }
   
   .header-right {
-    align-self: center;
+    flex-shrink: 0;
   }
   
   .game-controls {
-    justify-content: center;
+    gap: 3px; /* 减少按钮间距 */
+    justify-content: flex-end;
   }
   
   .btn {
-    padding: 8px;
-    min-width: 40px;
+    padding: 5px 7px; /* 进一步减小按钮大小 */
+    min-width: 30px; /* 减小最小宽度 */
+    font-size: 11px; /* 减小字体 */
   }
   
-  .game-area {
-    height: 65vh; /* 在超小屏幕上略微减少游戏区域高度 */
-    min-height: 250px; /* 减少最小高度 */
-  }
-  
-  .control-area {
-    height: 35vh; /* 相应增加控制区域高度以容纳必要控件 */
-    min-height: 140px; /* 适当增加最小高度 */
+  /* 超小屏幕下的游戏区域调整 */
+  .app:not(.mobile-fullscreen) .game-area {
+    min-height: 200px; /* 减少最小高度以适应更小的屏幕 */
   }
   
   .simulation-canvas {
@@ -882,5 +894,194 @@
     width: 28px;
     height: 28px;
     font-size: 20px;
+  }
+}
+
+/* 脚本管理样式 */
+.script-manager {
+  background: #1e293b;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 12px 16px;
+  flex-shrink: 0;
+}
+
+.script-manager-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.script-manager-header h4 {
+  margin: 0;
+  font-size: 14px;
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.script-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.script-selector {
+  background: #374151;
+  border: 1px solid #4b5563;
+  border-radius: 6px;
+  color: #e2e8f0;
+  padding: 6px 12px;
+  font-size: 13px;
+  min-width: 120px;
+  cursor: pointer;
+  flex: 1;
+}
+
+.script-selector:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}
+
+/* 脚本管理专用按钮样式 */
+.script-controls .btn {
+  height: 36px;
+  min-width: 36px;
+  padding: 8px 14px;
+  font-size: 12px;
+  border-radius: 10px;
+}
+
+.script-controls .btn-icon {
+  padding: 8px;
+  min-width: 36px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.new-script-dialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.new-script-dialog-content {
+  background: #1e293b;
+  border-radius: 8px;
+  padding: 24px;
+  min-width: 300px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.new-script-dialog h3 {
+  margin: 0 0 16px 0;
+  color: #e2e8f0;
+  font-size: 16px;
+}
+
+.new-script-dialog input {
+  width: 100%;
+  background: #374151;
+  border: 1px solid #4b5563;
+  border-radius: 6px;
+  color: #e2e8f0;
+  padding: 8px 12px;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.new-script-dialog input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}
+
+.new-script-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* 移动端脚本管理适配 */
+@media (max-width: 768px) {
+  .script-manager {
+    padding: 8px 12px;
+  }
+  
+  .script-manager-header {
+    gap: 12px;
+  }
+  
+  .script-manager-header h4 {
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  
+  .script-controls {
+    gap: 6px;
+    flex: 1;
+  }
+  
+  .script-selector {
+    flex: 1;
+    min-width: 80px;
+    font-size: 12px;
+    padding: 5px 8px;
+  }
+  
+  .script-controls .btn {
+    height: 28px;
+    min-width: 28px;
+    padding: 4px 8px;
+    font-size: 11px;
+    border-radius: 4px;
+  }
+  
+  .script-controls .btn-icon {
+    padding: 4px 6px;
+    min-width: 28px;
+    font-size: 12px;
+  }
+  
+  .mobile-fullscreen .script-manager {
+    padding: 12px 16px;
+  }
+  
+  .mobile-fullscreen .script-manager-header {
+    gap: 16px;
+  }
+  
+  .mobile-fullscreen .script-manager-header h4 {
+    font-size: 14px;
+  }
+  
+  .mobile-fullscreen .script-controls {
+    gap: 8px;
+  }
+  
+  .mobile-fullscreen .script-selector {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
+  
+  .mobile-fullscreen .script-controls .btn {
+    height: 36px;
+    min-width: 36px;
+    padding: 8px 14px;
+    font-size: 12px;
+    border-radius: 10px;
+  }
+  
+  .mobile-fullscreen .script-controls .btn-icon {
+    padding: 8px;
+    min-width: 36px;
+    font-size: 16px;
   }
 }
