@@ -190,10 +190,52 @@ kbd {
     height: 44px;
     min-width: 44px;
     font-size: 13px;
+    border-radius: 10px;
+  }
+  
+  .btn-small {
+    padding: 6px 12px;
+    height: 36px;
+    min-width: 36px;
+    font-size: 11px;
+    border-radius: 8px;
   }
   
   .game-controls {
-    gap: 8px;
-    padding: 6px;
+    gap: 6px;
+    padding: 4px;
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .btn {
+    padding: 8px 12px;
+    height: 40px;
+    min-width: 40px;
+    font-size: 12px;
+    border-radius: 8px;
+  }
+  
+  .btn-small {
+    padding: 6px 10px;
+    height: 32px;
+    min-width: 32px;
+    font-size: 10px;
+    border-radius: 6px;
+  }
+  
+  .game-controls {
+    gap: 4px;
+    padding: 3px;
+    border-radius: 10px;
+  }
+  
+  .btn[title*="手动控制"] {
+    font-size: 16px;
+  }
+  
+  .btn[title*="智能体参数"] {
+    font-size: 14px;
   }
 } 

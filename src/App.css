@@ -238,58 +238,21 @@
   color: #aaa;
 }
 
-/* 移动端适配 */
-@media (max-width: 768px) {
-  .app {
-    flex-direction: column;
-  }
-
-  .game-area {
-    width: 100% !important;
-    height: 50%;
-  }
-
-  .resize-handle {
-    display: none;
-  }
-
-  .control-area {
-    width: 100% !important;
-    height: 50%;
-  }
-
-  .control-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-    min-height: auto;
-  }
-
-  .header-left {
-    justify-content: center;
-  }
-
-  .app-title {
-    font-size: 16px;
-  }
-
-  .script-options {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-}
+/* 移动端适配 - 移除重复代码 */
 
 .simulation-canvas {
   width: 100%;
   height: 100%;
   display: block;
+  position: relative;
+  overflow: hidden;
 }
 
 .simulation-canvas canvas {
   width: 100% !important;
   height: 100% !important;
-  display: block;
+  display: block !important;
+  object-fit: contain;
 }
 
 /* 统一控制行：包含所有控件 */
@@ -340,14 +303,79 @@
 }
 
 /* 响应式设计 */
-@media (max-width: 768px) {
-  .app {
-    flex-direction: column;
+/* 平板适配 */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .control-header {
+    padding: 16px 20px;
+    min-height: 70px;
+  }
+  
+  .app-title {
+    font-size: 20px;
   }
   
   .game-area {
-    height: 50vh;
+    min-width: 40%;
+  }
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  
+  /* 移动端全屏模式 */
+  .app.mobile-fullscreen {
+    flex-direction: column;
+  }
+  
+  .app.mobile-fullscreen .control-area {
+    height: 100vh !important;
     width: 100% !important;
+  }
+  
+  .game-area {
+    height: calc(100vh - 100px);
+    width: 100% !important;
+    min-height: 300px;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .simulation-canvas {
+    width: 100%;
+    height: 100%;
+  }
+  
+  .simulation-canvas canvas {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  
+  .game-stats-overlay {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 1000;
+  }
+  
+  .game-stats-overlay .stat-item {
+    padding: 4px 8px;
+    margin-bottom: 4px;
+  }
+  
+  .game-stats-overlay .stat-label {
+    font-size: 9px;
+  }
+  
+  .game-stats-overlay .stat-value {
+    font-size: 12px;
   }
   
   .resize-handle {
@@ -355,41 +383,160 @@
   }
   
   .control-area {
-    height: 50vh;
+    height: auto;
+    min-height: 100px;
     width: 100% !important;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  
+  /* 移动端正常模式下只显示标签页头部 */
+  .control-area .content-area {
+    flex: 0 0 auto;
+  }
+  
+  .control-area .tab-panel {
+    height: auto;
   }
   
   .control-header {
-    flex-direction: column;
-    gap: 12px;
-    align-items: stretch;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
     min-height: auto;
-    padding: 12px;
+    padding: 8px 12px;
+    flex-shrink: 0;
   }
   
   .header-left {
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
+    flex: 1;
+    min-width: 0;
   }
   
   .app-title {
-    font-size: 18px;
+    font-size: 16px;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .header-right {
+    flex-shrink: 0;
+  }
+  
+  .game-controls {
+    gap: 4px;
+  }
+  
+  .btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    min-width: 36px;
+  }
+  
+  .content-area {
+    flex: 1;
+    overflow: hidden;
   }
   
   .script-options {
-    flex-direction: column;
+    flex-direction: row;
     gap: 8px;
-    align-items: stretch;
+    align-items: center;
+    padding: 8px 12px;
   }
 }
 
-/* 标签页内容区域样式 */
+/* 超小屏幕适配 */
+@media (max-width: 480px) {
+  .control-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+    padding: 8px;
+  }
+  
+  .header-left {
+    text-align: center;
+  }
+  
+  .app-title {
+    font-size: 14px;
+  }
+  
+  .header-right {
+    align-self: center;
+  }
+  
+  .game-controls {
+    justify-content: center;
+  }
+  
+  .btn {
+    padding: 8px;
+    min-width: 40px;
+  }
+  
+  .game-area {
+    height: 50vh;
+    min-height: 250px;
+  }
+  
+  .control-area {
+    height: 50vh;
+  }
+  
+  .simulation-canvas {
+    width: 100%;
+    height: 100%;
+  }
+  
+  .simulation-canvas canvas {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain;
+  }
+  
+  .game-stats-overlay .stat-label {
+    font-size: 8px;
+  }
+  
+  .game-stats-overlay .stat-value {
+    font-size: 10px;
+  }
+}
+
+/* 移动端标签页头部样式 - 删除这些样式，因为现在统一在TabPanel头部处理 */
+
 .script-tab-content {
   height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* 移动端全屏模式下的标签页内容 */
+@media (max-width: 768px) {
+  .mobile-fullscreen .script-tab-content,
+  .mobile-fullscreen .agent-params-tab-content {
+    height: 100vh;
+    overflow-y: auto;
+  }
+  
+  .mobile-fullscreen .script-tab-content .script-control {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  
+  .mobile-fullscreen .script-tab-content .onframe-section {
+    flex: 1;
+    margin: 8px;
+    min-height: 0;
+  }
 }
 
 .script-tab-content .script-control {
@@ -555,4 +702,115 @@
   font-style: italic;
 }
 
- 
+/* 设置模态框样式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: #2a2a2a;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-modal {
+  min-height: 300px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* 模态框响应式设计 */
+@media (max-width: 768px) {
+  .modal-content {
+    max-width: 95%;
+    margin: 20px;
+    max-height: 90vh;
+  }
+  
+  .modal-header {
+    padding: 16px 20px;
+  }
+  
+  .modal-header h3 {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-content {
+    max-width: 100%;
+    margin: 10px;
+    border-radius: 8px;
+  }
+  
+  .modal-header {
+    padding: 12px 16px;
+  }
+  
+  .modal-header h3 {
+    font-size: 16px;
+  }
+  
+  .modal-close-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 20px;
+  }
+}

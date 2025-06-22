@@ -6,15 +6,20 @@ import AgentParametersModal, { AgentParameters } from './components/AgentParamet
 import AgentParametersPanel from './components/AgentParametersPanel';
 import TabPanel from './components/TabPanel';
 import CodeEditor from './components/CodeEditor';
+import SettingsPanel from './components/SettingsPanel';
+import { useLanguage } from './contexts/LanguageContext';
 import { SimulationEngine } from './engine/SimulationEngine';
 import './App.css';
 
 const App: React.FC = () => {
+  const { t } = useLanguage();
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   // 默认使用SNN控制模式（智能体自主行为）
   const [isScriptMode, setIsScriptMode] = useState(false);
   const [enableManualOverride, setEnableManualOverride] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [mobileFullscreenTab, setMobileFullscreenTab] = useState<string | null>(null);
 
   
   // 拖拽分割条状态
@@ -81,10 +86,21 @@ function onFrame(state, action) {
 
   // 计算画布尺寸
   const calculateCanvasDimensions = useCallback(() => {
-    const newWidth = window.innerWidth * (gameAreaWidth / 100);
-    const newHeight = window.innerHeight;
-    setCanvasWidth(newWidth);
-    setCanvasHeight(newHeight);
+    const isMobile = window.innerWidth <= 768;
+    
+    if (isMobile) {
+      // 移动端：垂直布局，使用全宽和60%高度
+      const newWidth = window.innerWidth;
+      const newHeight = window.innerHeight * 0.6; // 60%高度给游戏区域
+      setCanvasWidth(newWidth);
+      setCanvasHeight(newHeight);
+    } else {
+      // 桌面端：水平布局，使用百分比宽度和全高度
+      const newWidth = window.innerWidth * (gameAreaWidth / 100);
+      const newHeight = window.innerHeight;
+      setCanvasWidth(newWidth);
+      setCanvasHeight(newHeight);
+    }
   }, [gameAreaWidth]);
 
   useEffect(() => {
@@ -217,6 +233,9 @@ function onFrame(state, action) {
     return num.toLocaleString();
   };
 
+  // 检查是否为移动端
+  const isMobile = window.innerWidth <= 768;
+
   // 创建标签页内容
   const scriptTabContent = (
     <div className="script-tab-content">
@@ -225,16 +244,16 @@ function onFrame(state, action) {
           <CodeEditor
             value={onFrameCode}
             onChange={setOnFrameCode}
-            placeholder="编写onFrame函数代码..."
+            placeholder={t('placeholder.code-editor')}
           />
         </div>
         <div className="script-actions">
           <button 
             onClick={handleApplyScript}
             className="btn btn-apply"
-            title="应用脚本"
+            title={t('tooltip.apply-script')}
           >
-            ✓ 应用脚本
+            {t('btn.apply-script')}
           </button>
         </div>
       </div>
@@ -253,62 +272,72 @@ function onFrame(state, action) {
   const tabs = [
     {
       id: 'script',
-      label: '脚本编辑',
+      label: t('tab.script'),
       content: scriptTabContent
     },
     {
       id: 'agent-params',
-      label: '智能体参数',
+      label: t('tab.agent-params'),
       content: agentParamsTabContent
     }
   ];
 
   return (
-    <div className="app">
-      {/* 左侧游戏区域 */}
-      <div className="game-area" style={{ width: `${gameAreaWidth}%` }}>
-        <SimulationCanvas 
-          width={canvasWidth}
-          height={canvasHeight}
-          isRunning={isRunning && !isPaused}
-          isScriptMode={isScriptMode}
-          scriptCode={onFrameCode}
-          enablePlayerInputInScript={enableManualOverride}
-          onStatsUpdate={handleStatsUpdate}
-          onEngineReady={handleEngineReady}
-          enableFogOfWar={true}
-        />
-        
-        {/* 游戏区域统计指标 */}
-        <div className="game-stats-overlay">
-          <div className="stat-item">
-            <span className="stat-label">FPS</span>
-            <span className="stat-value">{stats.fps.toFixed(1)}</span>
-          </div>
+    <div className={`app ${isMobile && mobileFullscreenTab ? 'mobile-fullscreen' : ''}`}>
+      {/* 左侧游戏区域 - 在移动端全屏模式下隐藏 */}
+      {!(isMobile && mobileFullscreenTab) && (
+        <div className="game-area" style={{ width: `${gameAreaWidth}%` }}>
+          <SimulationCanvas 
+            width={canvasWidth}
+            height={canvasHeight}
+            isRunning={isRunning && !isPaused}
+            isScriptMode={isScriptMode}
+            scriptCode={onFrameCode}
+            enablePlayerInputInScript={enableManualOverride}
+            onStatsUpdate={handleStatsUpdate}
+            onEngineReady={handleEngineReady}
+            enableFogOfWar={true}
+          />
           
-          <div className="stat-item">
-            <span className="stat-label">奖励</span>
-            <span className="stat-value positive">{formatNumber(stats.totalReward)}</span>
+          {/* 游戏区域统计指标 */}
+          <div className="game-stats-overlay">
+            <div className="stat-item">
+              <span className="stat-label">{t('stats.fps')}</span>
+              <span className="stat-value">{stats.fps.toFixed(1)}</span>
+            </div>
+            
+            <div className="stat-item">
+              <span className="stat-label">{t('stats.reward')}</span>
+              <span className="stat-value positive">{formatNumber(stats.totalReward)}</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
       
-      {/* 拖拽分割条 */}
-      <div 
-        className={`resize-handle ${isDragging ? 'dragging' : ''}`}
-        onMouseDown={handleMouseDown}
-      >
-        <div className="resize-indicator">
-          <div className="resize-line"></div>
-          <div className="resize-line"></div>
-          <div className="resize-line"></div>
+      {/* 拖拽分割条 - 在移动端全屏模式下隐藏 */}
+      {!(isMobile && mobileFullscreenTab) && (
+        <div 
+          className={`resize-handle ${isDragging ? 'dragging' : ''}`}
+          onMouseDown={handleMouseDown}
+        >
+          <div className="resize-indicator">
+            <div className="resize-line"></div>
+            <div className="resize-line"></div>
+            <div className="resize-line"></div>
+          </div>
         </div>
-      </div>
+      )}
       
       {/* 右侧控制区域 */}
-      <div className="control-area" style={{ width: `${100 - gameAreaWidth}%` }}>
-        {/* 新的顶部布局 */}
-        <div className="control-header">
+      <div 
+        className="control-area" 
+        style={{ 
+          width: isMobile && mobileFullscreenTab ? '100%' : `${100 - gameAreaWidth}%` 
+        }}
+      >
+        {/* 新的顶部布局 - 在移动端全屏模式下隐藏 */}
+        {!(isMobile && mobileFullscreenTab) && (
+          <div className="control-header">
           {/* 左半边：标题 */}
           <div className="header-left">
             <h1 className="app-title">NeuralSoup</h1>
@@ -319,7 +348,7 @@ function onFrame(state, action) {
               <button 
                 onClick={handleStartPause}
                 className="btn btn-primary"
-                title={isRunning ? (isPaused ? '继续' : '暂停') : '开始'}
+                title={isRunning ? (isPaused ? t('tooltip.resume') : t('tooltip.pause')) : t('tooltip.start')}
               >
                 {isRunning ? (isPaused ? '▶' : '⏸') : '▶'}
               </button>
@@ -327,17 +356,29 @@ function onFrame(state, action) {
               <button 
                 onClick={() => setEnableManualOverride(!enableManualOverride)}
                 className={`btn ${enableManualOverride ? 'btn-warning' : 'btn-secondary'}`}
-                title={enableManualOverride ? "关闭手动控制" : "启用手动控制 (WASD/方向键: W↑前进 S↓后退 A←左转 D→右转)"}
+                title={enableManualOverride ? t('tooltip.manual-control-on') : t('tooltip.manual-control-off')}
               >
                 🎮
               </button>
             </div>
           </div>
         </div>
+        )}
 
-        {/* 标签页内容区域 */}
+        {/* 标签页内容区域 - 移动端正常模式下只显示标签页头部，不显示内容 */}
         <div className="content-area">
-          <TabPanel tabs={tabs} defaultActiveTab="script" />
+          <TabPanel 
+            tabs={tabs} 
+            defaultActiveTab="script" 
+            showSettingsButton={true}
+            onSettingsClick={() => setShowSettingsModal(true)}
+            isMobile={isMobile}
+            mobileFullscreenTab={mobileFullscreenTab}
+            onMobileTabClick={setMobileFullscreenTab}
+            onMobileCollapseClick={() => setMobileFullscreenTab(null)}
+            showContentInMobileNormalMode={false}
+            collapseText={t('mobile.collapse')}
+          />
         </div>
       </div>
       
@@ -348,6 +389,26 @@ function onFrame(state, action) {
         onApply={handleAgentParametersApply}
         currentParams={agentParameters}
       />
+
+      {/* 设置模态框 */}
+      {showSettingsModal && (
+        <div className="modal-overlay" onClick={() => setShowSettingsModal(false)}>
+          <div className="modal-content settings-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{t('settings.title')}</h3>
+              <button 
+                className="modal-close-btn"
+                onClick={() => setShowSettingsModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <SettingsPanel />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

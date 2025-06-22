@@ -54,10 +54,17 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       canvasRef.current.appendChild(newApp.view as HTMLCanvasElement);
       appRef.current = newApp;
       
+      // 设置canvas样式以确保正确缩放和居中
+      const canvasElement = newApp.view as HTMLCanvasElement;
+      canvasElement.style.width = '100%';
+      canvasElement.style.height = '100%';
+      canvasElement.style.objectFit = 'contain';
+      canvasElement.style.display = 'block';
+      
       console.log('Canvas element appended to DOM');
       console.log('Canvas container children after:', canvasRef.current.children.length);
-      console.log('Canvas view dimensions:', (newApp.view as HTMLCanvasElement).width, (newApp.view as HTMLCanvasElement).height);
-      console.log('Canvas view style:', (newApp.view as HTMLCanvasElement).style.cssText);
+      console.log('Canvas view dimensions:', canvasElement.width, canvasElement.height);
+      console.log('Canvas view style:', canvasElement.style.cssText);
 
       // 创建仿真引擎 - 设置一个更大的固定世界尺寸
       const fixedWorldWidth = 3000;
@@ -132,6 +139,32 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       }
     }
   }, [isScriptMode]);
+
+  // 添加resize监听，确保canvas在容器尺寸变化时正确调整
+  useEffect(() => {
+    if (!canvasRef.current || !appRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width: containerWidth, height: containerHeight } = entry.contentRect;
+        if (appRef.current && containerWidth > 0 && containerHeight > 0) {
+          console.log('Container resized to:', containerWidth, containerHeight);
+          appRef.current.renderer.resize(containerWidth, containerHeight);
+          
+          // 强制重绘
+          if (engineRef.current && typeof (engineRef.current as any).forceRender === 'function') {
+            (engineRef.current as any).forceRender();
+          }
+        }
+      }
+    });
+
+    resizeObserver.observe(canvasRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
 
   return (
     <div 
