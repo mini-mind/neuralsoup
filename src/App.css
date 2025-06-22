@@ -1,3 +1,9 @@
+/* 引入拆分的样式文件 */
+@import "./styles/game-area.css";
+@import "./styles/control-panel.css";
+@import "./styles/modals.css";
+@import "./styles/mobile.css";
+
 .app {
   display: flex;
   height: 100vh;
@@ -5,139 +11,17 @@
   overflow: hidden;
   background: #1a1a1a;
   color: #ffffff;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
   position: relative;
 }
 
-/* 游戏区域 */
-.game-area {
-  position: relative;
-  background: #000;
-  overflow: hidden;
-  flex-shrink: 0;
-  transition: width 0.1s ease;
-}
-
-/* 游戏区域统计指标覆盖层 */
-.game-stats-overlay {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  z-index: 1000;
-  pointer-events: none;
-}
-
-.game-stats-overlay .stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  background: rgba(0, 0, 0, 0.8);
-  padding: 6px 10px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.game-stats-overlay .stat-label {
-  font-size: 10px;
-  color: #aaa;
-  text-transform: uppercase;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-}
-
-.game-stats-overlay .stat-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: #ffffff;
-}
-
-.game-stats-overlay .stat-value.positive {
-  color: #4ade80;
-}
-
-/* 拖拽分割条 */
-.resize-handle {
-  width: 6px;
-  background: #444;
-  cursor: col-resize;
-  position: relative;
-  flex-shrink: 0;
-  transition: background-color 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.resize-handle:hover,
-.resize-handle.dragging {
-  background: #6366f1;
-}
-
-.resize-indicator {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 0;
-}
-
-.resize-line {
-  width: 2px;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 1px;
-}
-
-.resize-handle:hover .resize-line,
-.resize-handle.dragging .resize-line {
-  background: rgba(255, 255, 255, 0.8);
-}
-
-/* 控制区域 */
-.control-area {
-  background: #2a2a2a;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  flex-shrink: 0;
-  transition: width 0.1s ease;
-}
-
-/* 控制区域顶部 - 现代化设计 */
-.control-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  min-height: 80px;
-  gap: 20px;
-  backdrop-filter: blur(20px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  flex: 1;
-}
-
-.app-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 800;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  letter-spacing: -0.5px;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
+/* 剩余的主应用样式 - 不在其他拆分文件中的样式 */
 
 /* .game-controls 样式已迁移到 buttons.css */
 
@@ -309,11 +193,11 @@
     padding: 16px 20px;
     min-height: 70px;
   }
-  
+
   .app-title {
     font-size: 20px;
   }
-  
+
   .game-area {
     min-width: 40%;
   }
@@ -326,17 +210,17 @@
     height: 100vh;
     overflow: hidden;
   }
-  
+
   /* 移动端全屏模式 */
   .app.mobile-fullscreen {
     flex-direction: column;
   }
-  
+
   .app.mobile-fullscreen .control-area {
     height: 100vh !important;
     width: 100% !important;
   }
-  
+
   .game-area {
     width: 100% !important;
     position: relative;
@@ -345,7 +229,7 @@
     height: 70vh;
     min-height: 300px;
   }
-  
+
   /* 当移动端没有全屏标签页时，游戏区域占据更多空间 */
   .app:not(.mobile-fullscreen) .game-area {
     /* 使用flex自动填充剩余空间 */
@@ -353,12 +237,12 @@
     height: auto; /* 让flex控制高度 */
     min-height: 250px; /* 设置合理的最小高度 */
   }
-  
+
   .simulation-canvas {
     width: 100%;
     height: 100%;
   }
-  
+
   .simulation-canvas canvas {
     width: 100% !important;
     height: 100% !important;
@@ -367,31 +251,31 @@
     object-fit: contain;
     transform-origin: center center;
   }
-  
+
   .game-stats-overlay {
     position: absolute;
     top: 8px;
     left: 8px;
     z-index: 1000;
   }
-  
+
   .game-stats-overlay .stat-item {
     padding: 4px 8px;
     margin-bottom: 4px;
   }
-  
+
   .game-stats-overlay .stat-label {
     font-size: 9px;
   }
-  
+
   .game-stats-overlay .stat-value {
     font-size: 12px;
   }
-  
+
   .resize-handle {
     display: none;
   }
-  
+
   .control-area {
     /* 移动端正常模式：自动高度，不限制最大高度 */
     height: auto;
@@ -401,46 +285,46 @@
     overflow: hidden;
     flex-shrink: 0; /* 防止被压缩 */
   }
-  
+
   /* 移动端全屏模式下的控制区域布局 */
   .mobile-fullscreen .control-area {
     height: 100vh !important;
   }
-  
+
   .mobile-fullscreen .control-area .content-area {
     flex: 1;
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
-  
+
   .mobile-fullscreen .control-area .tab-panel {
     flex: 1;
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
-  
+
   .mobile-fullscreen .control-area .tab-content {
     flex: 1;
     overflow: hidden;
   }
-  
+
   /* 移动端正常模式下的控制区域 */
   .control-area .content-area {
     flex: 0 0 auto; /* 不占用多余空间 */
     overflow: hidden;
   }
-  
+
   .control-area .tab-panel {
     height: auto;
   }
-  
+
   /* 移动端正常模式下，标签页内容不显示 */
   .app:not(.mobile-fullscreen) .control-area .tab-content {
     display: none;
   }
-  
+
   .control-header {
     flex-direction: row;
     gap: 8px;
@@ -450,12 +334,12 @@
     flex-shrink: 0;
     justify-content: space-between; /* 确保左右分布 */
   }
-  
+
   .header-left {
     flex: 1;
     min-width: 0;
   }
-  
+
   .app-title {
     font-size: 15px; /* 稍微减小字体 */
     margin: 0;
@@ -463,28 +347,28 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  
+
   .header-right {
     flex-shrink: 0;
   }
-  
+
   .game-controls {
     gap: 4px;
     display: flex;
     align-items: center;
   }
-  
+
   .btn {
-    padding: 5px 10px; /* 减小按钮内边距 */ 
+    padding: 5px 10px; /* 减小按钮内边距 */
     font-size: 12px;
     min-width: 32px; /* 减小最小宽度 */
   }
-  
+
   .content-area {
     flex: 1;
     overflow: hidden;
   }
-  
+
   .script-options {
     flex-direction: row;
     gap: 8px;
@@ -502,52 +386,52 @@
     padding: 6px 8px; /* 进一步减少内边距以节省空间 */
     justify-content: space-between;
   }
-  
+
   .header-left {
     flex: 1;
     min-width: 0;
     /* 不要居中对齐 */
   }
-  
+
   .app-title {
     font-size: 13px; /* 进一步减小字体以节省空间 */
   }
-  
+
   .header-right {
     flex-shrink: 0;
   }
-  
+
   .game-controls {
     gap: 3px; /* 减少按钮间距 */
     justify-content: flex-end;
   }
-  
+
   .btn {
     padding: 5px 7px; /* 进一步减小按钮大小 */
     min-width: 30px; /* 减小最小宽度 */
     font-size: 11px; /* 减小字体 */
   }
-  
+
   /* 超小屏幕下的游戏区域调整 */
   .app:not(.mobile-fullscreen) .game-area {
     min-height: 200px; /* 减少最小高度以适应更小的屏幕 */
   }
-  
+
   .simulation-canvas {
     width: 100%;
     height: 100%;
   }
-  
+
   .simulation-canvas canvas {
     width: 100% !important;
     height: 100% !important;
     object-fit: contain;
   }
-  
+
   .game-stats-overlay .stat-label {
     font-size: 8px;
   }
-  
+
   .game-stats-overlay .stat-value {
     font-size: 10px;
   }
@@ -570,7 +454,7 @@
     flex-direction: column;
     overflow: hidden;
   }
-  
+
   .mobile-fullscreen .script-tab-content .script-control {
     flex: 1;
     display: flex;
@@ -578,7 +462,7 @@
     min-height: 0;
     overflow: hidden;
   }
-  
+
   .mobile-fullscreen .script-tab-content .onframe-section {
     flex: 1;
     display: flex;
@@ -587,13 +471,13 @@
     min-height: 0;
     overflow: hidden;
   }
-  
+
   /* 确保代码编辑器在移动端全屏模式下正确填充空间 */
   .mobile-fullscreen .script-tab-content .onframe-section .code-editor {
     flex: 1;
     min-height: 0;
   }
-  
+
   .mobile-fullscreen .script-tab-content .script-actions {
     flex-shrink: 0;
     padding: 12px 16px 24px; /* 增加底部边距以避免被系统UI遮盖 */
@@ -605,13 +489,13 @@
     /* 添加安全边距支持 */
     padding-bottom: max(24px, env(safe-area-inset-bottom, 24px));
   }
-  
+
   .mobile-fullscreen .script-tab-content .script-actions .btn {
     padding: 12px 24px;
     font-size: 14px;
     min-width: 120px;
   }
-  
+
   /* 移动端全屏模式下的智能体参数标签页 */
   .mobile-fullscreen .agent-params-tab-content {
     height: 100%;
@@ -865,11 +749,11 @@
     margin: 20px;
     max-height: 90vh;
   }
-  
+
   .modal-header {
     padding: 16px 20px;
   }
-  
+
   .modal-header h3 {
     font-size: 18px;
   }
@@ -881,15 +765,15 @@
     margin: 10px;
     border-radius: 8px;
   }
-  
+
   .modal-header {
     padding: 12px 16px;
   }
-  
+
   .modal-header h3 {
     font-size: 16px;
   }
-  
+
   .modal-close-btn {
     width: 28px;
     height: 28px;
@@ -1014,28 +898,28 @@
   .script-manager {
     padding: 8px 12px;
   }
-  
+
   .script-manager-header {
     gap: 12px;
   }
-  
+
   .script-manager-header h4 {
     font-size: 13px;
     flex-shrink: 0;
   }
-  
+
   .script-controls {
     gap: 6px;
     flex: 1;
   }
-  
+
   .script-selector {
     flex: 1;
     min-width: 80px;
     font-size: 12px;
     padding: 5px 8px;
   }
-  
+
   .script-controls .btn {
     height: 28px;
     min-width: 28px;
@@ -1043,34 +927,34 @@
     font-size: 11px;
     border-radius: 4px;
   }
-  
+
   .script-controls .btn-icon {
     padding: 4px 6px;
     min-width: 28px;
     font-size: 12px;
   }
-  
+
   .mobile-fullscreen .script-manager {
     padding: 12px 16px;
   }
-  
+
   .mobile-fullscreen .script-manager-header {
     gap: 16px;
   }
-  
+
   .mobile-fullscreen .script-manager-header h4 {
     font-size: 14px;
   }
-  
+
   .mobile-fullscreen .script-controls {
     gap: 8px;
   }
-  
+
   .mobile-fullscreen .script-selector {
     font-size: 13px;
     padding: 6px 12px;
   }
-  
+
   .mobile-fullscreen .script-controls .btn {
     height: 36px;
     min-width: 36px;
@@ -1078,7 +962,7 @@
     font-size: 12px;
     border-radius: 10px;
   }
-  
+
   .mobile-fullscreen .script-controls .btn-icon {
     padding: 8px;
     min-width: 36px;

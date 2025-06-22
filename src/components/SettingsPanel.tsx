@@ -1,6 +1,6 @@
-import React from 'react';
-import { useLanguage, Language } from '../contexts/LanguageContext';
-import './SettingsPanel.css';
+import React from "react";
+import { useLanguage, Language } from "../contexts/LanguageContext";
+import "./SettingsPanel.css";
 
 const SettingsPanel: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
@@ -11,22 +11,22 @@ const SettingsPanel: React.FC = () => {
 
   return (
     <div className="settings-panel">
-      <h2 className="settings-title">{t('settings.title')}</h2>
-      
+      <h2 className="settings-title">{t("settings.title")}</h2>
+
       <div className="settings-section">
-        <label className="settings-label">{t('settings.language')}</label>
+        <label className="settings-label">{t("settings.language")}</label>
         <div className="language-options">
-          <button 
-            className={`language-btn ${language === 'zh' ? 'active' : ''}`}
-            onClick={() => handleLanguageChange('zh')}
+          <button
+            className={`language-btn ${language === "zh" ? "active" : ""}`}
+            onClick={() => handleLanguageChange("zh")}
           >
-            {t('settings.language.chinese')}
+            {t("settings.language.chinese")}
           </button>
-          <button 
-            className={`language-btn ${language === 'en' ? 'active' : ''}`}
-            onClick={() => handleLanguageChange('en')}
+          <button
+            className={`language-btn ${language === "en" ? "active" : ""}`}
+            onClick={() => handleLanguageChange("en")}
           >
-            {t('settings.language.english')}
+            {t("settings.language.english")}
           </button>
         </div>
       </div>
@@ -34,4 +34,4 @@ const SettingsPanel: React.FC = () => {
   );
 };
 
-export default SettingsPanel; 
+export default SettingsPanel;

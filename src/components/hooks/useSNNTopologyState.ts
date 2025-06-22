@@ -1,8 +1,16 @@
-import { useState, useCallback } from 'react';
-import { SNNNode, SNNSynapse, Receptor, Effector, ReceptorInput, EffectorOutput, ReceptorModality } from '../../types/simulation';
+import { useState, useCallback } from "react";
+import {
+  SNNNode,
+  SNNSynapse,
+  Receptor,
+  Effector,
+  ReceptorInput,
+  EffectorOutput,
+  ReceptorModality,
+} from "../../types/simulation";
 
 export interface DetailModalData {
-  type: 'neuron' | 'synapse' | 'receptor' | 'effector';
+  type: "neuron" | "synapse" | "receptor" | "effector";
   data: any;
 }
 
@@ -15,13 +23,13 @@ export interface SelectionState {
 
 export interface ConnectionState {
   from: string;
-  fromType: 'node' | 'receptor' | 'effector';
+  fromType: "node" | "receptor" | "effector";
   mouseX: number;
   mouseY: number;
 }
 
 export interface DragState {
-  type: 'node' | 'receptor' | 'effector';
+  type: "node" | "receptor" | "effector";
   id: string;
   offsetX: number;
   offsetY: number;
@@ -50,16 +58,21 @@ export const useSNNTopologyState = () => {
   const [dragging, setDragging] = useState<DragState | null>(null);
   const [connecting, setConnecting] = useState<ConnectionState | null>(null);
   const [isSelecting, setIsSelecting] = useState<SelectionState | null>(null);
-  const [showDetailModal, setShowDetailModal] = useState<DetailModalData | null>(null);
+  const [showDetailModal, setShowDetailModal] =
+    useState<DetailModalData | null>(null);
 
   // 画布状态
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
   const [canvasScale, setCanvasScale] = useState(1.0);
-  const [isDraggingCanvas, setIsDraggingCanvas] = useState<{ startX: number; startY: number } | null>(null);
+  const [isDraggingCanvas, setIsDraggingCanvas] = useState<{
+    startX: number;
+    startY: number;
+  } | null>(null);
 
   // 控制状态
-  const [enablePlayerControlOverride, setEnablePlayerControlOverride] = useState(false);
-  
+  const [enablePlayerControlOverride, setEnablePlayerControlOverride] =
+    useState(false);
+
   // 感受器滚动状态
   const [receptorScrollX, setReceptorScrollX] = useState(0);
 
@@ -71,22 +84,25 @@ export const useSNNTopologyState = () => {
   }, []);
 
   const addNode = useCallback((node: SNNNode) => {
-    setNodes(prev => [...prev, node]);
+    setNodes((prev) => [...prev, node]);
   }, []);
 
   const removeNodes = useCallback((nodeIds: string[]) => {
-    setNodes(prev => prev.filter(node => !nodeIds.includes(node.id)));
-    setSynapses(prev => prev.filter(synapse => 
-      !nodeIds.includes(synapse.from) && !nodeIds.includes(synapse.to)
-    ));
+    setNodes((prev) => prev.filter((node) => !nodeIds.includes(node.id)));
+    setSynapses((prev) =>
+      prev.filter(
+        (synapse) =>
+          !nodeIds.includes(synapse.from) && !nodeIds.includes(synapse.to),
+      ),
+    );
   }, []);
 
   const addSynapse = useCallback((synapse: SNNSynapse) => {
-    setSynapses(prev => [...prev, synapse]);
+    setSynapses((prev) => [...prev, synapse]);
   }, []);
 
   const removeSynapse = useCallback((synapseId: string) => {
-    setSynapses(prev => prev.filter(synapse => synapse.id !== synapseId));
+    setSynapses((prev) => prev.filter((synapse) => synapse.id !== synapseId));
   }, []);
 
   return {
@@ -133,6 +149,6 @@ export const useSNNTopologyState = () => {
     addNode,
     removeNodes,
     addSynapse,
-    removeSynapse
+    removeSynapse,
   };
-}; 
+};

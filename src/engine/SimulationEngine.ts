@@ -4,13 +4,13 @@
  * 使用模块化组件管理不同功能
  */
 
-import * as PIXI from 'pixi.js';
-import { Agent, Food, Obstacle, SimulationState } from '../types/simulation';
-import { WorldRenderer } from './WorldRenderer';
-import { VisionSystem } from './VisionSystem';
-import { AgentController } from './AgentController';
-import { WorldManager } from './WorldManager';
-import { CollisionDetector } from './CollisionDetector';
+import * as PIXI from "pixi.js";
+import { Agent, Food, Obstacle, SimulationState } from "../types/simulation";
+import { WorldRenderer } from "./WorldRenderer";
+import { VisionSystem } from "./VisionSystem";
+import { AgentController } from "./AgentController";
+import { WorldManager } from "./WorldManager";
+import { CollisionDetector } from "./CollisionDetector";
 
 export class SimulationEngine {
   // 核心系统
@@ -20,7 +20,7 @@ export class SimulationEngine {
   private agentController: AgentController;
   private worldManager: WorldManager;
   private collisionDetector: CollisionDetector;
-  
+
   // 运行状态
   private isRunning: boolean = false;
   private isPaused: boolean = false;
@@ -29,20 +29,20 @@ export class SimulationEngine {
   private fps: number = 0;
   private simulationTime: number = 0;
   private frameCount: number = 0;
-  
+
   // 游戏实体
   private agents: Agent[] = [];
   private foods: Food[] = [];
   private obstacles: Obstacle[] = [];
-  
+
   // 主控智能体ID
   private mainAgentId: number = 0;
-  
+
   // 统计数据
   private stats = {
     totalRewards: 0,
     totalCollisions: 0,
-    averageNeuralState: { motivation: 0, stress: 0, homeostasis: 0.5 }
+    averageNeuralState: { motivation: 0, stress: 0, homeostasis: 0.5 },
   };
 
   // 回调函数
@@ -51,9 +51,13 @@ export class SimulationEngine {
   // 战争迷雾设置
   private fogOfWarEnabled: boolean = false;
 
-  constructor(app: PIXI.Application, initialWidth: number = 1600, initialHeight: number = 1200) {
+  constructor(
+    app: PIXI.Application,
+    initialWidth: number = 1600,
+    initialHeight: number = 1200,
+  ) {
     this.app = app;
-    
+
     // 初始化各个系统
     this.renderer = new WorldRenderer(app);
     this.visionSystem = new VisionSystem();
@@ -83,8 +87,6 @@ export class SimulationEngine {
     return this.agentController.applyScript();
   }
 
-
-
   /**
    * 更新智能体参数配置
    */
@@ -95,21 +97,24 @@ export class SimulationEngine {
   }): void {
     // 更新视觉系统配置
     this.visionSystem.updateConfiguration(params);
-    
+
     // 为所有智能体重新初始化视野格子
     for (const agent of this.agents) {
       this.visionSystem.initializeVisionCells(agent);
-      
+
       // 如果是SNN控制的智能体，更新皮质柱配置
-      if (agent.controlType === 'snn' && params.visionCells) {
-        this.agentController.updateCorticalColumnConfiguration(agent.id, params.visionCells);
+      if (agent.controlType === "snn" && params.visionCells) {
+        this.agentController.updateCorticalColumnConfiguration(
+          agent.id,
+          params.visionCells,
+        );
       }
     }
-    
+
     // 立即重新渲染世界，确保即使在暂停状态下也能看到变化
     this.renderWorld();
-    
-    console.log('智能体参数已更新:', params);
+
+    console.log("智能体参数已更新:", params);
   }
 
   /**
@@ -123,7 +128,9 @@ export class SimulationEngine {
     return {
       visionCells: this.visionSystem.getVisionCells(),
       visionRange: this.visionSystem.getVisionRange(),
-      visionAngle: Math.round((this.visionSystem.getVisionAngle() * 180) / Math.PI) // 转换为度数
+      visionAngle: Math.round(
+        (this.visionSystem.getVisionAngle() * 180) / Math.PI,
+      ), // 转换为度数
     };
   }
 
@@ -153,33 +160,45 @@ export class SimulationEngine {
    * 初始化仿真系统
    */
   initialize(): void {
-    console.log('初始化仿真系统...');
-    
+    console.log("初始化仿真系统...");
+
     // 设置渲染器的世界尺寸
-    this.renderer.setWorldDimensions(this.worldManager.width, this.worldManager.height);
-    
+    this.renderer.setWorldDimensions(
+      this.worldManager.width,
+      this.worldManager.height,
+    );
+
     // 创建游戏世界
     this.agents = this.worldManager.createAgents();
     this.foods = this.worldManager.generateFood(this.agents);
     this.obstacles = this.worldManager.generateObstacles();
-    
+
     // 初始化智能体
     for (const agent of this.agents) {
       this.visionSystem.initializeVisionCells(agent);
-      
+
       // 为SNN控制的智能体创建神经网络
-      if (agent.controlType === 'snn') {
-        this.agentController.createCorticalColumn(agent.id, this.visionSystem.getVisionCells());
-        console.log('Created SNN agent:', agent.id, 'at position:', agent.x, agent.y);
+      if (agent.controlType === "snn") {
+        this.agentController.createCorticalColumn(
+          agent.id,
+          this.visionSystem.getVisionCells(),
+        );
+        console.log(
+          "Created SNN agent:",
+          agent.id,
+          "at position:",
+          agent.x,
+          agent.y,
+        );
       }
     }
-    
+
     // 设置镜头跟随主智能体
     const mainAgent = this.getMainAgent();
     if (mainAgent) {
       this.setCameraTarget(mainAgent);
     }
-    
+
     this.renderWorld();
     console.log(`仿真系统初始化完成: ${this.agents.length}个智能体`);
   }
@@ -188,7 +207,7 @@ export class SimulationEngine {
    * 启动仿真
    */
   start(): void {
-    console.log('启动仿真...');
+    console.log("启动仿真...");
     this.isRunning = true;
     this.isPaused = false;
     this.lastTime = performance.now();
@@ -202,7 +221,7 @@ export class SimulationEngine {
    * 暂停仿真
    */
   pause(): void {
-    console.log('暂停仿真...');
+    console.log("暂停仿真...");
     this.isPaused = true;
   }
 
@@ -210,7 +229,7 @@ export class SimulationEngine {
    * 恢复仿真
    */
   resume(): void {
-    console.log('恢复仿真...');
+    console.log("恢复仿真...");
     this.isPaused = false;
     this.lastTime = performance.now();
   }
@@ -219,13 +238,11 @@ export class SimulationEngine {
    * 停止仿真
    */
   stop(): void {
-    console.log('停止仿真...');
+    console.log("停止仿真...");
     this.isRunning = false;
     this.isPaused = false;
     this.gameLoopRunning = false;
   }
-
-
 
   /**
    * 游戏主循环
@@ -234,15 +251,15 @@ export class SimulationEngine {
     if (!this.gameLoopRunning) return;
 
     const currentTime = performance.now();
-    
+
     if (this.isRunning && !this.isPaused) {
       const deltaTime = Math.min((currentTime - this.lastTime) / 1000, 0.033);
       this.lastTime = currentTime;
-      
+
       this.updateSimulation(deltaTime);
       this.simulationTime += deltaTime;
       this.frameCount++;
-      
+
       if (this.frameCount % 60 === 0) {
         this.fps = Math.round(1 / deltaTime);
       }
@@ -262,11 +279,16 @@ export class SimulationEngine {
     // 更新智能体
     for (const agent of this.agents) {
       // 更新视觉系统
-      this.visionSystem.updateVisionCells(agent, this.agents, this.foods, this.obstacles);
-      
+      this.visionSystem.updateVisionCells(
+        agent,
+        this.agents,
+        this.foods,
+        this.obstacles,
+      );
+
       // 更新智能体控制
       this.agentController.updateAgent(agent, deltaTime);
-      
+
       // 处理边界碰撞
       this.worldManager.handleBoundaryCollision(agent);
     }
@@ -275,11 +297,18 @@ export class SimulationEngine {
     this.worldManager.updateMovingObstacles(this.obstacles, deltaTime);
 
     // 处理碰撞
-    const collisionResult = this.collisionDetector.handleCollisions(this.agents, this.foods, this.obstacles);
-    
+    const collisionResult = this.collisionDetector.handleCollisions(
+      this.agents,
+      this.foods,
+      this.obstacles,
+    );
+
     // 移除被吃掉的食物
-    this.foods = this.collisionDetector.removeFoods(this.foods, collisionResult.foodsToRemove);
-    
+    this.foods = this.collisionDetector.removeFoods(
+      this.foods,
+      collisionResult.foodsToRemove,
+    );
+
     // 更新统计数据
     this.stats.totalRewards += collisionResult.totalRewards;
     this.stats.totalCollisions += collisionResult.totalCollisions;
@@ -298,7 +327,7 @@ export class SimulationEngine {
       foods: this.foods,
       obstacles: this.obstacles,
       visionRange: this.visionSystem.getVisionRange(),
-      visionAngle: this.visionSystem.getVisionAngle()
+      visionAngle: this.visionSystem.getVisionAngle(),
     });
   }
 
@@ -309,17 +338,19 @@ export class SimulationEngine {
     let totalMotivation = 0;
     let totalStress = 0;
     let totalHomeostasis = 0;
-    
+
     for (const agent of this.agents) {
       totalMotivation += agent.motivation;
       totalStress += agent.stress;
       totalHomeostasis += agent.homeostasis;
     }
-    
+
     this.stats.averageNeuralState = {
-      motivation: this.agents.length > 0 ? totalMotivation / this.agents.length : 0,
+      motivation:
+        this.agents.length > 0 ? totalMotivation / this.agents.length : 0,
       stress: this.agents.length > 0 ? totalStress / this.agents.length : 0,
-      homeostasis: this.agents.length > 0 ? totalHomeostasis / this.agents.length : 0.5
+      homeostasis:
+        this.agents.length > 0 ? totalHomeostasis / this.agents.length : 0.5,
     };
 
     // 触发统计更新回调
@@ -328,7 +359,7 @@ export class SimulationEngine {
         fps: this.fps,
         totalReward: this.stats.totalRewards,
         collisionCount: this.stats.totalCollisions,
-        neuralState: this.stats.averageNeuralState
+        neuralState: this.stats.averageNeuralState,
       });
     }
   }
@@ -337,7 +368,7 @@ export class SimulationEngine {
    * 获取主智能体
    */
   getMainAgent(): Agent | null {
-    return this.agents.find(agent => agent.id === this.mainAgentId) || null;
+    return this.agents.find((agent) => agent.id === this.mainAgentId) || null;
   }
 
   /**
@@ -359,21 +390,21 @@ export class SimulationEngine {
         x: 0,
         y: 0,
         width: this.worldManager.width,
-        height: this.worldManager.height
+        height: this.worldManager.height,
       },
       stats: {
         fps: this.fps,
         totalReward: this.stats.totalRewards,
         collisionCount: this.stats.totalCollisions,
-        neuralState: this.stats.averageNeuralState
-      }
+        neuralState: this.stats.averageNeuralState,
+      },
     };
   }
 
   /**
    * 设置控制模式
    */
-  public setControlMode(newMode: 'snn' | 'random' | 'script'): void {
+  public setControlMode(newMode: "snn" | "random" | "script"): void {
     const mainAgent = this.getMainAgent();
     if (mainAgent) {
       mainAgent.controlType = newMode;
@@ -396,4 +427,4 @@ export class SimulationEngine {
     this.agentController.destroy();
     this.renderer.destroy();
   }
-} 
+}

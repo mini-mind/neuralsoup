@@ -6,7 +6,13 @@
   overflow: hidden;
   background: #1a1a1a;
   color: #ffffff;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
 }
 
 /* 左侧游戏区域 (60%) */
@@ -49,4 +55,4 @@
     border-left: none;
     border-top: 1px solid #444;
   }
-} 
+}

@@ -79,7 +79,7 @@
 }
 
 .help-button[data-tooltip]:hover::before {
-  content: '';
+  content: "";
   position: fixed;
   top: 65px;
   left: 50%;
@@ -273,4 +273,4 @@
     max-width: 280px;
     font-size: 11px;
   }
-} 
+}

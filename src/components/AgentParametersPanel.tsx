@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { AgentParameters } from './AgentParametersModal';
+import React, { useState, useEffect } from "react";
+import { AgentParameters } from "./AgentParametersModal";
 
 interface AgentParametersPanelProps {
   currentParams: AgentParameters;
@@ -8,7 +8,7 @@ interface AgentParametersPanelProps {
 
 const AgentParametersPanel: React.FC<AgentParametersPanelProps> = ({
   currentParams,
-  onApply
+  onApply,
 }) => {
   const [params, setParams] = useState<AgentParameters>(currentParams);
 
@@ -27,19 +27,19 @@ const AgentParametersPanel: React.FC<AgentParametersPanelProps> = ({
     <div className="agent-params-panel">
       <div className="panel-header">
         <h3>智能体参数设置</h3>
-        <button 
-          className={`btn ${hasChanges ? 'btn-primary' : 'btn-secondary'}`}
+        <button
+          className={`btn ${hasChanges ? "btn-primary" : "btn-secondary"}`}
           onClick={handleApply}
           disabled={!hasChanges}
         >
-          {hasChanges ? '应用设置' : '已应用'}
+          {hasChanges ? "应用设置" : "已应用"}
         </button>
       </div>
-      
+
       <div className="panel-body">
         <div className="param-section">
           <h4>视觉系统参数</h4>
-          
+
           <div className="param-item">
             <label>
               <span className="param-label">视野单元格数量</span>
@@ -50,7 +50,12 @@ const AgentParametersPanel: React.FC<AgentParametersPanelProps> = ({
                   max="72"
                   step="1"
                   value={params.visionCells}
-                  onChange={(e) => setParams({...params, visionCells: parseInt(e.target.value)})}
+                  onChange={(e) =>
+                    setParams({
+                      ...params,
+                      visionCells: parseInt(e.target.value),
+                    })
+                  }
                   className="param-slider"
                 />
                 <input
@@ -59,13 +64,19 @@ const AgentParametersPanel: React.FC<AgentParametersPanelProps> = ({
                   max="72"
                   step="1"
                   value={params.visionCells}
-                  onChange={(e) => setParams({...params, visionCells: parseInt(e.target.value)})}
+                  onChange={(e) =>
+                    setParams({
+                      ...params,
+                      visionCells: parseInt(e.target.value),
+                    })
+                  }
                   className="param-input"
                 />
               </div>
             </label>
             <div className="param-description">
-              影响视觉输入维度: {params.visionCells} × 3 = {params.visionCells * 3}维
+              影响视觉输入维度: {params.visionCells} × 3 ={" "}
+              {params.visionCells * 3}维
             </div>
           </div>
 
@@ -79,7 +90,12 @@ const AgentParametersPanel: React.FC<AgentParametersPanelProps> = ({
                   max="500"
                   step="25"
                   value={params.visionRange}
-                  onChange={(e) => setParams({...params, visionRange: parseInt(e.target.value)})}
+                  onChange={(e) =>
+                    setParams({
+                      ...params,
+                      visionRange: parseInt(e.target.value),
+                    })
+                  }
                   className="param-slider"
                 />
                 <input
@@ -88,14 +104,17 @@ const AgentParametersPanel: React.FC<AgentParametersPanelProps> = ({
                   max="500"
                   step="25"
                   value={params.visionRange}
-                  onChange={(e) => setParams({...params, visionRange: parseInt(e.target.value)})}
+                  onChange={(e) =>
+                    setParams({
+                      ...params,
+                      visionRange: parseInt(e.target.value),
+                    })
+                  }
                   className="param-input"
                 />
               </div>
             </label>
-            <div className="param-description">
-              智能体能够感知到的最大距离
-            </div>
+            <div className="param-description">智能体能够感知到的最大距离</div>
           </div>
 
           <div className="param-item">
@@ -108,23 +127,31 @@ const AgentParametersPanel: React.FC<AgentParametersPanelProps> = ({
                   max="180"
                   step="5"
                   value={params.visionAngle}
-                  onChange={(e) => setParams({...params, visionAngle: parseInt(e.target.value)})}
+                  onChange={(e) =>
+                    setParams({
+                      ...params,
+                      visionAngle: parseInt(e.target.value),
+                    })
+                  }
                   className="param-slider"
                 />
                 <input
                   type="number"
                   min="30"
                   max="180"
-                  step="5" 
+                  step="5"
                   value={params.visionAngle}
-                  onChange={(e) => setParams({...params, visionAngle: parseInt(e.target.value)})}
+                  onChange={(e) =>
+                    setParams({
+                      ...params,
+                      visionAngle: parseInt(e.target.value),
+                    })
+                  }
                   className="param-input"
                 />
               </div>
             </label>
-            <div className="param-description">
-              智能体的视野扇形角度范围
-            </div>
+            <div className="param-description">智能体的视野扇形角度范围</div>
           </div>
         </div>
       </div>
@@ -132,4 +159,4 @@ const AgentParametersPanel: React.FC<AgentParametersPanelProps> = ({
   );
 };
 
-export default AgentParametersPanel; 
+export default AgentParametersPanel;

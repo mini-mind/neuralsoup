@@ -1,0 +1,316 @@
+/* 移动端专用样式 */
+
+/* 平板设备 (1024px以下) */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .control-header {
+    padding: 16px 20px;
+    min-height: 70px;
+  }
+
+  .app-title {
+    font-size: 20px;
+  }
+
+  .game-area {
+    min-height: 60vh;
+  }
+}
+
+/* 移动设备 (768px以下) */
+@media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* 移动端全屏模式 */
+  .app.mobile-fullscreen {
+    flex-direction: row;
+  }
+
+  .app.mobile-fullscreen .control-area {
+    width: 100% !important;
+    height: 100vh;
+  }
+
+  .game-area {
+    width: 100% !important;
+    height: 60vh;
+    order: 1;
+    flex-shrink: 0;
+  }
+
+  /* 移动端正常模式下游戏区域高度固定 */
+  .app:not(.mobile-fullscreen) .game-area {
+    height: 60vh !important;
+    width: 100% !important;
+    min-height: 400px;
+    max-height: 60vh;
+  }
+
+  .simulation-canvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  .simulation-canvas canvas {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain;
+  }
+
+  /* 游戏统计覆盖层在移动端的调整 */
+  .game-stats-overlay {
+    top: 8px;
+    left: 8px;
+    gap: 4px;
+  }
+
+  .game-stats-overlay .stat-item {
+    padding: 4px 8px;
+  }
+
+  .game-stats-overlay .stat-label {
+    font-size: 9px;
+  }
+
+  .game-stats-overlay .stat-value {
+    font-size: 12px;
+  }
+
+  /* 隐藏拖拽分割条 */
+  .resize-handle {
+    display: none;
+  }
+
+  .control-area {
+    width: 100% !important;
+    height: 40vh;
+    order: 2;
+    flex-shrink: 0;
+    background: #2a2a2a;
+  }
+
+  /* 移动端全屏时的控制区域 */
+  .mobile-fullscreen .control-area {
+    height: 100vh !important;
+    order: 1;
+  }
+
+  .mobile-fullscreen .control-area .content-area {
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* 移动端全屏时的标签页布局 */
+  .mobile-fullscreen .control-area .tab-panel {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 移动端全屏时内容区域 */
+  .mobile-fullscreen .control-area .tab-content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 移动端正常模式下控制区域布局 */
+  .control-area .content-area {
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .control-area .tab-panel {
+    height: 100%;
+  }
+
+  /* 移动端正常模式下隐藏标签页内容 */
+  .app:not(.mobile-fullscreen) .control-area .tab-content {
+    display: none;
+  }
+
+  .control-header {
+    padding: 16px 20px;
+    min-height: 70px;
+    gap: 16px;
+  }
+
+  .header-left {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .app-title {
+    font-size: 18px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-right {
+    flex-shrink: 0;
+  }
+
+  .game-controls {
+    gap: 8px;
+  }
+
+  .btn {
+    padding: 8px 12px;
+    font-size: 14px;
+    min-width: 40px;
+  }
+
+  .content-area {
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .script-options {
+    padding: 12px 16px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+}
+
+/* 小屏手机 (480px以下) */
+@media (max-width: 480px) {
+  .control-header {
+    padding: 12px 16px;
+    min-height: 60px;
+    gap: 12px;
+  }
+
+  .header-left {
+    flex: 1;
+  }
+
+  .app-title {
+    font-size: 16px;
+  }
+
+  .header-right {
+    flex-shrink: 0;
+  }
+
+  .game-controls {
+    gap: 6px;
+  }
+
+  .btn {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-width: 36px;
+  }
+
+  /* 小屏设备上的游戏区域 */
+  .app:not(.mobile-fullscreen) .game-area {
+    height: 50vh !important;
+    min-height: 300px;
+  }
+
+  .simulation-canvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  .simulation-canvas canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  .game-stats-overlay .stat-label {
+    font-size: 8px;
+  }
+
+  .game-stats-overlay .stat-value {
+    font-size: 11px;
+  }
+}
+
+/* 脚本标签页内容的移动端适配 */
+.script-tab-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .mobile-fullscreen .script-tab-content {
+    height: 100%;
+    padding: 0;
+  }
+
+  .mobile-fullscreen .script-tab-content .script-control {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+  }
+
+  .mobile-fullscreen .script-tab-content .onframe-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .mobile-fullscreen .script-tab-content .onframe-section .code-editor {
+    flex: 1;
+    min-height: 200px;
+  }
+
+  .mobile-fullscreen .script-tab-content .script-actions {
+    padding: 12px 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .mobile-fullscreen .script-tab-content .script-actions .btn {
+    flex: 1;
+    min-width: 80px;
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+
+  .mobile-fullscreen .agent-params-tab-content {
+    padding: 16px;
+    overflow-y: auto;
+    height: 100%;
+  }
+}
+
+/* 标签页内容通用样式 */
+.script-tab-content .script-control {
+  flex-shrink: 0;
+}
+
+.script-tab-content .onframe-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.script-actions {
+  padding: 16px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.agent-params-tab-content {
+  overflow-y: auto;
+  height: 100%;
+}

@@ -3,14 +3,17 @@
  * 负责处理智能体与环境元素间的碰撞检测和处理
  */
 
-import { Agent, Food, Obstacle } from '../types/simulation';
+import { Agent, Food, Obstacle } from "../types/simulation";
 
 export class CollisionDetector {
-  
   /**
    * 处理所有碰撞
    */
-  public handleCollisions(agents: Agent[], foods: Food[], obstacles: Obstacle[]): {
+  public handleCollisions(
+    agents: Agent[],
+    foods: Food[],
+    obstacles: Obstacle[],
+  ): {
     foodsToRemove: Food[];
     totalRewards: number;
     totalCollisions: number;
@@ -37,14 +40,17 @@ export class CollisionDetector {
     return {
       foodsToRemove,
       totalRewards,
-      totalCollisions
+      totalCollisions,
     };
   }
 
   /**
    * 检查智能体与食物的碰撞
    */
-  private checkFoodCollisions(agent: Agent, foods: Food[]): {
+  private checkFoodCollisions(
+    agent: Agent,
+    foods: Food[],
+  ): {
     foodsToRemove: Food[];
     reward: number;
   } {
@@ -55,21 +61,23 @@ export class CollisionDetector {
       const dx = agent.x - food.x;
       const dy = agent.y - food.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      
+
       // 智能体半径约为15，食物半径为8
       if (distance < 15 + food.radius) {
         // 碰撞检测成功
         foodsToRemove.push(food);
-        
+
         // 增加奖励和动机
         agent.totalReward += food.nutritionValue;
         agent.motivation = Math.min(1, agent.motivation + 0.3);
         agent.health = Math.min(100, agent.health + food.nutritionValue);
         agent.energy = Math.min(100, agent.energy + food.nutritionValue);
-        
+
         reward += food.nutritionValue;
-        
-        console.log(`Agent ${agent.id} ate food ${food.id}, reward: ${food.nutritionValue}`);
+
+        console.log(
+          `Agent ${agent.id} ate food ${food.id}, reward: ${food.nutritionValue}`,
+        );
       }
     }
 
@@ -86,23 +94,23 @@ export class CollisionDetector {
       const dx = agent.x - obstacle.x;
       const dy = agent.y - obstacle.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      
+
       // 智能体半径为15
       if (distance < 15 + obstacle.radius) {
         // 碰撞处理：推开智能体
-        const pushDistance = (15 + obstacle.radius) - distance + 1;
+        const pushDistance = 15 + obstacle.radius - distance + 1;
         const pushAngle = Math.atan2(dy, dx);
-        
+
         agent.x += Math.cos(pushAngle) * pushDistance;
         agent.y += Math.sin(pushAngle) * pushDistance;
-        
+
         // 减少健康值和增加压力
         agent.health = Math.max(0, agent.health - 5);
         agent.stress = Math.min(1, agent.stress + 0.2);
         agent.collisionCount++;
-        
+
         collisions++;
-        
+
         console.log(`Agent ${agent.id} collided with obstacle ${obstacle.id}`);
       }
     }
@@ -118,31 +126,31 @@ export class CollisionDetector {
 
     for (const otherAgent of agents) {
       if (agent.id === otherAgent.id) continue;
-      
+
       const dx = agent.x - otherAgent.x;
       const dy = agent.y - otherAgent.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      
+
       // 两个智能体的半径都是15
       if (distance < 15 + 15) {
         // 碰撞处理：相互推开
         const pushDistance = (30 - distance) / 2 + 1;
         const pushAngle = Math.atan2(dy, dx);
-        
+
         agent.x += Math.cos(pushAngle) * pushDistance;
         agent.y += Math.sin(pushAngle) * pushDistance;
         otherAgent.x -= Math.cos(pushAngle) * pushDistance;
         otherAgent.y -= Math.sin(pushAngle) * pushDistance;
-        
+
         // 增加压力
         agent.stress = Math.min(1, agent.stress + 0.1);
         otherAgent.stress = Math.min(1, otherAgent.stress + 0.1);
-        
+
         agent.collisionCount++;
         otherAgent.collisionCount++;
-        
+
         collisions++;
-        
+
         console.log(`Agent ${agent.id} collided with agent ${otherAgent.id}`);
       }
     }
@@ -157,18 +165,21 @@ export class CollisionDetector {
     const dx = agent.x - food.x;
     const dy = agent.y - food.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
-    
+
     return distance < 15 + food.radius;
   }
 
   /**
    * 检查单个智能体与障碍物的碰撞（用于路径规划）
    */
-  public checkSingleAgentObstacleCollision(agent: Agent, obstacle: Obstacle): boolean {
+  public checkSingleAgentObstacleCollision(
+    agent: Agent,
+    obstacle: Obstacle,
+  ): boolean {
     const dx = agent.x - obstacle.x;
     const dy = agent.y - obstacle.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
-    
+
     return distance < 15 + obstacle.radius;
   }
 
@@ -176,13 +187,19 @@ export class CollisionDetector {
    * 移除被吃掉的食物
    */
   public removeFoods(foods: Food[], foodsToRemove: Food[]): Food[] {
-    return foods.filter(food => !foodsToRemove.some(removeFood => removeFood.id === food.id));
+    return foods.filter(
+      (food) => !foodsToRemove.some((removeFood) => removeFood.id === food.id),
+    );
   }
 
   /**
    * 获取智能体周围的危险程度（用于AI决策）
    */
-  public getDangerLevel(agent: Agent, obstacles: Obstacle[], otherAgents: Agent[]): number {
+  public getDangerLevel(
+    agent: Agent,
+    obstacles: Obstacle[],
+    otherAgents: Agent[],
+  ): number {
     let dangerLevel = 0;
     const dangerRadius = 50; // 危险感知半径
 
@@ -191,7 +208,7 @@ export class CollisionDetector {
       const dx = agent.x - obstacle.x;
       const dy = agent.y - obstacle.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      
+
       if (distance < dangerRadius) {
         dangerLevel += (dangerRadius - distance) / dangerRadius;
       }
@@ -200,16 +217,16 @@ export class CollisionDetector {
     // 检查其他智能体威胁
     for (const otherAgent of otherAgents) {
       if (agent.id === otherAgent.id) continue;
-      
+
       const dx = agent.x - otherAgent.x;
       const dy = agent.y - otherAgent.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      
+
       if (distance < dangerRadius) {
-        dangerLevel += 0.5 * (dangerRadius - distance) / dangerRadius;
+        dangerLevel += (0.5 * (dangerRadius - distance)) / dangerRadius;
       }
     }
 
     return Math.min(1, dangerLevel); // 限制在0-1范围内
   }
-} 
+}

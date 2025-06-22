@@ -17,19 +17,24 @@
   gap: 8px;
   overflow: hidden;
   backdrop-filter: blur(10px);
-  box-shadow: 
+  box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.15),
     0 0 0 1px rgba(255, 255, 255, 0.1) inset;
 }
 
 .btn::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
   transition: left 0.5s;
 }
 
@@ -39,7 +44,7 @@
 
 .btn:hover {
   transform: translateY(-2px);
-  box-shadow: 
+  box-shadow:
     0 8px 25px rgba(0, 0, 0, 0.2),
     0 0 0 1px rgba(255, 255, 255, 0.15) inset;
 }
@@ -53,14 +58,14 @@
 .btn-primary {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  box-shadow: 
+  box-shadow:
     0 4px 12px rgba(102, 126, 234, 0.4),
     0 0 0 1px rgba(255, 255, 255, 0.1) inset;
 }
 
 .btn-primary:hover {
   background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
-  box-shadow: 
+  box-shadow:
     0 8px 25px rgba(102, 126, 234, 0.5),
     0 0 0 1px rgba(255, 255, 255, 0.15) inset;
 }
@@ -70,7 +75,7 @@
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   opacity: 0.7;
   color: white;
-  box-shadow: 
+  box-shadow:
     0 4px 12px rgba(107, 114, 128, 0.3),
     0 0 0 1px rgba(255, 255, 255, 0.1) inset;
 }
@@ -78,7 +83,7 @@
 .btn-secondary:hover {
   opacity: 1;
   background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
-  box-shadow: 
+  box-shadow:
     0 8px 25px rgba(107, 114, 128, 0.4),
     0 0 0 1px rgba(255, 255, 255, 0.15) inset;
 }
@@ -87,14 +92,14 @@
 .btn-warning {
   background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
   color: white;
-  box-shadow: 
+  box-shadow:
     0 4px 12px rgba(255, 107, 53, 0.4),
     0 0 0 1px rgba(255, 255, 255, 0.1) inset;
 }
 
 .btn-warning:hover {
   background: linear-gradient(135deg, #e55a2b 0%, #de841a 100%);
-  box-shadow: 
+  box-shadow:
     0 8px 25px rgba(255, 107, 53, 0.5),
     0 0 0 1px rgba(255, 255, 255, 0.15) inset;
 }
@@ -104,14 +109,14 @@
   background: linear-gradient(135deg, #ffd700 0%, #ffb347 100%);
   color: #1a1a1a;
   font-weight: 700;
-  box-shadow: 
+  box-shadow:
     0 4px 12px rgba(255, 215, 0, 0.4),
     0 0 0 1px rgba(255, 255, 255, 0.2) inset;
 }
 
 .btn-apply:hover {
   background: linear-gradient(135deg, #ffed4e 0%, #ffa500 100%);
-  box-shadow: 
+  box-shadow:
     0 8px 25px rgba(255, 215, 0, 0.5),
     0 0 0 1px rgba(255, 255, 255, 0.25) inset;
 }
@@ -121,14 +126,14 @@
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   color: white;
   font-weight: 700;
-  box-shadow: 
+  box-shadow:
     0 4px 12px rgba(16, 185, 129, 0.4),
     0 0 0 1px rgba(255, 255, 255, 0.2) inset;
 }
 
 .btn-success:hover {
   background: linear-gradient(135deg, #0ea670 0%, #047857 100%);
-  box-shadow: 
+  box-shadow:
     0 8px 25px rgba(16, 185, 129, 0.5),
     0 0 0 1px rgba(255, 255, 255, 0.25) inset;
 }
@@ -138,14 +143,14 @@
   background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   color: white;
   font-weight: 700;
-  box-shadow: 
+  box-shadow:
     0 4px 12px rgba(239, 68, 68, 0.4),
     0 0 0 1px rgba(255, 255, 255, 0.2) inset;
 }
 
 .btn-danger:hover {
   background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-  box-shadow: 
+  box-shadow:
     0 8px 25px rgba(239, 68, 68, 0.5),
     0 0 0 1px rgba(255, 255, 255, 0.25) inset;
 }
@@ -191,7 +196,7 @@ kbd {
   font-size: 11px;
   color: #e5e7eb;
   font-weight: 600;
-  box-shadow: 
+  box-shadow:
     0 2px 4px rgba(0, 0, 0, 0.2),
     0 0 0 1px rgba(255, 255, 255, 0.1) inset;
 }
@@ -203,7 +208,7 @@ kbd {
 }
 
 .btn.loading::after {
-  content: '';
+  content: "";
   position: absolute;
   width: 16px;
   height: 16px;
@@ -214,8 +219,12 @@ kbd {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* 响应式设计 */
@@ -227,7 +236,7 @@ kbd {
     font-size: 13px;
     border-radius: 10px;
   }
-  
+
   .btn-small {
     padding: 6px 12px;
     height: 36px;
@@ -235,7 +244,7 @@ kbd {
     font-size: 11px;
     border-radius: 8px;
   }
-  
+
   .game-controls {
     gap: 6px;
     padding: 4px;
@@ -251,7 +260,7 @@ kbd {
     font-size: 12px;
     border-radius: 8px;
   }
-  
+
   .btn-small {
     padding: 6px 10px;
     height: 32px;
@@ -259,19 +268,19 @@ kbd {
     font-size: 10px;
     border-radius: 6px;
   }
-  
+
   .game-controls {
     gap: 4px;
     padding: 3px;
     border-radius: 10px;
   }
-  
+
   .btn[title*="手动控制"] {
     font-size: 10px;
     font-weight: 700;
   }
-  
+
   .btn[title*="智能体参数"] {
     font-size: 14px;
   }
-} 
+}

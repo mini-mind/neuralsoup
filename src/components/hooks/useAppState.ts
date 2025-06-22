@@ -3,8 +3,8 @@
  * 统一管理应用的各种状态
  */
 
-import { useState, useCallback } from 'react';
-import { SimulationEngine } from '../../engine/SimulationEngine';
+import { useState, useCallback } from "react";
+import { SimulationEngine } from "../../engine/SimulationEngine";
 
 export interface AgentParameters {
   visionCells: number;
@@ -18,33 +18,33 @@ export const useAppState = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [isScriptMode, setIsScriptMode] = useState(false);
   const [enableManualOverride, setEnableManualOverride] = useState(false);
-  
+
   // 拖拽状态
   const [isDragging, setIsDragging] = useState(false);
   const [gameAreaWidth, setGameAreaWidth] = useState(60);
-  
+
   // 模态框状态
   const [showAgentParamsModal, setShowAgentParamsModal] = useState(false);
-  
+
   // 画布尺寸
   const [canvasWidth, setCanvasWidth] = useState(window.innerWidth * 0.6);
   const [canvasHeight, setCanvasHeight] = useState(window.innerHeight);
-  
+
   // 智能体参数
   const [agentParameters, setAgentParameters] = useState<AgentParameters>({
     visionCells: 36,
     visionRange: 250,
-    visionAngle: 120
+    visionAngle: 120,
   });
-  
+
   // 统计数据
   const [stats, setStats] = useState({
     fps: 0,
     totalReward: 0,
     collisionCount: 0,
-    neuralState: { motivation: 0, stress: 0, homeostasis: 0.5 }
+    neuralState: { motivation: 0, stress: 0, homeostasis: 0.5 },
   });
-  
+
   // 脚本代码
   const [onFrameCode, setOnFrameCode] = useState(`// 实现每帧的智能体控制逻辑
 // 这段代码会在点击"应用脚本"时执行一次进行初始化
@@ -110,7 +110,7 @@ function onFrame(state, action) {
     agentParameters,
     stats,
     onFrameCode,
-    
+
     // 状态设置器
     setIsRunning,
     setIsPaused,
@@ -124,9 +124,9 @@ function onFrame(state, action) {
     setAgentParameters,
     setStats,
     setOnFrameCode,
-    
+
     // 辅助函数
     calculateCanvasDimensions,
     formatNumber,
   };
-}; 
+};

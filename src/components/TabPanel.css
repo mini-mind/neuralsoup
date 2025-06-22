@@ -35,7 +35,7 @@
 }
 
 .tab-button.active::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: -2px;
   left: 0;
@@ -79,16 +79,16 @@
     min-height: 44px;
     padding: 0 4px; /* 添加少量水平内边距 */
   }
-  
+
   /* 移动端正常模式下不显示内容时的样式 */
   .tab-content:empty {
     display: none;
   }
-  
+
   .tab-header::-webkit-scrollbar {
     display: none; /* Chrome, Safari */
   }
-  
+
   .tab-button {
     padding: 8px 14px; /* 减小内边距 */
     font-size: 13px;
@@ -99,13 +99,14 @@
     align-items: center;
     justify-content: center;
   }
-  
-  .settings-button, .collapse-button {
+
+  .settings-button,
+  .collapse-button {
     padding: 8px 10px; /* 减小内边距 */
     min-width: 44px;
     flex-shrink: 0;
   }
-  
+
   /* 全屏模式下的收起按钮样式优化 */
   .collapse-button {
     background: rgba(245, 158, 11, 0.1) !important;
@@ -114,7 +115,7 @@
     font-weight: 600 !important;
     font-size: 14px !important;
   }
-  
+
   .collapse-button:hover {
     background: rgba(245, 158, 11, 0.2) !important;
     border-color: rgba(245, 158, 11, 0.5) !important;
@@ -126,20 +127,21 @@
     min-height: 40px; /* 稍微减少高度 */
     padding: 0 2px; /* 减少水平内边距 */
   }
-  
+
   .tab-button {
     padding: 6px 10px; /* 减小内边距 */
     font-size: 12px;
     min-height: 40px; /* 匹配头部高度 */
   }
-  
-  .settings-button, .collapse-button {
+
+  .settings-button,
+  .collapse-button {
     padding: 6px 8px; /* 减小内边距 */
     min-width: 40px;
   }
-  
+
   .collapse-button {
     font-size: 12px !important;
     border-radius: 4px !important;
   }
-} 
+}

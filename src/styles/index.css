@@ -1,13 +1,13 @@
 /* 样式模块索引 */
 
 /* 基础布局 */
-@import './layout.css';
+@import "./layout.css";
 
 /* 控制组件 */
-@import './controls.css';
+@import "./controls.css";
 
 /* 按钮样式 */
-@import './buttons.css';
+@import "./buttons.css";
 
 /* 仿真画布 */
 .simulation-canvas {
@@ -22,4 +22,4 @@
   height: 100%;
 }
 
-/* 已移动到App.css中统一管理脚本控制样式 */ 
+/* 已移动到App.css中统一管理脚本控制样式 */

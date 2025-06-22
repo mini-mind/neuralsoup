@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import './TabPanel.css';
+import React, { useState, useEffect } from "react";
+import "./TabPanel.css";
 
 interface Tab {
   id: string;
@@ -20,17 +20,17 @@ interface TabPanelProps {
   collapseText?: string;
 }
 
-const TabPanel: React.FC<TabPanelProps> = ({ 
-  tabs, 
-  defaultActiveTab, 
-  showSettingsButton = false, 
+const TabPanel: React.FC<TabPanelProps> = ({
+  tabs,
+  defaultActiveTab,
+  showSettingsButton = false,
   onSettingsClick,
   isMobile = false,
   mobileFullscreenTab,
   onMobileTabClick,
   onMobileCollapseClick,
   showContentInMobileNormalMode = true,
-  collapseText = "↓"
+  collapseText = "↓",
 }) => {
   const [activeTab, setActiveTab] = useState(defaultActiveTab || tabs[0]?.id);
 
@@ -58,7 +58,7 @@ const TabPanel: React.FC<TabPanelProps> = ({
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
+            className={`tab-button ${activeTab === tab.id ? "active" : ""}`}
             onClick={() => handleTabClick(tab.id)}
           >
             {tab.label}
@@ -87,17 +87,17 @@ const TabPanel: React.FC<TabPanelProps> = ({
       </div>
       <div className="tab-content">
         {/* 移动端：只在全屏模式或允许正常模式显示内容时显示 */}
-        {isMobile ? (
-          mobileFullscreenTab ? 
-            tabs.find((tab) => tab.id === activeTab)?.content :
-            (showContentInMobileNormalMode ? tabs.find((tab) => tab.id === activeTab)?.content : null)
-        ) : (
-          /* 桌面端：正常显示内容 */
-          tabs.find((tab) => tab.id === activeTab)?.content
-        )}
+        {isMobile
+          ? mobileFullscreenTab
+            ? tabs.find((tab) => tab.id === activeTab)?.content
+            : showContentInMobileNormalMode
+              ? tabs.find((tab) => tab.id === activeTab)?.content
+              : null
+          : /* 桌面端：正常显示内容 */
+            tabs.find((tab) => tab.id === activeTab)?.content}
       </div>
     </div>
   );
 };
 
-export default TabPanel; 
+export default TabPanel;

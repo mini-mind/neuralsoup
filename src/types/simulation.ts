@@ -8,24 +8,24 @@ export interface Position {
 }
 
 export interface NeuralState {
-  motivation: number;   // 动机 [0-1] 
-  stress: number;       // 压力 [0-1]
-  homeostasis: number;  // 稳态 [0-1]
+  motivation: number; // 动机 [0-1]
+  stress: number; // 压力 [0-1]
+  homeostasis: number; // 稳态 [0-1]
 }
 
 // IZ神经元参数
 export interface IZNeuronParams {
-  a: number;  // 恢复参数 (0.02)
-  b: number;  // 敏感度参数 (0.2)
-  c: number;  // 重置后的膜电位 (-65)
-  d: number;  // 重置后的恢复变量 (8)
+  a: number; // 恢复参数 (0.02)
+  b: number; // 敏感度参数 (0.2)
+  c: number; // 重置后的膜电位 (-65)
+  d: number; // 重置后的恢复变量 (8)
   threshold: number; // 发放阈值 (30)
 }
 
 // IZ神经元状态
 export interface IZNeuronState {
-  v: number;  // 膜电位
-  u: number;  // 恢复变量
+  v: number; // 膜电位
+  u: number; // 恢复变量
   spike: boolean; // 是否发放脉冲
   lastSpikeTime: number; // 最后发放时间
 }
@@ -35,25 +35,25 @@ export interface SNNNode {
   id: string;
   x: number;
   y: number;
-  type: 'input' | 'neuron' | 'output';
+  type: "input" | "neuron" | "output";
   label: string;
   params?: IZNeuronParams; // 神经元参数（仅神经元类型有）
-  state?: IZNeuronState;   // 神经元状态（仅神经元类型有）
-  inputVoltage?: number;   // 输入电压（输入类型专用）
-  outputSignal?: number;   // 输出信号强度（输出类型专用）
+  state?: IZNeuronState; // 神经元状态（仅神经元类型有）
+  inputVoltage?: number; // 输入电压（输入类型专用）
+  outputSignal?: number; // 输出信号强度（输出类型专用）
 }
 
 // 突触连接
 export interface SNNSynapse {
   id: string;
   from: string; // 源节点ID
-  to: string;   // 目标节点ID
+  to: string; // 目标节点ID
   weight: number; // 连接权重
-  delay: number;  // 传导延迟 (ms)
+  delay: number; // 传导延迟 (ms)
 }
 
 // 感受器模态类型
-export type ModalityType = 'vision' | 'audio' | 'touch';
+export type ModalityType = "vision" | "audio" | "touch";
 
 // 感受器（输入连接点组）
 export interface Receptor {
@@ -81,7 +81,7 @@ export interface ReceptorInput {
   y: number;
   label: string;
   voltage: number; // 施加的电压
-  colorType?: 'R' | 'G' | 'B'; // RGB颜色类型，用于视觉输入
+  colorType?: "R" | "G" | "B"; // RGB颜色类型，用于视觉输入
 }
 
 // 效应器（输出连接点组）
@@ -114,23 +114,23 @@ export interface Agent {
   velocity: { x: number; y: number };
   health: number;
   energy: number;
-  
+
   // 视觉系统
   visionCells: VisionCell[]; // 8个视野格子
   visualInput: number[]; // 24维视觉输入(8格子 × 3颜色)
-  
+
   // 控制类型
-  controlType: 'snn' | 'random' | 'script'; // SNN控制、随机游走或脚本控制
-  
+  controlType: "snn" | "random" | "script"; // SNN控制、随机游走或脚本控制
+
   // 神经状态
   motivation: number; // 动机 [0, 1]
-  stress: number;     // 压力 [0, 1] 
+  stress: number; // 压力 [0, 1]
   homeostasis: number; // 稳态 [0, 1]
-  
+
   // 统计数据
   totalReward: number;
   collisionCount: number;
-  
+
   // 渲染对象
   sprite?: any;
   visionSprites?: any[]; // 视野格子的渲染对象
@@ -193,17 +193,17 @@ export interface SimulationState {
 }
 
 export interface SensorInput {
-  direction: number;  // 方向（弧度）
+  direction: number; // 方向（弧度）
   channels: {
-    r: number;  // 红色通道 [0-1]
-    g: number;  // 绿色通道 [0-1]  
-    b: number;  // 蓝色通道 [0-1]
+    r: number; // 红色通道 [0-1]
+    g: number; // 绿色通道 [0-1]
+    b: number; // 蓝色通道 [0-1]
   };
 }
 
 export interface ActionOutput {
-  turnLeft: number;   // 左转强度 [0-1]
-  turnRight: number;  // 右转强度 [0-1]
+  turnLeft: number; // 左转强度 [0-1]
+  turnRight: number; // 右转强度 [0-1]
   moveForward: number; // 前进强度 [0-1]
 }
 
@@ -214,4 +214,4 @@ export interface VisionCell {
   y: number; // 世界坐标系中的渲染位置
   color: { r: number; g: number; b: number };
   closestDistance?: number; // 新增：记录该视野格子检测到的最近元素的距离
-} 
+}

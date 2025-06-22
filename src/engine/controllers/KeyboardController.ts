@@ -4,7 +4,7 @@
 
 export class KeyboardController {
   private keyStates: { [key: string]: boolean } = {};
-  
+
   // 缓存输入结果，避免每帧重复计算
   private cachedInputs: [number, number, number, number] = [0, 0, 0, 0];
   private hasAnyInput: boolean = false;
@@ -18,15 +18,15 @@ export class KeyboardController {
    * 设置键盘控制监听
    */
   private setupKeyboardControls(): void {
-    window.addEventListener('keydown', (e) => {
+    window.addEventListener("keydown", (e) => {
       const key = e.key.toLowerCase();
       if (!this.keyStates[key]) {
         this.keyStates[key] = true;
         this.inputsDirty = true; // 标记输入已变化
       }
     });
-    
-    window.addEventListener('keyup', (e) => {
+
+    window.addEventListener("keyup", (e) => {
       const key = e.key.toLowerCase();
       if (this.keyStates[key]) {
         this.keyStates[key] = false;
@@ -63,49 +63,50 @@ export class KeyboardController {
     let moveForward = 0;
     let turnRight = 0;
     let moveBackward = 0;
-    
+
     // 前进控制
-    if (this.keyStates['arrowup'] || this.keyStates['w']) {
+    if (this.keyStates["arrowup"] || this.keyStates["w"]) {
       moveForward = 1.0;
     }
-    
+
     // 后退控制
-    if (this.keyStates['arrowdown'] || this.keyStates['s']) {
+    if (this.keyStates["arrowdown"] || this.keyStates["s"]) {
       moveBackward = 1.0;
     }
-    
+
     // 左转控制
-    if (this.keyStates['arrowleft'] || this.keyStates['a']) {
+    if (this.keyStates["arrowleft"] || this.keyStates["a"]) {
       turnLeft = 1.0;
     }
-    
+
     // 右转控制
-    if (this.keyStates['arrowright'] || this.keyStates['d']) {
+    if (this.keyStates["arrowright"] || this.keyStates["d"]) {
       turnRight = 1.0;
     }
-    
+
     // 处理左右转同时按下的抵消逻辑
     if (turnLeft > 0 && turnRight > 0) {
       turnLeft = 0;
       turnRight = 0;
     }
-    
+
     // 处理前进后退同时按下的抵消逻辑
     if (moveForward > 0 && moveBackward > 0) {
       moveForward = 0;
       moveBackward = 0;
     }
-    
+
     // 更新缓存
     this.cachedInputs[0] = turnLeft;
     this.cachedInputs[1] = moveForward;
     this.cachedInputs[2] = turnRight;
     this.cachedInputs[3] = moveBackward;
-    
+
     // 更新是否有输入的标志
-    this.hasAnyInput = turnLeft > 0 || moveForward > 0 || turnRight > 0 || moveBackward > 0;
-    
+    this.hasAnyInput =
+      turnLeft > 0 || moveForward > 0 || turnRight > 0 || moveBackward > 0;
+
     // 清除脏标志
     this.inputsDirty = false;
   }
-} 
+}

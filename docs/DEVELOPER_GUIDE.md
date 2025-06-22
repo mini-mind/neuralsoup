@@ -7,6 +7,7 @@
 **移动端优先"观察"，桌面端优先"创造"**
 
 - **移动端的核心用途**：向朋友展示您或者别人创造的酷炫AI，或者在通勤路上观察一个正在长时间演化的AI种群。它的首要任务是"看"，而不是"改"。
+
   - 优化观察体验：流畅的动画、清晰的可视化、直观的状态展示
   - 简化交互：最小化编辑功能，专注于展示和监控
   - 社交分享：方便的截图、录制和分享功能
@@ -21,11 +22,13 @@
 ## 环境设置
 
 ### 系统要求
+
 - Node.js 18+
 - npm 或 yarn
 - 现代浏览器（支持WebGL）
 
 ### 快速启动
+
 ```bash
 # 克隆项目
 git clone <repository-url>
@@ -80,14 +83,22 @@ neuralsoup/
 ```typescript
 // 状态管理Hook
 const {
-  nodes, synapses, receptors, effectors,
-  addNode, removeNode, updateNode
+  nodes,
+  synapses,
+  receptors,
+  effectors,
+  addNode,
+  removeNode,
+  updateNode,
 } = useSNNTopologyState();
 
 // 事件处理Hook
 const {
-  handleMouseDown, handleMouseMove, handleMouseUp,
-  handleDoubleClick, handleKeyDown
+  handleMouseDown,
+  handleMouseMove,
+  handleMouseUp,
+  handleDoubleClick,
+  handleKeyDown,
 } = useSNNTopologyEvents();
 ```
 
@@ -123,7 +134,7 @@ interface SNNNode {
   id: string;
   x: number;
   y: number;
-  type: 'inhibitory' | 'excitatory';
+  type: "inhibitory" | "excitatory";
   params: IZNeuronParams;
   state: IZNeuronState;
 }
@@ -172,6 +183,7 @@ refactor(engine): 重构渲染系统模块化
 ### 1. 组件设计原则
 
 **单一职责原则**
+
 ```typescript
 // ❌ 违反单一职责
 const MultiPurposeComponent = () => {
@@ -185,12 +197,13 @@ const useSNNState = () => {}; // 只负责状态
 ```
 
 **组合优于继承**
+
 ```typescript
 // ✅ 通过组合实现复杂功能
 const SNNTopologyEditor = () => {
   const state = useSNNTopologyState();
   const events = useSNNTopologyEvents();
-  
+
   return (
     <div>
       <CanvasRenderer {...state} />
@@ -203,6 +216,7 @@ const SNNTopologyEditor = () => {
 ### 2. 性能优化技巧
 
 **使用React.memo防止不必要重渲染**
+
 ```typescript
 const NeuronRenderer = React.memo(({ nodes }: { nodes: SNNNode[] }) => {
   // 只在nodes变化时重新渲染
@@ -210,13 +224,15 @@ const NeuronRenderer = React.memo(({ nodes }: { nodes: SNNNode[] }) => {
 ```
 
 **使用useMemo缓存计算结果**
+
 ```typescript
 const expensiveCalculation = useMemo(() => {
-  return nodes.map(node => calculateSomething(node));
+  return nodes.map((node) => calculateSomething(node));
 }, [nodes]);
 ```
 
 **PixiJS对象池管理**
+
 ```typescript
 // 复用图形对象而不是频繁创建销毁
 const graphic = objectPool.getGraphic();
@@ -227,20 +243,22 @@ objectPool.returnGraphic(graphic);
 ### 3. 错误处理策略
 
 **全局错误边界**
+
 ```typescript
 class ErrorBoundary extends React.Component {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Component Error:', error, errorInfo);
+    console.error("Component Error:", error, errorInfo);
   }
 }
 ```
 
 **异步操作错误处理**
+
 ```typescript
 try {
   await simulationEngine.initialize();
 } catch (error) {
-  console.error('Simulation initialization failed:', error);
+  console.error("Simulation initialization failed:", error);
   // 显示用户友好的错误信息
 }
 ```
@@ -258,8 +276,8 @@ try {
 ```typescript
 // 启用PixiJS调试模式
 app.stage.interactive = true;
-app.stage.on('pointerdown', (event) => {
-  console.log('PixiJS Event:', event.data.global);
+app.stage.on("pointerdown", (event) => {
+  console.log("PixiJS Event:", event.data.global);
 });
 ```
 
@@ -268,7 +286,7 @@ app.stage.on('pointerdown', (event) => {
 ```typescript
 // 在Hook中添加调试日志
 useEffect(() => {
-  console.log('State changed:', { nodes, synapses });
+  console.log("State changed:", { nodes, synapses });
 }, [nodes, synapses]);
 ```
 
@@ -278,6 +296,7 @@ useEffect(() => {
 
 **症状**: 画布卡顿，FPS低下
 **解决方案**:
+
 - 检查是否使用了对象池
 - 确认是否开启了硬件加速
 - 优化渲染循环，避免不必要的重绘
@@ -286,6 +305,7 @@ useEffect(() => {
 
 **症状**: UI状态与实际状态不一致
 **解决方案**:
+
 - 检查useEffect依赖数组
 - 确认状态更新是否为异步
 - 使用React Strict Mode检查副作用
@@ -294,6 +314,7 @@ useEffect(() => {
 
 **症状**: 编译时类型错误
 **解决方案**:
+
 - 检查接口定义是否完整
 - 确认导入路径是否正确
 - 使用类型断言时要谨慎
@@ -302,6 +323,7 @@ useEffect(() => {
 
 **症状**: 长时间运行后内存不断增长
 **解决方案**:
+
 - 确保事件监听器正确清理
 - 检查定时器是否清理
 - 验证PixiJS对象是否正确销毁
@@ -329,17 +351,20 @@ useEffect(() => {
 ## 部署指南
 
 ### 开发部署
+
 ```bash
 npm run dev
 ```
 
 ### 生产构建
+
 ```bash
 npm run build
 npm run preview  # 预览构建结果
 ```
 
 ### Docker部署
+
 ```dockerfile
 FROM node:18-alpine
 WORKDIR /app
@@ -354,15 +379,19 @@ CMD ["npm", "run", "preview"]
 ## 代码风格
 
 ### ESLint配置
+
 项目使用ESLint确保代码质量，主要规则：
+
 - 使用TypeScript严格模式
 - 优先使用函数组件和Hooks
 - 强制使用分号和单引号
 - 禁止console.log（开发环境除外）
 
 ### 格式化
+
 使用Prettier自动格式化代码，配置：
+
 - 2空格缩进
 - 单引号字符串
 - 行末分号
-- 尾随逗号 
+- 尾随逗号
