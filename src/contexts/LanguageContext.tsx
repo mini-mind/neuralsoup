@@ -14,6 +14,10 @@ const LanguageContext = createContext<LanguageContextType | undefined>(
 
 const translations = {
   zh: {
+    // 控件
+    "controls.start": "启动",
+    "controls.stop": "停止",
+
     // 标签页
     "tab.script": "脚本编辑",
     "tab.agent-params": "智能体参数",
@@ -35,9 +39,10 @@ const translations = {
     // 状态
     "stats.fps": "FPS",
     "stats.reward": "奖励",
+    "stats.agentCount": "智能体数量",
 
     // 提示
-    "tooltip.start": "开始",
+    "tooltip.start": "启动仿真",
     "tooltip.pause": "暂停",
     "tooltip.resume": "继续",
     "tooltip.manual-control-off":
@@ -52,6 +57,10 @@ const translations = {
     "mobile.collapse": "收起",
   },
   en: {
+    // Controls
+    "controls.start": "Start",
+    "controls.stop": "Stop",
+
     // 标签页
     "tab.script": "Script Editor",
     "tab.agent-params": "Agent Parameters",
@@ -73,9 +82,10 @@ const translations = {
     // 状态
     "stats.fps": "FPS",
     "stats.reward": "Reward",
+    "stats.agentCount": "Agent Count",
 
     // 提示
-    "tooltip.start": "Start",
+    "tooltip.start": "Start Simulation",
     "tooltip.pause": "Pause",
     "tooltip.resume": "Resume",
     "tooltip.manual-control-off":

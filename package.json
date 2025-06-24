@@ -1,7 +1,7 @@
 {
-  "name": "dynn-embodied-ai",
+  "name": "neurosoup",
   "version": "1.0.0",
-  "description": "基于PixiJS+React的具身智能体仿真 - 浮游生物SNN仿真",
+  "description": "基于PixiJS+React的具身智能体仿真 - SNN仿真",
   "type": "module",
   "scripts": {
     "dev": "vite",

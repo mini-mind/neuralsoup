@@ -1,31 +1,23 @@
 # 开发者指南
 
-## 核心设计理念
+## 核心设计理念：分层与解耦
 
-### 📱💻 平台差异化价值观
+本项目采用**分层、模块化、事件驱动**的架构，旨在实现核心逻辑与UI展现的完全分离，提高代码的可测试性、可维护性和可扩展性。
 
-**移动端优先"观察"，桌面端优先"创造"**
+- **`core` (核心层)**: 纯粹的TypeScript逻辑，不依赖任何UI框架（如React、PIXI.js）。理论上，核心层可以在Node.js环境中独立运行。它定义了世界规则、仿真循环和核心服务。
+- **`modules` (功能模块层)**: 可插拔的功能单元，如不同类型的"大脑"、"传感器"或"执行器"。它们实现了`core`层定义的接口，并被动态加载。
+- **`ui` (用户界面层)**: 所有的React组件和渲染逻辑（包括使用PIXI.js的画布渲染）。UI层通过订阅核心服务来获取状态，通过发布事件来表达用户意图。
+- **`app` (应用层)**: 作为"总装车间"，负责初始化`core`模块，注册所有`modules`，并将它们与`ui`层连接起来。
 
-- **移动端的核心用途**：向朋友展示您或者别人创造的酷炫AI，或者在通勤路上观察一个正在长时间演化的AI种群。它的首要任务是"看"，而不是"改"。
-
-  - 优化观察体验：流畅的动画、清晰的可视化、直观的状态展示
-  - 简化交互：最小化编辑功能，专注于展示和监控
-  - 社交分享：方便的截图、录制和分享功能
-
-- **桌面端的核心用途**：深度编辑、创造和实验AI行为脚本，进行复杂的参数调试和长期实验。
-  - 强大的编辑工具：代码编辑器、可视化编辑器、调试工具
-  - 丰富的创造功能：脚本管理、参数微调、实验记录
-  - 专业工作流：版本控制、导入导出、批量操作
-
-这一理念指导我们在功能优先级、界面设计和交互模式上做出正确的取舍。
+这种架构使得每一层都可以独立开发和测试，极大地降低了项目的复杂性。
 
 ## 环境设置
 
 ### 系统要求
 
 - Node.js 18+
-- npm 或 yarn
-- 现代浏览器（支持WebGL）
+- npm (或等效的包管理器)
+- 现代浏览器 (支持WebGL)
 
 ### 快速启动
 
@@ -39,359 +31,164 @@ npm install
 
 # 启动开发服务器
 npm run dev
-
-# 运行类型检查
-npm run type-check
 ```
 
-## 项目结构
+## 项目结构 (新)
 
 ```
 neuralsoup/
 ├── src/
-│   ├── App.tsx                 # 主应用组件
-│   ├── main.tsx               # 应用入口
-│   ├── components/            # React组件
-│   │   ├── SNNTopologyEditor.tsx        # SNN编辑器主组件
-│   │   ├── CanvasEventHandler.tsx       # 画布事件处理
-│   │   ├── hooks/                       # 自定义Hooks
-│   │   ├── renderers/                   # 渲染器组件
-│   │   ├── topology/                    # 拓扑编辑相关
-│   │   │   └── canvas/                  # 画布渲染模块
-│   │   └── utils/                       # 组件工具函数
-│   ├── engine/                # 仿真引擎
-│   │   ├── SimulationEngine.ts          # 主仿真引擎
-│   │   ├── WorldManager.ts              # 世界管理器
-│   │   ├── systems/                     # 系统模块
-│   │   │   └── rendering/               # 渲染系统
-│   │   └── renderers/                   # 渲染器
-│   │       └── effects/                 # 特效系统
-│   ├── types/                 # TypeScript类型定义
-│   ├── utils/                 # 工具函数
-│   │   └── canvas/            # 画布相关工具
-│   └── styles/                # 样式文件
-├── docs/                      # 项目文档
-└── public/                    # 静态资源
+│   ├── app/                 # ✨ 应用入口与总协调器
+│   │   ├── App.tsx          # - 实例化核心模块，连接各层
+│   │   └── registerModules.ts # - 注册所有可插拔模块
+│   │
+│   ├── core/                # ✨ 核心引擎 (纯TS, 无UI依赖)
+│   │   ├── world/           #   - World类, 物理系统 (CollisionSystem)
+│   │   ├── simulation/      #   - SimulationLoop
+│   │   └── services/        #   - EventBus, GlobalState, ModuleRegistry
+│   │
+│   ├── modules/             # ✨ 可插拔的功能模块
+│   │   ├── brains/          #   - JsScriptBrain, SnnBrain...
+│   │   ├── sensors/         #   - VisionSensor...
+│   │   └── worlds/          #   - 各种世界生成器
+│   │
+│   ├── ui/                  # ✨ 所有的React组件与UI逻辑
+│   │   ├── components/      #   - 可复用的基础组件 (Button, Panel...)
+│   │   ├── views/           #   - 主视图 (SimulationView...)
+│   │   ├── renderers/       #   - PIXI.js渲染器
+│   │   └── styles/          #   - 样式文件
+│   │
+│   ├── shared/              # ✨ 共享的TypeScript接口
+│   │   └── interfaces/      #   - IAgent, IBrain, IWorld...
+│
+└── ... (其他配置文件)
 ```
 
 ## 核心概念
 
-### 1. Hook驱动的状态管理
+### 1. 事件驱动数据流
 
-项目使用自定义Hook管理复杂状态：
+应用的数据流是单向且解耦的：
 
-```typescript
-// 状态管理Hook
-const {
-  nodes,
-  synapses,
-  receptors,
-  effectors,
-  addNode,
-  removeNode,
-  updateNode,
-} = useSNNTopologyState();
+- **控制流 (用户 -> 核心)**:
+  1.  用户在UI组件上操作（如点击"启动"按钮）。
+  2.  UI组件向 `globalEventBus` 发布一个语义化的事件（`ui:start`）。
+  3.  `App.tsx` 中设置的监听器捕获此事件。
+  4.  监听器调用 `core` 模块的方法（`simulation.start()`）。
 
-// 事件处理Hook
-const {
-  handleMouseDown,
-  handleMouseMove,
-  handleMouseUp,
-  handleDoubleClick,
-  handleKeyDown,
-} = useSNNTopologyEvents();
-```
+- **数据流 (核心 -> UI)**:
+  1.  `SimulationLoop` 在每个tick更新 `World`。
+  2.  循环将最新的世界状态（如智能体列表）更新到 `globalState` 中。
+  3.  订阅了 `globalState` 的UI组件（如`SimulationView`）自动接收到新状态。
+  4.  UI组件使用新状态重新渲染，无需通过props传递。
 
-### 2. 模块化渲染系统
+### 2. 模块注册与动态加载
 
-渲染器采用职责分离设计：
+通过 `ModuleRegistry` 服务，我们可以动态地创建和使用功能模块：
 
 ```typescript
-// 主渲染协调器
-class CanvasRenderer {
-  static draw(props: CanvasRendererProps) {
-    // 协调各个子渲染器
-    GridRenderer.draw(ctx, ...);
-    NeuronRenderer.draw(ctx, ...);
-    SynapseRenderer.draw(ctx, ...);
-  }
-}
+// 1. 在 `registerModules.ts` 中注册模块
+moduleRegistry.registerBrain('JsScriptBrain', JsScriptBrain);
+moduleRegistry.registerSensor('VisionSensor', VisionSensor);
 
-// 专用渲染器
-class NeuronRenderer {
-  static draw(ctx: CanvasRenderingContext2D, nodes: SNNNode[]) {
-    // 专门负责神经元渲染
-  }
-}
+// 2. 在需要的地方，通过字符串ID创建实例
+const brain = moduleRegistry.createBrain('JsScriptBrain', scriptCode);
+const sensor = moduleRegistry.createSensor('VisionSensor', config);
 ```
 
-### 3. 类型安全的设计
+### 3. SNN编辑器架构
 
-所有数据结构都有完整的TypeScript类型：
+SNN（脉冲神经网络）编辑器采用完全事件驱动的架构：
+
+- **纯视图组件**: `SNNTopologyEditor` 是一个纯React组件，不包含任何业务逻辑。
+- **状态管理**: 所有SNN拓扑数据存储在 `globalState.snnTopology` 中。
+- **交互事件**: 用户的鼠标交互（点击、拖拽、滚轮）转换为标准化事件发送给 `globalEventBus`。
+- **逻辑处理**: `App.tsx` 监听这些事件并更新全局状态，实现节点创建、拖拽、缩放等功能。
 
 ```typescript
-interface SNNNode {
-  id: string;
-  x: number;
-  y: number;
-  type: "inhibitory" | "excitatory";
-  params: IZNeuronParams;
-  state: IZNeuronState;
+// 用户双击画布 -> 创建新节点
+globalEventBus.emit('ui:snn:canvas-doubleclick', { x, y });
+
+// App.tsx 监听事件并更新状态
+globalEventBus.on('ui:snn:canvas-doubleclick', (data) => {
+  const newNode = { id: `neuron-${Date.now()}`, type: 'neuron', x: worldPos.x, y: worldPos.y };
+  globalState.setState({ 
+    snnTopology: { ...snnTopology, nodes: [...snnTopology.nodes, newNode] } 
+  });
+});
+```
+
+### 4. 全局状态管理
+
+`GlobalState` 服务提供类型安全的状态管理：
+
+```typescript
+interface AppState {
+  simulationRunning: boolean;
+  activeAgentId: string | null;
+  cameraTarget: { x: number; y: number } | null;
+  worldState: IAgent[]; // 仿真世界状态
+  snnTopology: SNNTopology; // SNN编辑器状态
 }
 
-interface SNNSynapse {
-  id: string;
-  fromId: string;
-  toId: string;
-  weight: number;
-  delay: number;
-}
+// 组件中使用
+const { snnTopology } = globalState.useStore(s => ({ snnTopology: s.snnTopology }));
 ```
+
+## UI架构设计
+
+### 布局结构
+
+应用采用经典的三栏布局：
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    AppHeader (顶部导航)                    │
+├─────────────────────────────┬───────────────────────────┤
+│                             │                           │
+│     SimulationCanvas        │      SettingsPanel        │
+│      (左侧仿真区域)            │      (右侧控制面板)         │
+│                             │                           │
+│  ┌─────────────────────┐    │  ┌─────────────────────┐  │
+│  │    StatsOverlay     │    │  │   TabPanel          │  │
+│  │   (统计信息覆盖)      │    │  │ ┌─────┬─────┬─────┐ │  │
+│  └─────────────────────┘    │  │ │脚本 │参数 │SNN  │ │  │
+│                             │  │ └─────┴─────┴─────┘ │  │
+│                             │  │                     │  │
+│                             │  │   (标签页内容区域)    │  │
+│                             │  └─────────────────────┘  │
+└─────────────────────────────┴───────────────────────────┘
+```
+
+### 组件层次结构
+
+```
+App
+├── AppHeader                    # 顶部导航栏
+└── main-layout
+    ├── simulation-container     # 左侧仿真区域
+    │   ├── SimulationCanvas     # PIXI.js 渲染的仿真画布
+    │   └── StatsOverlay         # 统计信息覆盖层
+    └── control-panel           # 右侧控制面板
+        └── SettingsPanel
+            └── TabPanel         # 标签页容器
+                ├── ScriptEditArea      # 脚本编辑标签
+                ├── AgentParametersPanel # 智能体参数标签
+                └── SNNTopologyEditor   # SNN编辑器标签
+```
+
+### 响应式设计
+
+- **桌面端**: 固定双栏布局，右侧控制面板宽度450px
+- **移动端**: 可收缩的控制面板，支持全屏仿真模式
 
 ## 开发工作流
 
-### 1. 功能开发流程
-
-1. **需求分析** - 明确功能要求和接口设计
-2. **类型定义** - 在`types/`中定义相关接口
-3. **Hook开发** - 实现状态管理和业务逻辑
-4. **组件开发** - 创建React组件
-5. **测试验证** - 确保功能正常工作
-
-### 2. 代码提交规范
-
-```bash
-# 提交格式
-<type>(<scope>): <subject>
-
-# 示例
-feat(editor): 添加神经元自连接功能
-fix(renderer): 修复画布缩放时的坐标偏移
-docs(readme): 更新安装说明
-refactor(engine): 重构渲染系统模块化
-```
-
-### 3. 分支管理
-
-- `main` - 主分支，稳定版本
-- `develop` - 开发分支，功能集成
-- `feature/*` - 功能分支
-- `hotfix/*` - 紧急修复分支
-
-## 最佳实践
-
-### 1. 组件设计原则
-
-**单一职责原则**
-
-```typescript
-// ❌ 违反单一职责
-const MultiPurposeComponent = () => {
-  // 既处理渲染又处理事件还管理状态
-};
-
-// ✅ 职责分离
-const CanvasRenderer = () => {}; // 只负责渲染
-const CanvasEventHandler = () => {}; // 只负责事件
-const useSNNState = () => {}; // 只负责状态
-```
-
-**组合优于继承**
-
-```typescript
-// ✅ 通过组合实现复杂功能
-const SNNTopologyEditor = () => {
-  const state = useSNNTopologyState();
-  const events = useSNNTopologyEvents();
-
-  return (
-    <div>
-      <CanvasRenderer {...state} />
-      <CanvasEventHandler {...events} />
-    </div>
-  );
-};
-```
-
-### 2. 性能优化技巧
-
-**使用React.memo防止不必要重渲染**
-
-```typescript
-const NeuronRenderer = React.memo(({ nodes }: { nodes: SNNNode[] }) => {
-  // 只在nodes变化时重新渲染
-});
-```
-
-**使用useMemo缓存计算结果**
-
-```typescript
-const expensiveCalculation = useMemo(() => {
-  return nodes.map((node) => calculateSomething(node));
-}, [nodes]);
-```
-
-**PixiJS对象池管理**
-
-```typescript
-// 复用图形对象而不是频繁创建销毁
-const graphic = objectPool.getGraphic();
-// 使用后回收
-objectPool.returnGraphic(graphic);
-```
-
-### 3. 错误处理策略
-
-**全局错误边界**
-
-```typescript
-class ErrorBoundary extends React.Component {
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Component Error:", error, errorInfo);
-  }
-}
-```
-
-**异步操作错误处理**
-
-```typescript
-try {
-  await simulationEngine.initialize();
-} catch (error) {
-  console.error("Simulation initialization failed:", error);
-  // 显示用户友好的错误信息
-}
-```
-
-## 调试技巧
-
-### 1. React DevTools
-
-- 使用Components面板查看组件状态
-- 使用Profiler分析性能瓶颈
-- 使用Console面板查看状态变化
-
-### 2. PixiJS调试
-
-```typescript
-// 启用PixiJS调试模式
-app.stage.interactive = true;
-app.stage.on("pointerdown", (event) => {
-  console.log("PixiJS Event:", event.data.global);
-});
-```
-
-### 3. 状态调试
-
-```typescript
-// 在Hook中添加调试日志
-useEffect(() => {
-  console.log("State changed:", { nodes, synapses });
-}, [nodes, synapses]);
-```
-
-## 常见问题解决
-
-### 1. 渲染性能问题
-
-**症状**: 画布卡顿，FPS低下
-**解决方案**:
-
-- 检查是否使用了对象池
-- 确认是否开启了硬件加速
-- 优化渲染循环，避免不必要的重绘
-
-### 2. 状态同步问题
-
-**症状**: UI状态与实际状态不一致
-**解决方案**:
-
-- 检查useEffect依赖数组
-- 确认状态更新是否为异步
-- 使用React Strict Mode检查副作用
-
-### 3. TypeScript类型错误
-
-**症状**: 编译时类型错误
-**解决方案**:
-
-- 检查接口定义是否完整
-- 确认导入路径是否正确
-- 使用类型断言时要谨慎
-
-### 4. 内存泄漏
-
-**症状**: 长时间运行后内存不断增长
-**解决方案**:
-
-- 确保事件监听器正确清理
-- 检查定时器是否清理
-- 验证PixiJS对象是否正确销毁
-
-## 扩展开发
-
-### 1. 添加新的神经元类型
-
-1. 在`types/simulation.ts`中扩展类型定义
-2. 在`NeuronRenderer`中添加渲染逻辑
-3. 在相关Hook中添加处理逻辑
-
-### 2. 新增仿真特效
-
-1. 在`engine/renderers/effects/`创建新特效类
-2. 实现`initialize`、`update`、`render`方法
-3. 在`WorldRenderer`中注册和使用
-
-### 3. 集成新的学习算法
-
-1. 在`engine/`创建新的学习算法模块
-2. 定义算法接口和参数类型
-3. 在仿真循环中集成算法调用
-
-## 部署指南
-
-### 开发部署
-
-```bash
-npm run dev
-```
-
-### 生产构建
-
-```bash
-npm run build
-npm run preview  # 预览构建结果
-```
-
-### Docker部署
-
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
-EXPOSE 3000
-CMD ["npm", "run", "preview"]
-```
-
-## 代码风格
-
-### ESLint配置
-
-项目使用ESLint确保代码质量，主要规则：
-
-- 使用TypeScript严格模式
-- 优先使用函数组件和Hooks
-- 强制使用分号和单引号
-- 禁止console.log（开发环境除外）
-
-### 格式化
-
-使用Prettier自动格式化代码，配置：
-
-- 2空格缩进
-- 单引号字符串
-- 行末分号
-- 尾随逗号
+1.  **定义接口**: 在 `src/shared/interfaces` 中为新功能定义清晰的契约。
+2.  **创建模块**: 在 `src/modules` 中创建实现该接口的新模块。
+3.  **注册模块**: 在 `src/app/registerModules.ts` 中注册你的新模块。
+4.  **开发UI**: 在 `src/ui` 中创建与用户交互的组件。让组件通过 `globalEventBus` 发布事件，通过 `globalState` 订阅数据。
+5.  **组装应用**: 在 `App.tsx` 或相关模块中，监听UI事件并调用核心逻辑。
+
+---
+此文档将随项目进展持续更新。
