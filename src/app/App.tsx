@@ -14,9 +14,8 @@ import SimulationArea from '../ui/components/SimulationArea';
 import '../ui/styles/layout.css';
 
 // 导入模块
-import { createDefaultWorld } from '../modules/worlds/DefaultWorld';
 import { registerAllModules } from './registerModules';
-import { createDefaultTopology } from '../modules/brains/snn/defaultSNN';
+import { demoSNNTopology } from './demoData';
 
 // 临时的类型定义
 type Vector2D = { x: number; y: number; };
@@ -36,11 +35,8 @@ const App: React.FC = () => {
     const world = new World(1600, 1200);
     const simulation = new SimulationLoop(world);
 
-    // 使用一个工厂函数来填充世界
-    createDefaultWorld(world);
-
     // 初始化SNN编辑器状态
-    globalState.setState({ snnTopology: createDefaultTopology() });
+    globalState.setState({ snnTopology: demoSNNTopology });
 
     // --- 2. 设置事件监听 ---
     // 监听UI事件来控制仿真
