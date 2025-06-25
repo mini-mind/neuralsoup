@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { useLanguage } from "../../contexts/LanguageContext";
 import "./CodeEditor.css";
 
 interface CodeEditorProps {
@@ -13,12 +14,16 @@ interface CodeEditorProps {
 const CodeEditor: React.FC<CodeEditorProps> = ({
   value,
   onChange,
-  placeholder = "编写代码...",
+  placeholder,
   language = "javascript",
 }) => {
+  const { t } = useLanguage();
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const highlighterRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
+
+  // 如果没有提供占位符，使用默认的国际化占位符
+  const finalPlaceholder = placeholder || t('placeholder.default-code');
 
   // 同步滚动
   const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
@@ -99,7 +104,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
           onKeyDown={handleKeyDown}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          placeholder={placeholder}
+          placeholder={finalPlaceholder}
           className={`code-textarea ${isFocused ? "focused" : ""}`}
           style={editorStyles}
           spellCheck={false}

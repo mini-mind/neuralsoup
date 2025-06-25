@@ -5,7 +5,6 @@ import { globalEventBus } from '../core/services/EventBus';
 import { globalState } from '../core/services/GlobalState';
 
 // 导入新的布局组件
-import NavigationBar from '../ui/components/NavigationBar';
 import Sidebar from '../ui/components/Sidebar';
 import TabSystem from '../ui/components/TabSystem';
 import ResizableSplitter from '../ui/components/ResizableSplitter';
@@ -169,8 +168,6 @@ const App: React.FC = () => {
 
   return (
     <div className="app-container">
-      <NavigationBar />
-      
       <div className="main-content">
         <Sidebar
           collapsed={sidebarCollapsed}

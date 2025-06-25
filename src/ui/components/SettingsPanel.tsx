@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLanguage } from '../../contexts/LanguageContext';
 import TabPanel from './TabPanel';
 import ScriptEditArea from './ScriptEditArea';
 import SNNTopologyEditor from '../views/SNNTopologyEditor';
@@ -6,6 +7,8 @@ import AgentParametersPanel from './AgentParametersPanel';
 import './SettingsPanel.css';
 
 const SettingsPanel: React.FC = () => {
+  const { t } = useLanguage();
+  
   // 临时的 props 来满足类型检查，这些将在后续被全局状态替代
   const dummyScript = `// Welcome to NeuralSoup!
 function onFrame(agent) {
@@ -16,7 +19,7 @@ function onFrame(agent) {
   const tabs = [
     {
       id: 'script',
-      label: '脚本编辑', // Script Editor
+      label: t('tab.script'), // Script Editor
       content: (
         <ScriptEditArea
           currentScriptName="default"
@@ -31,7 +34,7 @@ function onFrame(agent) {
     },
     {
       id: 'params',
-      label: '智能体参数', // Agent Parameters
+      label: t('tab.agent-params'), // Agent Parameters
       content: (
         <AgentParametersPanel
           currentParams={{ visionCells: 32, visionRange: 250, visionAngle: 120 }}
@@ -41,7 +44,7 @@ function onFrame(agent) {
     },
     {
       id: 'snn',
-      label: 'SNN 编辑器', // SNN Editor
+      label: t('tab.snn'), // SNN Editor
       content: <SNNTopologyEditor width={400} height={600} />,
     },
   ];

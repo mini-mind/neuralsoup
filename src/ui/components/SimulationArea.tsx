@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../../contexts/LanguageContext';
 import SimulationCanvas from '../views/SimulationCanvas';
 import { globalEventBus } from '../../core/services/EventBus';
 import { globalState } from '../../core/services/GlobalState';
@@ -8,6 +9,7 @@ import { globalState } from '../../core/services/GlobalState';
  * 包含仿真画布和底部的控制按钮、FPS统计
  */
 const SimulationArea: React.FC = () => {
+  const { t } = useLanguage();
   const [isRunning, setIsRunning] = useState(false);
   const [fps, setFps] = useState(60);
 
@@ -47,14 +49,14 @@ const SimulationArea: React.FC = () => {
           <button
             className={`control-button ${isRunning ? '' : 'paused'}`}
             onClick={handlePlayPause}
-            title={isRunning ? '暂停仿真' : '开始仿真'}
+            title={isRunning ? t('simulation.pause') : t('simulation.start')}
           >
             {isRunning ? '⏸' : '▶'}
           </button>
         </div>
         
         <div className="fps-counter">
-          FPS: {fps}
+          {t('stats.fps')}: {fps}
         </div>
       </div>
     </div>

@@ -1,13 +1,29 @@
-/* 样式模块索引 */
-
-/* 基础布局 */
+/* 样式模块索引 - 导入必须在最前面 */
 @import "./layout.css";
-
-/* 控制组件 */
 @import "./controls.css";
-
-/* 按钮样式 */
 @import "./buttons.css";
+
+/* CSS重置 - 去掉所有白边 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
 
 /* 仿真画布 */
 .simulation-canvas {

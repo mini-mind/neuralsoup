@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useLanguage } from "../../contexts/LanguageContext";
 import { AgentParameters } from "./AgentParametersModal";
 
 interface AgentParametersPanelProps {
@@ -10,6 +11,7 @@ const AgentParametersPanel: React.FC<AgentParametersPanelProps> = ({
   currentParams,
   onApply,
 }) => {
+  const { t } = useLanguage();
   const [params, setParams] = useState<AgentParameters>(currentParams);
 
   // 当外部参数更新时同步本地状态
@@ -26,23 +28,23 @@ const AgentParametersPanel: React.FC<AgentParametersPanelProps> = ({
   return (
     <div className="agent-params-panel">
       <div className="panel-header">
-        <h3>智能体参数设置</h3>
+        <h3>{t('agent.title')}</h3>
         <button
           className={`btn ${hasChanges ? "btn-primary" : "btn-secondary"}`}
           onClick={handleApply}
           disabled={!hasChanges}
         >
-          {hasChanges ? "应用设置" : "已应用"}
+          {hasChanges ? t('btn.apply') : t('btn.applied')}
         </button>
       </div>
 
       <div className="panel-body">
         <div className="param-section">
-          <h4>视觉系统参数</h4>
+          <h4>{t('agent.vision-system')}</h4>
 
           <div className="param-item">
             <label>
-              <span className="param-label">视野单元格数量</span>
+              <span className="param-label">{t('agent.vision-cells')}</span>
               <div className="param-control">
                 <input
                   type="range"
@@ -75,14 +77,14 @@ const AgentParametersPanel: React.FC<AgentParametersPanelProps> = ({
               </div>
             </label>
             <div className="param-description">
-              影响视觉输入维度: {params.visionCells} × 3 ={" "}
-              {params.visionCells * 3}维
+              {t('agent.vision-desc-cells')}: {params.visionCells} × 3 ={" "}
+              {params.visionCells * 3}{t('agent.dimension-unit')}
             </div>
           </div>
 
           <div className="param-item">
             <label>
-              <span className="param-label">视野范围 (像素)</span>
+              <span className="param-label">{t('agent.vision-range')}</span>
               <div className="param-control">
                 <input
                   type="range"
@@ -114,12 +116,12 @@ const AgentParametersPanel: React.FC<AgentParametersPanelProps> = ({
                 />
               </div>
             </label>
-            <div className="param-description">智能体能够感知到的最大距离</div>
+            <div className="param-description">{t('agent.vision-desc-range')}</div>
           </div>
 
           <div className="param-item">
             <label>
-              <span className="param-label">视野角度 (度)</span>
+              <span className="param-label">{t('agent.vision-angle')}</span>
               <div className="param-control">
                 <input
                   type="range"
@@ -151,7 +153,7 @@ const AgentParametersPanel: React.FC<AgentParametersPanelProps> = ({
                 />
               </div>
             </label>
-            <div className="param-description">智能体的视野扇形角度范围</div>
+            <div className="param-description">{t('agent.vision-desc-angle')}</div>
           </div>
         </div>
       </div>

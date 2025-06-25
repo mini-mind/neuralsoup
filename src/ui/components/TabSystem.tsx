@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLanguage } from '../../contexts/LanguageContext';
 import ScriptEditArea from './ScriptEditArea';
 import SNNTopologyEditor from '../views/SNNTopologyEditor';
 
@@ -21,6 +22,8 @@ const TabSystem: React.FC<TabSystemProps> = ({
   activeTab,
   onTabChange,
 }) => {
+  const { t } = useLanguage();
+
   // 临时的脚本代码用于演示
   const dummyScript = `// 工具库
 // 移动相关工具
@@ -77,7 +80,7 @@ function onFrame(agent) {
   const tabs: Tab[] = [
     {
       id: 'script',
-      label: '脚本',
+      label: t('sidebar.script'),
       content: (
         <ScriptEditArea
           currentScriptName="default"
@@ -92,42 +95,42 @@ function onFrame(agent) {
     },
     {
       id: 'snn',
-      label: 'SNN模型',
+      label: t('sidebar.snn'),
       content: <SNNTopologyEditor width={600} height={400} />,
     },
     {
       id: 'sensors',
-      label: '感受器',
+      label: t('sidebar.sensors'),
       content: (
         <div style={{ padding: '20px', textAlign: 'center', color: '#888' }}>
-          感受器配置功能开发中...
+          {t('status.dev-sensors')}
         </div>
       ),
     },
     {
       id: 'effectors',
-      label: '效应器',
+      label: t('sidebar.effectors'),
       content: (
         <div style={{ padding: '20px', textAlign: 'center', color: '#888' }}>
-          效应器配置功能开发中...
+          {t('status.dev-effectors')}
         </div>
       ),
     },
     {
       id: 'freemode',
-      label: '自由模式',
+      label: t('sidebar.freemode'),
       content: (
         <div style={{ padding: '20px', textAlign: 'center', color: '#888' }}>
-          自由模式配置功能开发中...
+          {t('status.dev-freemode')}
         </div>
       ),
     },
     {
       id: 'ranked',
-      label: '排位',
+      label: t('sidebar.ranked'),
       content: (
         <div style={{ padding: '20px', textAlign: 'center', color: '#888' }}>
-          排位模式配置功能开发中...
+          {t('status.dev-ranked')}
         </div>
       ),
     },
