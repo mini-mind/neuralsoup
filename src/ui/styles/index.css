@@ -1,7 +1,7 @@
 /* 样式模块索引 - 导入必须在最前面 */
 @import "./layout.css";
-@import "./controls.css";
 @import "./buttons.css";
+@import "./game-area.css";
 
 /* CSS重置 - 去掉所有白边 */
 * {

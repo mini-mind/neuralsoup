@@ -1,4 +1,4 @@
-import type { IAgent } from './IAgent';
+import type { IAgent } from '../entities/types';
 
 /**
  * 定义了"世界"的契约。
@@ -26,4 +26,17 @@ export interface IWorld {
    * 更新世界状态，推进一个时间步。
    */
   update(): void;
+}
+
+/**
+ * 定义了可碰撞实体的契约。
+ * 任何需要在物理世界中参与碰撞检测的实体都应实现此接口。
+ */
+export interface ICollidable {
+  readonly id: string;
+  x: number;
+  y: number;
+  angle: number; // 实体的朝向，以弧度表示
+  radius: number;
+  entityType: string; // 用于区分实体类型，例如 'agent', 'food', 'obstacle'
 } 

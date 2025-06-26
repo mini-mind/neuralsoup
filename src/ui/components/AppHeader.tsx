@@ -1,21 +1,32 @@
 import React from 'react';
-import GameControls from './GameControls';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 /**
  * 应用头部组件
- * 包含应用标题和游戏控制按钮
+ * 包含应用标题和一些控件
  */
 const AppHeader: React.FC = () => {
+  const { language, setLanguage } = useLanguage();
+
+  const toggleLanguage = () => {
+    setLanguage(language === 'en' ? 'zh' : 'en');
+  };
+
   return (
-    <div className="control-header">
-      {/* 左半边：标题 */}
+    <div className="app-header">
       <div className="header-left">
         <h1 className="app-title">NeuralSoup</h1>
       </div>
-
-      {/* 右半边：游戏控制 */}
       <div className="header-right">
-        <GameControls />
+        <div className="header-controls">
+          <span className="control-item">分享 V</span>
+          <span className="control-separator">|</span>
+          <span className="control-item" onClick={toggleLanguage} style={{cursor: 'pointer'}}>
+            {language === 'en' ? '中' : 'En'}
+          </span>
+           <span className="control-separator">|</span>
+          <div className="user-icon"></div>
+        </div>
       </div>
     </div>
   );

@@ -6,11 +6,11 @@ export const demoSNNTopology = {
     { id: 'motor-2', type: 'output', x: 450, y: 200 },
     { id: 'neuron-1', type: 'neuron', x: 250, y: 150 },
   ],
-  links: [
-    { from: 'vision-1', to: 'neuron-1' },
-    { from: 'vision-2', to: 'neuron-1' },
-    { from: 'neuron-1', to: 'motor-1' },
-    { from: 'neuron-1', to: 'motor-2' },
+  synapses: [
+    { from: 'vision-1', to: 'neuron-1', weight: 1 },
+    { from: 'vision-2', to: 'neuron-1', weight: 1 },
+    { from: 'neuron-1', to: 'motor-1', weight: 1 },
+    { from: 'neuron-1', to: 'motor-2', weight: 1 },
   ],
   canvasOffset: { x: 0, y: 0 },
   canvasScale: 1,

@@ -1,7 +1,8 @@
 import React, { useRef, useCallback, useEffect } from 'react';
 
 interface ResizableSplitterProps {
-  onResize: (deltaX: number) => void;
+  onResize: (delta: number) => void;
+  direction?: 'vertical' | 'horizontal';
   className?: string;
 }
 
@@ -11,26 +12,28 @@ interface ResizableSplitterProps {
  */
 const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
   onResize,
+  direction = 'vertical',
   className = '',
 }) => {
   const isDragging = useRef(false);
-  const startX = useRef(0);
+  const startPos = useRef(0);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     isDragging.current = true;
-    startX.current = e.clientX;
-    document.body.style.cursor = 'col-resize';
+    startPos.current = direction === 'vertical' ? e.clientX : e.clientY;
+    document.body.style.cursor = direction === 'vertical' ? 'col-resize' : 'row-resize';
     document.body.style.userSelect = 'none';
     e.preventDefault();
-  }, []);
+  }, [direction]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging.current) return;
     
-    const deltaX = e.clientX - startX.current;
-    startX.current = e.clientX;
-    onResize(deltaX);
-  }, [onResize]);
+    const currentPos = direction === 'vertical' ? e.clientX : e.clientY;
+    const delta = currentPos - startPos.current;
+    startPos.current = currentPos;
+    onResize(delta);
+  }, [onResize, direction]);
 
   const handleMouseUp = useCallback(() => {
     if (!isDragging.current) return;
@@ -50,9 +53,11 @@ const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
     };
   }, [handleMouseMove, handleMouseUp]);
 
+  const splitterClassName = `resizable-splitter ${direction} ${className}`;
+
   return (
     <div
-      className={`resizable-splitter ${className}`}
+      className={splitterClassName}
       onMouseDown={handleMouseDown}
       title="拖拽调整面板大小"
     />

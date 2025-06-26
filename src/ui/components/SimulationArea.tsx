@@ -3,10 +3,14 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import SimulationCanvas from '../views/SimulationCanvas';
 import { globalEventBus } from '../../core/services/EventBus';
 import { globalState } from '../../core/services/GlobalState';
+import StatsOverlay from './StatsOverlay';
+import GameControls from './GameControls';
+import '../styles/game-area.css';
 
 /**
- * 仿真展示区组件
- * 包含仿真画布和底部的控制按钮、FPS统计
+ * 仿真区域组件
+ * 该组件是仿真世界的主要显示区域。
+ * 它包含了Canvas、统计信息浮层和游戏控制按钮。
  */
 const SimulationArea: React.FC = () => {
   const { t } = useLanguage();
@@ -40,24 +44,10 @@ const SimulationArea: React.FC = () => {
 
   return (
     <div className="simulation-area">
-      <div className="simulation-canvas">
-        <SimulationCanvas />
-      </div>
-      
-      <div className="simulation-controls">
-        <div className="control-left">
-          <button
-            className={`control-button ${isRunning ? '' : 'paused'}`}
-            onClick={handlePlayPause}
-            title={isRunning ? t('simulation.pause') : t('simulation.start')}
-          >
-            {isRunning ? '⏸' : '▶'}
-          </button>
-        </div>
-        
-        <div className="fps-counter">
-          {t('stats.fps')}: {fps}
-        </div>
+      <SimulationCanvas />
+      <StatsOverlay />
+      <div className="game-controls-container">
+        <GameControls />
       </div>
     </div>
   );

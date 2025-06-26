@@ -3,8 +3,8 @@
  * 它是仿真环境的核心。
  */
 
-import type { IWorld } from '../../shared/interfaces/IWorld';
-import type { IAgent } from '../../shared/interfaces/IAgent';
+import type { IWorld } from './types';
+import type { IAgent } from '../entities/types';
 
 export class World implements IWorld {
   private agents: Map<string, IAgent> = new Map();

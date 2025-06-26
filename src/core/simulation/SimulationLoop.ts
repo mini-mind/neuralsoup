@@ -1,4 +1,4 @@
-import type { IWorld } from '../../shared/interfaces/IWorld';
+import type { IWorld } from '../world/types';
 
 /**
  * 纯粹的仿真循环，负责以固定的时间步长驱动世界状态的更新。
