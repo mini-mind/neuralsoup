@@ -88,6 +88,112 @@ body, html, #root {
   padding: 5px;
 }
 
+/* SNN编辑器样式 */
+.snn-editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: #1e1e1e;
+  overflow: hidden;
+}
+
+.snn-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 15px;
+  background-color: #333;
+  border-bottom: 1px solid var(--border-color);
+  border-radius: 8px 8px 0 0;
+  min-height: 40px;
+}
+
+.editor-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.snn-editor-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+.help-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #6366f1;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: help;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.help-icon:hover {
+  background: #5855eb;
+  transform: scale(1.1);
+}
+
+.help-icon[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.95);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 11px;
+  white-space: pre-line;
+  z-index: 1000;
+  pointer-events: none;
+  font-weight: normal;
+  max-width: 300px;
+  line-height: 1.4;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 8px;
+}
+
+.help-icon[data-tooltip]:hover::before {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid rgba(0, 0, 0, 0.95);
+  z-index: 1000;
+  pointer-events: none;
+  margin-top: 2px;
+}
+
+.editor-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.snn-editor-content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
 .resource-library-panel, .editor-panel {
   display: flex;
   flex-direction: column;

@@ -199,6 +199,121 @@
   white-space: nowrap;
 }
 
+/* 选择框样式 */
+.selection-box {
+  position: absolute;
+  border: 1px dashed #4a90e2;
+  background-color: rgba(74, 144, 226, 0.1);
+  pointer-events: none;
+}
+
+/* 详情编辑器样式 - 黑色背景白色文字 */
+.detail-editor {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 320px;
+  max-width: calc(100% - 20px);
+  background-color: #1e1e1e;
+  border: 1px solid #444;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.detail-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: #2d2d2d;
+  border-bottom: 1px solid #444;
+  border-radius: 6px 6px 0 0;
+}
+
+.detail-editor-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: #cccccc;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.close-button:hover {
+  background-color: #404040;
+  color: #ffffff;
+}
+
+/* 覆盖子组件的样式以适配黑色主题 */
+.detail-editor .panel-content {
+  background-color: #1e1e1e;
+  color: #ffffff;
+  padding: 16px;
+}
+
+.detail-editor input,
+.detail-editor select,
+.detail-editor textarea {
+  background-color: #2d2d2d;
+  border: 1px solid #444;
+  color: #ffffff;
+  border-radius: 3px;
+  padding: 6px 8px;
+}
+
+.detail-editor input:focus,
+.detail-editor select:focus,
+.detail-editor textarea:focus {
+  outline: none;
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+}
+
+.detail-editor label {
+  color: #cccccc;
+  font-size: 12px;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.detail-editor button {
+  background-color: #4a90e2;
+  border: none;
+  color: #ffffff;
+  border-radius: 3px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.2s ease;
+}
+
+.detail-editor button:hover {
+  background-color: #357abd;
+}
+
+.detail-editor button:disabled {
+  background-color: #444;
+  color: #888;
+  cursor: not-allowed;
+}
+
 /* 模态弹窗样式 */
 .modal-overlay {
   position: fixed;
@@ -274,3 +389,5 @@
     font-size: 11px;
   }
 }
+
+

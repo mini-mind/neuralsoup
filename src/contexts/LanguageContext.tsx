@@ -108,6 +108,15 @@ const translations = {
     "editor.apply": "应用代码",
     "editor.applied": "已应用",
 
+    // SNN 编辑器
+    "snn.editor.title": "神经网络拓扑编辑器",
+    "snn.editor.apply": "应用",
+    "snn.editor.helpTooltip": "操作说明：\n• 左键拖拽：框选多个神经元\n• Shift+点击：多选神经元\n• 双击组合组件：切换收起/展开状态\n• 右键拖拽：平移画布\n• 滚轮：缩放画布\n• Ctrl+左键拖拽：创建连接",
+    "snn.group.visualReceptor": "视觉感受器",
+    "snn.group.rotationController": "旋转控制器",
+    "snn.details.neuron": "神经元详情",
+    "snn.details.synapse": "突触详情",
+
     // 功能状态
     "status.dev-sensors": "感受器配置功能开发中...",
     "status.dev-effectors": "效应器配置功能开发中...",
@@ -212,6 +221,15 @@ const translations = {
     "editor.title": "JS Code Editor",
     "editor.apply": "Apply Code",
     "editor.applied": "Applied",
+
+    // SNN Editor
+    "snn.editor.title": "SNN Topology Editor",
+    "snn.editor.apply": "Apply",
+    "snn.editor.helpTooltip": "Instructions:\n• Left Drag: Box select neurons\n• Shift+Click: Multi-select\n• Double Click Group: Toggle collapse\n• Right Drag: Pan canvas\n• Scroll: Zoom canvas\n• Ctrl+Left Drag: Create connection",
+    "snn.group.visualReceptor": "Visual Receptor",
+    "snn.group.rotationController": "Rotation Controller",
+    "snn.details.neuron": "Neuron Details",
+    "snn.details.synapse": "Synapse Details",
 
     // 功能状态
     "status.dev-sensors": "Sensor configuration in development...",

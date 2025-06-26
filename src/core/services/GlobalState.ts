@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { EventBus } from './EventBus';
+import type { NetworkTopology } from '../types';
 
 /**
  * 一个简单的、类型安全的全局状态管理器。
@@ -74,7 +75,10 @@ interface AppState {
   activeAgentId: string | null;
   cameraTarget: { x: number; y: number } | null;
   worldState: any[]; // 用于存储来自world的实体状态
-  snnTopology: any; // 为SNN编辑器添加的状态
+  snnTopology: any; // 保持兼容性的简单拓扑数据
+  networkTopology: NetworkTopology | null; // 新的网络拓扑实例
+  selectedNodeId: string | null; // 当前选中的节点ID
+  selectedEdgeId: string | null; // 当前选中的边ID
 }
 
 const initialState: AppState = {
@@ -83,6 +87,9 @@ const initialState: AppState = {
   cameraTarget: null,
   worldState: [], // 初始为空数组
   snnTopology: null, // 初始化snnTopology
+  networkTopology: null, // 初始化网络拓扑
+  selectedNodeId: null,
+  selectedEdgeId: null,
 };
 
 export const globalState = new GlobalState<AppState>(initialState); 
