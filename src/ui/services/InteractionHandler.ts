@@ -115,15 +115,28 @@ export class InteractionHandler {
 
       // 如果节点在组内，限制其移动范围
       if (parentGroup) {
-        const nodeRadius = 8; // 组内节点的半径
+        // 获取节点实际半径，与绘制逻辑保持一致
+        const getNodeRadius = (nodeType: string, scale: number) => {
+          if (nodeType === 'voltage_input') {
+            const baseSize = 4;
+            return Math.max(2, Math.min(6, baseSize + (scale - 1) * 2));
+          } else {
+            // 组内节点
+            const baseSize = 8;
+            return Math.max(4, Math.min(10, baseSize + (scale - 1) * 1.5));
+          }
+        };
+
+        const nodeRadius = getNodeRadius(node.type, scale);
         const padding = 5; // 边界内边距
-        const titleBarHeight = 20; // 标题栏高度
-        
+        // 标题栏高度需要考虑缩放，但保持最小值
+        const titleBarHeight = Math.max(20, 20 * Math.sqrt(scale));
+
         // 限制x坐标
         const minX = parentGroup.x + padding + nodeRadius;
         const maxX = parentGroup.x + parentGroup.width - padding - nodeRadius;
         newX = Math.max(minX, Math.min(maxX, newX));
-        
+
         // 限制y坐标（考虑标题栏高度）
         const minY = parentGroup.y + titleBarHeight + padding + nodeRadius;
         const maxY = parentGroup.y + parentGroup.height - padding - nodeRadius;
@@ -249,21 +262,56 @@ export class InteractionHandler {
   ): NodeGroup | null {
     const buttonSize = 12;
     const buttonMargin = 4;
-    
+
     for (const group of groups) {
-      // 计算按钮在世界坐标中的位置
+      // 计算标题栏的偏移量（标题现在在组框上方）
+      const titleBarHeight = Math.max(20, 20 * Math.sqrt(canvasScale));
+      const titleOffsetY = -(titleBarHeight + 5) / canvasScale; // 标题在组框上方，留5px间距
+
+      // 计算按钮在世界坐标中的位置（现在在标题栏中）
       const buttonWorldX = group.x + buttonMargin / canvasScale;
-      const buttonWorldY = group.y + buttonMargin / canvasScale;
+      const buttonWorldY = group.y + titleOffsetY + buttonMargin / canvasScale;
       const buttonWorldSize = buttonSize / canvasScale;
-      
-      if (worldPos.x >= buttonWorldX && 
+
+      if (worldPos.x >= buttonWorldX &&
           worldPos.x <= buttonWorldX + buttonWorldSize &&
-          worldPos.y >= buttonWorldY && 
+          worldPos.y >= buttonWorldY &&
           worldPos.y <= buttonWorldY + buttonWorldSize) {
         return group;
       }
     }
-    
+
+    return null;
+  }
+
+  /**
+   * 检测标题栏点击（用于拖动和双击）
+   */
+  static findTitleBarAtPosition(
+    worldPos: Vector2D,
+    groups: NodeGroup[],
+    canvasScale: number,
+    canvasOffset: Vector2D
+  ): NodeGroup | null {
+    for (const group of groups) {
+      // 计算标题栏的偏移量和尺寸
+      const titleBarHeight = Math.max(20, 20 * Math.sqrt(canvasScale));
+      const titleOffsetY = -(titleBarHeight + 5) / canvasScale; // 标题在组框上方，留5px间距
+
+      // 标题栏的世界坐标范围
+      const titleBarWorldX = group.x;
+      const titleBarWorldY = group.y + titleOffsetY;
+      const titleBarWorldWidth = group.width;
+      const titleBarWorldHeight = titleBarHeight / canvasScale;
+
+      if (worldPos.x >= titleBarWorldX &&
+          worldPos.x <= titleBarWorldX + titleBarWorldWidth &&
+          worldPos.y >= titleBarWorldY &&
+          worldPos.y <= titleBarWorldY + titleBarWorldHeight) {
+        return group;
+      }
+    }
+
     return null;
   }
 } 

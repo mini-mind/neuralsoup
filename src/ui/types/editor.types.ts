@@ -41,6 +41,7 @@ export interface NodeGroup {
   nodes: string[]; // 包含的节点ID列表
   neurons: string[]; // 神经元ID列表，用于折叠检查
   managedEdges?: ManagedEdge[]; // 收起时托管的边信息
+  pluginInstance?: any; // 关联的插件实例（如果是插件组）
 }
 
 export interface ManagedEdge {

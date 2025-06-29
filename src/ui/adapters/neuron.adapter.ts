@@ -1,4 +1,4 @@
-import { SNNNode } from "../components/utils/ElementDetector";
+import { SNNNode } from "../types/snn.types";
 
 /**
  * 神经元适配器

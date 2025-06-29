@@ -124,11 +124,28 @@ const translations = {
     // SNN 编辑器
     "snn.editor.title": "神经网络拓扑编辑器",
     "snn.editor.apply": "应用",
-    "snn.editor.helpTooltip": "操作说明：\n• 左键拖拽：框选多个神经元\n• Shift+点击：多选神经元\n• 双击组合组件：切换收起/展开状态\n• 右键拖拽：平移画布\n• 滚轮：缩放画布\n• Ctrl+左键拖拽：创建连接",
+    "snn.editor.helpTooltip": "操作说明：\n• 左键拖拽：框选多个神经元\n• Ctrl+左键：多选神经元/组\n• 双击组合组件：切换收起/展开状态\n• 右键拖拽：平移画布\n• 滚轮：缩放画布（以中心为原点）\n• Ctrl+右键：创建连接\n• Del键：删除选中元素",
     "snn.group.visualReceptor": "视觉感受器",
     "snn.group.rotationController": "旋转控制器",
     "snn.details.neuron": "神经元详情",
     "snn.details.synapse": "突触详情",
+
+    // 节点类型
+    "node.type.sensor": "感受器",
+    "node.type.effector": "效应器",
+    "node.type.visualReceptor": "视觉感受器",
+    "node.type.rotationController": "旋转控制器",
+
+    // 警告信息
+    "warning.effector-no-start": "效应器节点（旋转控制器）不能作为连接的起点。",
+    "warning.sensor-no-end": "感受器节点（视觉感受器）不能作为连接的终点。",
+    "warning.cannot-delete-protected-nodes": "感受器和效应器插件的内部节点受到保护，无法删除。",
+    "warning.cannot-delete-group-nodes": "无法删除组内的节点，请删除整个组。",
+    "warning.cannot-delete-protected-groups": "感受器和效应器插件组受到保护，无法删除。",
+
+    // 感受器和效应器组标题
+    "group.sensor.title": "感受器组",
+    "group.effector.title": "效应器组",
 
     // 功能状态
     "status.dev-sensors": "感受器配置功能开发中...",
@@ -251,11 +268,28 @@ const translations = {
     // SNN Editor
     "snn.editor.title": "SNN Topology Editor",
     "snn.editor.apply": "Apply",
-    "snn.editor.helpTooltip": "Instructions:\n• Left Drag: Box select neurons\n• Shift+Click: Multi-select\n• Double Click Group: Toggle collapse\n• Right Drag: Pan canvas\n• Scroll: Zoom canvas\n• Ctrl+Left Drag: Create connection",
+    "snn.editor.helpTooltip": "Instructions:\n• Left Drag: Box select neurons\n• Ctrl+Left Click: Multi-select neurons/groups\n• Double Click Group: Toggle collapse\n• Right Drag: Pan canvas\n• Scroll: Zoom canvas (center-based)\n• Ctrl+Right Click: Create connection\n• Del Key: Delete selected elements",
     "snn.group.visualReceptor": "Visual Receptor",
     "snn.group.rotationController": "Rotation Controller",
     "snn.details.neuron": "Neuron Details",
     "snn.details.synapse": "Synapse Details",
+
+    // Node Types
+    "node.type.sensor": "Sensor",
+    "node.type.effector": "Effector",
+    "node.type.visualReceptor": "Visual Receptor",
+    "node.type.rotationController": "Rotation Controller",
+
+    // Warning Messages
+    "warning.effector-no-start": "Effector nodes (Rotation Controllers) cannot be the starting point of an edge.",
+    "warning.sensor-no-end": "Sensor nodes (Visual Receptors) cannot be the end point of an edge.",
+    "warning.cannot-delete-protected-nodes": "Internal nodes of sensor and effector plugins are protected and cannot be deleted.",
+    "warning.cannot-delete-group-nodes": "Cannot delete nodes that are part of a group. Delete the entire group instead.",
+    "warning.cannot-delete-protected-groups": "Sensor and effector plugin groups are protected and cannot be deleted.",
+
+    // Sensor and Effector Group Titles
+    "group.sensor.title": "Sensor Group",
+    "group.effector.title": "Effector Group",
 
     // 功能状态
     "status.dev-sensors": "Sensor configuration in development...",

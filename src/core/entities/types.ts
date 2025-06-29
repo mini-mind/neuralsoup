@@ -1,4 +1,5 @@
 import type { IWorld, ICollidable } from '../world/types';
+import { INeuron, NeuronState } from './neuron';
 
 /**
  * 定义了智能体"大脑"的契约。
@@ -58,13 +59,15 @@ export interface IAgent extends ICollidable {
 
 /**
  * 电压输入节点类
- * 输入多少就立刻输出多少，没有内在逻辑
+ * 视觉感受器的内部组件，输入多少就立刻输出多少，没有内在逻辑
  */
-export class VoltageInputNode {
+export class VoltageInputNode implements INeuron {
   readonly id: string;
-  readonly type = 'voltage_input';
+  readonly type = 'voltage_input' as const;
   x: number;
   y: number;
+  voltage: number = 0; // 当前电压值
+  threshold: number = 0.5; // 阈值
   private currentOutput: number = 0;
 
   constructor(id: string, x: number, y: number) {
@@ -74,11 +77,28 @@ export class VoltageInputNode {
   }
 
   /**
+   * 设置位置
+   */
+  setPosition(x: number, y: number): void {
+    this.x = x;
+    this.y = y;
+  }
+
+  /**
    * 处理输入并立即输出
    */
   process(input: number): number {
     this.currentOutput = input;
+    this.voltage = input;
     return this.currentOutput;
+  }
+
+  /**
+   * 更新神经元状态 - INeuron接口要求
+   */
+  update(input: number, deltaTime: number): boolean {
+    this.process(input);
+    return this.voltage >= this.threshold;
   }
 
   /**
@@ -89,12 +109,13 @@ export class VoltageInputNode {
   }
 
   /**
-   * 获取状态信息
+   * 获取状态信息 - INeuron接口要求
    */
-  getState(): { voltage: number; isSpiking: boolean } {
+  getState(): NeuronState {
     return {
-      voltage: this.currentOutput,
-      isSpiking: false
+      voltage: this.voltage,
+      isSpiking: this.voltage >= this.threshold,
+      lastSpikeTime: -Infinity
     };
   }
 
@@ -103,14 +124,7 @@ export class VoltageInputNode {
    */
   reset(): void {
     this.currentOutput = 0;
-  }
-
-  /**
-   * 设置位置
-   */
-  setPosition(x: number, y: number): void {
-    this.x = x;
-    this.y = y;
+    this.voltage = 0;
   }
 }
 
@@ -119,11 +133,17 @@ export class VoltageInputNode {
  * 输入的电压经过打折后累积起来但会随时间快速线性衰减
  * 已有电压越高则累加时打折力度越大
  */
-export class VoltageAccumulatorNode {
+/**
+ * 电压累积节点类
+ * 旋转控制器的内部组件，累积输入电压，持续衰减，最大值限制为1
+ */
+export class VoltageAccumulatorNode implements INeuron {
   readonly id: string;
-  readonly type = 'voltage_accumulator';
+  readonly type = 'voltage_accumulator' as const;
   x: number;
   y: number;
+  voltage: number = 0; // 当前电压值，对外接口
+  threshold: number = 50; // 阈值
   private accumulatedVoltage: number = 0;
   private lastUpdateTime: number = Date.now();
 
@@ -139,25 +159,44 @@ export class VoltageAccumulatorNode {
   }
 
   /**
+   * 设置位置
+   */
+  setPosition(x: number, y: number): void {
+    this.x = x;
+    this.y = y;
+  }
+
+  /**
    * 处理输入并累积电压
    */
   process(input: number, deltaTime: number = 1): number {
     const currentTime = Date.now();
     const timeDelta = Math.max(1, currentTime - this.lastUpdateTime);
-    
+
     // 时间衰减
     this.accumulatedVoltage *= Math.pow(this.decayRate, timeDelta);
-    
+
     // 计算打折因子（电压越高打折越厉害）
     const voltageRatio = this.accumulatedVoltage / this.maxVoltage;
     const currentDiscountFactor = this.discountFactor * (1 + voltageRatio * 2);
-    
+
     // 累积新输入（打折后）
     const discountedInput = input * (1 - Math.min(0.9, currentDiscountFactor));
     this.accumulatedVoltage = Math.min(this.maxVoltage, this.accumulatedVoltage + discountedInput);
-    
+
+    // 更新对外接口的voltage值
+    this.voltage = this.accumulatedVoltage;
+
     this.lastUpdateTime = currentTime;
     return this.accumulatedVoltage;
+  }
+
+  /**
+   * 更新神经元状态 - INeuron接口要求
+   */
+  update(input: number, deltaTime: number): boolean {
+    this.process(input, deltaTime);
+    return this.voltage >= this.threshold;
   }
 
   /**
@@ -168,12 +207,13 @@ export class VoltageAccumulatorNode {
   }
 
   /**
-   * 获取状态信息
+   * 获取状态信息 - INeuron接口要求
    */
-  getState(): { voltage: number; isSpiking: boolean } {
+  getState(): NeuronState {
     return {
-      voltage: this.accumulatedVoltage,
-      isSpiking: this.accumulatedVoltage > this.maxVoltage * 0.8
+      voltage: this.voltage,
+      isSpiking: this.voltage >= this.threshold,
+      lastSpikeTime: -Infinity
     };
   }
 
@@ -182,14 +222,7 @@ export class VoltageAccumulatorNode {
    */
   reset(): void {
     this.accumulatedVoltage = 0;
+    this.voltage = 0;
     this.lastUpdateTime = Date.now();
   }
-
-  /**
-   * 设置位置
-   */
-  setPosition(x: number, y: number): void {
-    this.x = x;
-    this.y = y;
-  }
-} 
+}

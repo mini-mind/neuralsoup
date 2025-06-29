@@ -8,21 +8,15 @@ import ResizableSplitter from '../ui/components/ResizableSplitter';
 import SimulationArea from '../ui/components/SimulationArea';
 import GraphEditor from '../ui/views/SNNTopologyEditor';
 import '../ui/styles/layout.css';
-import { registerAllModules } from './registerModules';
 import { demoSNNTopology, createDemoNetworkTopology } from './demoData';
 import { useLanguage } from '../contexts/LanguageContext';
 import HelpTooltipIcon from '../ui/components/HelpTooltipIcon';
-
-type Vector2D = { x: number; y: number };
-type SNNNode = { id: string; type: string; x: number; y: number };
-
-registerAllModules();
 
 const App: React.FC = () => {
   const [rightPanelWidth, setRightPanelWidth] = useState(500);
   const editorPanelRef = useRef<HTMLDivElement>(null);
   const [editorSize, setEditorSize] = useState({ width: 0, height: 0 });
-  const { t, language, setLanguage } = useLanguage();
+  const { t } = useLanguage();
 
   useEffect(() => {
     const world = new World(1600, 1200);

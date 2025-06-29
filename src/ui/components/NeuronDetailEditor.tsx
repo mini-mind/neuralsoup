@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { SNNNode } from "../types/simulation";
+import { SNNNode } from "../types/snn.types";
 
 interface NeuronDetailEditorProps {
   neuron: SNNNode;

@@ -70,44 +70,101 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
     neuronGroups.forEach(group => {
       const isSelected = interactionState.selectedGroups.includes(group.id);
       
-      // 收起时调整框尺寸
-      const displayWidth = group.collapsed ? Math.min(group.width, 80) : group.width;
-      const displayHeight = group.collapsed ? 30 : group.height;
-      
+      // 缩放感知的尺寸计算
+      const scale = snnTopology.canvasScale;
+
+      // 计算标题文字所需的最小宽度
+      const title = group.type === 'visual_receptor_group' ? t('snn.group.visualReceptor') : t('snn.group.rotationController');
+      const fontSize = Math.max(9, Math.min(14, 11 * Math.sqrt(scale)));
+
+      // 创建临时canvas来测量文字宽度
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      let minWidthForTitle = 120; // 默认最小宽度
+
+      if (tempCtx) {
+        tempCtx.font = `bold ${fontSize}px Arial`;
+        const textWidth = tempCtx.measureText(title).width;
+
+        // 计算最小宽度：文字宽度 + 按钮 + 边距
+        const buttonSize = Math.max(10, Math.min(16, 12 * Math.sqrt(scale)));
+        const buttonMargin = Math.max(3, 4 * Math.sqrt(scale));
+        minWidthForTitle = textWidth + buttonSize + buttonMargin * 3 + 8; // 额外8px边距
+      }
+
+      const minWidth = Math.max(120, minWidthForTitle); // 确保标题完全可见
+      const minHeight = 30; // 最小高度
+      const maxCollapsedWidth = Math.max(minWidth, 80 * Math.sqrt(scale)); // 缩放感知的收起宽度
+
+      // 计算标题栏高度（需要在其他计算之前定义）
+      const titleBarHeight = Math.max(20, 20 * Math.sqrt(scale));
+
+      // 收起时调整框尺寸，考虑缩放因子
+      const displayWidth = group.collapsed
+        ? Math.max(minWidth, Math.min(group.width, maxCollapsedWidth))
+        : Math.max(minWidth, group.width);
+      const displayHeight = group.collapsed
+        ? Math.max(minHeight, 30 * Math.sqrt(scale))
+        : Math.max(minHeight * 2, group.height);
+
+      // 对于视觉感受器和旋转控制器组，收起时只显示标题栏
+      const isReceptorOrControllerGroup = group.type === 'visual_receptor_group' || group.type === 'rotation_controller_group';
+      const finalDisplayHeight = (group.collapsed && isReceptorOrControllerGroup)
+        ? titleBarHeight
+        : displayHeight;
+
       // 修复坐标变换：正确的顺序应该是先缩放再平移
       const screenPos = {
-        x: group.x * snnTopology.canvasScale + snnTopology.canvasOffset.x,
-        y: group.y * snnTopology.canvasScale + snnTopology.canvasOffset.y
+        x: group.x * scale + snnTopology.canvasOffset.x,
+        y: group.y * scale + snnTopology.canvasOffset.y
       };
       const screenSize = {
-        width: displayWidth * snnTopology.canvasScale,
-        height: displayHeight * snnTopology.canvasScale
+        width: displayWidth * scale,
+        height: finalDisplayHeight * scale
       };
 
-      // 绘制组背景
-      ctx.fillStyle = isSelected ? 'rgba(255, 0, 0, 0.1)' : 'rgba(100, 100, 100, 0.2)';
-      ctx.fillRect(screenPos.x, screenPos.y, screenSize.width, screenSize.height);
-      
-      // 绘制组边框
-      ctx.strokeStyle = isSelected ? '#ff0000' : '#888';
-      ctx.lineWidth = isSelected ? 3 : 2;
-      ctx.strokeRect(screenPos.x, screenPos.y, screenSize.width, screenSize.height);
+      // 绘制组背景（只在非收起状态或非视觉感受器/旋转控制器组时绘制）
+      if (!group.collapsed || !isReceptorOrControllerGroup) {
+        ctx.fillStyle = isSelected ? 'rgba(255, 0, 0, 0.1)' : 'rgba(100, 100, 100, 0.2)';
+        ctx.fillRect(screenPos.x, screenPos.y, screenSize.width, screenSize.height);
 
-      // 绘制标题栏
-      const titleBarHeight = 20;
-      ctx.fillStyle = isSelected ? 'rgba(255, 0, 0, 0.2)' : 'rgba(120, 120, 120, 0.3)';
-      ctx.fillRect(screenPos.x, screenPos.y, screenSize.width, titleBarHeight);
-      
-      // 绘制标题栏边框
+        // 绘制组边框
+        ctx.strokeStyle = isSelected ? '#ff0000' : '#888';
+        ctx.lineWidth = isSelected ? 3 : 2;
+        ctx.strokeRect(screenPos.x, screenPos.y, screenSize.width, screenSize.height);
+      }
+
+      // 计算标题位置
+      let titleOffsetY, titleBarWidth;
+
+      if (isReceptorOrControllerGroup) {
+        // 视觉感受器和旋转控制器组：标题栏在组框上方
+        titleOffsetY = -titleBarHeight - 5; // 标题显示在组框上方，留5px间距
+        titleBarWidth = screenSize.width;
+      } else {
+        // 其他组：标题栏在组框内部顶部
+        titleOffsetY = 0;
+        titleBarWidth = screenSize.width;
+      }
+
+      // 绘制标题背景
+      const titleBgColor = isReceptorOrControllerGroup
+        ? (isSelected ? 'rgba(0, 123, 255, 0.3)' : 'rgba(108, 117, 125, 0.4)')
+        : (isSelected ? 'rgba(255, 0, 0, 0.2)' : 'rgba(120, 120, 120, 0.3)');
+
+      ctx.fillStyle = titleBgColor;
+      ctx.fillRect(screenPos.x, screenPos.y + titleOffsetY, titleBarWidth, titleBarHeight);
+
+      // 绘制标题边框
       ctx.strokeStyle = isSelected ? '#ff0000' : '#999';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(screenPos.x, screenPos.y, screenSize.width, titleBarHeight);
+      ctx.lineWidth = Math.max(1, scale * 0.8);
+      ctx.strokeRect(screenPos.x, screenPos.y + titleOffsetY, titleBarWidth, titleBarHeight);
 
-      // 绘制收起按钮
-      const buttonSize = 12;
-      const buttonMargin = 4;
+      // 绘制收起按钮 - 缩放感知的尺寸，位置在标题栏中
+      const buttonSize = Math.max(10, Math.min(16, 12 * Math.sqrt(scale)));
+      const buttonMargin = Math.max(3, 4 * Math.sqrt(scale));
       const buttonX = screenPos.x + buttonMargin;
-      const buttonY = screenPos.y + buttonMargin;
+      const buttonY = screenPos.y + titleOffsetY + buttonMargin;
       
       ctx.fillStyle = group.collapsed ? '#ff6b6b' : '#4a90e2';
       ctx.fillRect(buttonX, buttonY, buttonSize, buttonSize);
@@ -136,27 +193,28 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
       }
       ctx.stroke();
 
-      // 绘制标题文字
+      // 绘制标题文字 - 缩放感知的字体大小
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 11px Arial';
+      ctx.font = `bold ${fontSize}px Arial`;
       ctx.textAlign = 'left';
-      const title = group.type === 'visual_receptor_group' ? t('snn.group.visualReceptor') : t('snn.group.rotationController');
       const maxTitleWidth = screenSize.width - buttonSize - buttonMargin * 3 - 4;
-      
+
       // Truncate title if too long in collapsed state
       let displayTitle = title;
       if (group.collapsed) {
-        ctx.font = 'bold 10px Arial';
+        const collapsedFontSize = Math.max(8, Math.min(12, 10 * Math.sqrt(scale)));
+        ctx.font = `bold ${collapsedFontSize}px Arial`;
         const titleWidth = ctx.measureText(title).width;
         if (titleWidth > maxTitleWidth) {
           displayTitle = title.substring(0, Math.floor(title.length * maxTitleWidth / titleWidth)) + '...';
         }
       }
-      
-      ctx.fillText(displayTitle, screenPos.x + buttonSize + buttonMargin * 2 + 2, screenPos.y + 14);
 
-      // 如果组已收起，显示省略号
-      if (group.collapsed) {
+      const textY = screenPos.y + titleOffsetY + titleBarHeight * 0.7; // 垂直居中在标题栏中
+      ctx.fillText(displayTitle, screenPos.x + buttonSize + buttonMargin * 2 + 2, textY);
+
+      // 如果组已收起，显示省略号（但视觉感受器和旋转控制器组不显示）
+      if (group.collapsed && !isReceptorOrControllerGroup) {
         ctx.fillStyle = '#999';
         ctx.font = '12px Arial';
         ctx.textAlign = 'center';
@@ -168,6 +226,50 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
   const drawNetworkTopology = (ctx: CanvasRenderingContext2D, topology: any, legacyTopology: any, selectedNode: string | null, selectedEdge: string | null) => {
     const offset = legacyTopology?.canvasOffset || { x: 0, y: 0 };
     const scale = legacyTopology?.canvasScale || 1;
+
+    // 绘制感受器和效应器组内的节点
+    const drawGroupNodes = (nodes: any[], groups: NodeGroup[]) => {
+      nodes.forEach(node => {
+        // 检查节点是否属于某个组
+        const parentGroup = groups.find(group =>
+          (group.type === 'sensor_group' || group.type === 'effector_group') &&
+          group.nodes.includes(node.id)
+        );
+
+        if (parentGroup && !parentGroup.collapsed) {
+          // 绘制组内节点
+          const screenX = node.x * scale + offset.x;
+          const screenY = node.y * scale + offset.y;
+          const nodeRadius = node.type === 'voltage_input' ? 4 : 8;
+          const scaledRadius = nodeRadius * Math.sqrt(scale);
+
+          // 节点颜色
+          const nodeColor = node.type === 'voltage_input' ? '#28a745' : '#fd7e14'; // 绿色感受器，橙色效应器
+          const isSelected = selectedNode === node.id;
+
+          // 绘制节点
+          ctx.beginPath();
+          ctx.arc(screenX, screenY, scaledRadius, 0, 2 * Math.PI);
+          ctx.fillStyle = isSelected ? '#ff0000' : nodeColor;
+          ctx.fill();
+          ctx.strokeStyle = isSelected ? '#ffffff' : '#333333';
+          ctx.lineWidth = isSelected ? 2 : 1;
+          ctx.stroke();
+
+          // 绘制节点状态（如果有）
+          if (node.getState) {
+            const state = node.getState();
+            if (state.isSpiking) {
+              ctx.beginPath();
+              ctx.arc(screenX, screenY, scaledRadius + 3, 0, 2 * Math.PI);
+              ctx.strokeStyle = '#ff0000';
+              ctx.lineWidth = 2;
+              ctx.stroke();
+            }
+          }
+        }
+      });
+    };
     
     ctx.save();
     ctx.translate(offset.x, offset.y);
@@ -212,7 +314,12 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
         }
       });
     }
-    
+
+    // 绘制感受器和效应器组内的节点
+    if (legacyTopology?.nodes) {
+      drawGroupNodes(legacyTopology.nodes, neuronGroups);
+    }
+
     ctx.restore();
   };
   
@@ -228,13 +335,22 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
     const shouldHighlight = isSelected || isMultiSelected;
 
     // Adjust node size based on type and whether it's in a group
+    // 优化缩放算法，防止节点过大遮挡箭头，确保与边绘制逻辑一致
+    const scale = snnTopology?.canvasScale || 1;
     let radius: number;
+
     if (node.type === 'voltage_input') {
-      radius = 4; // Voltage input nodes are particularly small
+      // 电压输入节点：基础尺寸4，使用更保守的缩放
+      const baseSize = 4;
+      radius = Math.max(2, Math.min(6, baseSize + (scale - 1) * 2));
     } else if (isInGroup) {
-      radius = 8; // Other nodes in groups
+      // 组内节点：基础尺寸8，使用线性缩放但限制最大值
+      const baseSize = 8;
+      radius = Math.max(4, Math.min(10, baseSize + (scale - 1) * 1.5));
     } else {
-      radius = 15; // Regular nodes
+      // 普通节点：基础尺寸15，使用对数缩放防止过大
+      const baseSize = 15;
+      radius = Math.max(8, Math.min(20, baseSize + Math.log(scale) * 3));
     }
     
     const state = node.getState ? node.getState() : { voltage: 0, isSpiking: false };
@@ -279,12 +395,28 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
     const shouldHighlight = isSelected || isMultiSelected;
     const state = edge.getState();
     
+    // 获取节点实际半径的函数，与drawNode保持一致
+    const getNodeRadius = (node: any, isInGroup: boolean, scale: number) => {
+      if (node.type === 'voltage_input') {
+        const baseSize = 4;
+        return Math.max(2, Math.min(6, baseSize + (scale - 1) * 2));
+      } else if (isInGroup) {
+        const baseSize = 8;
+        return Math.max(4, Math.min(10, baseSize + (scale - 1) * 1.5));
+      } else {
+        const baseSize = 15;
+        return Math.max(8, Math.min(20, baseSize + Math.log(scale) * 3));
+      }
+    };
+
+    const scale = snnTopology?.canvasScale || 1;
+
     // 检查节点是否在收起的组内，如果是则使用组的中心点
     let actualFromNode = fromNode;
     let actualToNode = toNode;
     let fromRadius = 15; // 默认普通节点半径
     let toRadius = 15; // 默认普通节点半径
-    
+
     // 检查起点是否在收起的组内
     const fromNodeGroup = neuronGroups.find(g => g.collapsed && g.neurons.includes(fromNode.id));
     if (fromNodeGroup) {
@@ -294,15 +426,11 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
       };
       fromRadius = Math.min(fromNodeGroup.width, fromNodeGroup.height) / 2;
     } else {
-      // 获取起点节点的实际半径
+      // 获取起点节点的实际半径，与绘制逻辑保持一致
       const fromNodeInGroup = neuronGroups.some(g => !g.collapsed && g.neurons.includes(fromNode.id));
-      if (fromNode.type === 'voltage_input') {
-        fromRadius = 4;
-      } else if (fromNodeInGroup) {
-        fromRadius = 8;
-      }
+      fromRadius = getNodeRadius(fromNode, fromNodeInGroup, scale);
     }
-    
+
     // 检查终点是否在收起的组内
     const toNodeGroup = neuronGroups.find(g => g.collapsed && g.neurons.includes(toNode.id));
     if (toNodeGroup) {
@@ -312,13 +440,9 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
       };
       toRadius = Math.min(toNodeGroup.width, toNodeGroup.height) / 2;
     } else {
-      // 获取终点节点的实际半径
+      // 获取终点节点的实际半径，与绘制逻辑保持一致
       const toNodeInGroup = neuronGroups.some(g => !g.collapsed && g.neurons.includes(toNode.id));
-      if (toNode.type === 'voltage_input') {
-        toRadius = 4;
-      } else if (toNodeInGroup) {
-        toRadius = 8;
-      }
+      toRadius = getNodeRadius(toNode, toNodeInGroup, scale);
     }
     
     const dx = actualToNode.x - actualFromNode.x;

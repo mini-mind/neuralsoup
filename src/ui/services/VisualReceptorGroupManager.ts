@@ -1,4 +1,5 @@
 import { VoltageInputNode } from '../../core/entities/types';
+import { VisualReceptor } from '../../core/entities/neuron';
 import { NodeGroup, Vector2D } from '../types/editor.types';
 
 /**
@@ -18,10 +19,14 @@ export class VisualReceptorGroupManager {
   static createGroup(position: Vector2D, timestamp: number = Date.now()): {
     group: NodeGroup;
     nodes: any[];
+    pluginInstance: VisualReceptor;
   } {
     const groupId = `visual_group_${timestamp}`;
     const nodes: any[] = [];
-    
+
+    // 创建视觉感受器插件实例
+    const visualReceptor = new VisualReceptor(groupId, position.x, position.y);
+
     // 创建节点
     for (let i = 0; i < this.NODE_COUNT; i++) {
       const nodeId = `visual_sensor_${timestamp}_${i}`;
@@ -30,7 +35,7 @@ export class VisualReceptorGroupManager {
         x: position.x + relativePos.x,
         y: position.y + relativePos.y
       };
-      
+
       const voltageInputNode = new VoltageInputNode(nodeId, absolutePos.x, absolutePos.y);
       const node = {
         id: nodeId,
@@ -57,10 +62,11 @@ export class VisualReceptorGroupManager {
       height: this.GROUP_HEIGHT,
       collapsed: false,
       nodes: nodes.map(n => n.id),
-      neurons: nodes.map(n => n.id)
+      neurons: nodes.map(n => n.id),
+      pluginInstance: visualReceptor // 关联插件实例
     };
 
-    return { group, nodes };
+    return { group, nodes, pluginInstance: visualReceptor };
   }
 
   /**

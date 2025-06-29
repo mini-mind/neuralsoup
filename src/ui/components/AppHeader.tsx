@@ -36,7 +36,7 @@ const AppHeader: React.FC = () => {
               style={{cursor: 'pointer'}}
               title={t('header.share-tooltip')}
             >
-              {t('header.share')} ▼
+              {t('header.share')}
             </span>
             <span className="control-separator">|</span>
             <span
