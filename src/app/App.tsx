@@ -6,7 +6,7 @@ import { globalState } from '../core/services/GlobalState';
 import AppHeader from '../ui/components/AppHeader';
 import ResizableSplitter from '../ui/components/ResizableSplitter';
 import SimulationArea from '../ui/components/SimulationArea';
-import SNNTopologyEditor from '../ui/views/SNNTopologyEditor';
+import GraphEditor from '../ui/views/SNNTopologyEditor';
 import '../ui/styles/layout.css';
 import { registerAllModules } from './registerModules';
 import { demoSNNTopology, createDemoNetworkTopology } from './demoData';
@@ -28,7 +28,7 @@ const App: React.FC = () => {
     const world = new World(1600, 1200);
     const simulation = new SimulationLoop(world);
     
-    // 初始化拓扑数据
+    // Initialize topology data
     const networkTopology = createDemoNetworkTopology();
     globalState.setState({ 
       snnTopology: demoSNNTopology,
@@ -94,13 +94,14 @@ const App: React.FC = () => {
             </div>
             <div className="editor-controls">
               <button className="control-button" onClick={() => {
-                console.log('应用当前配置');
+                console.log('Apply current configuration');
+                // TODO: Implement SNN configuration application logic
               }}>
                 {t('snn.editor.apply')}
               </button>
             </div>
           </div>
-          <SNNTopologyEditor 
+          <GraphEditor 
             width={editorSize.width} 
             height={editorSize.height} 
             ref={editorPanelRef}

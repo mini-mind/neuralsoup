@@ -1,9 +1,23 @@
 // 基础类型定义
-interface SNNNode {
+export interface SNNNode {
   id: string;
+  label?: string;
   type: string;
   x: number;
   y: number;
+  params?: {
+    a: number;
+    b: number;
+    c: number;
+    d: number;
+    threshold: number;
+  };
+  state?: {
+    v: number;
+    u: number;
+    spike: boolean;
+    lastSpikeTime: number;
+  };
 }
 
 interface Receptor {

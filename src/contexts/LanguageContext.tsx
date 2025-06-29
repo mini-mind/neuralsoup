@@ -38,6 +38,12 @@ const translations = {
     "btn.apply": "应用设置",
     "btn.applied": "已应用",
 
+    // 头部导航
+    "header.share": "分享",
+    "header.share-tooltip": "分享当前配置",
+    "header.user": "用户",
+    "header.language-switch": "语言切换",
+
     // 侧边栏
     "sidebar.world": "世界",
     "sidebar.agent": "智能体",
@@ -63,6 +69,13 @@ const translations = {
     "modal.script-name": "请输入脚本名称",
     "modal.new-script-name": "请输入新的脚本名称",
     "modal.delete-confirm": "确定要删除脚本",
+
+    // 分享模态框
+    "modal.share-title": "分享配置",
+    "modal.share-description": "分享当前的智能体配置和SNN拓扑",
+    "modal.share-copy-link": "复制链接",
+    "modal.share-download": "下载配置",
+    "modal.share-close": "关闭",
 
     // 智能体参数
     "agent.title": "智能体参数设置",
@@ -152,6 +165,12 @@ const translations = {
     "btn.apply": "Apply Settings",
     "btn.applied": "Applied",
 
+    // 头部导航
+    "header.share": "Share",
+    "header.share-tooltip": "Share current configuration",
+    "header.user": "User",
+    "header.language-switch": "Language Switch",
+
     // 侧边栏
     "sidebar.world": "World",
     "sidebar.agent": "Agent",
@@ -177,6 +196,13 @@ const translations = {
     "modal.script-name": "Enter script name",
     "modal.new-script-name": "Enter new script name",
     "modal.delete-confirm": "Are you sure you want to delete script",
+
+    // 分享模态框
+    "modal.share-title": "Share Configuration",
+    "modal.share-description": "Share current agent configuration and SNN topology",
+    "modal.share-copy-link": "Copy Link",
+    "modal.share-download": "Download Config",
+    "modal.share-close": "Close",
 
     // 智能体参数
     "agent.title": "Agent Parameter Settings",

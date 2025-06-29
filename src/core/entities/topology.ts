@@ -144,19 +144,24 @@ export class NetworkTopology {
    * 添加边
    */
   addEdge(synapse: ISynapse): NetworkEdge | null {
-    // 检查节点是否存在
-    if (!this.nodes.has(synapse.preNeuronId) || !this.nodes.has(synapse.postNeuronId)) {
-      console.warn(`Cannot add edge: one or both nodes not found`);
+    // 检查是否至少有一个节点存在于网络拓扑中
+    const preNodeExists = this.nodes.has(synapse.preNeuronId);
+    const postNodeExists = this.nodes.has(synapse.postNeuronId);
+    
+    if (!preNodeExists && !postNodeExists) {
+      console.warn(`Cannot add edge: at least one node must be in the network topology`);
       return null;
     }
     
     const edge = new NetworkEdge(synapse);
     this.edges.set(edge.id, edge);
     
-    // 更新邻接表
-    const fromConnections = this.adjacencyList.get(edge.fromNodeId) || [];
-    fromConnections.push(edge.toNodeId);
-    this.adjacencyList.set(edge.fromNodeId, fromConnections);
+    // 只为存在于网络拓扑中的节点更新邻接表
+    if (preNodeExists) {
+      const fromConnections = this.adjacencyList.get(edge.fromNodeId) || [];
+      fromConnections.push(edge.toNodeId);
+      this.adjacencyList.set(edge.fromNodeId, fromConnections);
+    }
     
     return edge;
   }
@@ -284,7 +289,10 @@ export class NetworkTopology {
     };
     
     for (const node of this.nodes.values()) {
-      nodesByType[node.neuron.type]++;
+      const nodeType = node.neuron.type;
+      if (nodeType === 'input' || nodeType === 'hidden' || nodeType === 'output') {
+        nodesByType[nodeType]++;
+      }
     }
     
     const avgWeight = edgeCount > 0 

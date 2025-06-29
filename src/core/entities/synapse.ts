@@ -173,6 +173,89 @@ export class STDPSynapse implements ISynapse {
 }
 
 /**
+ * 基础突触实现
+ * 固定权重，不具备学习能力
+ */
+export class BasicSynapse implements ISynapse {
+  readonly id: string;
+  readonly preNeuronId: string;
+  readonly postNeuronId: string;
+  
+  weight: number;
+  delay: number;
+  
+  // 状态追踪
+  private lastPreSpikeTime: number = -Infinity;
+  private lastPostSpikeTime: number = -Infinity;
+  private currentTime: number = 0;
+  
+  // 突触后电流追踪
+  private synapticCurrent: number = 0;
+  private currentDecay: number = 0.9; // 电流衰减因子
+  
+  constructor(
+    id: string,
+    preNeuronId: string,
+    postNeuronId: string,
+    weight: number = 0.5,
+    delay: number = 1
+  ) {
+    this.id = id;
+    this.preNeuronId = preNeuronId;
+    this.postNeuronId = postNeuronId;
+    this.weight = Math.max(0, Math.min(1, weight)); // 权重限制在[0,1]
+    this.delay = delay;
+  }
+  
+  /**
+   * 处理突触传递
+   */
+  process(preSpike: boolean, preNeuron: INeuron, postNeuron: INeuron, deltaTime: number = 1): number {
+    this.currentTime += deltaTime;
+    
+    // 衰减突触后电流
+    this.synapticCurrent *= this.currentDecay;
+    
+    // 检查前突触神经元是否发放动作电位
+    if (preSpike) {
+      this.lastPreSpikeTime = this.currentTime;
+      // 增加突触后电流
+      this.synapticCurrent += this.weight * 10; // 放大因子
+    }
+    
+    // 记录后突触神经元状态
+    const postState = postNeuron.getState();
+    if (postState.isSpiking) {
+      this.lastPostSpikeTime = this.currentTime;
+    }
+    
+    return this.synapticCurrent;
+  }
+  
+  /**
+   * 获取突触状态信息
+   */
+  getState(): SynapseState {
+    return {
+      weight: this.weight,
+      lastPreSpikeTime: this.lastPreSpikeTime,
+      lastPostSpikeTime: this.lastPostSpikeTime,
+      recentActivity: this.synapticCurrent
+    };
+  }
+  
+  /**
+   * 重置突触状态
+   */
+  reset(): void {
+    this.lastPreSpikeTime = -Infinity;
+    this.lastPostSpikeTime = -Infinity;
+    this.currentTime = 0;
+    this.synapticCurrent = 0;
+  }
+}
+
+/**
  * STDP突触参数接口
  */
 export interface STDPParams {

@@ -54,4 +54,142 @@ export interface IAgent extends ICollidable {
    * @param world - 当前的世界实例。
    */
   update(world: IWorld): void;
+}
+
+/**
+ * 电压输入节点类
+ * 输入多少就立刻输出多少，没有内在逻辑
+ */
+export class VoltageInputNode {
+  readonly id: string;
+  readonly type = 'voltage_input';
+  x: number;
+  y: number;
+  private currentOutput: number = 0;
+
+  constructor(id: string, x: number, y: number) {
+    this.id = id;
+    this.x = x;
+    this.y = y;
+  }
+
+  /**
+   * 处理输入并立即输出
+   */
+  process(input: number): number {
+    this.currentOutput = input;
+    return this.currentOutput;
+  }
+
+  /**
+   * 获取当前输出
+   */
+  getOutput(): number {
+    return this.currentOutput;
+  }
+
+  /**
+   * 获取状态信息
+   */
+  getState(): { voltage: number; isSpiking: boolean } {
+    return {
+      voltage: this.currentOutput,
+      isSpiking: false
+    };
+  }
+
+  /**
+   * 重置状态
+   */
+  reset(): void {
+    this.currentOutput = 0;
+  }
+
+  /**
+   * 设置位置
+   */
+  setPosition(x: number, y: number): void {
+    this.x = x;
+    this.y = y;
+  }
+}
+
+/**
+ * 电压累积节点类
+ * 输入的电压经过打折后累积起来但会随时间快速线性衰减
+ * 已有电压越高则累加时打折力度越大
+ */
+export class VoltageAccumulatorNode {
+  readonly id: string;
+  readonly type = 'voltage_accumulator';
+  x: number;
+  y: number;
+  private accumulatedVoltage: number = 0;
+  private lastUpdateTime: number = Date.now();
+
+  // 参数配置
+  private readonly decayRate: number = 0.95; // 每毫秒的衰减率
+  private readonly maxVoltage: number = 100; // 最大电压
+  private readonly discountFactor: number = 0.1; // 基础打折因子
+
+  constructor(id: string, x: number, y: number) {
+    this.id = id;
+    this.x = x;
+    this.y = y;
+  }
+
+  /**
+   * 处理输入并累积电压
+   */
+  process(input: number, deltaTime: number = 1): number {
+    const currentTime = Date.now();
+    const timeDelta = Math.max(1, currentTime - this.lastUpdateTime);
+    
+    // 时间衰减
+    this.accumulatedVoltage *= Math.pow(this.decayRate, timeDelta);
+    
+    // 计算打折因子（电压越高打折越厉害）
+    const voltageRatio = this.accumulatedVoltage / this.maxVoltage;
+    const currentDiscountFactor = this.discountFactor * (1 + voltageRatio * 2);
+    
+    // 累积新输入（打折后）
+    const discountedInput = input * (1 - Math.min(0.9, currentDiscountFactor));
+    this.accumulatedVoltage = Math.min(this.maxVoltage, this.accumulatedVoltage + discountedInput);
+    
+    this.lastUpdateTime = currentTime;
+    return this.accumulatedVoltage;
+  }
+
+  /**
+   * 获取当前累积电压
+   */
+  getOutput(): number {
+    return this.accumulatedVoltage;
+  }
+
+  /**
+   * 获取状态信息
+   */
+  getState(): { voltage: number; isSpiking: boolean } {
+    return {
+      voltage: this.accumulatedVoltage,
+      isSpiking: this.accumulatedVoltage > this.maxVoltage * 0.8
+    };
+  }
+
+  /**
+   * 重置状态
+   */
+  reset(): void {
+    this.accumulatedVoltage = 0;
+    this.lastUpdateTime = Date.now();
+  }
+
+  /**
+   * 设置位置
+   */
+  setPosition(x: number, y: number): void {
+    this.x = x;
+    this.y = y;
+  }
 } 

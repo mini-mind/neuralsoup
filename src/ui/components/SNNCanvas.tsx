@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback } from "react";
 import { globalState } from "../../core/services/GlobalState";
 import { IzhikevichNeuron } from "../../core/entities/neuron";
-import { InteractionState, NeuronGroup, SelectionBox } from "../views/SNNTopologyEditor";
+import { InteractionState, SelectionBox, NodeGroup } from "../types/editor.types";
 import { useLanguage } from "../../contexts/LanguageContext";
 
 interface SNNCanvasProps {
@@ -13,7 +13,7 @@ interface SNNCanvasProps {
   selectedEdgeId: string | null;
   interactionState: InteractionState;
   selectionBox: SelectionBox;
-  neuronGroups: NeuronGroup[];
+  neuronGroups: NodeGroup[];
   onMouseDown: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   onMouseMove: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   onMouseUp: (e: React.MouseEvent<HTMLCanvasElement>) => void;
@@ -69,33 +69,98 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
 
     neuronGroups.forEach(group => {
       const isSelected = interactionState.selectedGroups.includes(group.id);
+      
+      // 收起时调整框尺寸
+      const displayWidth = group.collapsed ? Math.min(group.width, 80) : group.width;
+      const displayHeight = group.collapsed ? 30 : group.height;
+      
+      // 修复坐标变换：正确的顺序应该是先缩放再平移
       const screenPos = {
-        x: (group.x - snnTopology.canvasOffset.x) * snnTopology.canvasScale,
-        y: (group.y - snnTopology.canvasOffset.y) * snnTopology.canvasScale
+        x: group.x * snnTopology.canvasScale + snnTopology.canvasOffset.x,
+        y: group.y * snnTopology.canvasScale + snnTopology.canvasOffset.y
       };
       const screenSize = {
-        width: group.width * snnTopology.canvasScale,
-        height: group.height * snnTopology.canvasScale
+        width: displayWidth * snnTopology.canvasScale,
+        height: displayHeight * snnTopology.canvasScale
       };
 
+      // 绘制组背景
       ctx.fillStyle = isSelected ? 'rgba(255, 0, 0, 0.1)' : 'rgba(100, 100, 100, 0.2)';
       ctx.fillRect(screenPos.x, screenPos.y, screenSize.width, screenSize.height);
       
+      // 绘制组边框
       ctx.strokeStyle = isSelected ? '#ff0000' : '#888';
       ctx.lineWidth = isSelected ? 3 : 2;
       ctx.strokeRect(screenPos.x, screenPos.y, screenSize.width, screenSize.height);
 
+      // 绘制标题栏
+      const titleBarHeight = 20;
+      ctx.fillStyle = isSelected ? 'rgba(255, 0, 0, 0.2)' : 'rgba(120, 120, 120, 0.3)';
+      ctx.fillRect(screenPos.x, screenPos.y, screenSize.width, titleBarHeight);
+      
+      // 绘制标题栏边框
+      ctx.strokeStyle = isSelected ? '#ff0000' : '#999';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(screenPos.x, screenPos.y, screenSize.width, titleBarHeight);
+
+      // 绘制收起按钮
+      const buttonSize = 12;
+      const buttonMargin = 4;
+      const buttonX = screenPos.x + buttonMargin;
+      const buttonY = screenPos.y + buttonMargin;
+      
+      ctx.fillStyle = group.collapsed ? '#ff6b6b' : '#4a90e2';
+      ctx.fillRect(buttonX, buttonY, buttonSize, buttonSize);
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(buttonX, buttonY, buttonSize, buttonSize);
+      
+      // 绘制按钮图标
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      if (group.collapsed) {
+        // "+" 图标
+        const centerX = buttonX + buttonSize / 2;
+        const centerY = buttonY + buttonSize / 2;
+        ctx.moveTo(centerX - 3, centerY);
+        ctx.lineTo(centerX + 3, centerY);
+        ctx.moveTo(centerX, centerY - 3);
+        ctx.lineTo(centerX, centerY + 3);
+      } else {
+        // "-" 图标
+        const centerX = buttonX + buttonSize / 2;
+        const centerY = buttonY + buttonSize / 2;
+        ctx.moveTo(centerX - 3, centerY);
+        ctx.lineTo(centerX + 3, centerY);
+      }
+      ctx.stroke();
+
+      // 绘制标题文字
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 11px Arial';
       ctx.textAlign = 'left';
       const title = group.type === 'visual_receptor_group' ? t('snn.group.visualReceptor') : t('snn.group.rotationController');
-      ctx.fillText(title, screenPos.x + 3, screenPos.y + 12);
+      const maxTitleWidth = screenSize.width - buttonSize - buttonMargin * 3 - 4;
+      
+      // Truncate title if too long in collapsed state
+      let displayTitle = title;
+      if (group.collapsed) {
+        ctx.font = 'bold 10px Arial';
+        const titleWidth = ctx.measureText(title).width;
+        if (titleWidth > maxTitleWidth) {
+          displayTitle = title.substring(0, Math.floor(title.length * maxTitleWidth / titleWidth)) + '...';
+        }
+      }
+      
+      ctx.fillText(displayTitle, screenPos.x + buttonSize + buttonMargin * 2 + 2, screenPos.y + 14);
 
+      // 如果组已收起，显示省略号
       if (group.collapsed) {
         ctx.fillStyle = '#999';
-        ctx.font = '16px Arial';
+        ctx.font = '12px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('...', screenPos.x + screenSize.width / 2, screenPos.y + screenSize.height / 2);
+        ctx.fillText('...', screenPos.x + screenSize.width / 2, screenPos.y + screenSize.height - 8);
       }
     });
   };
@@ -108,17 +173,45 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
     ctx.translate(offset.x, offset.y);
     ctx.scale(scale, scale);
     
+    // 创建节点查找函数，包括组内节点
+    const findNode = (nodeId: string) => {
+      // 先从网络拓扑中查找
+      let node = topology.getNode(nodeId);
+      if (node) return node;
+      
+      // 如果没找到，从snnTopology中查找组内节点
+      if (legacyTopology?.nodes) {
+        node = legacyTopology.nodes.find((n: any) => n.id === nodeId);
+        if (node) return node;
+      }
+      
+      return null;
+    };
+    
+    // 渲染网络拓扑中的边
     topology.getAllEdges().forEach((edge: any) => {
-      const fromNode = topology.getNode(edge.fromNodeId);
-      const toNode = topology.getNode(edge.toNodeId);
+      const fromNode = findNode(edge.fromNodeId);
+      const toNode = findNode(edge.toNodeId);
       if (fromNode && toNode) {
         drawEdge(ctx, fromNode, toNode, edge, selectedEdge === edge.id);
       }
     });
     
+    // 渲染网络拓扑中的节点
     topology.getAllNodes().forEach((node: any) => {
       drawNode(ctx, node, selectedNode === node.id);
     });
+    
+    // 渲染snnTopology中的组内节点（不在网络拓扑中）
+    if (legacyTopology?.nodes) {
+      legacyTopology.nodes.forEach((node: any) => {
+        // 检查节点是否在某个组内
+        const parentGroup = neuronGroups.find(g => g.neurons.includes(node.id));
+        if (parentGroup) {
+          drawNode(ctx, node, selectedNode === node.id);
+        }
+      });
+    }
     
     ctx.restore();
   };
@@ -127,9 +220,23 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
     const isInCollapsedGroup = neuronGroups.some(g => g.collapsed && g.neurons.includes(node.id));
     if (isInCollapsedGroup) return;
 
+    // Check if node is in a group
+    const parentGroup = neuronGroups.find(g => !g.collapsed && g.neurons.includes(node.id));
+    const isInGroup = !!parentGroup;
+
     const isMultiSelected = interactionState.selectedNodes.includes(node.id);
     const shouldHighlight = isSelected || isMultiSelected;
-    const radius = 15;
+
+    // Adjust node size based on type and whether it's in a group
+    let radius: number;
+    if (node.type === 'voltage_input') {
+      radius = 4; // Voltage input nodes are particularly small
+    } else if (isInGroup) {
+      radius = 8; // Other nodes in groups
+    } else {
+      radius = 15; // Regular nodes
+    }
+    
     const state = node.getState ? node.getState() : { voltage: 0, isSpiking: false };
     
     let color = '#888888';
@@ -137,55 +244,34 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
     
     ctx.fillStyle = color;
     
-    const neuronType = node.neuron?.type || node.type;
-    switch (neuronType) {
-      case 'sensor':
-        ctx.fillRect(node.x - radius, node.y - radius, radius * 2, radius * 2);
-        if (shouldHighlight) {
-          ctx.strokeStyle = '#ff0000';
-          ctx.lineWidth = 3;
-          ctx.strokeRect(node.x - radius, node.y - radius, radius * 2, radius * 2);
-        }
-        break;
-      case 'effector':
-        ctx.beginPath();
-        ctx.moveTo(node.x, node.y - radius);
-        ctx.lineTo(node.x - radius * 0.866, node.y + radius * 0.5);
-        ctx.lineTo(node.x + radius * 0.866, node.y + radius * 0.5);
-        ctx.closePath();
-        ctx.fill();
-        if (shouldHighlight) {
-          ctx.strokeStyle = '#ff0000';
-          ctx.lineWidth = 3;
-          ctx.stroke();
-        }
-        break;
-      default:
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
-        ctx.fill();
-        if (shouldHighlight) {
-          ctx.strokeStyle = '#ff0000';
-          ctx.lineWidth = 3;
-          ctx.stroke();
-        }
-        break;
-    }
-
-    if (!shouldHighlight) {
+    // 所有节点都显示为圆形
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
+    ctx.fill();
+    
+    if (shouldHighlight) {
+      ctx.strokeStyle = '#ff0000';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else {
       ctx.strokeStyle = '#333333';
       ctx.lineWidth = 1;
-      // ... (rest of the non-highlighted stroke logic)
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
+      ctx.stroke();
     }
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 8px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    let typeLabel = 'B';
-    if (neuronType === 'sensor') typeLabel = 'S';
-    if (neuronType === 'effector') typeLabel = 'E';
-    ctx.fillText(typeLabel, node.x, node.y);
+    // Only show text labels for regular nodes not in groups
+    if (!isInGroup && node.type !== 'voltage_input' && node.type !== 'voltage_accumulator') {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 8px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      let typeLabel = 'B';
+      if (node.type === 'sensor') typeLabel = 'S';
+      if (node.type === 'effector') typeLabel = 'E';
+      ctx.fillText(typeLabel, node.x, node.y);
+    }
   };
   
   const drawEdge = (ctx: CanvasRenderingContext2D, fromNode: any, toNode: any, edge: any, isSelected: boolean) => {
@@ -193,27 +279,82 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
     const shouldHighlight = isSelected || isMultiSelected;
     const state = edge.getState();
     
-    const dx = toNode.x - fromNode.x;
-    const dy = toNode.y - fromNode.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    const nodeRadius = 15;
+    // 检查节点是否在收起的组内，如果是则使用组的中心点
+    let actualFromNode = fromNode;
+    let actualToNode = toNode;
+    let fromRadius = 15; // 默认普通节点半径
+    let toRadius = 15; // 默认普通节点半径
     
-    const startX = fromNode.x + (dx / distance) * nodeRadius;
-    const startY = fromNode.y + (dy / distance) * nodeRadius;
-    const endX = toNode.x - (dx / distance) * nodeRadius;
-    const endY = toNode.y - (dy / distance) * nodeRadius;
+    // 检查起点是否在收起的组内
+    const fromNodeGroup = neuronGroups.find(g => g.collapsed && g.neurons.includes(fromNode.id));
+    if (fromNodeGroup) {
+      actualFromNode = {
+        x: fromNodeGroup.x + fromNodeGroup.width / 2,
+        y: fromNodeGroup.y + fromNodeGroup.height / 2
+      };
+      fromRadius = Math.min(fromNodeGroup.width, fromNodeGroup.height) / 2;
+    } else {
+      // 获取起点节点的实际半径
+      const fromNodeInGroup = neuronGroups.some(g => !g.collapsed && g.neurons.includes(fromNode.id));
+      if (fromNode.type === 'voltage_input') {
+        fromRadius = 4;
+      } else if (fromNodeInGroup) {
+        fromRadius = 8;
+      }
+    }
+    
+    // 检查终点是否在收起的组内
+    const toNodeGroup = neuronGroups.find(g => g.collapsed && g.neurons.includes(toNode.id));
+    if (toNodeGroup) {
+      actualToNode = {
+        x: toNodeGroup.x + toNodeGroup.width / 2,
+        y: toNodeGroup.y + toNodeGroup.height / 2
+      };
+      toRadius = Math.min(toNodeGroup.width, toNodeGroup.height) / 2;
+    } else {
+      // 获取终点节点的实际半径
+      const toNodeInGroup = neuronGroups.some(g => !g.collapsed && g.neurons.includes(toNode.id));
+      if (toNode.type === 'voltage_input') {
+        toRadius = 4;
+      } else if (toNodeInGroup) {
+        toRadius = 8;
+      }
+    }
+    
+    const dx = actualToNode.x - actualFromNode.x;
+    const dy = actualToNode.y - actualFromNode.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    const startX = actualFromNode.x + (dx / distance) * fromRadius;
+    const startY = actualFromNode.y + (dy / distance) * fromRadius;
+    const endX = actualToNode.x - (dx / distance) * toRadius;
+    const endY = actualToNode.y - (dy / distance) * toRadius;
     
     const weight = state.weight;
     const lineWidth = Math.max(1, weight * 5);
     let color = `rgba(100, 100, 100, ${Math.max(0.3, weight)})`;
     if (state.recentActivity > 0.1) color = `rgba(255, 100, 100, ${Math.max(0.3, weight)})`;
     
+    // 检查是否涉及组内节点，如果是则使用虚线
+    const fromInGroup = neuronGroups.some(g => g.neurons.includes(fromNode.id));
+    const toInGroup = neuronGroups.some(g => g.neurons.includes(toNode.id));
+    const useDashedLine = fromInGroup || toInGroup;
+    
     ctx.beginPath();
     ctx.moveTo(startX, startY);
     ctx.lineTo(endX, endY);
     ctx.strokeStyle = shouldHighlight ? '#ff0000' : color;
     ctx.lineWidth = shouldHighlight ? lineWidth + 2 : lineWidth;
+    
+    if (useDashedLine) {
+      ctx.setLineDash([3, 3]);
+    }
+    
     ctx.stroke();
+    
+    if (useDashedLine) {
+      ctx.setLineDash([]);
+    }
     
     drawArrow(ctx, startX, startY, endX, endY, shouldHighlight ? '#ff0000' : color);
   };
@@ -246,9 +387,19 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
   };
 
   const drawCreatingEdge = (ctx: CanvasRenderingContext2D) => {
-    if (!interactionState.edgeStartNodeId || !networkTopology) return;
-    const startNode = networkTopology.getNode(interactionState.edgeStartNodeId);
-    if (!startNode || !snnTopology) return;
+    if (!interactionState.edgeStartNodeId || !snnTopology) return;
+    
+    const edgeStartNodeId = interactionState.edgeStartNodeId;
+    
+    // 先从网络拓扑中查找起始节点
+    let startNode = networkTopology?.getNode(edgeStartNodeId);
+    
+    // 如果网络拓扑中没有，从snnTopology中查找组内节点
+    if (!startNode && snnTopology.nodes) {
+      startNode = snnTopology.nodes.find((node: any) => node.id === edgeStartNodeId);
+    }
+    
+    if (!startNode) return;
 
     const { canvasOffset, canvasScale } = snnTopology;
     const startX = startNode.x * canvasScale + canvasOffset.x;
@@ -256,9 +407,12 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
     const endX = interactionState.lastMousePos.x;
     const endY = interactionState.lastMousePos.y;
     
+    // 检查起始节点是否在组内，如果是则使用虚线
+    const startNodeInGroup = neuronGroups.some(g => g.neurons.includes(edgeStartNodeId));
+    
     ctx.strokeStyle = '#ff6b6b';
     ctx.lineWidth = 2;
-    ctx.setLineDash([3, 3]);
+    ctx.setLineDash([3, 3]); // 创建边时总是使用虚线
     ctx.beginPath();
     ctx.moveTo(startX, startY);
     ctx.lineTo(endX, endY);
