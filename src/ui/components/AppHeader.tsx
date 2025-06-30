@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import ShareModal from './ShareModal';
+import WorldSelectionModal from './WorldSelectionModal';
 
 /**
  * 应用头部组件
@@ -9,6 +10,7 @@ import ShareModal from './ShareModal';
 const AppHeader: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showWorldModal, setShowWorldModal] = useState(false);
 
   const toggleLanguage = () => {
     setLanguage(language === 'en' ? 'zh' : 'en');
@@ -22,6 +24,14 @@ const AppHeader: React.FC = () => {
     setShowShareModal(false);
   };
 
+  const handleWorldClick = () => {
+    setShowWorldModal(true);
+  };
+
+  const handleCloseWorldModal = () => {
+    setShowWorldModal(false);
+  };
+
   return (
     <>
       <div className="app-header">
@@ -30,6 +40,15 @@ const AppHeader: React.FC = () => {
         </div>
         <div className="header-right">
           <div className="header-controls">
+            <span
+              className="control-item"
+              onClick={handleWorldClick}
+              style={{cursor: 'pointer'}}
+              title={t('header.world-tooltip')}
+            >
+              🌍 {t('header.world')}
+            </span>
+            <span className="control-separator">|</span>
             <span
               className="control-item"
               onClick={handleShareClick}
@@ -52,6 +71,12 @@ const AppHeader: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* World Selection Modal */}
+      <WorldSelectionModal
+        isOpen={showWorldModal}
+        onClose={handleCloseWorldModal}
+      />
 
       {/* Share Modal */}
       <ShareModal

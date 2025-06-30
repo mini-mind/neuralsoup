@@ -14,7 +14,9 @@ export type {
   IEffector,
   
   // 神经网络核心
+  IProcessableNode,
   INeuron,
+  NodeState,
   NeuronState,
   IzhikevichParams,
   LIFParams,

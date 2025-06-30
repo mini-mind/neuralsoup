@@ -3,8 +3,7 @@ import { globalState } from "../../core/services/GlobalState";
 import { IzhikevichNeuron } from "../../core/entities/neuron";
 import { InteractionHandler } from "../services/InteractionHandler";
 import { CanvasGraphManager } from "../services/CanvasGraphManager";
-import { VisualReceptorGroupManager } from "../services/VisualReceptorGroupManager";
-import { RotationControllerGroupManager } from "../services/RotationControllerGroupManager";
+import { ControllerGroupRegistry } from "../services/ControllerGroupRegistry";
 import { NeuronAdapter } from "../adapters/neuron.adapter";
 import { SynapseAdapter } from "../adapters/synapse.adapter";
 import { GraphEditorProps, SelectionBox, InteractionState, NodeGroup, Vector2D, CanvasTransform, ManagedEdge } from "../types/editor.types";
@@ -56,30 +55,67 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
     }
   }, [networkTopology, graphManager]);
 
-  // Initialize default node groups
+  // Initialize default node groups using registry to ensure single instances
   useEffect(() => {
     if (snnTopology && networkTopology && !initialized) {
-      // Create default visual receptor group (top of canvas viewport)
-      const visualResult = VisualReceptorGroupManager.createGroup({ x: 100, y: 50 });
-      // Create rotation controller group (bottom of canvas viewport)
-      const rotationResult = RotationControllerGroupManager.createGroup({ x: 100, y: 400 });
+      console.log('开始初始化控制器组...');
 
-      // Group nodes are not added to network topology, they have their own processing logic
-      // Only update snnTopology for canvas rendering
-      const allNewNodes = [...visualResult.nodes, ...rotationResult.nodes];
+      // 使用注册表确保每种感受器和效应器只有一个实例
+      const registry = ControllerGroupRegistry.getInstance();
 
-      // Update state
+      // 检查是否已经初始化过
+      if (registry.isInitialized()) {
+        console.log('注册表已初始化，获取现有组...');
+        const groups = registry.getAllGroups();
+        const nodes = registry.getAllNodes();
+
+        // 检查当前SNN拓扑中是否已经包含这些节点
+        const existingNodeIds = new Set(snnTopology.nodes.map(n => n.id));
+        const newNodes = nodes.filter(n => !existingNodeIds.has(n.id));
+
+        if (newNodes.length > 0) {
+          console.log(`添加 ${newNodes.length} 个缺失的节点到SNN拓扑`);
+          globalState.setState({
+            snnTopology: {
+              ...snnTopology,
+              nodes: [...snnTopology.nodes, ...newNodes]
+            }
+          });
+        }
+
+        setNodeGroups(groups);
+        setInitialized(true);
+        console.log(`使用现有的 ${groups.length} 个控制器组，包含 ${nodes.length} 个节点`);
+        return;
+      }
+
+      const { groups, nodes } = registry.initializeControllerGroups();
+
+      // Update state with controller groups and nodes
       globalState.setState({
         snnTopology: {
           ...snnTopology,
-          nodes: [...snnTopology.nodes, ...allNewNodes]
+          nodes: [...snnTopology.nodes, ...nodes]
         }
       });
-      
-      setNodeGroups([visualResult.group, rotationResult.group]);
+
+      setNodeGroups(groups);
       setInitialized(true);
+
+      // 检查是否有重复的组
+      registry.checkForDuplicates([...groups, ...nodeGroups]);
+
+      console.log(`已初始化 ${groups.length} 个控制器组，包含 ${nodes.length} 个节点`);
     }
   }, [snnTopology, networkTopology, initialized]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // 组件卸载时不重置注册表，保持单例状态
+      console.log('SNNTopologyEditor 组件卸载');
+    };
+  }, []);
 
   // 获取当前画布变换
   const getCanvasTransform = (): CanvasTransform => ({
@@ -725,7 +761,9 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
     }
 
     // 回退到基于组类型的检查（向后兼容）
-    return group.type === 'visual_receptor_group' || group.type === 'rotation_controller_group';
+    return group.type === 'visual_receptor_group' || 
+           group.type === 'rotation_controller_group' ||
+           group.type === 'health_receptor_group';
   };
 
   // 删除选中的元素

@@ -1,14 +1,21 @@
 /**
- * 神经元接口
- * 定义了神经元的基本行为和属性
+ * 可处理节点接口
+ * 定义了所有可以处理电压信号的节点的基本行为和属性
+ * 包括真正的神经元以及电压输入/输出节点
  */
 
 import { AbstractSensor, AbstractEffector } from './plugins';
-export interface INeuron {
+import { VoltageInputNode, VoltageAccumulatorNode } from './types';
+
+/**
+ * 可处理节点的基础接口
+ * 所有能够处理电压信号的节点都应该实现这个接口
+ */
+export interface IProcessableNode {
   readonly id: string;
   readonly type: 'izhikevich' | 'lif' | 'voltage_input' | 'voltage_accumulator';
 
-  // 膜电位相关
+  // 电压相关
   voltage: number;
   threshold: number;
 
@@ -17,32 +24,47 @@ export interface INeuron {
   y: number;
 
   /**
-   * 更新神经元状态
-   * @param input 输入电流
+   * 更新节点状态
+   * @param input 输入电流/电压
    * @param deltaTime 时间步长
-   * @returns 是否发放了动作电位
+   * @returns 是否超过阈值或发放了动作电位
    */
   update(input: number, deltaTime: number): boolean;
 
   /**
-   * 重置神经元状态
+   * 重置节点状态
    */
   reset(): void;
 
   /**
    * 获取当前状态信息
    */
-  getState(): NeuronState;
+  getState(): NodeState;
 }
 
 /**
- * 神经元状态信息
+ * 神经元接口
+ * 专门用于真正的神经元（如Izhikevich、LIF等）
  */
-export interface NeuronState {
+export interface INeuron extends IProcessableNode {
+  readonly type: 'izhikevich' | 'lif';
+}
+
+/**
+ * 节点状态信息
+ * 适用于所有可处理节点
+ */
+export interface NodeState {
   voltage: number;
   isSpiking: boolean;
   lastSpikeTime: number;
 }
+
+/**
+ * 神经元状态信息（向后兼容别名）
+ * @deprecated 使用 NodeState 替代
+ */
+export type NeuronState = NodeState;
 
 /**
  * Izhikevich神经元模型实现
@@ -128,7 +150,7 @@ export class IzhikevichNeuron implements INeuron {
   /**
    * 获取当前状态信息
    */
-  getState(): NeuronState {
+  getState(): NodeState {
     return {
       voltage: this.voltage,
       isSpiking: this.currentTime - this.lastSpikeTime < 1, // 1ms内算作尖峰状态
@@ -222,7 +244,7 @@ export class LIFNeuron implements INeuron {
   /**
    * 获取当前状态信息
    */
-  getState(): NeuronState {
+  getState(): NodeState {
     return {
       voltage: this.voltage,
       isSpiking: this.currentTime - this.lastSpikeTime < 1, // 1ms内算作尖峰状态
@@ -231,82 +253,18 @@ export class LIFNeuron implements INeuron {
   }
 }
 
-/**
- * 效应神经元
- * 电压范围0-1，持续快速线性衰减到0，最大值限制为1
- */
-export class EffectorNeuron implements INeuron {
-  readonly id: string;
-  readonly type = 'voltage_accumulator' as const;
-  
-  voltage: number = 0; // 电压范围 0-1
-  threshold: number = 0.5; // 阈值
-  
-  x: number;
-  y: number;
-  
-  // 衰减参数
-  private decayRate: number = 0.01; // 每毫秒衰减量
-  private lastSpikeTime: number = -Infinity;
-  private currentTime: number = 0;
-  
-  constructor(id: string, x: number = 0, y: number = 0, decayRate: number = 0.01) {
-    this.id = id;
-    this.x = x;
-    this.y = y;
-    this.decayRate = decayRate;
-  }
-  
-  update(input: number, deltaTime: number = 1): boolean {
-    this.currentTime += deltaTime;
-    
-    // 添加输入并限制最大值为1
-    this.voltage = Math.min(1, this.voltage + input);
-    
-    // 线性衰减到0
-    this.voltage = Math.max(0, this.voltage - this.decayRate * deltaTime);
-    
-    // 检查是否超过阈值
-    if (this.voltage >= this.threshold) {
-      this.lastSpikeTime = this.currentTime;
-      return true;
-    }
-    
-    return false;
-  }
-  
-  reset(): void {
-    this.voltage = 0;
-    this.lastSpikeTime = -Infinity;
-    this.currentTime = 0;
-  }
-  
-  getState(): NeuronState {
-    return {
-      voltage: this.voltage,
-      isSpiking: this.currentTime - this.lastSpikeTime < 1,
-      lastSpikeTime: this.lastSpikeTime
-    };
-  }
-}
+
 
 /**
  * 视觉感受器
- * 包含8个神经元，覆盖60度视角
+ * 包含8个电压输入节点，覆盖60度视角
  */
 export class VisualReceptor extends AbstractSensor {
-  private neurons: IzhikevichNeuron[] = [];
   private fieldOfView: number = 60; // 视角度数
   private numReceptors: number = 8;
 
   constructor(id: string, x: number = 0, y: number = 0) {
     super(id, 'visual_receptor', x, y, 8); // 8个感受器节点
-
-    // 创建8个感受器神经元（除了基类创建的VoltageInputNode）
-    for (let i = 0; i < this.numReceptors; i++) {
-      const neuronId = `${id}_receptor_${i}`;
-      this.neurons.push(new IzhikevichNeuron(neuronId, x, y));
-    }
   }
 
   /**
@@ -316,17 +274,17 @@ export class VisualReceptor extends AbstractSensor {
     return {
       fieldOfView: this.fieldOfView,
       numReceptors: this.numReceptors,
-      neuronCount: this.neurons.length
+      nodeCount: this.getInputNodes().length
     };
   }
-  
+
   /**
-   * 获取所有感受器神经元
+   * 获取所有感受器输入节点
    */
-  getReceptors(): IzhikevichNeuron[] {
-    return this.neurons;
+  getReceptors(): VoltageInputNode[] {
+    return this.getInputNodes();
   }
-  
+
   /**
    * 根据视觉输入更新所有感受器
    * @param visualInputs 8个感受器的输入数组
@@ -336,27 +294,28 @@ export class VisualReceptor extends AbstractSensor {
     if (visualInputs.length !== this.numReceptors) {
       throw new Error(`视觉输入数量必须为${this.numReceptors}个`);
     }
-    
-    return this.neurons.map((neuron, index) => 
-      neuron.update(visualInputs[index], deltaTime)
+
+    const inputNodes = this.getInputNodes();
+    return inputNodes.map((node, index) =>
+      node.update(visualInputs[index], deltaTime)
     );
   }
-  
+
   /**
    * 重置所有感受器
    */
   reset(): void {
-    this.neurons.forEach(neuron => neuron.reset());
+    this.getInputNodes().forEach(node => node.reset());
   }
-  
+
   /**
    * 获取每个感受器的视角方向（度数）
    */
   getReceptorAngles(): number[] {
     const angleStep = this.fieldOfView / (this.numReceptors - 1);
     const startAngle = -this.fieldOfView / 2;
-    
-    return Array.from({ length: this.numReceptors }, (_, i) => 
+
+    return Array.from({ length: this.numReceptors }, (_, i) =>
       startAngle + i * angleStep
     );
   }
@@ -364,43 +323,38 @@ export class VisualReceptor extends AbstractSensor {
 
 /**
  * 旋转控制器
- * 包含2个效应神经元，控制顺时针和逆时针旋转
+ * 包含2个电压累积节点，控制顺时针和逆时针旋转
  */
 export class RotationController extends AbstractEffector {
-  private clockwiseNeuron: EffectorNeuron;
-  private counterclockwiseNeuron: EffectorNeuron;
-
   constructor(id: string, x: number = 0, y: number = 0) {
     super(id, 'rotation_controller', x, y, 2); // 2个效应器节点
-
-    this.clockwiseNeuron = new EffectorNeuron(`${id}_cw`, x, y);
-    this.counterclockwiseNeuron = new EffectorNeuron(`${id}_ccw`, x, y);
   }
 
   /**
    * 实现抽象方法：获取插件特定参数
    */
   protected getParameters(): Record<string, any> {
+    const accumulatorNodes = this.getAccumulatorNodes();
     return {
-      clockwiseNeuronId: this.clockwiseNeuron.id,
-      counterclockwiseNeuronId: this.counterclockwiseNeuron.id
+      clockwiseNodeId: accumulatorNodes[0]?.id,
+      counterclockwiseNodeId: accumulatorNodes[1]?.id
     };
   }
-  
+
   /**
-   * 获取顺时针控制神经元
+   * 获取顺时针控制节点
    */
-  getClockwiseNeuron(): EffectorNeuron {
-    return this.clockwiseNeuron;
+  getClockwiseNode(): VoltageAccumulatorNode {
+    return this.getAccumulatorNodes()[0];
   }
-  
+
   /**
-   * 获取逆时针控制神经元
+   * 获取逆时针控制节点
    */
-  getCounterclockwiseNeuron(): EffectorNeuron {
-    return this.counterclockwiseNeuron;
+  getCounterclockwiseNode(): VoltageAccumulatorNode {
+    return this.getAccumulatorNodes()[1];
   }
-  
+
   /**
    * 更新旋转控制器
    * @param clockwiseInput 顺时针输入
@@ -411,28 +365,30 @@ export class RotationController extends AbstractEffector {
     clockwise: boolean;
     counterclockwise: boolean;
   } {
+    const clockwiseNode = this.getClockwiseNode();
+    const counterclockwiseNode = this.getCounterclockwiseNode();
+
     return {
-      clockwise: this.clockwiseNeuron.update(clockwiseInput, deltaTime),
-      counterclockwise: this.counterclockwiseNeuron.update(counterclockwiseInput, deltaTime)
+      clockwise: clockwiseNode.update(clockwiseInput, deltaTime),
+      counterclockwise: counterclockwiseNode.update(counterclockwiseInput, deltaTime)
     };
   }
-  
+
   /**
    * 获取当前旋转速度（-1到1，负值为逆时针，正值为顺时针）
    */
   getRotationSpeed(): number {
-    const cwState = this.clockwiseNeuron.getState();
-    const ccwState = this.counterclockwiseNeuron.getState();
-    
-    return cwState.voltage - ccwState.voltage;
+    const cwState = this.getClockwiseNode().getState();
+    const ccwState = this.getCounterclockwiseNode().getState();
+
+    return (cwState.voltage - ccwState.voltage) / 100; // 归一化到-1到1
   }
-  
+
   /**
    * 重置旋转控制器
    */
   reset(): void {
-    this.clockwiseNeuron.reset();
-    this.counterclockwiseNeuron.reset();
+    this.getAccumulatorNodes().forEach(node => node.reset());
   }
 }
 
@@ -455,4 +411,172 @@ export interface LIFParams {
   membraneResistance: number; // 膜阻抗
   membraneCapacitance: number; // 膜电容
   refractoryPeriod: number; // 不应期
+}
+
+/**
+ * 健康感受器
+ * 包含2个电压输入节点：健康度感受器和非健康度感受器
+ */
+export class HealthReceptor extends AbstractSensor {
+  constructor(id: string, x: number = 0, y: number = 0) {
+    super(id, 'health_receptor', x, y, 2); // 2个感受器节点
+  }
+
+  /**
+   * 实现抽象方法：获取插件特定参数
+   */
+  protected getParameters(): Record<string, any> {
+    const inputNodes = this.getInputNodes();
+    return {
+      healthNodeId: inputNodes[0]?.id,
+      unhealthNodeId: inputNodes[1]?.id,
+      description: '健康感受器，监测智能体健康状况'
+    };
+  }
+
+  /**
+   * 获取健康度感受器节点
+   */
+  getHealthNode(): VoltageInputNode {
+    return this.getInputNodes()[0];
+  }
+
+  /**
+   * 获取非健康度感受器节点
+   */
+  getUnhealthNode(): VoltageInputNode {
+    return this.getInputNodes()[1];
+  }
+
+  /**
+   * 根据健康状态更新感受器
+   * @param healthRatio 健康比例（0-1）
+   * @param deltaTime 时间步长
+   */
+  updateWithHealth(healthRatio: number, deltaTime: number = 1): {
+    healthSpike: boolean;
+    unhealthSpike: boolean;
+  } {
+    // 健康度输入：健康比例越高，输入越强
+    const healthInput = healthRatio * 20;
+
+    // 非健康度输入：健康比例越低，输入越强
+    const unhealthInput = (1 - healthRatio) * 20;
+
+    const healthNode = this.getHealthNode();
+    const unhealthNode = this.getUnhealthNode();
+
+    return {
+      healthSpike: healthNode.update(healthInput, deltaTime),
+      unhealthSpike: unhealthNode.update(unhealthInput, deltaTime)
+    };
+  }
+
+  /**
+   * 重置所有感受器
+   */
+  reset(): void {
+    this.getInputNodes().forEach(node => node.reset());
+  }
+}
+
+/**
+ * 移动控制器
+ * 包含4个电压累积节点，控制上下左右移动
+ */
+export class MovementController extends AbstractEffector {
+  constructor(id: string, x: number = 0, y: number = 0) {
+    super(id, 'movement_controller', x, y, 4); // 4个效应器节点
+  }
+
+  /**
+   * 实现抽象方法：获取插件特定参数
+   */
+  protected getParameters(): Record<string, any> {
+    const accumulatorNodes = this.getAccumulatorNodes();
+    return {
+      upNodeId: accumulatorNodes[0]?.id,
+      downNodeId: accumulatorNodes[1]?.id,
+      leftNodeId: accumulatorNodes[2]?.id,
+      rightNodeId: accumulatorNodes[3]?.id,
+      description: '移动控制器，控制上下左右移动'
+    };
+  }
+
+  /**
+   * 获取上移动节点
+   */
+  getUpNode(): VoltageAccumulatorNode {
+    return this.getAccumulatorNodes()[0];
+  }
+
+  /**
+   * 获取下移动节点
+   */
+  getDownNode(): VoltageAccumulatorNode {
+    return this.getAccumulatorNodes()[1];
+  }
+
+  /**
+   * 获取左移动节点
+   */
+  getLeftNode(): VoltageAccumulatorNode {
+    return this.getAccumulatorNodes()[2];
+  }
+
+  /**
+   * 获取右移动节点
+   */
+  getRightNode(): VoltageAccumulatorNode {
+    return this.getAccumulatorNodes()[3];
+  }
+
+  /**
+   * 更新移动控制器
+   * @param upInput 上移输入
+   * @param downInput 下移输入
+   * @param leftInput 左移输入
+   * @param rightInput 右移输入
+   * @param deltaTime 时间步长
+   */
+  update(upInput: number, downInput: number, leftInput: number, rightInput: number, deltaTime: number = 1): {
+    up: boolean;
+    down: boolean;
+    left: boolean;
+    right: boolean;
+  } {
+    const upNode = this.getUpNode();
+    const downNode = this.getDownNode();
+    const leftNode = this.getLeftNode();
+    const rightNode = this.getRightNode();
+
+    return {
+      up: upNode.update(upInput, deltaTime),
+      down: downNode.update(downInput, deltaTime),
+      left: leftNode.update(leftInput, deltaTime),
+      right: rightNode.update(rightInput, deltaTime)
+    };
+  }
+
+  /**
+   * 获取当前移动向量（-1到1）
+   */
+  getMovementVector(): { x: number; y: number } {
+    const upState = this.getUpNode().getState();
+    const downState = this.getDownNode().getState();
+    const leftState = this.getLeftNode().getState();
+    const rightState = this.getRightNode().getState();
+
+    return {
+      x: (rightState.voltage - leftState.voltage) / 100, // 右为正，左为负，归一化
+      y: (upState.voltage - downState.voltage) / 100     // 上为正，下为负，归一化
+    };
+  }
+
+  /**
+   * 重置移动控制器
+   */
+  reset(): void {
+    this.getAccumulatorNodes().forEach(node => node.reset());
+  }
 }

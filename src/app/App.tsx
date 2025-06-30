@@ -19,12 +19,14 @@ const App: React.FC = () => {
   const { t } = useLanguage();
 
   useEffect(() => {
-    const world = new World(1600, 1200);
-    const simulation = new SimulationLoop(world);
-    
+    // 从全局状态获取选中的世界类型
+    const selectedWorld = globalState.getState().selectedWorld || 'luminous-garden';
+    let world = World.createWorld(1600, 1200, selectedWorld);
+    let simulation = new SimulationLoop(world);
+
     // Initialize topology data
     const networkTopology = createDemoNetworkTopology();
-    globalState.setState({ 
+    globalState.setState({
       snnTopology: demoSNNTopology,
       networkTopology: networkTopology
     });
@@ -41,10 +43,35 @@ const App: React.FC = () => {
       globalState.setState({ simulationRunning: false });
     });
 
+    // 监听世界切换事件
+    const unsubscribeWorldChange = globalEventBus.on('world:changed', (event: any) => {
+      console.log('Switching to world:', event.worldType);
+
+      // 停止当前仿真
+      simulation.stop();
+
+      // 创建新世界
+      world = World.createWorld(1600, 1200, event.worldType);
+      simulation = new SimulationLoop(world);
+
+      // 通知渲染系统世界实例已更新
+      globalEventBus.emit('world:instance', { world });
+
+      // 更新全局状态
+      globalState.setState({
+        worldState: world.getAgents(),
+        simulationRunning: false
+      });
+    });
+
+    // 初始化时也要发送世界实例
+    globalEventBus.emit('world:instance', { world });
+
     return () => {
       simulation.stop();
       unsubscribeStart();
       unsubscribeStop();
+      unsubscribeWorldChange();
     };
   }, []);
   

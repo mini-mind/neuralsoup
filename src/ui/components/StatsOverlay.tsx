@@ -1,33 +1,45 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useLanguage } from "../../contexts/LanguageContext";
-import { globalState } from "../../core/services/GlobalState";
-import type { IAgent } from "../../shared/interfaces/IAgent";
 
 /**
  * 统计显示组件
- * 负责在游戏区域显示实时统计信息，数据直接来源于GlobalState
+ * 负责在游戏区域显示实时FPS统计信息
  */
 const StatsOverlay: React.FC = () => {
   const { t } = useLanguage();
-  const [agents, setAgents] = useState<IAgent[]>([]);
+  const [fps, setFps] = useState<number>(60);
+  const frameCountRef = useRef<number>(0);
+  const lastTimeRef = useRef<number>(performance.now());
 
   useEffect(() => {
-    const unsubscribe = globalState.subscribe(state => {
-      // 确保 worldState 是一个数组
-      if (Array.isArray(state.worldState)) {
-        setAgents(state.worldState);
+    const updateFPS = () => {
+      frameCountRef.current++;
+      const currentTime = performance.now();
+      
+      // 每秒更新一次FPS
+      if (currentTime - lastTimeRef.current >= 1000) {
+        const calculatedFPS = Math.round((frameCountRef.current * 1000) / (currentTime - lastTimeRef.current));
+        setFps(calculatedFPS);
+        frameCountRef.current = 0;
+        lastTimeRef.current = currentTime;
       }
-    });
-    return unsubscribe;
+      
+      requestAnimationFrame(updateFPS);
+    };
+
+    const animationId = requestAnimationFrame(updateFPS);
+    
+    return () => {
+      cancelAnimationFrame(animationId);
+    };
   }, []);
 
   return (
     <div className="game-stats-overlay">
       <div className="stat-item">
-        <span className="stat-label">{t("stats.agentCount")}</span>
-        <span className="stat-value">{agents.length}</span>
+        <span className="stat-label">{t("stats.fps")}</span>
+        <span className="stat-value">{fps}</span>
       </div>
-      {/* 在这里可以添加更多的统计数据 */}
     </div>
   );
 };

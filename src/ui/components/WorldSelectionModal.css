@@ -1,0 +1,203 @@
+/* World Selection Modal Styles */
+
+.world-selection-modal {
+  max-width: 900px;
+  max-height: 90vh;
+  width: 90vw;
+}
+
+.world-selection-description {
+  text-align: center;
+  color: #cccccc;
+  margin-bottom: 24px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.world-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.world-card {
+  background: #1e1e1e;
+  border: 2px solid #333;
+  border-radius: 16px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.world-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--world-color);
+  opacity: 0.8;
+}
+
+.world-card:hover {
+  border-color: #555;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.world-card:hover::before {
+  opacity: 1;
+  height: 6px;
+}
+
+.world-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.world-icon {
+  font-size: 32px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--world-color);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.world-name {
+  margin: 0;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.world-description {
+  margin-bottom: 16px;
+}
+
+.world-description p {
+  color: #cccccc;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.world-features {
+  margin-bottom: 20px;
+}
+
+.world-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #aaaaaa;
+  line-height: 1.4;
+}
+
+.feature-bullet {
+  color: var(--world-color);
+  font-weight: bold;
+  margin-top: 1px;
+}
+
+.world-card-footer {
+  display: flex;
+  justify-content: center;
+}
+
+.world-select-btn {
+  width: 100%;
+  background: var(--world-color);
+  border: none;
+  color: white;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.world-select-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  filter: brightness(1.1);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .world-selection-modal {
+    width: 95vw;
+    max-height: 95vh;
+    margin: 16px;
+    padding: 16px;
+  }
+
+  .world-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .world-card {
+    padding: 16px;
+  }
+
+  .world-icon {
+    font-size: 24px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .world-name {
+    font-size: 16px;
+  }
+
+  .world-description p {
+    font-size: 13px;
+  }
+
+  .world-feature {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .world-selection-modal {
+    width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+    margin: 0;
+  }
+
+  .world-grid {
+    gap: 12px;
+  }
+
+  .world-card {
+    padding: 12px;
+  }
+
+  .world-card-header {
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .world-icon {
+    font-size: 20px;
+    width: 36px;
+    height: 36px;
+  }
+
+  .world-name {
+    font-size: 15px;
+  }
+}

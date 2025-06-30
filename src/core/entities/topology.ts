@@ -1,11 +1,12 @@
-import type { INeuron, NeuronState } from './neuron';
+import type { INeuron, NodeState, NeuronState } from './neuron';
 import type { ISynapse, SynapseState } from './synapse';
 import { IzhikevichNeuron } from './neuron';
 import { STDPSynapse } from './synapse';
 
 /**
  * 神经网络节点类
- * 封装神经元实例，提供拓扑图管理接口
+ * 封装真正的神经元实例（不包括电压输入/输出节点），提供拓扑图管理接口
+ * 只接受实现INeuron接口的真正神经元（如IzhikevichNeuron、LIFNeuron）
  */
 export class NetworkNode {
   readonly id: string;
@@ -36,7 +37,7 @@ export class NetworkNode {
   /**
    * 获取神经元状态
    */
-  getState(): NeuronState {
+  getState(): NodeState {
     return this.neuron.getState();
   }
   
@@ -107,7 +108,7 @@ export class NetworkTopology {
   private adjacencyList: Map<string, string[]> = new Map(); // 邻接表，用于快速查找连接
   
   /**
-   * 添加节点
+   * 添加节点（只接受真正的神经元）
    */
   addNode(neuron: INeuron): NetworkNode {
     const node = new NetworkNode(neuron);

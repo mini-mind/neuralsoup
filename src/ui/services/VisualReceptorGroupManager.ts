@@ -1,5 +1,5 @@
 import { VoltageInputNode } from '../../core/entities/types';
-import { VisualReceptor } from '../../core/entities/neuron';
+import { VisualReceptor, HealthReceptor } from '../../core/entities/neuron';
 import { NodeGroup, Vector2D } from '../types/editor.types';
 
 /**
@@ -131,6 +131,87 @@ export class VisualReceptorGroupManager {
     return {
       width: this.NODE_COUNT * this.NODE_SPACING + this.GROUP_PADDING * 2,
       height: this.GROUP_HEIGHT
+    };
+  }
+}
+
+/**
+ * 健康感受器组管理器
+ * 专门管理健康感受器组的创建、更新和维护
+ */
+export class HealthReceptorGroupManager {
+  private static readonly NODE_COUNT = 2; // 健康 + 非健康
+  private static readonly NODE_SPACING = 40;
+  private static readonly GROUP_PADDING = 10;
+  private static readonly GROUP_HEIGHT = 50;
+  private static readonly TITLE_BAR_HEIGHT = 20;
+
+  /**
+   * 创建健康感受器组
+   */
+  static createGroup(position: Vector2D, timestamp: number = Date.now()): {
+    group: NodeGroup;
+    nodes: any[];
+    pluginInstance: HealthReceptor;
+  } {
+    const groupId = `health_group_${timestamp}`;
+    const nodes: any[] = [];
+
+    // 创建健康感受器插件实例
+    const healthReceptor = new HealthReceptor(groupId, position.x, position.y);
+
+    // 创建节点
+    const nodeLabels = ['健康度', '非健康度'];
+    for (let i = 0; i < this.NODE_COUNT; i++) {
+      const nodeId = `health_sensor_${timestamp}_${i}`;
+      const relativePos = this.getNodeRelativePosition(i);
+      const absolutePos = {
+        x: position.x + relativePos.x,
+        y: position.y + relativePos.y
+      };
+
+      const voltageInputNode = new VoltageInputNode(nodeId, absolutePos.x, absolutePos.y);
+      const node = {
+        id: nodeId,
+        type: 'voltage_input',
+        x: absolutePos.x,
+        y: absolutePos.y,
+        processor: voltageInputNode,
+        getState: () => voltageInputNode.getState(),
+        setPosition: (x: number, y: number) => voltageInputNode.setPosition(x, y),
+        // 记录相对位置和标签
+        relativeX: relativePos.x,
+        relativeY: relativePos.y,
+        label: nodeLabels[i]
+      };
+      nodes.push(node);
+    }
+
+    // 创建节点组
+    const group: NodeGroup = {
+      id: groupId,
+      type: 'health_receptor_group',
+      x: position.x,
+      y: position.y,
+      width: this.NODE_COUNT * this.NODE_SPACING + this.GROUP_PADDING * 2,
+      height: this.GROUP_HEIGHT,
+      collapsed: false,
+      nodes: nodes.map(n => n.id),
+      neurons: nodes.map(n => n.id),
+      pluginInstance: healthReceptor // 关联插件实例
+    };
+
+    return { group, nodes, pluginInstance: healthReceptor };
+  }
+
+  /**
+   * 获取单个节点的相对位置
+   */
+  private static getNodeRelativePosition(index: number): Vector2D {
+    const nodeRadius = 4; // 组内节点半径
+    return {
+      x: this.GROUP_PADDING + nodeRadius + index * this.NODE_SPACING,
+      y: this.TITLE_BAR_HEIGHT + (this.GROUP_HEIGHT - this.TITLE_BAR_HEIGHT) / 2
     };
   }
 } 

@@ -39,6 +39,8 @@ const translations = {
     "btn.applied": "已应用",
 
     // 头部导航
+    "header.world": "世界",
+    "header.world-tooltip": "选择仿真世界环境",
     "header.share": "分享",
     "header.share-tooltip": "分享当前配置",
     "header.user": "用户",
@@ -76,6 +78,12 @@ const translations = {
     "modal.share-copy-link": "复制链接",
     "modal.share-download": "下载配置",
     "modal.share-close": "关闭",
+
+    // 世界选择模态框
+    "modal.world-selection-title": "选择仿真世界",
+    "modal.world-selection-description": "选择一个世界环境来探索不同的智能体行为和学习场景",
+    "modal.world-select": "选择此世界",
+    "modal.cancel": "取消",
 
     // 智能体参数
     "agent.title": "智能体参数设置",
@@ -126,7 +134,9 @@ const translations = {
     "snn.editor.apply": "应用",
     "snn.editor.helpTooltip": "操作说明：\n• 左键拖拽：框选多个神经元\n• Ctrl+左键：多选神经元/组\n• 双击组合组件：切换收起/展开状态\n• 右键拖拽：平移画布\n• 滚轮：缩放画布（以中心为原点）\n• Ctrl+右键：创建连接\n• Del键：删除选中元素",
     "snn.group.visualReceptor": "视觉感受器",
+    "snn.group.healthReceptor": "健康感受器",
     "snn.group.rotationController": "旋转控制器",
+    "snn.group.movementController": "移动控制器",
     "snn.details.neuron": "神经元详情",
     "snn.details.synapse": "突触详情",
 
@@ -156,6 +166,34 @@ const translations = {
     // 仿真控制
     "simulation.pause": "暂停仿真",
     "simulation.start": "开始仿真",
+
+    // 世界类型 - 光影花园
+    "world.luminous-garden.name": "光影花园",
+    "world.luminous-garden.description": "一个充满动态光影的神秘世界，智能体需要学会趋光避暗，在能量与环境的平衡中生存。",
+    "world.luminous-garden.feature1": "动态光斑提供能量补充",
+    "world.luminous-garden.feature2": "暗物质区域消耗能量",
+    "world.luminous-garden.feature3": "水晶碎片提供高能奖励",
+
+    // 世界类型 - 回声洞穴
+    "world.echo-chamber.name": "回声洞穴",
+    "world.echo-chamber.description": "完全黑暗的迷宫世界，智能体必须通过声纳回声定位来探索和觅食。",
+    "world.echo-chamber.feature1": "主动声纳探测机制",
+    "world.echo-chamber.feature2": "回声信号模式识别",
+    "world.echo-chamber.feature3": "空间记忆与地图构建",
+
+    // 世界类型 - 意识集群
+    "world.sentient-swarm.name": "意识集群",
+    "world.sentient-swarm.description": "群体智能的展示舞台，多个智能体共享同一大脑设计，展现涌现的集体行为。",
+    "world.sentient-swarm.feature1": "多智能体群体行为",
+    "world.sentient-swarm.feature2": "信标通讯系统",
+    "world.sentient-swarm.feature3": "角色分工与协作",
+
+    // 世界类型 - 律动色域
+    "world.chromatic-composer.name": "律动色域",
+    "world.chromatic-composer.description": "艺术创作的数字画布，智能体通过移动和感知创造独特的视觉和听觉艺术作品。",
+    "world.chromatic-composer.feature1": "动态绘画与色彩系统",
+    "world.chromatic-composer.feature2": "节奏感知与响应",
+    "world.chromatic-composer.feature3": "自指涉艺术创作",
   },
   en: {
     // Controls
@@ -183,6 +221,8 @@ const translations = {
     "btn.applied": "Applied",
 
     // 头部导航
+    "header.world": "World",
+    "header.world-tooltip": "Select simulation world environment",
     "header.share": "Share",
     "header.share-tooltip": "Share current configuration",
     "header.user": "User",
@@ -220,6 +260,12 @@ const translations = {
     "modal.share-copy-link": "Copy Link",
     "modal.share-download": "Download Config",
     "modal.share-close": "Close",
+
+    // 世界选择模态框
+    "modal.world-selection-title": "Select Simulation World",
+    "modal.world-selection-description": "Choose a world environment to explore different agent behaviors and learning scenarios",
+    "modal.world-select": "Select This World",
+    "modal.cancel": "Cancel",
 
     // 智能体参数
     "agent.title": "Agent Parameter Settings",
@@ -270,7 +316,9 @@ const translations = {
     "snn.editor.apply": "Apply",
     "snn.editor.helpTooltip": "Instructions:\n• Left Drag: Box select neurons\n• Ctrl+Left Click: Multi-select neurons/groups\n• Double Click Group: Toggle collapse\n• Right Drag: Pan canvas\n• Scroll: Zoom canvas (center-based)\n• Ctrl+Right Click: Create connection\n• Del Key: Delete selected elements",
     "snn.group.visualReceptor": "Visual Receptor",
+    "snn.group.healthReceptor": "Health Receptor",
     "snn.group.rotationController": "Rotation Controller",
+    "snn.group.movementController": "Movement Controller",
     "snn.details.neuron": "Neuron Details",
     "snn.details.synapse": "Synapse Details",
 
@@ -300,6 +348,34 @@ const translations = {
     // 仿真控制
     "simulation.pause": "Pause Simulation",
     "simulation.start": "Start Simulation",
+
+    // 世界类型 - 光影花园
+    "world.luminous-garden.name": "Luminous Garden",
+    "world.luminous-garden.description": "A mysterious world filled with dynamic light and shadow, where agents must learn to seek light and avoid darkness, surviving in the balance between energy and environment.",
+    "world.luminous-garden.feature1": "Dynamic light patches provide energy",
+    "world.luminous-garden.feature2": "Dark matter zones consume energy",
+    "world.luminous-garden.feature3": "Crystal fragments offer high-energy rewards",
+
+    // 世界类型 - 回声洞穴
+    "world.echo-chamber.name": "Echo Chamber",
+    "world.echo-chamber.description": "A completely dark maze world where agents must use sonar echolocation to explore and forage.",
+    "world.echo-chamber.feature1": "Active sonar detection mechanism",
+    "world.echo-chamber.feature2": "Echo signal pattern recognition",
+    "world.echo-chamber.feature3": "Spatial memory and map building",
+
+    // 世界类型 - 意识集群
+    "world.sentient-swarm.name": "Sentient Swarm",
+    "world.sentient-swarm.description": "A showcase of collective intelligence where multiple agents share the same brain design, demonstrating emergent group behaviors.",
+    "world.sentient-swarm.feature1": "Multi-agent swarm behavior",
+    "world.sentient-swarm.feature2": "Beacon communication system",
+    "world.sentient-swarm.feature3": "Role division and collaboration",
+
+    // 世界类型 - 律动色域
+    "world.chromatic-composer.name": "Chromatic Composer",
+    "world.chromatic-composer.description": "A digital canvas for artistic creation where agents create unique visual and auditory artworks through movement and perception.",
+    "world.chromatic-composer.feature1": "Dynamic painting and color system",
+    "world.chromatic-composer.feature2": "Rhythm perception and response",
+    "world.chromatic-composer.feature3": "Self-referential art creation",
   },
 };
 

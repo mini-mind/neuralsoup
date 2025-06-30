@@ -72,7 +72,21 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
       const scale = snnTopology.canvasScale;
 
       // 计算标题文字所需的最小宽度
-      const title = group.type === 'visual_receptor_group' ? t('snn.group.visualReceptor') : t('snn.group.rotationController');
+      const getGroupTitle = (groupType: string) => {
+        switch (groupType) {
+          case 'visual_receptor_group':
+            return t('snn.group.visualReceptor');
+          case 'health_receptor_group':
+            return t('snn.group.healthReceptor');
+          case 'rotation_controller_group':
+            return t('snn.group.rotationController');
+          case 'movement_controller_group':
+            return t('snn.group.movementController');
+          default:
+            return groupType;
+        }
+      };
+      const title = getGroupTitle(group.type);
       const fontSize = Math.max(9, Math.min(14, 11 * Math.sqrt(scale)));
 
       // 创建临时canvas来测量文字宽度
@@ -105,8 +119,11 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
         ? Math.max(minHeight, 30 * Math.sqrt(scale))
         : Math.max(minHeight * 2, group.height);
 
-      // 对于视觉感受器和旋转控制器组，收起时只显示标题栏
-      const isReceptorOrControllerGroup = group.type === 'visual_receptor_group' || group.type === 'rotation_controller_group';
+      // 对于感受器和效应器组，收起时只显示标题栏
+      const isReceptorOrControllerGroup = group.type === 'visual_receptor_group' ||
+                                         group.type === 'health_receptor_group' ||
+                                         group.type === 'rotation_controller_group' ||
+                                         group.type === 'movement_controller_group';
       const finalDisplayHeight = (group.collapsed && isReceptorOrControllerGroup)
         ? titleBarHeight
         : displayHeight;
@@ -233,12 +250,14 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
           (group.type === 'sensor_group' ||
            group.type === 'effector_group' ||
            group.type === 'visual_receptor_group' ||
-           group.type === 'rotation_controller_group') &&
-          group.nodes.includes(node.id)
+           group.type === 'health_receptor_group' ||
+           group.type === 'rotation_controller_group' ||
+           group.type === 'movement_controller_group') &&
+          (group.nodes?.includes(node.id) || group.neurons?.includes(node.id))
         );
 
         if (parentGroup && !parentGroup.collapsed) {
-          // 修复：使用世界坐标，避免双重变换
+          // 使用世界坐标，让画布变换矩阵来处理坐标变换
           const nodeRadius = node.type === 'voltage_input' ? 4 : 8;
           const scaledRadius = nodeRadius * Math.sqrt(scale);
 

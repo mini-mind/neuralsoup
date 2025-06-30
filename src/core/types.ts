@@ -8,7 +8,7 @@ export type { IWorld, ICollidable } from './world/types';
 export type { IAgent, IBrain, ISensor, IEffector } from './entities/types';
 
 // === 神经网络核心类型 ===
-export type { INeuron, NeuronState, IzhikevichParams, LIFParams } from './entities/neuron';
+export type { IProcessableNode, INeuron, NodeState, NeuronState, IzhikevichParams, LIFParams } from './entities/neuron';
 export type { ISynapse, SynapseState, STDPParams } from './entities/synapse';
 export type { NetworkStats } from './entities/topology';
 

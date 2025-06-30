@@ -18,8 +18,8 @@ export interface ISynapse {
   /**
    * 处理突触传递
    * @param preSpike 前突触神经元是否发放动作电位
-   * @param preNeuron 前突触神经元
-   * @param postNeuron 后突触神经元
+   * @param preNeuron 前突触神经元（真正的神经元，不是电压节点）
+   * @param postNeuron 后突触神经元（真正的神经元，不是电压节点）
    * @param deltaTime 时间步长
    * @returns 传递给后突触神经元的电流
    */

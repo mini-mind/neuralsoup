@@ -4,7 +4,7 @@
  * 感受器和效应器是包含多个内部节点的复合组件
  */
 
-import { INeuron, NeuronState } from './neuron';
+import { IProcessableNode, NodeState } from './neuron';
 import { VoltageInputNode, VoltageAccumulatorNode } from './types';
 
 /**
@@ -20,9 +20,9 @@ export interface IPlugin {
   readonly y: number;
 
   /**
-   * 获取插件内部的所有节点
+   * 获取插件内部的所有可处理节点
    */
-  getNodes(): INeuron[];
+  getNodes(): IProcessableNode[];
 
   /**
    * 插件特定的处理方法
@@ -67,7 +67,7 @@ export abstract class AbstractPlugin implements IPlugin {
   readonly x: number;
   readonly y: number;
 
-  protected nodes: INeuron[] = [];
+  protected nodes: IProcessableNode[] = [];
 
   constructor(
     id: string,
@@ -84,9 +84,9 @@ export abstract class AbstractPlugin implements IPlugin {
   }
 
   /**
-   * 获取插件内部的所有节点
+   * 获取插件内部的所有可处理节点
    */
-  getNodes(): INeuron[] {
+  getNodes(): IProcessableNode[] {
     return [...this.nodes];
   }
 

@@ -79,6 +79,7 @@ interface AppState {
   networkTopology: NetworkTopology | null; // 新的网络拓扑实例
   selectedNodeId: string | null; // 当前选中的节点ID
   selectedEdgeId: string | null; // 当前选中的边ID
+  selectedWorld: string | null; // 当前选中的世界类型
 }
 
 const initialState: AppState = {
@@ -90,6 +91,7 @@ const initialState: AppState = {
   networkTopology: null, // 初始化网络拓扑
   selectedNodeId: null,
   selectedEdgeId: null,
+  selectedWorld: 'luminous-garden', // 默认选择光影花园
 };
 
 export const globalState = new GlobalState<AppState>(initialState); 

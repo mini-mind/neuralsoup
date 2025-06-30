@@ -1,5 +1,5 @@
 import type { IWorld, ICollidable } from '../world/types';
-import { INeuron, NeuronState } from './neuron';
+import { IProcessableNode, NodeState } from './neuron';
 
 /**
  * 定义了智能体"大脑"的契约。
@@ -59,9 +59,10 @@ export interface IAgent extends ICollidable {
 
 /**
  * 电压输入节点类
- * 视觉感受器的内部组件，输入多少就立刻输出多少，没有内在逻辑
+ * 感受器的内部组件，输入多少就立刻输出多少，没有内在逻辑
+ * 这不是真正的神经元，而是一个简单的电压传递节点
  */
-export class VoltageInputNode implements INeuron {
+export class VoltageInputNode implements IProcessableNode {
   readonly id: string;
   readonly type = 'voltage_input' as const;
   x: number;
@@ -109,9 +110,9 @@ export class VoltageInputNode implements INeuron {
   }
 
   /**
-   * 获取状态信息 - INeuron接口要求
+   * 获取状态信息 - IProcessableNode接口要求
    */
-  getState(): NeuronState {
+  getState(): NodeState {
     return {
       voltage: this.voltage,
       isSpiking: this.voltage >= this.threshold,
@@ -135,9 +136,10 @@ export class VoltageInputNode implements INeuron {
  */
 /**
  * 电压累积节点类
- * 旋转控制器的内部组件，累积输入电压，持续衰减，最大值限制为1
+ * 效应器的内部组件，累积输入电压，持续衰减，最大值限制为1
+ * 这不是真正的神经元，而是一个电压累积和衰减节点
  */
-export class VoltageAccumulatorNode implements INeuron {
+export class VoltageAccumulatorNode implements IProcessableNode {
   readonly id: string;
   readonly type = 'voltage_accumulator' as const;
   x: number;
@@ -192,7 +194,7 @@ export class VoltageAccumulatorNode implements INeuron {
   }
 
   /**
-   * 更新神经元状态 - INeuron接口要求
+   * 更新节点状态 - IProcessableNode接口要求
    */
   update(input: number, deltaTime: number): boolean {
     this.process(input, deltaTime);
@@ -207,9 +209,9 @@ export class VoltageAccumulatorNode implements INeuron {
   }
 
   /**
-   * 获取状态信息 - INeuron接口要求
+   * 获取状态信息 - IProcessableNode接口要求
    */
-  getState(): NeuronState {
+  getState(): NodeState {
     return {
       voltage: this.voltage,
       isSpiking: this.voltage >= this.threshold,
