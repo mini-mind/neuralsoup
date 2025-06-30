@@ -1,6 +1,4 @@
 import React, { useRef, useEffect, useCallback } from "react";
-import { globalState } from "../../core/services/GlobalState";
-import { IzhikevichNeuron } from "../../core/entities/neuron";
 import { InteractionState, SelectionBox, NodeGroup } from "../types/editor.types";
 import { useLanguage } from "../../contexts/LanguageContext";
 
@@ -232,40 +230,49 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
       nodes.forEach(node => {
         // 检查节点是否属于某个组
         const parentGroup = groups.find(group =>
-          (group.type === 'sensor_group' || group.type === 'effector_group') &&
+          (group.type === 'sensor_group' ||
+           group.type === 'effector_group' ||
+           group.type === 'visual_receptor_group' ||
+           group.type === 'rotation_controller_group') &&
           group.nodes.includes(node.id)
         );
 
         if (parentGroup && !parentGroup.collapsed) {
-          // 绘制组内节点
-          const screenX = node.x * scale + offset.x;
-          const screenY = node.y * scale + offset.y;
+          // 修复：使用世界坐标，避免双重变换
           const nodeRadius = node.type === 'voltage_input' ? 4 : 8;
           const scaledRadius = nodeRadius * Math.sqrt(scale);
 
           // 节点颜色
-          const nodeColor = node.type === 'voltage_input' ? '#28a745' : '#fd7e14'; // 绿色感受器，橙色效应器
+          const nodeColor = node.type === 'voltage_input' ? '#28a745' : '#fd7e14';
           const isSelected = selectedNode === node.id;
 
-          // 绘制节点
+          // 获取节点状态
+          const state = node.getState ? node.getState() : { voltage: 0, isSpiking: false };
+
+          // 绘制空心节点
           ctx.beginPath();
-          ctx.arc(screenX, screenY, scaledRadius, 0, 2 * Math.PI);
-          ctx.fillStyle = isSelected ? '#ff0000' : nodeColor;
+          ctx.arc(node.x, node.y, scaledRadius, 0, 2 * Math.PI);
+          ctx.fillStyle = 'transparent';
           ctx.fill();
-          ctx.strokeStyle = isSelected ? '#ffffff' : '#333333';
-          ctx.lineWidth = isSelected ? 2 : 1;
+          ctx.strokeStyle = isSelected ? '#ff0000' : nodeColor;
+          ctx.lineWidth = isSelected ? 3 : 2;
           ctx.stroke();
 
-          // 绘制节点状态（如果有）
-          if (node.getState) {
-            const state = node.getState();
-            if (state.isSpiking) {
-              ctx.beginPath();
-              ctx.arc(screenX, screenY, scaledRadius + 3, 0, 2 * Math.PI);
-              ctx.strokeStyle = '#ff0000';
-              ctx.lineWidth = 2;
-              ctx.stroke();
-            }
+          // 在节点中心显示膜电位
+          ctx.fillStyle = isSelected ? '#ff0000' : nodeColor;
+          ctx.font = `${Math.max(8, scaledRadius * 0.6)}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const voltage = Math.round(state.voltage || 0);
+          ctx.fillText(voltage.toString(), node.x, node.y);
+
+          // 绘制放电状态
+          if (state.isSpiking) {
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, scaledRadius + 3, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 3;
+            ctx.stroke();
           }
         }
       });
@@ -304,18 +311,7 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
       drawNode(ctx, node, selectedNode === node.id);
     });
     
-    // 渲染snnTopology中的组内节点（不在网络拓扑中）
-    if (legacyTopology?.nodes) {
-      legacyTopology.nodes.forEach((node: any) => {
-        // 检查节点是否在某个组内
-        const parentGroup = neuronGroups.find(g => g.neurons.includes(node.id));
-        if (parentGroup) {
-          drawNode(ctx, node, selectedNode === node.id);
-        }
-      });
-    }
-
-    // 绘制感受器和效应器组内的节点
+    // 绘制感受器和效应器组内的节点（统一处理，避免重复绘制）
     if (legacyTopology?.nodes) {
       drawGroupNodes(legacyTopology.nodes, neuronGroups);
     }
@@ -354,40 +350,33 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
     }
     
     const state = node.getState ? node.getState() : { voltage: 0, isSpiking: false };
-    
+
     let color = '#888888';
     if (state.isSpiking) color = '#ff6b6b';
-    
-    ctx.fillStyle = color;
-    
-    // 所有节点都显示为圆形
+
+    // 绘制空心节点
     ctx.beginPath();
     ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
+    ctx.fillStyle = 'transparent';
     ctx.fill();
-    
+
     if (shouldHighlight) {
       ctx.strokeStyle = '#ff0000';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 3;
       ctx.stroke();
     } else {
-      ctx.strokeStyle = '#333333';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
       ctx.stroke();
     }
 
-    // Only show text labels for regular nodes not in groups
-    if (!isInGroup && node.type !== 'voltage_input' && node.type !== 'voltage_accumulator') {
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 8px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      let typeLabel = 'B';
-      if (node.type === 'sensor') typeLabel = 'S';
-      if (node.type === 'effector') typeLabel = 'E';
-      ctx.fillText(typeLabel, node.x, node.y);
-    }
+    // 在节点中心显示膜电位
+    ctx.fillStyle = shouldHighlight ? '#ff0000' : color;
+    ctx.font = `${Math.max(10, radius * 0.6)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const voltage = Math.round(state.voltage || 0);
+    ctx.fillText(voltage.toString(), node.x, node.y);
   };
   
   const drawEdge = (ctx: CanvasRenderingContext2D, fromNode: any, toNode: any, edge: any, isSelected: boolean) => {
@@ -498,6 +487,7 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
   };
 
   const drawSelectionBox = (ctx: CanvasRenderingContext2D) => {
+    if (!selectionBox.visible) return;
     const { startX, startY, endX, endY } = selectionBox;
     ctx.strokeStyle = '#4a90e2';
     ctx.lineWidth = 1;
@@ -530,9 +520,6 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
     const startY = startNode.y * canvasScale + canvasOffset.y;
     const endX = interactionState.lastMousePos.x;
     const endY = interactionState.lastMousePos.y;
-    
-    // 检查起始节点是否在组内，如果是则使用虚线
-    const startNodeInGroup = neuronGroups.some(g => g.neurons.includes(edgeStartNodeId));
     
     ctx.strokeStyle = '#ff6b6b';
     ctx.lineWidth = 2;
@@ -570,4 +557,4 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
       onDoubleClick={onDoubleClick}
     />
   );
-}; 
+};

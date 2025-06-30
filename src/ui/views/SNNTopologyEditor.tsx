@@ -341,10 +341,13 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
     if (!snnTopology) return;
 
     const canvasPos = InteractionHandler.getCanvasPosition(e);
-    setInteractionState(prev => ({ ...prev, lastMousePos: canvasPos }));
 
+    // 计算鼠标移动的增量（修复：在更新lastMousePos之前计算，避免平移抖动）
     const dx = canvasPos.x - interactionState.lastMousePos.x;
     const dy = canvasPos.y - interactionState.lastMousePos.y;
+
+    // 更新鼠标位置状态
+    setInteractionState(prev => ({ ...prev, lastMousePos: canvasPos }));
 
     if (interactionState.isDragging && interactionState.draggedNodes.length > 0) {
       // 拖动节点 - 包括所有选中的节点
@@ -619,9 +622,16 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
   // Update handler functions
   const handleNodeUpdate = (updatedNode: any) => {
     if (selectedNode && networkTopology) {
-      NeuronAdapter.updateFromSNNNode(selectedNode, updatedNode);
-      globalState.setState({ networkTopology });
-      console.log('Node updated:', updatedNode);
+      try {
+        NeuronAdapter.updateFromSNNNode(selectedNode, updatedNode);
+        globalState.setState({ networkTopology });
+        // 可选：在开发环境中记录更新
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Node updated:', updatedNode);
+        }
+      } catch (error) {
+        console.error('Failed to update node:', error);
+      }
     }
   };
 

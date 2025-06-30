@@ -46,7 +46,9 @@ export class CanvasGraphManager {
       // 添加边到网络拓扑
       const newEdge = this.networkTopology.addEdge(synapse);
       if (newEdge) {
-        console.log(`成功创建边: ${fromNodeId} -> ${toNodeId}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`成功创建边: ${fromNodeId} -> ${toNodeId}`);
+        }
         return true;
       }
       
@@ -63,7 +65,7 @@ export class CanvasGraphManager {
   deleteEdge(edgeId: string): boolean {
     try {
       const success = this.networkTopology.removeEdge(edgeId);
-      if (success) {
+      if (success && process.env.NODE_ENV === 'development') {
         console.log(`成功删除边: ${edgeId}`);
       }
       return success;
@@ -90,7 +92,7 @@ export class CanvasGraphManager {
 
       // 删除节点
       const success = this.networkTopology.removeNode(nodeId);
-      if (success) {
+      if (success && process.env.NODE_ENV === 'development') {
         console.log(`成功删除节点: ${nodeId}`);
       }
       return success;
@@ -108,7 +110,9 @@ export class CanvasGraphManager {
       const edge = this.networkTopology.getEdge(edgeId);
       if (edge) {
         edge.synapse.weight = weight;
-        console.log(`更新边权重: ${edgeId} -> ${weight}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`更新边权重: ${edgeId} -> ${weight}`);
+        }
         return true;
       }
       return false;

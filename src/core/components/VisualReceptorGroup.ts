@@ -1,5 +1,22 @@
 import { VoltageInputNode } from '../entities/types';
-import { NodeGroup, Vector2D } from '../../ui/types/editor.types';
+
+// 定义核心层自己的基础类型，避免依赖UI层
+interface Vector2D {
+  x: number;
+  y: number;
+}
+
+interface NodeGroup {
+  id: string;
+  type: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  collapsed: boolean;
+  nodes: string[];
+  neurons: string[];
+}
 
 /**
  * 视觉感受器节点组类

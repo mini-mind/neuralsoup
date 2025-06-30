@@ -1,12 +1,31 @@
+import type { UIEdge, NetworkEdge } from "../../types";
+
 /**
  * 突触适配器
- * 将NetworkEdge转换为编辑器组件所需的格式
+ * 将核心层NetworkEdge转换为UI层所需的格式
  */
 export class SynapseAdapter {
   /**
-   * 将NetworkEdge转换为编辑器所需格式
+   * 将NetworkEdge转换为UIEdge格式
    */
-  static toSynapseEditFormat(networkEdge: any): any {
+  static toUIEdge(networkEdge: NetworkEdge): UIEdge {
+    const state = networkEdge.getState();
+
+    return {
+      id: networkEdge.id,
+      fromNodeId: networkEdge.fromNodeId,
+      toNodeId: networkEdge.toNodeId,
+      weight: state.weight,
+      delay: networkEdge.synapse.delay,
+      synapse: networkEdge.synapse // 保持对核心突触的引用
+    };
+  }
+
+  /**
+   * 将NetworkEdge转换为编辑器所需格式
+   * @deprecated 使用 toUIEdge 替代
+   */
+  static toSynapseEditFormat(networkEdge: NetworkEdge): any {
     const state = networkEdge.getState();
     
     return {

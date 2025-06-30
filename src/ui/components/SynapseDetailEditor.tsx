@@ -1,9 +1,9 @@
 import React, { useState } from "react";
-import { SNNSynapse } from "../types/simulation";
+import type { ISynapse } from "../../core/entities/synapse";
 
 interface SynapseDetailEditorProps {
-  synapse: SNNSynapse;
-  onUpdate: (updatedSynapse: SNNSynapse) => void;
+  synapse: ISynapse;
+  onUpdate: (updatedSynapse: ISynapse) => void;
 }
 
 const SynapseDetailEditor: React.FC<SynapseDetailEditorProps> = ({

@@ -1,14 +1,14 @@
-import { SNNNode } from "../types/snn.types";
+import type { UINode, NetworkNode } from "../../types";
 
 /**
  * 神经元适配器
- * 将NetworkNode转换为编辑器组件所需的格式
+ * 将核心层NetworkNode转换为UI层所需的格式
  */
 export class NeuronAdapter {
   /**
-   * 将NetworkNode转换为SNNNode格式
+   * 将NetworkNode转换为UINode格式
    */
-  static toSNNNode(networkNode: any): SNNNode {
+  static toUINode(networkNode: NetworkNode): UINode {
     const state = networkNode.getState();
     const neuron = networkNode.neuron;
     
@@ -18,6 +18,7 @@ export class NeuronAdapter {
       type: neuron.type,
       x: networkNode.x,
       y: networkNode.y,
+      neuron: neuron, // 保持对核心神经元的引用
       params: {
         a: neuron.a || 0.02,
         b: neuron.b || 0.2,
@@ -52,4 +53,12 @@ export class NeuronAdapter {
       networkNode.setPosition(snnNode.x, snnNode.y);
     }
   }
-} 
+
+  /**
+   * 向后兼容方法：将NetworkNode转换为SNNNode格式
+   * @deprecated 使用 toUINode 替代
+   */
+  static toSNNNode(networkNode: NetworkNode) {
+    return this.toUINode(networkNode);
+  }
+}

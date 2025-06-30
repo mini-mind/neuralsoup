@@ -3,7 +3,7 @@
  */
 
 import * as PIXI from "pixi.js";
-import { Agent } from "../../types/simulation";
+import type { IAgent } from "../../core/entities/types";
 
 export class AgentRenderer {
   private agentContainer: PIXI.Container;
@@ -16,7 +16,7 @@ export class AgentRenderer {
   /**
    * 渲染所有智能体
    */
-  public render(agents: Agent[], visionAngle: number): void {
+  public render(agents: IAgent[], visionAngle: number): void {
     // 清理不存在的智能体精灵
     for (const [id, sprite] of this.agentSprites) {
       if (!agents.find((agent) => agent.id === id)) {
