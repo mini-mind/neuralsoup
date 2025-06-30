@@ -137,6 +137,8 @@ const translations = {
     "snn.group.healthReceptor": "健康感受器",
     "snn.group.rotationController": "旋转控制器",
     "snn.group.movementController": "移动控制器",
+    "snn.group.gradientMovementController": "梯度运动控制器",
+    "snn.group.lightReceptor": "光感受器",
     "snn.details.neuron": "神经元详情",
     "snn.details.synapse": "突触详情",
 
@@ -194,6 +196,13 @@ const translations = {
     "world.chromatic-composer.feature1": "动态绘画与色彩系统",
     "world.chromatic-composer.feature2": "节奏感知与响应",
     "world.chromatic-composer.feature3": "自指涉艺术创作",
+
+    // 世界类型 - 追光者
+    "world.light-seeker.name": "追光者",
+    "world.light-seeker.description": "简化的测试环境，包含多个大光球随机缓慢运动，为测试视觉感受器和梯度运动控制器提供光源环境。",
+    "world.light-seeker.feature1": "多个大光球光源",
+    "world.light-seeker.feature2": "随机缓慢运动",
+    "world.light-seeker.feature3": "适合测试光感受器",
   },
   en: {
     // Controls
@@ -319,6 +328,8 @@ const translations = {
     "snn.group.healthReceptor": "Health Receptor",
     "snn.group.rotationController": "Rotation Controller",
     "snn.group.movementController": "Movement Controller",
+    "snn.group.gradientMovementController": "Gradient Movement Controller",
+    "snn.group.lightReceptor": "Light Receptor",
     "snn.details.neuron": "Neuron Details",
     "snn.details.synapse": "Synapse Details",
 
@@ -376,6 +387,13 @@ const translations = {
     "world.chromatic-composer.feature1": "Dynamic painting and color system",
     "world.chromatic-composer.feature2": "Rhythm perception and response",
     "world.chromatic-composer.feature3": "Self-referential art creation",
+
+    // 世界类型 - 追光者
+    "world.light-seeker.name": "Light Seeker",
+    "world.light-seeker.description": "A simplified test environment with multiple large light orbs moving randomly and slowly, providing light sources for testing visual receptors and gradient movement controllers.",
+    "world.light-seeker.feature1": "Multiple large light orb sources",
+    "world.light-seeker.feature2": "Random slow movement",
+    "world.light-seeker.feature3": "Ideal for testing light receptors",
   },
 };
 

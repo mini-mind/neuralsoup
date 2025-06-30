@@ -12,6 +12,7 @@ import { LuminousGardenWorld } from './luminous-garden/LuminousGardenWorld';
 import { EchoChamberWorld } from './echo-chamber/EchoChamberWorld';
 import { SentientSwarmWorld } from './sentient-swarm/SentientSwarmWorld';
 import { ChromaticComposerWorld } from './chromatic-composer/ChromaticComposerWorld';
+import { LightSeekerWorld } from './light-seeker/LightSeekerWorld';
 
 export class World extends BaseWorld {
   constructor(width: number, height: number, worldType: string = 'luminous-garden') {
@@ -32,8 +33,10 @@ export class World extends BaseWorld {
         return new SentientSwarmWorld(width, height);
       case 'chromatic-composer':
         return new ChromaticComposerWorld(width, height);
+      case 'light-seeker':
+        return new LightSeekerWorld(width, height);
       default:
-        return new LuminousGardenWorld(width, height);
+        return new LightSeekerWorld(width, height);
     }
   }
 

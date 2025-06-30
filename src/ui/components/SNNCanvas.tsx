@@ -82,6 +82,10 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
             return t('snn.group.rotationController');
           case 'movement_controller_group':
             return t('snn.group.movementController');
+          case 'gradient_movement_controller':
+            return t('snn.group.gradientMovementController');
+          case 'light_receptor_group':
+            return t('snn.group.lightReceptor');
           default:
             return groupType;
         }
@@ -123,7 +127,9 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
       const isReceptorOrControllerGroup = group.type === 'visual_receptor_group' ||
                                          group.type === 'health_receptor_group' ||
                                          group.type === 'rotation_controller_group' ||
-                                         group.type === 'movement_controller_group';
+                                         group.type === 'movement_controller_group' ||
+                                         group.type === 'gradient_movement_controller' ||
+                                         group.type === 'light_receptor_group';
       const finalDisplayHeight = (group.collapsed && isReceptorOrControllerGroup)
         ? titleBarHeight
         : displayHeight;
@@ -252,7 +258,9 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
            group.type === 'visual_receptor_group' ||
            group.type === 'health_receptor_group' ||
            group.type === 'rotation_controller_group' ||
-           group.type === 'movement_controller_group') &&
+           group.type === 'movement_controller_group' ||
+           group.type === 'gradient_movement_controller' ||
+           group.type === 'light_receptor_group') &&
           (group.nodes?.includes(node.id) || group.neurons?.includes(node.id))
         );
 
@@ -339,11 +347,11 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
   };
   
   const drawNode = (ctx: CanvasRenderingContext2D, node: any, isSelected: boolean) => {
-    const isInCollapsedGroup = neuronGroups.some(g => g.collapsed && g.neurons.includes(node.id));
+    const isInCollapsedGroup = neuronGroups.some(g => g.collapsed && (g.neurons?.includes(node.id) || g.nodes?.includes(node.id)));
     if (isInCollapsedGroup) return;
 
     // Check if node is in a group
-    const parentGroup = neuronGroups.find(g => !g.collapsed && g.neurons.includes(node.id));
+    const parentGroup = neuronGroups.find(g => !g.collapsed && (g.neurons?.includes(node.id) || g.nodes?.includes(node.id)));
     const isInGroup = !!parentGroup;
 
     const isMultiSelected = interactionState.selectedNodes.includes(node.id);
@@ -426,7 +434,7 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
     let toRadius = 15; // 默认普通节点半径
 
     // 检查起点是否在收起的组内
-    const fromNodeGroup = neuronGroups.find(g => g.collapsed && g.neurons.includes(fromNode.id));
+    const fromNodeGroup = neuronGroups.find(g => g.collapsed && (g.neurons?.includes(fromNode.id) || g.nodes?.includes(fromNode.id)));
     if (fromNodeGroup) {
       actualFromNode = {
         x: fromNodeGroup.x + fromNodeGroup.width / 2,
@@ -435,12 +443,12 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
       fromRadius = Math.min(fromNodeGroup.width, fromNodeGroup.height) / 2;
     } else {
       // 获取起点节点的实际半径，与绘制逻辑保持一致
-      const fromNodeInGroup = neuronGroups.some(g => !g.collapsed && g.neurons.includes(fromNode.id));
+      const fromNodeInGroup = neuronGroups.some(g => !g.collapsed && (g.neurons?.includes(fromNode.id) || g.nodes?.includes(fromNode.id)));
       fromRadius = getNodeRadius(fromNode, fromNodeInGroup, scale);
     }
 
     // 检查终点是否在收起的组内
-    const toNodeGroup = neuronGroups.find(g => g.collapsed && g.neurons.includes(toNode.id));
+    const toNodeGroup = neuronGroups.find(g => g.collapsed && (g.neurons?.includes(toNode.id) || g.nodes?.includes(toNode.id)));
     if (toNodeGroup) {
       actualToNode = {
         x: toNodeGroup.x + toNodeGroup.width / 2,
@@ -449,7 +457,7 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
       toRadius = Math.min(toNodeGroup.width, toNodeGroup.height) / 2;
     } else {
       // 获取终点节点的实际半径，与绘制逻辑保持一致
-      const toNodeInGroup = neuronGroups.some(g => !g.collapsed && g.neurons.includes(toNode.id));
+      const toNodeInGroup = neuronGroups.some(g => !g.collapsed && (g.neurons?.includes(toNode.id) || g.nodes?.includes(toNode.id)));
       toRadius = getNodeRadius(toNode, toNodeInGroup, scale);
     }
     
@@ -468,8 +476,8 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
     if (state.recentActivity > 0.1) color = `rgba(255, 100, 100, ${Math.max(0.3, weight)})`;
     
     // 检查是否涉及组内节点，如果是则使用虚线
-    const fromInGroup = neuronGroups.some(g => g.neurons.includes(fromNode.id));
-    const toInGroup = neuronGroups.some(g => g.neurons.includes(toNode.id));
+    const fromInGroup = neuronGroups.some(g => g.neurons?.includes(fromNode.id) || g.nodes?.includes(fromNode.id));
+    const toInGroup = neuronGroups.some(g => g.neurons?.includes(toNode.id) || g.nodes?.includes(toNode.id));
     const useDashedLine = fromInGroup || toInGroup;
     
     ctx.beginPath();

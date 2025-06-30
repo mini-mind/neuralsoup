@@ -9,7 +9,7 @@ interface WorldSelectionModalProps {
   onClose: () => void;
 }
 
-export type WorldType = 'luminous-garden' | 'echo-chamber' | 'sentient-swarm' | 'chromatic-composer';
+export type WorldType = 'luminous-garden' | 'echo-chamber' | 'sentient-swarm' | 'chromatic-composer' | 'light-seeker';
 
 interface WorldOption {
   id: WorldType;
@@ -21,6 +21,14 @@ interface WorldOption {
 }
 
 const worldOptions: WorldOption[] = [
+  {
+    id: 'light-seeker',
+    nameKey: 'world.light-seeker.name',
+    descriptionKey: 'world.light-seeker.description',
+    icon: '💡',
+    color: 'linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%)',
+    features: ['world.light-seeker.feature1', 'world.light-seeker.feature2', 'world.light-seeker.feature3']
+  },
   {
     id: 'luminous-garden',
     nameKey: 'world.luminous-garden.name',
@@ -52,6 +60,14 @@ const worldOptions: WorldOption[] = [
     icon: '🎨',
     color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
     features: ['world.chromatic-composer.feature1', 'world.chromatic-composer.feature2', 'world.chromatic-composer.feature3']
+  },
+  {
+    id: 'light-seeker',
+    nameKey: 'world.light-seeker.name',
+    descriptionKey: 'world.light-seeker.description',
+    icon: '💡',
+    color: 'linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%)',
+    features: ['world.light-seeker.feature1', 'world.light-seeker.feature2', 'world.light-seeker.feature3']
   }
 ];
 

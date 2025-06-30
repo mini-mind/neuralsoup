@@ -91,7 +91,7 @@ const initialState: AppState = {
   networkTopology: null, // 初始化网络拓扑
   selectedNodeId: null,
   selectedEdgeId: null,
-  selectedWorld: 'luminous-garden', // 默认选择光影花园
+  selectedWorld: 'light-seeker', // 默认选择追光者世界
 };
 
 export const globalState = new GlobalState<AppState>(initialState); 

@@ -27,23 +27,29 @@ export class RotationControllerGroupManager {
     // 创建旋转控制器插件实例
     const rotationController = new RotationController(groupId, position.x, position.y);
 
-    // 创建节点
-    const nodeLabels = ['左转', '右转'];
+    // 使用旋转控制器内部的节点
+    const nodeLabels = ['顺时针', '逆时针'];
+    const clockwiseNode = rotationController.getClockwiseNode();
+    const counterclockwiseNode = rotationController.getCounterclockwiseNode();
+    const internalNodes = [clockwiseNode, counterclockwiseNode];
+
     for (let i = 0; i < this.NODE_COUNT; i++) {
-      const nodeId = `rotation_controller_${timestamp}_${i}`;
       const relativePos = this.getNodeRelativePosition(i);
       const absolutePos = {
         x: position.x + relativePos.x,
         y: position.y + relativePos.y
       };
 
-      const voltageAccumulatorNode = new VoltageAccumulatorNode(nodeId, absolutePos.x, absolutePos.y);
+      // 使用内部节点而不是创建新的
+      const voltageAccumulatorNode = internalNodes[i];
+      voltageAccumulatorNode.setPosition(absolutePos.x, absolutePos.y);
+
       const node = {
-        id: nodeId,
+        id: voltageAccumulatorNode.id,
         type: 'voltage_accumulator',
         x: absolutePos.x,
         y: absolutePos.y,
-        processor: voltageAccumulatorNode,
+        processor: voltageAccumulatorNode, // 使用内部节点
         getState: () => voltageAccumulatorNode.getState(),
         setPosition: (x: number, y: number) => voltageAccumulatorNode.setPosition(x, y),
         // 记录相对位置和标签
@@ -158,23 +164,31 @@ export class MovementControllerGroupManager {
     // 创建移动控制器插件实例
     const movementController = new MovementController(groupId, position.x, position.y);
 
-    // 创建节点
+    // 使用移动控制器内部的节点
     const nodeLabels = ['上', '下', '左', '右'];
+    const upNode = movementController.getUpNode();
+    const downNode = movementController.getDownNode();
+    const leftNode = movementController.getLeftNode();
+    const rightNode = movementController.getRightNode();
+    const internalNodes = [upNode, downNode, leftNode, rightNode];
+
     for (let i = 0; i < this.NODE_COUNT; i++) {
-      const nodeId = `movement_controller_${timestamp}_${i}`;
       const relativePos = this.getNodeRelativePosition(i);
       const absolutePos = {
         x: position.x + relativePos.x,
         y: position.y + relativePos.y
       };
 
-      const voltageAccumulatorNode = new VoltageAccumulatorNode(nodeId, absolutePos.x, absolutePos.y);
+      // 使用内部节点而不是创建新的
+      const voltageAccumulatorNode = internalNodes[i];
+      voltageAccumulatorNode.setPosition(absolutePos.x, absolutePos.y);
+
       const node = {
-        id: nodeId,
+        id: voltageAccumulatorNode.id,
         type: 'voltage_accumulator',
         x: absolutePos.x,
         y: absolutePos.y,
-        processor: voltageAccumulatorNode,
+        processor: voltageAccumulatorNode, // 使用内部节点
         getState: () => voltageAccumulatorNode.getState(),
         setPosition: (x: number, y: number) => voltageAccumulatorNode.setPosition(x, y),
         // 记录相对位置和标签

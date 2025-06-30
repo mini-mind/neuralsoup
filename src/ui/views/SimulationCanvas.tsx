@@ -20,15 +20,15 @@ const SimulationCanvas: React.FC = () => {
   useEffect(() => {
     if (!canvasRef.current || appRef.current) return;
 
+    const container = canvasRef.current;
     const app = new PIXI.Application({
-      width: canvasRef.current.clientWidth,
-      height: canvasRef.current.clientHeight,
+      width: container.clientWidth,
+      height: container.clientHeight,
       backgroundColor: getWorldBackgroundColor(),
-      resizeTo: canvasRef.current,
       antialias: true,
     });
     appRef.current = app;
-    canvasRef.current.appendChild(app.view as HTMLCanvasElement);
+    container.appendChild(app.view as HTMLCanvasElement);
 
     // 创建渲染层
     const worldEntityContainer = new PIXI.Container();
@@ -64,11 +64,27 @@ const SimulationCanvas: React.FC = () => {
       app.renderer.backgroundColor = getWorldBackgroundColor();
     });
 
+    // 监听容器尺寸变化
+    const resizeObserver = new ResizeObserver(() => {
+      if (container && app) {
+        const newWidth = container.clientWidth;
+        const newHeight = container.clientHeight;
+
+        // 只有当尺寸真正改变时才调整
+        if (app.screen.width !== newWidth || app.screen.height !== newHeight) {
+          app.renderer.resize(newWidth, newHeight);
+        }
+      }
+    });
+
+    resizeObserver.observe(container);
+
     return () => {
       ticker.remove(renderLoop);
       agentRenderer.destroy();
       worldEntityRenderer.destroy();
       unsubscribeWorldChange();
+      resizeObserver.disconnect();
       app.destroy(true, { children: true });
       appRef.current = null;
     };
@@ -105,6 +121,8 @@ function getWorldBackgroundColor(): number {
       return 0x2d3748; // 深灰蓝色
     case 'chromatic-composer':
       return 0xf7fafc; // 浅灰白色
+    case 'light-seeker':
+      return 0x0f0f23; // 深蓝黑色，适合光球效果
     default:
       return 0x1a1a2e;
   }

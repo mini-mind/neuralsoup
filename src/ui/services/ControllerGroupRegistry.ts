@@ -1,5 +1,7 @@
 import { VisualReceptorGroupManager, HealthReceptorGroupManager } from "./VisualReceptorGroupManager";
 import { RotationControllerGroupManager, MovementControllerGroupManager } from "./RotationControllerGroupManager";
+import { GradientMovementControllerGroupManager } from "./GradientMovementControllerGroupManager";
+import { LightReceptorGroupManager } from "./LightReceptorGroupManager";
 import { NodeGroup, Vector2D } from "../types/editor.types";
 
 /**
@@ -15,6 +17,8 @@ export class ControllerGroupRegistry {
   private rotationControllerGroup: { group: NodeGroup; nodes: any[]; pluginInstance: any } | null = null;
   private movementControllerGroup: { group: NodeGroup; nodes: any[]; pluginInstance: any } | null = null;
   private healthReceptorGroup: { group: NodeGroup; nodes: any[]; pluginInstance: any } | null = null;
+  private gradientMovementControllerGroup: { group: NodeGroup; nodes: any[]; pluginInstance: any } | null = null;
+  private lightReceptorGroup: { group: NodeGroup; nodes: any[]; pluginInstance: any } | null = null;
 
   private constructor() {}
 
@@ -50,6 +54,8 @@ export class ControllerGroupRegistry {
     this.rotationControllerGroup = RotationControllerGroupManager.createGroup({ x: 100, y: 400 }, timestamp + 1);
     this.movementControllerGroup = MovementControllerGroupManager.createGroup({ x: 300, y: 400 }, timestamp + 2);
     this.healthReceptorGroup = HealthReceptorGroupManager.createGroup({ x: 100, y: 225 }, timestamp + 3);
+    this.gradientMovementControllerGroup = GradientMovementControllerGroupManager.createGroup({ x: 500, y: 400 }, timestamp + 4);
+    this.lightReceptorGroup = LightReceptorGroupManager.createGroup({ x: 300, y: 50 }, timestamp + 5);
 
     this.initialized = true;
 
@@ -74,6 +80,8 @@ export class ControllerGroupRegistry {
     if (this.rotationControllerGroup) groups.push(this.rotationControllerGroup.group);
     if (this.movementControllerGroup) groups.push(this.movementControllerGroup.group);
     if (this.healthReceptorGroup) groups.push(this.healthReceptorGroup.group);
+    if (this.gradientMovementControllerGroup) groups.push(this.gradientMovementControllerGroup.group);
+    if (this.lightReceptorGroup) groups.push(this.lightReceptorGroup.group);
     return groups;
   }
 
@@ -86,6 +94,8 @@ export class ControllerGroupRegistry {
     if (this.rotationControllerGroup) nodes.push(...this.rotationControllerGroup.nodes);
     if (this.movementControllerGroup) nodes.push(...this.movementControllerGroup.nodes);
     if (this.healthReceptorGroup) nodes.push(...this.healthReceptorGroup.nodes);
+    if (this.gradientMovementControllerGroup) nodes.push(...this.gradientMovementControllerGroup.nodes);
+    if (this.lightReceptorGroup) nodes.push(...this.lightReceptorGroup.nodes);
     return nodes;
   }
 
@@ -96,6 +106,8 @@ export class ControllerGroupRegistry {
   getRotationControllerGroup() { return this.rotationControllerGroup; }
   getMovementControllerGroup() { return this.movementControllerGroup; }
   getHealthReceptorGroup() { return this.healthReceptorGroup; }
+  getGradientMovementControllerGroup() { return this.gradientMovementControllerGroup; }
+  getLightReceptorGroup() { return this.lightReceptorGroup; }
 
   /**
    * 重置注册表（用于测试或重新初始化）
@@ -106,6 +118,8 @@ export class ControllerGroupRegistry {
     this.rotationControllerGroup = null;
     this.movementControllerGroup = null;
     this.healthReceptorGroup = null;
+    this.gradientMovementControllerGroup = null;
+    this.lightReceptorGroup = null;
     console.log('控制器组注册表已重置');
   }
 

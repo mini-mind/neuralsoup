@@ -11,6 +11,7 @@ import '../ui/styles/layout.css';
 import { demoSNNTopology, createDemoNetworkTopology } from './demoData';
 import { useLanguage } from '../contexts/LanguageContext';
 import HelpTooltipIcon from '../ui/components/HelpTooltipIcon';
+import { SensorDataManager } from '../ui/services/SensorDataManager';
 
 const App: React.FC = () => {
   const [rightPanelWidth, setRightPanelWidth] = useState(500);
@@ -19,8 +20,12 @@ const App: React.FC = () => {
   const { t } = useLanguage();
 
   useEffect(() => {
+    // 初始化传感器数据管理器
+    const sensorDataManager = SensorDataManager.getInstance();
+    sensorDataManager.initialize();
+
     // 从全局状态获取选中的世界类型
-    const selectedWorld = globalState.getState().selectedWorld || 'luminous-garden';
+    const selectedWorld = globalState.getState().selectedWorld || 'light-seeker';
     let world = World.createWorld(1600, 1200, selectedWorld);
     let simulation = new SimulationLoop(world);
 
@@ -120,6 +125,7 @@ const App: React.FC = () => {
               }}>
                 {t('snn.editor.apply')}
               </button>
+
             </div>
           </div>
           <GraphEditor 

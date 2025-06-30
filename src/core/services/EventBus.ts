@@ -48,6 +48,14 @@ export interface AppEventMap {
   'ui:snn:canvas-mousemove': { x: number; y: number; button: number; ctrlKey: boolean; shiftKey: boolean };
   'ui:snn:canvas-mouseup': { x: number; y: number; button: number; ctrlKey: boolean; shiftKey: boolean };
   'ui:snn:canvas-wheel': { deltaY: number };
+  'world:changed': { worldType: string };
+  'world:instance': { world: any };
+  'sensor:visual-input': { agentId: string; visionInputs?: number[]; lightIntensity?: number; timestamp: number };
+  'sensor:light-input': { agentId: string; lightIntensity: number; timestamp: number };
+  'effector:movement-output': { agentId: string; gradientX: number; gradientY: number; magnitude: number; timestamp: number };
+  'effector:gradient-movement-output': { agentId: string; gradientMagnitude: number; timestamp: number };
+  'ui:sensor-updated': { sensorType: string; agentId: string; [key: string]: any };
+  'ui:effector-updated': { effectorType: string; agentId: string; [key: string]: any };
 }
 
 // 创建一个单例供整个应用使用

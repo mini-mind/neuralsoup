@@ -27,22 +27,25 @@ export class VisualReceptorGroupManager {
     // 创建视觉感受器插件实例
     const visualReceptor = new VisualReceptor(groupId, position.x, position.y);
 
-    // 创建节点
+    // 使用视觉感受器内部的节点
+    const receptorNodes = visualReceptor.getReceptors();
     for (let i = 0; i < this.NODE_COUNT; i++) {
-      const nodeId = `visual_sensor_${timestamp}_${i}`;
       const relativePos = this.getNodeRelativePosition(i);
       const absolutePos = {
         x: position.x + relativePos.x,
         y: position.y + relativePos.y
       };
 
-      const voltageInputNode = new VoltageInputNode(nodeId, absolutePos.x, absolutePos.y);
+      // 使用内部节点而不是创建新的
+      const voltageInputNode = receptorNodes[i];
+      voltageInputNode.setPosition(absolutePos.x, absolutePos.y);
+
       const node = {
-        id: nodeId,
+        id: voltageInputNode.id,
         type: 'voltage_input',
         x: absolutePos.x,
         y: absolutePos.y,
-        processor: voltageInputNode,
+        processor: voltageInputNode, // 使用内部节点
         getState: () => voltageInputNode.getState(),
         setPosition: (x: number, y: number) => voltageInputNode.setPosition(x, y),
         // 记录相对位置
@@ -160,23 +163,29 @@ export class HealthReceptorGroupManager {
     // 创建健康感受器插件实例
     const healthReceptor = new HealthReceptor(groupId, position.x, position.y);
 
-    // 创建节点
+    // 使用健康感受器内部的节点
     const nodeLabels = ['健康度', '非健康度'];
+    const healthNode = healthReceptor.getHealthNode();
+    const unhealthNode = healthReceptor.getUnhealthNode();
+    const internalNodes = [healthNode, unhealthNode];
+
     for (let i = 0; i < this.NODE_COUNT; i++) {
-      const nodeId = `health_sensor_${timestamp}_${i}`;
       const relativePos = this.getNodeRelativePosition(i);
       const absolutePos = {
         x: position.x + relativePos.x,
         y: position.y + relativePos.y
       };
 
-      const voltageInputNode = new VoltageInputNode(nodeId, absolutePos.x, absolutePos.y);
+      // 使用内部节点而不是创建新的
+      const voltageInputNode = internalNodes[i];
+      voltageInputNode.setPosition(absolutePos.x, absolutePos.y);
+
       const node = {
-        id: nodeId,
+        id: voltageInputNode.id,
         type: 'voltage_input',
         x: absolutePos.x,
         y: absolutePos.y,
-        processor: voltageInputNode,
+        processor: voltageInputNode, // 使用内部节点
         getState: () => voltageInputNode.getState(),
         setPosition: (x: number, y: number) => voltageInputNode.setPosition(x, y),
         // 记录相对位置和标签

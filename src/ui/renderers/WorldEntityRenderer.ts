@@ -5,7 +5,7 @@
 import * as PIXI from "pixi.js";
 import type {
   IWorldEntity, ILightPatch, IDarkMatter, ICrystalShard, IWall, IFood, IMufflingZone,
-  IResourcePatch, ISignalBeacon, IThreat, IColorPool, IRhythmNode, ICanvasTrace
+  IResourcePatch, ISignalBeacon, IThreat, IColorPool, IRhythmNode, ICanvasTrace, ILightOrb
 } from "../../core/world/types";
 
 export class WorldEntityRenderer {
@@ -92,6 +92,9 @@ export class WorldEntityRenderer {
         break;
       case 'artistic-agent':
         this.drawArtisticAgent(graphics, entity);
+        break;
+      case 'light-orb':
+        this.drawLightOrb(graphics, entity as ILightOrb);
         break;
       default:
         this.drawGenericEntity(graphics, entity);
@@ -532,6 +535,45 @@ export class WorldEntityRenderer {
       ]);
       graphics.endFill();
     }
+  }
+
+  /**
+   * 绘制光球实体
+   */
+  private drawLightOrb(graphics: PIXI.Graphics, lightOrb: ILightOrb): void {
+    // 绘制影响范围（半透明圆圈）
+    graphics.beginFill(0xffff00, 0.05 * lightOrb.intensity);
+    graphics.drawCircle(lightOrb.x, lightOrb.y, lightOrb.influenceRadius);
+    graphics.endFill();
+
+    // 绘制影响范围边界
+    graphics.lineStyle(1, 0xffff00, 0.2 * lightOrb.intensity);
+    graphics.drawCircle(lightOrb.x, lightOrb.y, lightOrb.influenceRadius);
+    graphics.lineStyle(0);
+
+    // 绘制多层渐变光晕效果
+    const coreRadius = lightOrb.radius;
+    const layers = [
+      { radius: lightOrb.radius * 3.0, color: 0xffff00, alpha: 0.1 * lightOrb.intensity },
+      { radius: lightOrb.radius * 2.5, color: 0xffff00, alpha: 0.2 * lightOrb.intensity },
+      { radius: lightOrb.radius * 2.0, color: 0xffff00, alpha: 0.3 * lightOrb.intensity },
+      { radius: lightOrb.radius * 1.5, color: 0xffff00, alpha: 0.5 * lightOrb.intensity },
+      { radius: lightOrb.radius * 1.2, color: 0xffff88, alpha: 0.7 * lightOrb.intensity },
+      { radius: lightOrb.radius * 1.0, color: 0xffffff, alpha: 0.9 * lightOrb.intensity },
+      { radius: lightOrb.radius * 0.6, color: 0xffffff, alpha: 1.0 * lightOrb.intensity }
+    ];
+
+    // 从外到内绘制各层
+    layers.forEach(layer => {
+      graphics.beginFill(layer.color, layer.alpha);
+      graphics.drawCircle(lightOrb.x, lightOrb.y, layer.radius);
+      graphics.endFill();
+    });
+
+    // 添加一个亮白色的核心
+    graphics.beginFill(0xffffff, 1.0);
+    graphics.drawCircle(lightOrb.x, lightOrb.y, coreRadius * 0.3);
+    graphics.endFill();
   }
 
   /**

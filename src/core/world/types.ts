@@ -243,3 +243,25 @@ export interface ICanvasTrace extends IWorldEntity {
   fadeRate: number; // 淡化速度
   points: Array<{ x: number; y: number; timestamp: number }>;
 }
+
+// === 追光者世界实体 ===
+
+/**
+ * 光球实体 - 大型移动光源
+ */
+export interface ILightOrb extends IWorldEntity {
+  entityType: 'light-orb';
+  radius: number;
+  intensity: number; // 光强度 (0-1)
+  influenceRadius: number; // 影响范围
+
+  /**
+   * 获取在指定位置的光强度
+   */
+  getLightIntensityAt(x: number, y: number): number;
+
+  /**
+   * 检查指定位置是否在光球的影响范围内
+   */
+  isInInfluenceRange(x: number, y: number): boolean;
+}

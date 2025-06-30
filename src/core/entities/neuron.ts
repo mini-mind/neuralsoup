@@ -580,3 +580,109 @@ export class MovementController extends AbstractEffector {
     this.getAccumulatorNodes().forEach(node => node.reset());
   }
 }
+
+/**
+ * 梯度运动控制器
+ * 包含1个电压累积节点，用于接收梯度强度信号并控制朝梯度方向运动
+ */
+export class GradientMovementController extends AbstractEffector {
+  constructor(id: string, x: number = 0, y: number = 0) {
+    super(id, 'gradient_movement_controller', x, y, 1); // 1个效应器节点
+  }
+
+  /**
+   * 实现抽象方法：获取插件特定参数
+   */
+  protected getParameters(): Record<string, any> {
+    const accumulatorNodes = this.getAccumulatorNodes();
+    return {
+      gradientNodeId: accumulatorNodes[0]?.id,
+      description: '梯度运动控制器，根据梯度强度控制运动'
+    };
+  }
+
+  /**
+   * 获取梯度强度节点
+   */
+  getGradientNode(): VoltageAccumulatorNode {
+    return this.getAccumulatorNodes()[0];
+  }
+
+  /**
+   * 更新梯度运动控制器
+   * @param gradientInput 梯度强度输入
+   * @param deltaTime 时间步长
+   */
+  update(gradientInput: number, deltaTime: number = 1): boolean {
+    const gradientNode = this.getGradientNode();
+    return gradientNode.update(gradientInput, deltaTime);
+  }
+
+  /**
+   * 获取当前梯度强度（0到1）
+   */
+  getGradientStrength(): number {
+    const gradientState = this.getGradientNode().getState();
+    return Math.max(0, Math.min(1, gradientState.voltage / 100)); // 归一化到0-1
+  }
+
+  /**
+   * 重置梯度运动控制器
+   */
+  reset(): void {
+    this.getAccumulatorNodes().forEach(node => node.reset());
+  }
+}
+
+/**
+ * 光感受器
+ * 包含1个电压输入节点，专门用于感知光强度
+ */
+export class LightReceptor extends AbstractSensor {
+  constructor(id: string, x: number = 0, y: number = 0) {
+    super(id, 'light_receptor', x, y, 1); // 1个感受器节点
+  }
+
+  /**
+   * 实现抽象方法：获取插件特定参数
+   */
+  protected getParameters(): Record<string, any> {
+    const inputNodes = this.getInputNodes();
+    return {
+      lightNodeId: inputNodes[0]?.id,
+      description: '光感受器，感知环境中的光强度'
+    };
+  }
+
+  /**
+   * 获取光强度感受器节点
+   */
+  getLightNode(): VoltageInputNode {
+    return this.getInputNodes()[0];
+  }
+
+  /**
+   * 更新光感受器
+   * @param lightIntensity 光强度输入 (0-1)
+   * @param deltaTime 时间步长
+   */
+  update(lightIntensity: number, deltaTime: number = 1): boolean {
+    const lightNode = this.getLightNode();
+    return lightNode.update(lightIntensity * 100, deltaTime); // 转换为电压值
+  }
+
+  /**
+   * 获取当前光强度（0到1）
+   */
+  getLightIntensity(): number {
+    const lightState = this.getLightNode().getState();
+    return Math.max(0, Math.min(1, lightState.voltage / 100)); // 归一化到0-1
+  }
+
+  /**
+   * 重置光感受器
+   */
+  reset(): void {
+    this.getInputNodes().forEach(node => node.reset());
+  }
+}
