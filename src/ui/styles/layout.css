@@ -758,23 +758,7 @@ body, html, #root {
   width: 100%;
 }
 
-/* 仿真展示区 */
-.simulation-area {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background: #2d2d2d;
-  position: relative;
-  min-width: 400px;
-}
-
-.simulation-canvas {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
-}
+/* 仿真展示区样式已移动到game-area.css中统一管理 */
 
 .simulation-controls {
   height: 48px;

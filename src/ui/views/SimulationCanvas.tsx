@@ -12,88 +12,79 @@ const GAME_CONFIG = {
   // 游戏世界的原始尺寸
   WORLD_WIDTH: 1600,
   WORLD_HEIGHT: 1200,
+};
 
-  // 推荐的宽高比范围
-  ASPECT_RATIO: {
-    MIN: 1.0,  // 最窄比例 (1:1)
-    MAX: 2.5,  // 最宽比例 (2.5:1)
-    IDEAL: 1.33 // 理想比例 (4:3)
-  }
+// 布局配置（从CSS变量中获取）
+const LAYOUT_CONFIG = {
+  HEADER_HEIGHT: 50, // 导航栏高度
+  PADDING: 10, // 容器内边距
 };
 
 /**
- * 计算游戏视窗的缩放参数
- * 实现以中心为锚点的智能缩放算法
+ * 计算游戏视窗的稳定缩放参数
+ * 基于浏览器窗口高度而非容器高度，确保稳定性
+ * Canvas尺寸将被限制为实际游戏画面尺寸，父组件背景形成黑边
  */
 interface ScaleResult {
   scale: number;
-  offsetX: number;
-  offsetY: number;
-  scaledWidth: number;
-  scaledHeight: number;
+  canvasWidth: number;
+  canvasHeight: number;
 }
 
-function calculateGameViewportScale(containerWidth: number, containerHeight: number): ScaleResult {
-  const { WORLD_WIDTH, WORLD_HEIGHT, ASPECT_RATIO } = GAME_CONFIG;
+function calculateStableGameViewportScale(containerWidth: number): ScaleResult {
+  const { WORLD_WIDTH, WORLD_HEIGHT } = GAME_CONFIG;
+  const { HEADER_HEIGHT, PADDING } = LAYOUT_CONFIG;
+
+  // 使用稳定的窗口高度计算可用空间
+  const windowHeight = document.body.clientHeight || window.innerHeight;
+  const availableHeight = windowHeight - HEADER_HEIGHT - (PADDING * 2);
+  const availableWidth = containerWidth - (PADDING * 2);
 
   // 防止无效输入
-  if (containerWidth <= 0 || containerHeight <= 0) {
+  if (availableWidth <= 0 || availableHeight <= 0) {
     return {
       scale: 0.1,
-      offsetX: 0,
-      offsetY: 0,
-      scaledWidth: WORLD_WIDTH * 0.1,
-      scaledHeight: WORLD_HEIGHT * 0.1
+      canvasWidth: Math.max(100, WORLD_WIDTH * 0.1),
+      canvasHeight: Math.max(100, WORLD_HEIGHT * 0.1)
     };
   }
 
-  // 简化策略：固定根据高度计算缩放比例
-  const scale = containerHeight / WORLD_HEIGHT;
+  // 计算容器宽高比
+  const containerAspectRatio = availableWidth / availableHeight;
+  const worldAspectRatio = WORLD_WIDTH / WORLD_HEIGHT;
+  
+  let scale: number;
+  let canvasWidth: number;
+  let canvasHeight: number;
 
-  // 计算缩放后的游戏世界尺寸
-  const scaledWidth = WORLD_WIDTH * scale;
-  const scaledHeight = WORLD_HEIGHT * scale; // 这个应该等于 containerHeight
-
-  // 计算容器的宽高比
-  const containerAspectRatio = containerWidth / containerHeight;
-  const scaledAspectRatio = scaledWidth / scaledHeight;
-
-  let offsetX: number;
-  let offsetY: number;
-
-  // 垂直方向：游戏高度总是填满容器高度
-  offsetY = 0;
-
-  // 水平方向：根据宽度情况决定
-  if (containerWidth >= scaledWidth) {
-    // 容器足够宽：游戏视野扩展，居中显示
-    offsetX = (containerWidth - scaledWidth) / 2;
+  if (containerAspectRatio >= worldAspectRatio) {
+    // 容器偏宽（横向）：以高度为准进行缩放，左右自然形成黑边
+    scale = availableHeight / WORLD_HEIGHT;
+    canvasWidth = WORLD_WIDTH * scale;
+    canvasHeight = WORLD_HEIGHT * scale; // 保持宽高比
   } else {
-    // 容器太窄：需要裁剪游戏视野，但这种情况下我们仍然居中
-    offsetX = (containerWidth - scaledWidth) / 2;
+    // 容器偏窄（纵向）：以宽度为准进行缩放，上下自然形成黑边
+    scale = availableWidth / WORLD_WIDTH;
+    canvasWidth = WORLD_WIDTH * scale; // 保持宽高比
+    canvasHeight = WORLD_HEIGHT * scale;
   }
 
-  // 检查是否需要黑边（当宽高比超出合理范围时）
-  const needsBlackBars = containerAspectRatio > ASPECT_RATIO.MAX || containerAspectRatio < ASPECT_RATIO.MIN;
-
-  // 调试信息（开发环境）
-  console.log('🎮 简化缩放计算:', {
-    container: `${containerWidth}x${containerHeight}`,
+  // 调试信息
+  console.log('🎮 限制Canvas尺寸的缩放计算:', {
+    window: `${window.innerWidth}x${windowHeight}`,
+    available: `${availableWidth}x${availableHeight}`,
     world: `${WORLD_WIDTH}x${WORLD_HEIGHT}`,
-    scale: scale.toFixed(3),
-    scaled: `${scaledWidth.toFixed(1)}x${scaledHeight.toFixed(1)}`,
-    offset: `${offsetX.toFixed(1)}, ${offsetY.toFixed(1)}`,
     containerAspectRatio: containerAspectRatio.toFixed(2),
-    needsBlackBars,
-    strategy: '固定高度缩放'
+    worldAspectRatio: worldAspectRatio.toFixed(2),
+    scale: scale.toFixed(3),
+    canvas: `${canvasWidth.toFixed(1)}x${canvasHeight.toFixed(1)}`,
+    strategy: containerAspectRatio >= worldAspectRatio ? '横向-限制宽度' : '纵向-限制高度'
   });
 
   return {
     scale,
-    offsetX,
-    offsetY,
-    scaledWidth,
-    scaledHeight
+    canvasWidth,
+    canvasHeight
   };
 }
 
@@ -112,11 +103,13 @@ const SimulationCanvas: React.FC = () => {
 
     const container = canvasRef.current;
     const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
+
+    // 使用稳定的缩放算法计算初始参数
+    const scaleResult = calculateStableGameViewportScale(containerWidth);
 
     const app = new PIXI.Application({
-      width: containerWidth,
-      height: containerHeight,
+      width: scaleResult.canvasWidth,
+      height: scaleResult.canvasHeight,
       backgroundColor: getWorldBackgroundColor(),
       antialias: true,
       resolution: 1,
@@ -129,14 +122,9 @@ const SimulationCanvas: React.FC = () => {
 
     container.appendChild(app.view as HTMLCanvasElement);
 
-    // 使用新的缩放算法计算初始缩放参数
-    const initialScale = calculateGameViewportScale(containerWidth, containerHeight);
-
-    // 立即设置缩放和位置，无平滑过渡，以中心为锚点
-    app.stage.scale.x = initialScale.scale;
-    app.stage.scale.y = initialScale.scale;
-    app.stage.position.x = initialScale.offsetX;
-    app.stage.position.y = initialScale.offsetY;
+    // 设置缩放，无需偏移（Canvas尺寸已经是正确的）
+    app.stage.scale.set(scaleResult.scale);
+    app.stage.position.set(0, 0); // 不需要偏移，Canvas本身就是正确尺寸
 
     // 创建渲染层
     const worldEntityContainer = new PIXI.Container();
@@ -148,7 +136,7 @@ const SimulationCanvas: React.FC = () => {
     const agentRenderer = new AgentRenderer(agentContainer);
     const worldEntityRenderer = new WorldEntityRenderer(worldEntityContainer);
 
-    // 使用自定义渲染循环，避免PIXI内部的平滑效果
+    // 使用自定义渲染循环
     let animationFrameId: number;
     const renderLoop = () => {
       // 从 globalState 获取最新的世界状态
@@ -177,98 +165,39 @@ const SimulationCanvas: React.FC = () => {
     // 监听世界变化事件
     const unsubscribeWorldChange = globalEventBus.on('world:changed', () => {
       // 更新背景颜色
-      app.renderer.backgroundColor = getWorldBackgroundColor();
+      app.renderer.background.color = getWorldBackgroundColor();
     });
 
-    // 终极稳定方案：完全绕过PIXI的尺寸检测
-    // 直接跟踪DOM容器尺寸，不依赖PIXI的screen属性
-    let lastContainerWidth = containerWidth;
-    let lastContainerHeight = containerHeight;
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      if (!container || !app || entries.length === 0) return;
+    // 简化的窗口尺寸变化处理
+    const handleWindowResize = () => {
+      if (!container || !app) return;
 
       try {
-        const entry = entries[0];
-        const newWidth = entry.contentRect.width;
-        const newHeight = entry.contentRect.height;
+        const newContainerWidth = container.clientWidth;
+        const newScaleResult = calculateStableGameViewportScale(newContainerWidth);
 
-        // 验证尺寸有效性
-        if (newWidth <= 0 || newHeight <= 0) {
-          console.warn('无效的容器尺寸:', { newWidth, newHeight });
-          return;
-        }
+        // 更新渲染器尺寸
+        app.renderer.resize(newScaleResult.canvasWidth, newScaleResult.canvasHeight);
 
-        // 使用我们自己的尺寸跟踪，完全不依赖PIXI的screen属性
-        const widthDelta = Math.abs(lastContainerWidth - newWidth);
-        const heightDelta = Math.abs(lastContainerHeight - newHeight);
+        // 更新缩放，无需偏移
+        app.stage.scale.set(newScaleResult.scale);
+        app.stage.position.set(0, 0);
 
-        const widthChanged = widthDelta > 1;
-        const heightChanged = heightDelta > 10; // 严格的高度变化阈值
-
-        console.log('🎯 终极方案 - 绕过PIXI:', {
-          from: `${lastContainerWidth}x${lastContainerHeight}`,
-          to: `${newWidth}x${newHeight}`,
-          widthDelta: widthDelta.toFixed(1),
-          heightDelta: heightDelta.toFixed(1),
-          widthChanged,
-          heightChanged,
-          strategy: '直接DOM跟踪'
+        console.log('🔄 窗口尺寸变化，重新缩放:', {
+          newCanvasSize: `${newScaleResult.canvasWidth}x${newScaleResult.canvasHeight}`,
+          scale: newScaleResult.scale.toFixed(3),
+          strategy: '限制Canvas尺寸'
         });
 
-        // 总是更新渲染器尺寸
-        if (widthChanged || heightChanged) {
-          app.renderer.resize(newWidth, newHeight);
-        }
-
-        // 处理高度变化：重新缩放
-        if (heightChanged) {
-          lastContainerHeight = newHeight; // 更新我们的高度记录
-
-          // 重新计算缩放比例（基于新高度）
-          const newScale = newHeight / GAME_CONFIG.WORLD_HEIGHT;
-          const scaledWidth = GAME_CONFIG.WORLD_WIDTH * newScale;
-          const newOffsetX = (newWidth - scaledWidth) / 2;
-          const newOffsetY = 0; // 始终填满高度
-
-          // 更新缩放和位置
-          app.stage.scale.set(newScale);
-          app.stage.position.set(newOffsetX, newOffsetY);
-
-          console.log('� 高度变化，重新缩放:', {
-            newHeight,
-            newScale: newScale.toFixed(3),
-            strategy: '固定高度缩放'
-          });
-        } else if (widthChanged) {
-          lastContainerWidth = newWidth; // 更新我们的宽度记录
-
-          // 处理宽度变化：保持缩放不变，只调整水平偏移
-          const currentScale = app.stage.scale.x;
-          const scaledWidth = GAME_CONFIG.WORLD_WIDTH * currentScale;
-          const newOffsetX = (newWidth - scaledWidth) / 2;
-
-          // 只更新X位置，保持Y位置和缩放不变
-          app.stage.position.x = newOffsetX;
-
-          console.log('↔️ 宽度变化，调整视野:', {
-            newWidth,
-            newOffsetX: newOffsetX.toFixed(1),
-            preservedScale: currentScale.toFixed(3),
-            strategy: '保持缩放不变'
-          });
-        }
-
         // 强制立即渲染
-        if (widthChanged || heightChanged) {
-          app.renderer.render(app.stage);
-        }
+        app.renderer.render(app.stage);
       } catch (error) {
-        console.error('缩放调整过程中发生错误:', error);
+        console.error('窗口尺寸变化处理错误:', error);
       }
-    });
+    };
 
-    resizeObserver.observe(container);
+    // 监听窗口尺寸变化
+    window.addEventListener('resize', handleWindowResize);
 
     return () => {
       // 停止自定义渲染循环
@@ -278,7 +207,7 @@ const SimulationCanvas: React.FC = () => {
       agentRenderer.destroy();
       worldEntityRenderer.destroy();
       unsubscribeWorldChange();
-      resizeObserver.disconnect();
+      window.removeEventListener('resize', handleWindowResize);
       app.destroy(true, { children: true });
       appRef.current = null;
     };
@@ -294,8 +223,6 @@ const SimulationCanvas: React.FC = () => {
       unsubscribe();
     };
   }, []);
-
-
 
   return <div ref={canvasRef} className="simulation-canvas" />;
 };
