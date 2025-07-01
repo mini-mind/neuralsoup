@@ -3,6 +3,7 @@ import { RotationControllerGroupManager, MovementControllerGroupManager } from "
 import { GradientMovementControllerGroupManager } from "./GradientMovementControllerGroupManager";
 import { LightReceptorGroupManager } from "./LightReceptorGroupManager";
 import { NodeGroup, Vector2D } from "../types/editor.types";
+import { globalPluginManager } from "../../core/services/PluginManager";
 
 /**
  * 控制器组注册表
@@ -56,6 +57,26 @@ export class ControllerGroupRegistry {
     this.healthReceptorGroup = HealthReceptorGroupManager.createGroup({ x: 100, y: 225 }, timestamp + 3);
     this.gradientMovementControllerGroup = GradientMovementControllerGroupManager.createGroup({ x: 500, y: 400 }, timestamp + 4);
     this.lightReceptorGroup = LightReceptorGroupManager.createGroup({ x: 300, y: 50 }, timestamp + 5);
+
+    // 将所有插件实例注册到插件管理器
+    if (this.visualReceptorGroup?.pluginInstance) {
+      globalPluginManager.registerPlugin(this.visualReceptorGroup.pluginInstance);
+    }
+    if (this.rotationControllerGroup?.pluginInstance) {
+      globalPluginManager.registerPlugin(this.rotationControllerGroup.pluginInstance);
+    }
+    if (this.movementControllerGroup?.pluginInstance) {
+      globalPluginManager.registerPlugin(this.movementControllerGroup.pluginInstance);
+    }
+    if (this.healthReceptorGroup?.pluginInstance) {
+      globalPluginManager.registerPlugin(this.healthReceptorGroup.pluginInstance);
+    }
+    if (this.gradientMovementControllerGroup?.pluginInstance) {
+      globalPluginManager.registerPlugin(this.gradientMovementControllerGroup.pluginInstance);
+    }
+    if (this.lightReceptorGroup?.pluginInstance) {
+      globalPluginManager.registerPlugin(this.lightReceptorGroup.pluginInstance);
+    }
 
     this.initialized = true;
 

@@ -101,7 +101,7 @@ export class RotationControllerGroupManager {
 
     // 更新节点位置，保持相对位置
     const updatedNodes = nodes.map(node => {
-      if (group.neurons.includes(node.id)) {
+      if (group.neurons && group.neurons.includes(node.id)) {
         const newX = newPosition.x + (node.relativeX || 0);
         const newY = newPosition.y + (node.relativeY || 0);
         
@@ -244,7 +244,7 @@ export class MovementControllerGroupManager {
 
     // 更新节点位置，保持相对位置
     const updatedNodes = nodes.map(node => {
-      if (group.neurons.includes(node.id)) {
+      if (group.neurons && group.neurons.includes(node.id)) {
         const newX = newPosition.x + (node.relativeX || 0);
         const newY = newPosition.y + (node.relativeY || 0);
         

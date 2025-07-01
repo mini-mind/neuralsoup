@@ -3,19 +3,29 @@ import { World } from '../core/world/World';
 import { SimulationLoop } from '../core/simulation/SimulationLoop';
 import { globalEventBus } from '../core/services/EventBus';
 import { globalState } from '../core/services/GlobalState';
+import { globalPluginManager } from '../core/services/PluginManager';
 import AppHeader from '../ui/components/AppHeader';
 import ResizableSplitter from '../ui/components/ResizableSplitter';
 import SimulationArea from '../ui/components/SimulationArea';
 import GraphEditor from '../ui/views/SNNTopologyEditor';
+import TabContainer, { TabItem } from '../ui/components/TabContainer';
+import WorldSelectionTab from '../ui/components/WorldSelectionTab';
 import '../ui/styles/layout.css';
 import { demoSNNTopology, createDemoNetworkTopology } from './demoData';
 import { useLanguage } from '../contexts/LanguageContext';
-import HelpTooltipIcon from '../ui/components/HelpTooltipIcon';
 import { SensorDataManager } from '../ui/services/SensorDataManager';
 
+// 在开发环境中导入测试脚本
+if (process.env.NODE_ENV === 'development') {
+  import('../test/plugin-system-test');
+  import('../test/mouse-interaction-test');
+  import('../test/node-interaction-test');
+}
+
 const App: React.FC = () => {
-  const [rightPanelWidth, setRightPanelWidth] = useState(500);
+  const [rightPanelWidth, setRightPanelWidth] = useState(window.innerWidth / 2); // 初始50/50分屏
   const editorPanelRef = useRef<HTMLDivElement>(null);
+  const brainTabRef = useRef<HTMLDivElement>(null);
   const [editorSize, setEditorSize] = useState({ width: 0, height: 0 });
   const { t } = useLanguage();
 
@@ -29,6 +39,9 @@ const App: React.FC = () => {
     let world = World.createWorld(1600, 1200, selectedWorld);
     let simulation = new SimulationLoop(world);
 
+    // 初始化插件管理器的当前世界
+    globalPluginManager.setCurrentWorld(selectedWorld);
+
     // Initialize topology data
     const networkTopology = createDemoNetworkTopology();
     globalState.setState({
@@ -39,6 +52,29 @@ const App: React.FC = () => {
     const unsubscribeStart = globalEventBus.on('ui:start', () => {
       simulation.start((updatedWorld) => {
         globalState.setState({ worldState: updatedWorld.getAgents() });
+
+        // 更新网络拓扑（实时计算）
+        const currentNetworkTopology = globalState.getState().networkTopology;
+        if (currentNetworkTopology) {
+          // 只有启用的插件参与计算
+          const enabledPlugins = globalPluginManager.getComputingPlugins();
+          const externalInputs = new Map<string, number>();
+
+          // 从启用的感受器插件收集输入
+          enabledPlugins.forEach(plugin => {
+            if (plugin.pluginType === 'sensor') {
+              const nodes = plugin.getNodes();
+              nodes.forEach(node => {
+                if (node.getOutput) {
+                  externalInputs.set(node.id, node.getOutput());
+                }
+              });
+            }
+          });
+
+          // 更新网络拓扑
+          currentNetworkTopology.update(0.016, externalInputs); // ~60fps
+        }
       });
       globalState.setState({ simulationRunning: true });
     });
@@ -81,21 +117,42 @@ const App: React.FC = () => {
   }, []);
   
   useEffect(() => {
-    const editorElement = editorPanelRef.current;
-    if (!editorElement) return;
+    const brainTabElement = brainTabRef.current;
+    if (!brainTabElement) return;
 
-    const resizeObserver = new ResizeObserver(() => {
-      if (editorElement) {
+    const updateSize = () => {
+      if (brainTabElement) {
         setEditorSize({
-          width: editorElement.clientWidth,
-          height: editorElement.clientHeight,
+          width: brainTabElement.clientWidth,
+          height: brainTabElement.clientHeight,
         });
       }
-    });
+    };
 
-    resizeObserver.observe(editorElement);
+    // 初始尺寸设置
+    updateSize();
+
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(brainTabElement);
+
     return () => resizeObserver.disconnect();
   }, []);
+
+  // 标签页切换时重新计算尺寸
+  const handleTabChange = (tabId: string) => {
+    if (tabId === 'brain') {
+      // 延迟一帧来确保DOM已更新
+      requestAnimationFrame(() => {
+        const brainTabElement = brainTabRef.current;
+        if (brainTabElement) {
+          setEditorSize({
+            width: brainTabElement.clientWidth,
+            height: brainTabElement.clientHeight,
+          });
+        }
+      });
+    }
+  };
 
   const handleHorizontalResize = (deltaX: number) => {
     const newWidth = rightPanelWidth - deltaX;
@@ -104,35 +161,49 @@ const App: React.FC = () => {
     }
   };
 
+  // 创建标签页数据
+  const tabs: TabItem[] = [
+    {
+      id: 'world',
+      label: t('tabs.world'),
+      content: <WorldSelectionTab />
+    },
+    {
+      id: 'brain',
+      label: t('tabs.brain'),
+      content: (
+        <div className="brain-tab-content" ref={brainTabRef}>
+          <GraphEditor
+            width={editorSize.width}
+            height={editorSize.height}
+          />
+          {/* 画布内操作提示 */}
+          <div className="canvas-help-tooltip">
+            <div className="help-icon" title={t('snn.editor.helpTooltip')} style={{maxWidth: '280px'}}>
+              ?
+            </div>
+          </div>
+        </div>
+      )
+    }
+  ];
+
   return (
     <div className="app-container">
-      <AppHeader />
       <div className="main-layout">
         <div className="left-panel">
-          <SimulationArea />
+          <div className="app-header-container">
+            <AppHeader />
+          </div>
+          <div className="simulation-container">
+            <SimulationArea />
+          </div>
         </div>
         <ResizableSplitter onResize={handleHorizontalResize} direction="vertical" />
         <div className="right-panel" style={{ width: rightPanelWidth }}>
-          <div className="snn-editor-header">
-            <div className="editor-title">
-              <h3>{t('snn.editor.title')}</h3>
-              <HelpTooltipIcon tooltipText={t('snn.editor.helpTooltip')} />
-            </div>
-            <div className="editor-controls">
-              <button className="control-button" onClick={() => {
-                console.log('Apply current configuration');
-                // TODO: Implement SNN configuration application logic
-              }}>
-                {t('snn.editor.apply')}
-              </button>
-
-            </div>
+          <div className="workspace-container" ref={editorPanelRef}>
+            <TabContainer tabs={tabs} defaultActiveTab="brain" onTabChange={handleTabChange} />
           </div>
-          <GraphEditor 
-            width={editorSize.width} 
-            height={editorSize.height} 
-            ref={editorPanelRef}
-          />
         </div>
       </div>
     </div>

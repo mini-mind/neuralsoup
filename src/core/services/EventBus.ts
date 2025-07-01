@@ -50,6 +50,7 @@ export interface AppEventMap {
   'ui:snn:canvas-wheel': { deltaY: number };
   'world:changed': { worldType: string };
   'world:instance': { world: any };
+  'plugins:state-updated': { worldType: string; config: any };
   'sensor:visual-input': { agentId: string; visionInputs?: number[]; lightIntensity?: number; timestamp: number };
   'sensor:light-input': { agentId: string; lightIntensity: number; timestamp: number };
   'effector:movement-output': { agentId: string; gradientX: number; gradientY: number; magnitude: number; timestamp: number };

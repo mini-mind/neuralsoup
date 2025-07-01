@@ -23,6 +23,8 @@ const translations = {
     "tab.agent-params": "智能体参数",
     "tab.settings": "设置",
     "tab.snn": "SNN 编辑器",
+    "tabs.world": "世界",
+    "tabs.brain": "大脑",
 
     // 按钮
     "btn.start": "开始",
@@ -214,6 +216,8 @@ const translations = {
     "tab.agent-params": "Agent Parameters",
     "tab.settings": "Settings",
     "tab.snn": "SNN Editor",
+    "tabs.world": "World",
+    "tabs.brain": "Brain",
 
     // 按钮
     "btn.start": "Start",

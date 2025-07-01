@@ -130,6 +130,8 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
     const canvasPos = InteractionHandler.getCanvasPosition(e);
     const worldPos = InteractionHandler.getWorldPosition(e, getCanvasTransform());
 
+
+
     // 检查是否点击了收起按钮
     const clickedButton = InteractionHandler.findCollapseButtonAtPosition(
       worldPos,
@@ -153,7 +155,7 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
 
     // 首先从网络拓扑中查找节点
     let clickedNode = InteractionHandler.findNodeAtPosition(worldPos, networkTopology);
-    
+
     // 如果网络拓扑中没有找到，从snnTopology中查找组内节点
     if (!clickedNode && snnTopology.nodes) {
       clickedNode = snnTopology.nodes.find((node: any) => {
@@ -161,6 +163,8 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
         return dist < 20;
       });
     }
+
+
     
     const clickedGroup = clickedNode ? null : InteractionHandler.findGroupAtPosition(worldPos, nodeGroups);
     const clickedEdge = clickedNode || clickedGroup ? null : InteractionHandler.findEdgeAtPosition(worldPos, networkTopology);
@@ -224,7 +228,7 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
   // 处理节点选择
   const handleNodeSelection = (node: any, isMultiSelect: boolean, canvasPos: Vector2D) => {
     // 检查节点是否在组内，如果在组内则选择整个组进行拖动
-    const parentGroup = nodeGroups.find(g => g.neurons.includes(node.id));
+    const parentGroup = nodeGroups.find(g => g.neurons && g.neurons.includes(node.id));
 
     if (parentGroup) {
       // 如果节点在组内，选择组进行拖动
@@ -249,7 +253,7 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
       globalState.setState({ selectedNodeId: null, selectedEdgeId: null });
       setInteractionState(prev => ({
         ...prev,
-        isDragging: true,
+        isDragging: false, // 先不设置为拖拽状态，等鼠标移动时再设置
         dragStartPos: canvasPos,
         draggedGroups: [parentGroup.id], // 只拖动当前点击的组
         selectedGroups: newSelectedGroups, // 但保持多选状态
@@ -279,10 +283,12 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
       }
     }
 
-    globalState.setState({ selectedNodeId: null, selectedEdgeId: null });
+    // 设置全局选中状态，用于详情编辑器
+    globalState.setState({ selectedNodeId: node.id, selectedEdgeId: null });
+
     setInteractionState(prev => ({
       ...prev,
-      isDragging: true,
+      isDragging: false, // 先不设置为拖拽状态，等鼠标移动时再设置
       dragStartPos: canvasPos,
       draggedNodes: [node.id], // 只拖动当前点击的节点
       selectedNodes: newSelectedNodes, // 但保持多选状态
@@ -315,7 +321,7 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
     globalState.setState({ selectedNodeId: null, selectedEdgeId: null });
     setInteractionState(prev => ({
       ...prev,
-      isDragging: true,
+      isDragging: false, // 先不设置为拖拽状态，等鼠标移动时再设置
       dragStartPos: canvasPos,
       draggedGroups: [group.id], // 只拖动当前点击的组
       selectedGroups: newSelectedGroups, // 但保持多选状态
@@ -381,9 +387,16 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
     // 计算鼠标移动的增量（修复：在更新lastMousePos之前计算，避免平移抖动）
     const dx = canvasPos.x - interactionState.lastMousePos.x;
     const dy = canvasPos.y - interactionState.lastMousePos.y;
+    const moveDistance = Math.sqrt(dx * dx + dy * dy);
 
     // 更新鼠标位置状态
     setInteractionState(prev => ({ ...prev, lastMousePos: canvasPos }));
+
+    // 检查是否应该开始拖拽（鼠标移动超过阈值）
+    if (!interactionState.isDragging && moveDistance > 3 &&
+        (interactionState.draggedNodes.length > 0 || interactionState.draggedGroups.length > 0)) {
+      setInteractionState(prev => ({ ...prev, isDragging: true }));
+    }
 
     if (interactionState.isDragging && interactionState.draggedNodes.length > 0) {
       // 拖动节点 - 包括所有选中的节点
@@ -597,6 +610,8 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
       neuron: new IzhikevichNeuron(nodeId, worldPos.x, worldPos.y)
     };
 
+
+
     // Add node to network topology
     if (networkTopology) {
       networkTopology.addNode(newNode.neuron);
@@ -614,9 +629,10 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
 
-    if (snnTopology && ref.current) {
-      const canvas = ref.current.querySelector('canvas');
-      if (!canvas) return;
+    if (snnTopology) {
+      // 直接从事件目标获取画布元素
+      const canvas = e.target as HTMLCanvasElement;
+      if (!canvas || canvas.tagName !== 'CANVAS') return;
 
       const rect = canvas.getBoundingClientRect();
       const canvasWidth = rect.width;
@@ -694,8 +710,8 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
           const allEdges = networkTopology.getAllEdges();
 
           allEdges.forEach(edge => {
-            const isFromNodeInGroup = g.neurons.includes(edge.fromNodeId);
-            const isToNodeInGroup = g.neurons.includes(edge.toNodeId);
+            const isFromNodeInGroup = g.neurons && g.neurons.includes(edge.fromNodeId);
+            const isToNodeInGroup = g.neurons && g.neurons.includes(edge.toNodeId);
 
             if (isFromNodeInGroup || isToNodeInGroup) {
               managedEdges.push({
@@ -742,7 +758,7 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
 
     // 检查节点是否属于插件组（感受器或效应器）
     const parentGroup = nodeGroups.find(group =>
-      group.neurons.includes(nodeId)
+      group.neurons && group.neurons.includes(nodeId)
     );
 
     if (!parentGroup) return false;
@@ -784,7 +800,7 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
         }
 
         // 检查节点是否在组内，如果在组内则不能单独删除
-        const parentGroup = nodeGroups.find(g => g.neurons.includes(selectedNodeId));
+        const parentGroup = nodeGroups.find(g => g.neurons && g.neurons.includes(selectedNodeId));
         if (parentGroup) {
           console.warn(t('warning.cannot-delete-group-nodes'));
           return;
@@ -832,7 +848,7 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
 
       const nodesToDelete: string[] = [];
       interactionState.selectedNodes.forEach(nodeId => {
-        const parentGroup = nodeGroups.find(g => g.neurons.includes(nodeId));
+        const parentGroup = nodeGroups.find(g => g.neurons && g.neurons.includes(nodeId));
         if (!parentGroup) {
           networkTopology.removeNode(nodeId);
           nodesToDelete.push(nodeId);
@@ -886,7 +902,7 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
       let hasProtectedNodes = false;
       interactionState.selectedGroups.forEach(groupId => {
         const group = nodeGroups.find(g => g.id === groupId);
-        if (group) {
+        if (group && group.neurons) {
           const protectedNodes = group.neurons.filter(nodeId => isProtectedNode(nodeId));
           if (protectedNodes.length > 0) {
             hasProtectedNodes = true;

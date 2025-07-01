@@ -108,7 +108,7 @@ export class InteractionHandler {
       if (!node) return;
 
       // 检查节点是否在组内
-      const parentGroup = nodeGroups?.find(g => g.neurons.includes(nodeId));
+      const parentGroup = nodeGroups?.find(g => g.neurons && g.neurons.includes(nodeId));
       
       let newX = node.x + scaledDx;
       let newY = node.y + scaledDy;

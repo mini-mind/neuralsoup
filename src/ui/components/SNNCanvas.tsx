@@ -1,6 +1,9 @@
 import React, { useRef, useEffect, useCallback } from "react";
 import { InteractionState, SelectionBox, NodeGroup } from "../types/editor.types";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { globalPluginManager } from "../../core/services/PluginManager";
+import { globalEventBus } from "../../core/services/EventBus";
+import { globalPerformanceMonitor } from "../../utils/PerformanceMonitor";
 
 interface SNNCanvasProps {
   width: number;
@@ -39,12 +42,14 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
   const { t } = useLanguage();
 
   const draw = useCallback(() => {
+    const startTime = performance.now();
+
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
+
     ctx.clearRect(0, 0, width, height);
     
     if (networkTopology) {
@@ -60,12 +65,25 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
     if (interactionState.isCreatingEdge && interactionState.edgeStartNodeId) {
       drawCreatingEdge(ctx);
     }
+
+    // 记录渲染性能
+    globalPerformanceMonitor.recordRenderTime(startTime);
   }, [networkTopology, snnTopology, selectedNodeId, selectedEdgeId, width, height, selectionBox, interactionState, neuronGroups]);
 
   const drawNeuronGroups = (ctx: CanvasRenderingContext2D) => {
     if (!snnTopology) return;
 
-    neuronGroups.forEach(group => {
+    // 过滤可见的插件组
+    const visibleGroups = neuronGroups.filter(group => {
+      // 如果组有插件实例，检查插件是否在当前世界中可见
+      if (group.pluginInstance) {
+        return globalPluginManager.isPluginVisible(group.pluginInstance);
+      }
+      // 对于没有插件实例的组（如普通神经元组），默认可见
+      return true;
+    });
+
+    visibleGroups.forEach(group => {
       const isSelected = interactionState.selectedGroups.includes(group.id);
       
       // 缩放感知的尺寸计算
@@ -250,9 +268,17 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
 
     // 绘制感受器和效应器组内的节点
     const drawGroupNodes = (nodes: any[], groups: NodeGroup[]) => {
+      // 过滤可见的组
+      const visibleGroups = groups.filter(group => {
+        if (group.pluginInstance) {
+          return globalPluginManager.isPluginVisible(group.pluginInstance);
+        }
+        return true;
+      });
+
       nodes.forEach(node => {
-        // 检查节点是否属于某个组
-        const parentGroup = groups.find(group =>
+        // 检查节点是否属于某个可见组
+        const parentGroup = visibleGroups.find(group =>
           (group.type === 'sensor_group' ||
            group.type === 'effector_group' ||
            group.type === 'visual_receptor_group' ||
@@ -347,11 +373,19 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
   };
   
   const drawNode = (ctx: CanvasRenderingContext2D, node: any, isSelected: boolean) => {
-    const isInCollapsedGroup = neuronGroups.some(g => g.collapsed && (g.neurons?.includes(node.id) || g.nodes?.includes(node.id)));
+    // 过滤可见的组
+    const visibleGroups = neuronGroups.filter(group => {
+      if (group.pluginInstance) {
+        return globalPluginManager.isPluginVisible(group.pluginInstance);
+      }
+      return true;
+    });
+
+    const isInCollapsedGroup = visibleGroups.some(g => g.collapsed && (g.neurons?.includes(node.id) || g.nodes?.includes(node.id)));
     if (isInCollapsedGroup) return;
 
-    // Check if node is in a group
-    const parentGroup = neuronGroups.find(g => !g.collapsed && (g.neurons?.includes(node.id) || g.nodes?.includes(node.id)));
+    // Check if node is in a visible group
+    const parentGroup = visibleGroups.find(g => !g.collapsed && (g.neurons?.includes(node.id) || g.nodes?.includes(node.id)));
     const isInGroup = !!parentGroup;
 
     const isMultiSelected = interactionState.selectedNodes.includes(node.id);
@@ -560,6 +594,14 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
   
   useEffect(() => {
     draw();
+  }, [draw]);
+
+  // 监听插件状态更新事件，触发重绘
+  useEffect(() => {
+    const unsubscribe = globalEventBus.on('plugins:state-updated', () => {
+      draw();
+    });
+    return unsubscribe;
   }, [draw]);
 
   useEffect(() => {
