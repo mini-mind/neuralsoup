@@ -168,8 +168,8 @@ const SimulationCanvas: React.FC = () => {
       app.renderer.background.color = getWorldBackgroundColor();
     });
 
-    // 简化的窗口尺寸变化处理
-    const handleWindowResize = () => {
+    // 容器尺寸变化处理函数
+    const handleContainerResize = () => {
       if (!container || !app) return;
 
       try {
@@ -183,7 +183,8 @@ const SimulationCanvas: React.FC = () => {
         app.stage.scale.set(newScaleResult.scale);
         app.stage.position.set(0, 0);
 
-        console.log('🔄 窗口尺寸变化，重新缩放:', {
+        console.log('🔄 容器尺寸变化，重新缩放:', {
+          containerWidth: newContainerWidth,
           newCanvasSize: `${newScaleResult.canvasWidth}x${newScaleResult.canvasHeight}`,
           scale: newScaleResult.scale.toFixed(3),
           strategy: '限制Canvas尺寸'
@@ -192,12 +193,18 @@ const SimulationCanvas: React.FC = () => {
         // 强制立即渲染
         app.renderer.render(app.stage);
       } catch (error) {
-        console.error('窗口尺寸变化处理错误:', error);
+        console.error('容器尺寸变化处理错误:', error);
       }
     };
 
-    // 监听窗口尺寸变化
-    window.addEventListener('resize', handleWindowResize);
+    // 使用 ResizeObserver 监听容器尺寸变化
+    const resizeObserver = new ResizeObserver(() => {
+      handleContainerResize();
+    });
+    resizeObserver.observe(container);
+
+    // 监听窗口尺寸变化（作为备用）
+    window.addEventListener('resize', handleContainerResize);
 
     return () => {
       // 停止自定义渲染循环
@@ -207,7 +214,8 @@ const SimulationCanvas: React.FC = () => {
       agentRenderer.destroy();
       worldEntityRenderer.destroy();
       unsubscribeWorldChange();
-      window.removeEventListener('resize', handleWindowResize);
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', handleContainerResize);
       app.destroy(true, { children: true });
       appRef.current = null;
     };
