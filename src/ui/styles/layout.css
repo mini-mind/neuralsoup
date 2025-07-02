@@ -196,6 +196,20 @@ body, html, #root {
 
 
 
+/* 空白标签页内容样式 */
+.tab-empty-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  color: #666;
+  font-size: 16px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  margin: 10px;
+}
+
 /* 标签页容器样式 */
 .tab-container {
   display: flex;
