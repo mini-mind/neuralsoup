@@ -231,36 +231,35 @@ export class NetworkTopology {
    * 更新网络状态（一个时间步）
    */
   update(deltaTime: number = 1, externalInputs?: Map<string, number>): void {
-    // 1. 收集所有神经元的尖峰状态
-    const spikes = new Map<string, boolean>();
-    
-    // 2. 计算每个神经元的输入电流
+    // 1. 计算每个神经元的总输入电流（包含外部输入和突触电流）
     const inputs = new Map<string, number>();
-    
     for (const node of this.nodes.values()) {
       inputs.set(node.id, externalInputs?.get(node.id) || 0);
     }
-    
-    // 3. 处理所有突触传递
+
+    // 2. 处理所有突触传递，计算突触电流
     for (const edge of this.edges.values()) {
       const preNode = this.nodes.get(edge.fromNodeId);
       const postNode = this.nodes.get(edge.toNodeId);
-      
+
       if (preNode && postNode) {
-        const preSpike = spikes.get(edge.fromNodeId) || false;
+        // 获取前突触神经元的当前状态
+        const preState = preNode.getState();
+        const preSpike = preState.isSpiking;
+
+        // 处理突触传递并获取突触电流
         const synapticCurrent = edge.process(preSpike, preNode.neuron, postNode.neuron, deltaTime);
-        
-        // 累加到后突触神经元的输入
+
+        // 将突触电流累加到后突触神经元的输入
         const currentInput = inputs.get(edge.toNodeId) || 0;
         inputs.set(edge.toNodeId, currentInput + synapticCurrent);
       }
     }
-    
-    // 4. 更新所有神经元状态
+
+    // 3. 更新所有神经元状态
     for (const node of this.nodes.values()) {
       const input = inputs.get(node.id) || 0;
-      const spiked = node.update(input, deltaTime);
-      spikes.set(node.id, spiked);
+      node.update(input, deltaTime);
     }
   }
   

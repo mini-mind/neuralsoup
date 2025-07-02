@@ -110,7 +110,7 @@ export class STDPSynapse implements ISynapse {
       this.lastPreSpikeTime = this.currentTime;
       
       // 增加突触后电流
-      this.synapticCurrent += this.weight * 10; // 放大因子
+      this.synapticCurrent += this.weight * 20; // 增强放大因子
       
       // 检查是否有LTD（前突触在后突触之后发放）
       if (this.lastPostSpikeTime > -Infinity) {
@@ -220,7 +220,7 @@ export class BasicSynapse implements ISynapse {
     if (preSpike) {
       this.lastPreSpikeTime = this.currentTime;
       // 增加突触后电流
-      this.synapticCurrent += this.weight * 10; // 放大因子
+      this.synapticCurrent += this.weight * 20; // 增强放大因子
     }
     
     // 记录后突触神经元状态

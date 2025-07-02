@@ -4,6 +4,7 @@ import { SimulationLoop } from '../core/simulation/SimulationLoop';
 import { globalEventBus } from '../core/services/EventBus';
 import { globalState } from '../core/services/GlobalState';
 import { globalPluginManager } from '../core/services/PluginManager';
+// import { InferenceEngineManager } from '../core/inference-engine'; // 暂时不使用推理引擎
 import AppHeader from '../ui/components/AppHeader';
 import ResizableSplitter from '../ui/components/ResizableSplitter';
 import SimulationArea from '../ui/components/SimulationArea';
@@ -29,6 +30,9 @@ const App: React.FC = () => {
     const sensorDataManager = SensorDataManager.getInstance();
     sensorDataManager.initialize();
 
+    // 注释掉推理引擎管理器，直接使用NetworkTopology的update方法
+    // const inferenceEngineManager = new InferenceEngineManager({...});
+
     // 从全局状态获取选中的世界类型
     const selectedWorld = globalState.getState().selectedWorld || 'light-seeker';
     let world = World.createWorld(1600, 1200, selectedWorld);
@@ -44,18 +48,20 @@ const App: React.FC = () => {
       networkTopology: networkTopology
     });
 
-    const unsubscribeStart = globalEventBus.on('ui:start', () => {
-      simulation.start((updatedWorld) => {
+    const unsubscribeStart = globalEventBus.on('ui:start', async () => {
+      // 直接启动仿真，不需要初始化推理引擎
+      console.log('启动仿真循环');
+
+      simulation.start(async (updatedWorld) => {
         globalState.setState({ worldState: updatedWorld.getAgents() });
 
-        // 更新网络拓扑（实时计算）
+        // 使用NetworkTopology直接更新网络拓扑，确保每一帧执行所有节点
         const currentNetworkTopology = globalState.getState().networkTopology;
         if (currentNetworkTopology) {
-          // 只有启用的插件参与计算
+          // 从启用的感受器插件收集输入
           const enabledPlugins = globalPluginManager.getComputingPlugins();
           const externalInputs = new Map<string, number>();
 
-          // 从启用的感受器插件收集输入
           enabledPlugins.forEach(plugin => {
             if (plugin.pluginType === 'sensor') {
               const nodes = plugin.getNodes();
@@ -67,8 +73,22 @@ const App: React.FC = () => {
             }
           });
 
-          // 更新网络拓扑
-          currentNetworkTopology.update(0.016, externalInputs); // ~60fps
+          // 使用NetworkTopology的update方法，确保每一帧执行所有节点
+          // 该方法已正确实现：1) 收集输入 2) 处理突触传递 3) 更新所有神经元
+          currentNetworkTopology.update(0.016, externalInputs);
+
+          // 从效应器插件收集输出并应用到世界
+          enabledPlugins.forEach(plugin => {
+            if (plugin.pluginType === 'effector') {
+              const nodes = plugin.getNodes();
+              nodes.forEach(node => {
+                // 效应器节点的状态可以通过getState()获取
+                const state = node.getState();
+                // 这里可以将效应器的状态应用到世界状态
+                // 例如：updatedWorld.applyEffectorInput(plugin.id, state.voltage);
+              });
+            }
+          });
         }
       });
       globalState.setState({ simulationRunning: true });

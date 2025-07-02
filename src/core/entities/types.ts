@@ -186,6 +186,9 @@ export class VoltageAccumulatorNode implements IProcessableNode {
     const discountedInput = input * (1 - Math.min(0.9, currentDiscountFactor));
     this.accumulatedVoltage = Math.min(this.maxVoltage, this.accumulatedVoltage + discountedInput);
 
+    // 应用电压下限约束：确保电压值不会低于0
+    this.accumulatedVoltage = Math.max(0, this.accumulatedVoltage);
+
     // 更新对外接口的voltage值
     this.voltage = this.accumulatedVoltage;
 

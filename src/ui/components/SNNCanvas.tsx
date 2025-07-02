@@ -292,11 +292,12 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
 
         if (parentGroup && !parentGroup.collapsed) {
           // 使用世界坐标，让画布变换矩阵来处理坐标变换
-          const nodeRadius = node.type === 'voltage_input' ? 4 : 8;
+          // 统一节点尺寸，不区分类型
+          const nodeRadius = 12;
           const scaledRadius = nodeRadius * Math.sqrt(scale);
 
-          // 节点颜色
-          const nodeColor = node.type === 'voltage_input' ? '#28a745' : '#fd7e14';
+          // 统一节点颜色，不区分类型
+          const nodeColor = '#888888';
           const isSelected = selectedNode === node.id;
 
           // 获取节点状态
@@ -384,31 +385,15 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
     const isInCollapsedGroup = visibleGroups.some(g => g.collapsed && (g.neurons?.includes(node.id) || g.nodes?.includes(node.id)));
     if (isInCollapsedGroup) return;
 
-    // Check if node is in a visible group
-    const parentGroup = visibleGroups.find(g => !g.collapsed && (g.neurons?.includes(node.id) || g.nodes?.includes(node.id)));
-    const isInGroup = !!parentGroup;
+
 
     const isMultiSelected = interactionState.selectedNodes.includes(node.id);
     const shouldHighlight = isSelected || isMultiSelected;
 
-    // Adjust node size based on type and whether it's in a group
-    // 优化缩放算法，防止节点过大遮挡箭头，确保与边绘制逻辑一致
+    // 统一节点尺寸，不区分类型和位置
     const scale = snnTopology?.canvasScale || 1;
-    let radius: number;
-
-    if (node.type === 'voltage_input') {
-      // 电压输入节点：基础尺寸4，使用更保守的缩放
-      const baseSize = 4;
-      radius = Math.max(2, Math.min(6, baseSize + (scale - 1) * 2));
-    } else if (isInGroup) {
-      // 组内节点：基础尺寸8，使用线性缩放但限制最大值
-      const baseSize = 8;
-      radius = Math.max(4, Math.min(10, baseSize + (scale - 1) * 1.5));
-    } else {
-      // 普通节点：基础尺寸15，使用对数缩放防止过大
-      const baseSize = 15;
-      radius = Math.max(8, Math.min(20, baseSize + Math.log(scale) * 3));
-    }
+    const baseSize = 12;
+    const radius = Math.max(8, Math.min(16, baseSize + Math.log(scale) * 2));
     
     const state = node.getState ? node.getState() : { voltage: 0, isSpiking: false };
 
@@ -443,20 +428,28 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
   const drawEdge = (ctx: CanvasRenderingContext2D, fromNode: any, toNode: any, edge: any, isSelected: boolean) => {
     const isMultiSelected = interactionState.selectedEdges.includes(edge.id);
     const shouldHighlight = isSelected || isMultiSelected;
-    const state = edge.getState();
-    
+
+    // 统一获取边状态的方式
+    let state;
+    if (edge.getState) {
+      state = edge.getState();
+    } else if (edge.processor && edge.processor.getState) {
+      state = edge.processor.getState();
+    } else {
+      // 兜底状态
+      state = {
+        weight: edge.weight || 1.0,
+        recentActivity: 0,
+        lastActivityTime: -Infinity,
+        isActive: true
+      };
+    }
+
     // 获取节点实际半径的函数，与drawNode保持一致
-    const getNodeRadius = (node: any, isInGroup: boolean, scale: number) => {
-      if (node.type === 'voltage_input') {
-        const baseSize = 4;
-        return Math.max(2, Math.min(6, baseSize + (scale - 1) * 2));
-      } else if (isInGroup) {
-        const baseSize = 8;
-        return Math.max(4, Math.min(10, baseSize + (scale - 1) * 1.5));
-      } else {
-        const baseSize = 15;
-        return Math.max(8, Math.min(20, baseSize + Math.log(scale) * 3));
-      }
+    const getNodeRadius = (scale: number) => {
+      // 统一节点尺寸，不区分类型和位置
+      const baseSize = 12;
+      return Math.max(8, Math.min(16, baseSize + Math.log(scale) * 2));
     };
 
     const scale = snnTopology?.canvasScale || 1;
@@ -477,8 +470,7 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
       fromRadius = Math.min(fromNodeGroup.width, fromNodeGroup.height) / 2;
     } else {
       // 获取起点节点的实际半径，与绘制逻辑保持一致
-      const fromNodeInGroup = neuronGroups.some(g => !g.collapsed && (g.neurons?.includes(fromNode.id) || g.nodes?.includes(fromNode.id)));
-      fromRadius = getNodeRadius(fromNode, fromNodeInGroup, scale);
+      fromRadius = getNodeRadius(scale);
     }
 
     // 检查终点是否在收起的组内
@@ -491,8 +483,7 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
       toRadius = Math.min(toNodeGroup.width, toNodeGroup.height) / 2;
     } else {
       // 获取终点节点的实际半径，与绘制逻辑保持一致
-      const toNodeInGroup = neuronGroups.some(g => !g.collapsed && (g.neurons?.includes(toNode.id) || g.nodes?.includes(toNode.id)));
-      toRadius = getNodeRadius(toNode, toNodeInGroup, scale);
+      toRadius = getNodeRadius(scale);
     }
     
     const dx = actualToNode.x - actualFromNode.x;
@@ -506,29 +497,24 @@ export const SNNCanvas: React.FC<SNNCanvasProps> = ({
     
     const weight = state.weight;
     const lineWidth = Math.max(1, weight * 5);
+
+    // 统一边的颜色和样式，不区分类型，全部使用实线
     let color = `rgba(100, 100, 100, ${Math.max(0.3, weight)})`;
-    if (state.recentActivity > 0.1) color = `rgba(255, 100, 100, ${Math.max(0.3, weight)})`;
-    
-    // 检查是否涉及组内节点，如果是则使用虚线
-    const fromInGroup = neuronGroups.some(g => g.neurons?.includes(fromNode.id) || g.nodes?.includes(fromNode.id));
-    const toInGroup = neuronGroups.some(g => g.neurons?.includes(toNode.id) || g.nodes?.includes(toNode.id));
-    const useDashedLine = fromInGroup || toInGroup;
+
+    // 根据活动状态调整颜色
+    if (state.recentActivity > 0.1) {
+      color = `rgba(255, 100, 100, ${Math.max(0.3, weight)})`;
+    }
     
     ctx.beginPath();
     ctx.moveTo(startX, startY);
     ctx.lineTo(endX, endY);
     ctx.strokeStyle = shouldHighlight ? '#ff0000' : color;
     ctx.lineWidth = shouldHighlight ? lineWidth + 2 : lineWidth;
-    
-    if (useDashedLine) {
-      ctx.setLineDash([3, 3]);
-    }
-    
+
+    // 统一使用实线，不使用虚线
+    ctx.setLineDash([]);
     ctx.stroke();
-    
-    if (useDashedLine) {
-      ctx.setLineDash([]);
-    }
     
     drawArrow(ctx, startX, startY, endX, endY, shouldHighlight ? '#ff0000' : color);
   };

@@ -102,6 +102,7 @@ export class IzhikevichNeuron implements INeuron {
   // 状态追踪
   private lastSpikeTime: number = -Infinity;
   private currentTime: number = 0;
+  private isSpiking: boolean = false; // 当前是否在发放动作电位
 
   constructor(
     id: string,
@@ -128,22 +129,26 @@ export class IzhikevichNeuron implements INeuron {
    */
   update(input: number, deltaTime: number = 1): boolean {
     this.currentTime += deltaTime;
-    
+
+    // 重置发放状态
+    this.isSpiking = false;
+
     // Izhikevich模型的微分方程（欧拉方法数值积分）
     const dv = 0.04 * this.voltage * this.voltage + 5 * this.voltage + 140 - this.recovery + input;
     const du = this.a * (this.b * this.voltage - this.recovery);
-    
+
     this.voltage += dv * deltaTime;
     this.recovery += du * deltaTime;
-    
+
     // 检查是否发放动作电位
     if (this.voltage >= this.threshold) {
       this.voltage = this.c; // 重置膜电位
       this.recovery += this.d; // 增加恢复变量
       this.lastSpikeTime = this.currentTime;
+      this.isSpiking = true; // 设置发放状态
       return true; // 发放了尖峰
     }
-    
+
     return false;
   }
   
@@ -155,6 +160,7 @@ export class IzhikevichNeuron implements INeuron {
     this.recovery = this.b * this.voltage;
     this.lastSpikeTime = -Infinity;
     this.currentTime = 0;
+    this.isSpiking = false;
   }
   
   /**
@@ -163,7 +169,7 @@ export class IzhikevichNeuron implements INeuron {
   getState(): NodeState {
     return {
       voltage: this.voltage,
-      isSpiking: this.currentTime - this.lastSpikeTime < 1, // 1ms内算作尖峰状态
+      isSpiking: this.isSpiking, // 使用明确的发放状态标志
       lastSpikeTime: this.lastSpikeTime
     };
   }
@@ -194,6 +200,7 @@ export class LIFNeuron implements INeuron {
   // 状态追踪
   private lastSpikeTime: number = -Infinity;
   private currentTime: number = 0;
+  private isSpiking: boolean = false; // 当前是否在发放动作电位
 
   constructor(
     id: string,
@@ -221,6 +228,9 @@ export class LIFNeuron implements INeuron {
   update(input: number, deltaTime: number = 1): boolean {
     this.currentTime += deltaTime;
 
+    // 重置发放状态
+    this.isSpiking = false;
+
     // 检查是否在不应期
     if (this.currentTime - this.lastSpikeTime < this.refractoryPeriod) {
       return false;
@@ -236,6 +246,7 @@ export class LIFNeuron implements INeuron {
     if (this.voltage >= this.threshold) {
       this.voltage = this.restingPotential; // 重置膜电位
       this.lastSpikeTime = this.currentTime;
+      this.isSpiking = true; // 设置发放状态
       return true; // 发放了尖峰
     }
 
@@ -249,6 +260,7 @@ export class LIFNeuron implements INeuron {
     this.voltage = this.restingPotential;
     this.lastSpikeTime = -Infinity;
     this.currentTime = 0;
+    this.isSpiking = false;
   }
 
   /**
@@ -257,7 +269,7 @@ export class LIFNeuron implements INeuron {
   getState(): NodeState {
     return {
       voltage: this.voltage,
-      isSpiking: this.currentTime - this.lastSpikeTime < 1, // 1ms内算作尖峰状态
+      isSpiking: this.isSpiking, // 使用明确的发放状态标志
       lastSpikeTime: this.lastSpikeTime
     };
   }
@@ -678,7 +690,7 @@ export class LightReceptor extends AbstractSensor {
    */
   update(lightIntensity: number, deltaTime: number = 1): boolean {
     const lightNode = this.getLightNode();
-    return lightNode.update(lightIntensity * 100, deltaTime); // 转换为电压值
+    return lightNode.update(lightIntensity * 300, deltaTime); // 增强电压值转换
   }
 
   /**
@@ -686,7 +698,7 @@ export class LightReceptor extends AbstractSensor {
    */
   getLightIntensity(): number {
     const lightState = this.getLightNode().getState();
-    return Math.max(0, Math.min(1, lightState.voltage / 100)); // 归一化到0-1
+    return Math.max(0, Math.min(1, lightState.voltage / 300)); // 归一化到0-1
   }
 
   /**

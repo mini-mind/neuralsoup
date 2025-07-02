@@ -57,6 +57,16 @@ export interface AppEventMap {
   'effector:gradient-movement-output': { agentId: string; gradientMagnitude: number; timestamp: number };
   'ui:sensor-updated': { sensorType: string; agentId: string; [key: string]: any };
   'ui:effector-updated': { effectorType: string; agentId: string; [key: string]: any };
+  'topology:changed': {};
+  'topology:node-added': { nodeId: string; node: any };
+  'topology:node-removed': { nodeId: string };
+  'topology:connection-added': { fromId: string; toId: string; weight: number; edgeId: string };
+  'topology:connection-removed': { fromId: string; toId: string; edgeId: string };
+  'inference-engine:initialized': {};
+  'inference-engine:started': {};
+  'inference-engine:stopped': {};
+  'inference-engine:performance-update': { fps: number; totalTime: number; [key: string]: any };
+  'ui:nodes-state-updated': { updates: Array<{ nodeId: string; state: any; position?: any }> };
 }
 
 // 创建一个单例供整个应用使用

@@ -77,12 +77,12 @@ export class SensorDataManager {
       // 使用8方向的输入数据，如果没有则使用单一强度
       let visualInputs: number[];
       if (data.visionInputs && data.visionInputs.length === 8) {
-        // 放大电压值，确保能够触发神经元
-        visualInputs = data.visionInputs.map(intensity => intensity * 200); // 增加放大倍数
+        // 大幅放大电压值，确保能够触发神经元
+        visualInputs = data.visionInputs.map(intensity => intensity * 500); // 增加放大倍数到500
       } else {
         // 兼容旧格式：将单一光强度转换为8个方向的输入
         const intensity = data.lightIntensity || 0;
-        visualInputs = new Array(8).fill(intensity * 200);
+        visualInputs = new Array(8).fill(intensity * 500);
       }
 
       try {
@@ -90,11 +90,11 @@ export class SensorDataManager {
         const spikeResults = visualReceptor.update(visualInputs, 1.0);
 
         // 计算总强度用于调试
-        const totalIntensity = visualInputs.reduce((sum, v) => sum + v, 0) / 1600; // 归一化（因为放大倍数改为200）
+        const totalIntensity = visualInputs.reduce((sum, v) => sum + v, 0) / 4000; // 归一化（因为放大倍数改为500）
 
         // 开发环境调试信息
         if (process.env.NODE_ENV === 'development' && totalIntensity > 0.01) {
-          console.log(`Visual input processed: inputs=[${visualInputs.map(v => (v/200).toFixed(2)).join(', ')}], spikes=${spikeResults.filter(Boolean).length}/8`);
+          console.log(`📡 Visual input processed: inputs=[${visualInputs.map(v => (v/500).toFixed(2)).join(', ')}], spikes=${spikeResults.filter(Boolean).length}/8`);
         }
 
         // 发送更新事件给UI
@@ -103,7 +103,7 @@ export class SensorDataManager {
           agentId: data.agentId,
           intensity: totalIntensity,
           spikeCount: spikeResults.filter(Boolean).length,
-          visionInputs: visualInputs.map(v => v/200) // 归一化后的输入
+          visionInputs: visualInputs.map(v => v/500) // 归一化后的输入
         });
 
       } catch (error) {

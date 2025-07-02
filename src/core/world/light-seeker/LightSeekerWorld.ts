@@ -40,7 +40,9 @@ export class LightSeekerWorld extends BaseWorld {
         position.y,
         60 + Math.random() * 40, // 半径 60-100（更大）
         0.9 + Math.random() * 0.1, // 强度 0.9-1.0（更亮）
-        200 + Math.random() * 150 // 影响范围 200-350（更大范围）
+        200 + Math.random() * 150, // 影响范围 200-350（更大范围）
+        this.worldWidth,
+        this.worldHeight
       );
       
       this.lightOrbs.set(lightOrb.id, lightOrb);
@@ -64,7 +66,7 @@ export class LightSeekerWorld extends BaseWorld {
     const centerX = this.worldWidth / 2;
     const centerY = this.worldHeight / 2;
 
-    const agent = this.createSimpleAgent('test-agent', centerX, centerY);
+    const agent = this.createSimpleAgent('0', centerX, centerY);
     this.agents.set(agent.id, agent);
   }
 
@@ -99,7 +101,7 @@ export class LightSeekerWorld extends BaseWorld {
    * 计算8个方向的光强度并发送给UI中的视觉感受器
    */
   private updateAgentVision(_deltaTime: number): void {
-    const testAgent = this.agents.get('test-agent');
+    const testAgent = this.agents.get('0');
     if (!testAgent) return;
 
     // 计算8个方向的光强度
@@ -122,8 +124,8 @@ export class LightSeekerWorld extends BaseWorld {
 
     // 开发环境调试信息
     if (process.env.NODE_ENV === 'development' && totalIntensity > 0.001) {
-      console.log(`Agent位置: (${testAgent.x.toFixed(1)}, ${testAgent.y.toFixed(1)})`);
-      console.log(`Agent视觉输入: [${visionInputs.map(v => v.toFixed(3)).join(', ')}] 总强度: ${totalIntensity.toFixed(4)}`);
+      console.log(`🎯 Agent位置: (${testAgent.x.toFixed(1)}, ${testAgent.y.toFixed(1)}) 世界尺寸: ${this.worldWidth}x${this.worldHeight}`);
+      console.log(`👁️ Agent视觉输入: [${visionInputs.map(v => v.toFixed(3)).join(', ')}] 总强度: ${totalIntensity.toFixed(4)}`);
 
       // 显示光球位置和距离
       for (const orb of this.lightOrbs.values()) {
@@ -131,7 +133,7 @@ export class LightSeekerWorld extends BaseWorld {
         const dy = orb.y - testAgent.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         const intensity = orb.getLightIntensityAt(testAgent.x, testAgent.y);
-        console.log(`  光球 ${orb.id}: 位置(${orb.x.toFixed(1)}, ${orb.y.toFixed(1)}), 距离: ${distance.toFixed(1)}, 影响范围: ${orb.influenceRadius}, 强度: ${intensity.toFixed(4)}`);
+        console.log(`  💡 光球 ${orb.id}: 位置(${orb.x.toFixed(1)}, ${orb.y.toFixed(1)}), 距离: ${distance.toFixed(1)}, 影响范围: ${orb.influenceRadius}, 强度: ${intensity.toFixed(4)}`);
       }
     }
   }

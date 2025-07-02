@@ -14,11 +14,11 @@ export class LightOrb implements IWorldEntity {
   y: number;
   readonly entityType: 'light-orb' = 'light-orb';
   isActive: boolean = true;
-  
+
   readonly radius: number;
   readonly intensity: number; // 光强度 0-1
   readonly influenceRadius: number; // 影响范围
-  
+
   // 移动相关属性
   private targetX: number;
   private targetY: number;
@@ -28,13 +28,19 @@ export class LightOrb implements IWorldEntity {
   private lastTargetUpdate: number = 0;
   private targetUpdateInterval: number;
 
+  // 世界边界
+  private worldWidth: number;
+  private worldHeight: number;
+
   constructor(
     id: string,
     x: number,
     y: number,
     radius: number,
     intensity: number,
-    influenceRadius: number
+    influenceRadius: number,
+    worldWidth: number = 1600,
+    worldHeight: number = 1200
   ) {
     this.id = id;
     this.x = x;
@@ -42,7 +48,9 @@ export class LightOrb implements IWorldEntity {
     this.radius = radius;
     this.intensity = intensity;
     this.influenceRadius = influenceRadius;
-    
+    this.worldWidth = worldWidth;
+    this.worldHeight = worldHeight;
+
     // 初始化移动参数
     this.targetX = x;
     this.targetY = y;
@@ -89,9 +97,9 @@ export class LightOrb implements IWorldEntity {
     this.targetX = this.x + Math.cos(angle) * distance;
     this.targetY = this.y + Math.sin(angle) * distance;
     
-    // 确保目标在合理范围内（假设世界大小为1600x1200）
-    this.targetX = Math.max(this.radius, Math.min(1600 - this.radius, this.targetX));
-    this.targetY = Math.max(this.radius, Math.min(1200 - this.radius, this.targetY));
+    // 确保目标在世界边界内
+    this.targetX = Math.max(this.radius, Math.min(this.worldWidth - this.radius, this.targetX));
+    this.targetY = Math.max(this.radius, Math.min(this.worldHeight - this.radius, this.targetY));
     
     this.lastTargetUpdate = Date.now();
     this.targetUpdateInterval = 8000 + Math.random() * 12000; // 重新随机化间隔

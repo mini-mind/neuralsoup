@@ -36,6 +36,12 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
     draggedGroups: []
   });
 
+  // 辅助函数：计算与渲染逻辑一致的节点半径
+  const getNodeRadius = (scale: number) => {
+    const baseSize = 12;
+    return Math.max(8, Math.min(16, baseSize + Math.log(scale) * 2));
+  };
+
   const [nodeGroups, setNodeGroups] = useState<NodeGroup[]>([]);
   const [graphManager, setGraphManager] = useState<CanvasGraphManager | null>(null);
   const [initialized, setInitialized] = useState(false);
@@ -132,7 +138,9 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
 
 
 
-    // 检查是否点击了收起按钮
+    // 优化点选逻辑：提高边选中的优先级，防止被其他操作截获
+
+    // 1. 首先检查收起按钮（最高优先级UI元素）
     const clickedButton = InteractionHandler.findCollapseButtonAtPosition(
       worldPos,
       nodeGroups,
@@ -145,7 +153,7 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
       return;
     }
 
-    // 检查是否点击了标题栏（用于拖动）
+    // 2. 检查标题栏（用于拖动组）
     const clickedTitleBar = InteractionHandler.findTitleBarAtPosition(
       worldPos,
       nodeGroups,
@@ -153,21 +161,36 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
       snnTopology.canvasOffset
     );
 
-    // 首先从网络拓扑中查找节点
-    let clickedNode = InteractionHandler.findNodeAtPosition(worldPos, networkTopology);
-
-    // 如果网络拓扑中没有找到，从snnTopology中查找组内节点
+    // 3. 检查节点（包括网络拓扑和组内节点）
+    let clickedNode = InteractionHandler.findNodeAtPosition(worldPos, networkTopology, snnTopology.canvasScale || 1);
     if (!clickedNode && snnTopology.nodes) {
+      const nodeRadius = getNodeRadius(snnTopology.canvasScale || 1);
       clickedNode = snnTopology.nodes.find((node: any) => {
         const dist = Math.sqrt((node.x - worldPos.x) ** 2 + (node.y - worldPos.y) ** 2);
-        return dist < 20;
+        return dist < nodeRadius;
       });
     }
 
+    // 4. 检查边（提高优先级，只要没有点击节点就检查边）
+    const clickedEdge = clickedNode ? null : InteractionHandler.findEdgeAtPosition(worldPos, networkTopology, snnTopology, snnTopology.canvasScale);
 
-    
-    const clickedGroup = clickedNode ? null : InteractionHandler.findGroupAtPosition(worldPos, nodeGroups);
-    const clickedEdge = clickedNode || clickedGroup ? null : InteractionHandler.findEdgeAtPosition(worldPos, networkTopology);
+    // 5. 检查组（最后检查，避免截获边选中）
+    const clickedGroup = (clickedNode || clickedEdge) ? null : InteractionHandler.findGroupAtPosition(worldPos, nodeGroups);
+
+    // 调试信息：记录点击检测结果
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🖱️ 鼠标点击检测结果:`, {
+        worldPos,
+        clickedNode: clickedNode?.id,
+        clickedGroup: clickedGroup?.id,
+        clickedEdge: clickedEdge?.id,
+        clickedTitleBar: clickedTitleBar?.id,
+        networkTopologyEdges: networkTopology?.getAllEdges().length || 0,
+        snnTopologyNodes: snnTopology?.nodes?.length || 0,
+        button: e.button,
+        ctrlKey: e.ctrlKey
+      });
+    }
 
     if (e.button === 0) { // 左键
       if (e.ctrlKey && clickedNode) {
@@ -251,6 +274,8 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
       }
 
       globalState.setState({ selectedNodeId: null, selectedEdgeId: null });
+      // 清空边选择状态
+      globalState.setState({ selectedEdgeId: null });
       setInteractionState(prev => ({
         ...prev,
         isDragging: false, // 先不设置为拖拽状态，等鼠标移动时再设置
@@ -283,9 +308,12 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
       }
     }
 
-    // 设置全局选中状态，用于详情编辑器
-    globalState.setState({ selectedNodeId: node.id, selectedEdgeId: null });
+    // 单击节点时不设置全局选中状态，避免意外触发配置窗口
+    // 只有双击时才会设置 selectedNodeId 来显示配置窗口
+    globalState.setState({ selectedNodeId: null, selectedEdgeId: null });
 
+    // 清空边选择状态
+    globalState.setState({ selectedEdgeId: null });
     setInteractionState(prev => ({
       ...prev,
       isDragging: false, // 先不设置为拖拽状态，等鼠标移动时再设置
@@ -349,13 +377,21 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
       }
     }
 
-    globalState.setState({ selectedNodeId: null, selectedEdgeId: null });
+    // 更新全局状态：如果只选中一个边，设置selectedEdgeId；否则清空
+    const selectedEdgeId = newSelectedEdges.length === 1 ? newSelectedEdges[0] : null;
+    globalState.setState({ selectedNodeId: null, selectedEdgeId });
+
     setInteractionState(prev => ({
       ...prev,
       selectedNodes: [],
       selectedEdges: newSelectedEdges,
       selectedGroups: []
     }));
+
+    // 开发环境调试信息
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🎯 边选择更新: 选中边=${selectedEdgeId}, 多选边=[${newSelectedEdges.join(', ')}]`);
+    }
   };
 
   // 开始框选
@@ -368,6 +404,8 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
       endY: canvasPos.y,
       visible: true
     });
+    // 清空边选择状态
+    globalState.setState({ selectedEdgeId: null });
     setInteractionState(prev => ({
       ...prev,
       isSelecting: true,
@@ -461,11 +499,12 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
       const worldPos = InteractionHandler.getWorldPosition(e, getCanvasTransform());
       
       // 查找目标节点（包括组内节点）
-      let targetNode = InteractionHandler.findNodeAtPosition(worldPos, networkTopology);
+      let targetNode = InteractionHandler.findNodeAtPosition(worldPos, networkTopology, snnTopology.canvasScale || 1);
       if (!targetNode && snnTopology.nodes) {
+        const nodeRadius = getNodeRadius(snnTopology.canvasScale || 1);
         targetNode = snnTopology.nodes.find((node: any) => {
           const dist = Math.sqrt((node.x - worldPos.x) ** 2 + (node.y - worldPos.y) ** 2);
-          return dist < 20;
+          return dist < nodeRadius;
         });
       }
 
@@ -542,32 +581,39 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
     if (!snnTopology) return;
 
     const worldPos = InteractionHandler.getWorldPosition(e, getCanvasTransform());
-    const clickedNode = InteractionHandler.findNodeAtPosition(worldPos, networkTopology);
-    const clickedGroup = clickedNode ? null : InteractionHandler.findGroupAtPosition(worldPos, nodeGroups);
-    const clickedTitleBar = clickedNode || clickedGroup ? null : InteractionHandler.findTitleBarAtPosition(
+
+    // 优化双击检测逻辑，与单击保持一致
+    const clickedNode = InteractionHandler.findNodeAtPosition(worldPos, networkTopology, snnTopology.canvasScale || 1);
+    if (!clickedNode && snnTopology.nodes) {
+      const nodeRadius = getNodeRadius(snnTopology.canvasScale || 1);
+      const specialNode = snnTopology.nodes.find((node: any) => {
+        const dist = Math.sqrt((node.x - worldPos.x) ** 2 + (node.y - worldPos.y) ** 2);
+        return dist < nodeRadius;
+      });
+      if (specialNode) {
+        // 特殊节点不弹窗，直接返回
+        return;
+      }
+    }
+
+    const clickedTitleBar = clickedNode ? null : InteractionHandler.findTitleBarAtPosition(
       worldPos,
       nodeGroups,
       snnTopology.canvasScale,
       snnTopology.canvasOffset
     );
-    const clickedEdge = clickedNode || clickedGroup || clickedTitleBar ? null : InteractionHandler.findEdgeAtPosition(worldPos, networkTopology);
-    
-    // 检查是否点击了组内的特殊节点
-    let clickedSpecialNode = null;
-    if (!clickedNode && snnTopology.nodes) {
-      // 从snnTopology中查找特殊节点
-      clickedSpecialNode = snnTopology.nodes.find((node: any) => {
-        const dist = Math.sqrt((node.x - worldPos.x) ** 2 + (node.y - worldPos.y) ** 2);
-        return dist < 20 && (node.type === 'voltage_input' || node.type === 'voltage_accumulator');
-      });
-    }
-    
+
+    // 提高边检测优先级
+    const clickedEdge = clickedNode ? null : InteractionHandler.findEdgeAtPosition(worldPos, networkTopology, snnTopology, snnTopology.canvasScale);
+
+    const clickedGroup = (clickedNode || clickedEdge) ? null : InteractionHandler.findGroupAtPosition(worldPos, nodeGroups);
+
     if (clickedNode) {
       // 检查是否为特殊节点类型，不弹窗
       if (clickedNode.type === 'voltage_input' || clickedNode.type === 'voltage_accumulator') {
         return; // 电压输入和电压累积节点不弹窗
       }
-      
+
       // 双击节点：弹出编辑弹窗
       globalState.setState({ selectedNodeId: clickedNode.id, selectedEdgeId: null });
       setInteractionState(prev => ({
@@ -575,9 +621,6 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
         selectedNodes: [],
         selectedEdges: []
       }));
-    } else if (clickedSpecialNode) {
-      // 点击了特殊节点，不弹窗
-      return;
     } else if (clickedGroup) {
       // 双击节点组：切换收起/展开状态
       handleGroupCollapse(clickedGroup);

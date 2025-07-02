@@ -10,20 +10,30 @@ import { RotationControllerGroupManager } from './RotationControllerGroupManager
  */
 export class InteractionHandler {
   private static readonly NODE_CLICK_RADIUS = 20;
-  private static readonly EDGE_CLICK_TOLERANCE = 10;
+  private static readonly EDGE_CLICK_TOLERANCE = 15; // 增加边点击容差，使边更容易选中
+
+  // 计算与渲染逻辑一致的节点半径
+  private static getNodeRadius(scale: number = 1): number {
+    const baseSize = 12;
+    return Math.max(8, Math.min(16, baseSize + Math.log(scale) * 2));
+  }
 
   /**
    * 查找点击位置的节点
    */
   static findNodeAtPosition(
     worldPos: Vector2D,
-    networkTopology: NetworkTopology | null
+    networkTopology: NetworkTopology | null,
+    scale: number = 1
   ): any | null {
     if (!networkTopology) return null;
-    
+
+    // 使用与渲染逻辑一致的动态半径
+    const nodeRadius = this.getNodeRadius(scale);
+
     return networkTopology.getAllNodes().find((node: any) => {
       const dist = distance(node, worldPos);
-      return dist < this.NODE_CLICK_RADIUS;
+      return dist < nodeRadius;
     });
   }
 
@@ -32,21 +42,94 @@ export class InteractionHandler {
    */
   static findEdgeAtPosition(
     worldPos: Vector2D,
-    networkTopology: NetworkTopology | null
+    networkTopology: NetworkTopology | null,
+    snnTopology?: any,
+    scale: number = 1.0
   ): any | null {
     if (!networkTopology) return null;
-    
+
+    // 创建节点查找函数，支持跨拓扑查找（与SNNCanvas中的逻辑保持一致）
+    const findNode = (nodeId: string) => {
+      // 先从网络拓扑中查找
+      let node = networkTopology.getNode(nodeId);
+      if (node) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`✅ 在NetworkTopology中找到节点: ${nodeId}, 类型: ${node.neuron?.type || 'unknown'}`);
+        }
+        return node;
+      }
+
+      // 如果没找到，从snnTopology中查找组内节点（包括输入节点和输出节点）
+      // 注意：这里的snnTopology对应SNNCanvas中的legacyTopology参数
+      if (snnTopology?.nodes) {
+        node = snnTopology.nodes.find((n: any) => n.id === nodeId);
+        if (node) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`✅ 在snnTopology中找到节点: ${nodeId}, 类型: ${node.type}`);
+          }
+          return node;
+        }
+      }
+
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`❌ 未找到节点: ${nodeId}, snnTopology节点数: ${snnTopology?.nodes?.length || 0}`);
+        if (snnTopology?.nodes && snnTopology.nodes.length > 0) {
+          console.log('snnTopology中的节点ID列表:', snnTopology.nodes.map((n: any) => n.id));
+        }
+      }
+      return null;
+    };
+
+    // 根据缩放级别调整容差，确保在不同缩放级别下都能稳定选中边
+    const scaledTolerance = Math.max(this.EDGE_CLICK_TOLERANCE, this.EDGE_CLICK_TOLERANCE / scale);
+
     const edges = networkTopology.getAllEdges();
+    let closestEdge = null;
+    let closestDistance = Infinity;
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🔍 开始边检测，共有 ${edges.length} 条边，容差: ${scaledTolerance.toFixed(2)}`);
+    }
+
     for (const edge of edges) {
-      const fromNode = networkTopology.getNode(edge.fromNodeId);
-      const toNode = networkTopology.getNode(edge.toNodeId);
-      
+      const fromNode = findNode(edge.fromNodeId);
+      const toNode = findNode(edge.toNodeId);
+
+      // 确保两个节点都能找到才能检测连边点击
       if (fromNode && toNode) {
         const dist = distanceToLineSegment(worldPos, fromNode, toNode);
-        if (dist < this.EDGE_CLICK_TOLERANCE) return edge;
+
+        // 记录最近的边
+        if (dist < closestDistance) {
+          closestDistance = dist;
+          if (dist < scaledTolerance) {
+            closestEdge = edge;
+          }
+        }
+
+        if (process.env.NODE_ENV === 'development' && dist < scaledTolerance) {
+          console.log(`🎯 检测到连边点击: ${edge.fromNodeId} -> ${edge.toNodeId}, 距离: ${dist.toFixed(2)}, 容差: ${scaledTolerance.toFixed(2)}`);
+        }
+      } else {
+        // 调试信息：记录无法找到节点的情况
+        if (process.env.NODE_ENV === 'development' && (!fromNode || !toNode)) {
+          console.warn(`❌ 连边 ${edge.fromNodeId} -> ${edge.toNodeId} 的节点查找失败:`, {
+            fromNode: !!fromNode,
+            toNode: !!toNode,
+            fromNodeId: edge.fromNodeId,
+            toNodeId: edge.toNodeId,
+            snnTopologyNodesCount: snnTopology?.nodes?.length || 0
+          });
+        }
       }
     }
-    return null;
+
+    // 开发环境调试信息
+    if (process.env.NODE_ENV === 'development' && !closestEdge && closestDistance < Infinity) {
+      console.log(`🔍 最近边距离: ${closestDistance.toFixed(2)}, 容差: ${scaledTolerance.toFixed(2)}, 缩放: ${scale.toFixed(2)}`);
+    }
+
+    return closestEdge;
   }
 
   /**

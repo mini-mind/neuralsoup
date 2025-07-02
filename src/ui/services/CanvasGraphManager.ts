@@ -1,5 +1,6 @@
 import { NetworkTopology } from '../../core/entities/topology';
 import { BasicSynapse } from '../../core/entities/synapse';
+import { globalEventBus } from '../../core/services/EventBus';
 
 /**
  * 画布图结构管理器
@@ -15,14 +16,17 @@ export class CanvasGraphManager {
   /**
    * 创建边连接
    */
-  createEdge(fromNodeId: string, toNodeId: string, weight: number = 0.5): boolean {
-    // 验证至少有一个节点在网络拓扑中存在
+  createEdge(fromNodeId: string, toNodeId: string, weight: number = 2.0): boolean {
+    // 验证至少有一个节点在网络拓扑中存在，或者是输入节点到神经元的连接
     const startNode = this.networkTopology.getNode(fromNodeId);
     const endNode = this.networkTopology.getNode(toNodeId);
-    
-    if (!startNode && !endNode) {
+
+    // 允许输入节点到神经元的连接：如果目标节点是神经元，允许创建连接
+    const isInputToNeuronConnection = !startNode && endNode;
+
+    if (!startNode && !endNode && !isInputToNeuronConnection) {
       if (process.env.NODE_ENV === 'development') {
-        console.warn('无法创建边：至少需要一个节点在网络拓扑中');
+        console.warn('无法创建边：至少需要一个节点在网络拓扑中，或者是输入节点到神经元的连接');
       }
       return false;
     }
@@ -54,6 +58,15 @@ export class CanvasGraphManager {
         if (process.env.NODE_ENV === 'development') {
           console.log(`成功创建边: ${fromNodeId} -> ${toNodeId}`);
         }
+
+        // 触发连接添加事件
+        globalEventBus.emit('topology:connection-added', {
+          fromId: fromNodeId,
+          toId: toNodeId,
+          weight: weight,
+          edgeId: newEdge.id
+        });
+
         return true;
       }
       
@@ -69,10 +82,25 @@ export class CanvasGraphManager {
    */
   deleteEdge(edgeId: string): boolean {
     try {
+      // 获取边信息用于事件
+      const edge = this.networkTopology.getEdge(edgeId);
       const success = this.networkTopology.removeEdge(edgeId);
-      if (success && process.env.NODE_ENV === 'development') {
-        console.log(`成功删除边: ${edgeId}`);
+
+      if (success) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`成功删除边: ${edgeId}`);
+        }
+
+        // 触发连接删除事件
+        if (edge) {
+          globalEventBus.emit('topology:connection-removed', {
+            fromId: edge.fromNodeId,
+            toId: edge.toNodeId,
+            edgeId: edgeId
+          });
+        }
       }
+
       return success;
     } catch (error) {
       console.error('删除边失败:', error);
