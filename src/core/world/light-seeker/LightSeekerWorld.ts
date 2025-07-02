@@ -82,7 +82,7 @@ export class LightSeekerWorld extends BaseWorld {
       brain: {} as any,
       sensors: [],
       effectors: [],
-      update: (world: any) => {
+      update: (_world: any) => {
         // 简单的更新逻辑
       }
     };
@@ -98,7 +98,7 @@ export class LightSeekerWorld extends BaseWorld {
    * 更新agent的视觉感受器输入
    * 计算8个方向的光强度并发送给UI中的视觉感受器
    */
-  private updateAgentVision(deltaTime: number): void {
+  private updateAgentVision(_deltaTime: number): void {
     const testAgent = this.agents.get('test-agent');
     if (!testAgent) return;
 
@@ -120,8 +120,8 @@ export class LightSeekerWorld extends BaseWorld {
       timestamp: Date.now()
     });
 
-    // 输出调试信息
-    if (totalIntensity > 0.001) { // 进一步降低阈值
+    // 开发环境调试信息
+    if (process.env.NODE_ENV === 'development' && totalIntensity > 0.001) {
       console.log(`Agent位置: (${testAgent.x.toFixed(1)}, ${testAgent.y.toFixed(1)})`);
       console.log(`Agent视觉输入: [${visionInputs.map(v => v.toFixed(3)).join(', ')}] 总强度: ${totalIntensity.toFixed(4)}`);
 
@@ -188,7 +188,7 @@ export class LightSeekerWorld extends BaseWorld {
 
 
 
-  handleAgentInteractions(agent: IAgent): void {
+  handleAgentInteractions(_agent: IAgent): void {
     // 在这个简化的世界中，不需要特殊的交互处理
   }
 

@@ -40,6 +40,16 @@ export interface IProcessableNode {
    * 获取当前状态信息
    */
   getState(): NodeState;
+
+  /**
+   * 获取当前输出值（可选方法，主要用于电压输入/输出节点）
+   */
+  getOutput?(): number;
+
+  /**
+   * 设置节点位置（可选方法，主要用于电压输入/输出节点）
+   */
+  setPosition?(x: number, y: number): void;
 }
 
 /**

@@ -196,15 +196,10 @@ export function runNodeInteractionTest() {
   }
 }
 
-// 在浏览器环境中暴露测试函数
-if (typeof window !== 'undefined') {
-  (window as any).nodeInteractionTest = {
-    runNodeInteractionTest,
-    createTestNode,
-    testNodeSelection,
-    testNodeDrag
-  };
-  
-  console.log('节点交互测试已加载。在浏览器控制台中运行:');
-  console.log('nodeInteractionTest.runNodeInteractionTest()');
-}
+// 导出测试函数供手动调用
+export {
+  runNodeInteractionTest,
+  createTestNode,
+  testNodeSelection,
+  testNodeDrag
+};

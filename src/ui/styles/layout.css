@@ -739,7 +739,13 @@ body, html, #root {
 /* 可调整大小的分割器 */
 .resizable-splitter {
   background-color: #333;
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
+  flex-shrink: 0; /* 确保分割器不会被压缩 */
+  position: relative;
+  z-index: 10; /* 确保分割器在最上层 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .resizable-splitter:hover {
@@ -747,15 +753,48 @@ body, html, #root {
 }
 
 .resizable-splitter.vertical {
-  width: 5px;
+  width: 8px; /* 增加宽度，更容易点击 */
   cursor: col-resize;
   height: 100%;
+  min-width: 8px; /* 确保最小宽度 */
 }
 
 .resizable-splitter.horizontal {
-  height: 5px;
+  height: 8px; /* 增加高度，更容易点击 */
   cursor: row-resize;
   width: 100%;
+  min-height: 8px; /* 确保最小高度 */
+}
+
+/* 添加视觉指示器 */
+.resizable-splitter.vertical::before {
+  content: '';
+  position: absolute;
+  width: 2px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 1px;
+  transition: all 0.2s ease;
+}
+
+.resizable-splitter.vertical:hover::before {
+  background: rgba(255, 255, 255, 0.6);
+  height: 30px;
+}
+
+.resizable-splitter.horizontal::before {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 1px;
+  transition: all 0.2s ease;
+}
+
+.resizable-splitter.horizontal:hover::before {
+  background: rgba(255, 255, 255, 0.6);
+  width: 30px;
 }
 
 /* 仿真展示区样式已移动到game-area.css中统一管理 */

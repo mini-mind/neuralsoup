@@ -97,7 +97,7 @@ export class VoltageInputNode implements IProcessableNode {
   /**
    * 更新神经元状态 - INeuron接口要求
    */
-  update(input: number, deltaTime: number): boolean {
+  update(input: number, _deltaTime: number): boolean {
     this.process(input);
     return this.voltage >= this.threshold;
   }
@@ -171,7 +171,7 @@ export class VoltageAccumulatorNode implements IProcessableNode {
   /**
    * 处理输入并累积电压
    */
-  process(input: number, deltaTime: number = 1): number {
+  process(input: number, _deltaTime: number = 1): number {
     const currentTime = Date.now();
     const timeDelta = Math.max(1, currentTime - this.lastUpdateTime);
 

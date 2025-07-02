@@ -20,15 +20,15 @@ export class NeuronAdapter {
       y: networkNode.y,
       neuron: neuron, // 保持对核心神经元的引用
       params: {
-        a: neuron.a || 0.02,
-        b: neuron.b || 0.2,
-        c: neuron.c || -65,
-        d: neuron.d || 8,
-        threshold: neuron.threshold || 30
+        a: (neuron as any).a || 0.02,
+        b: (neuron as any).b || 0.2,
+        c: (neuron as any).c || -65,
+        d: (neuron as any).d || 8,
+        threshold: (neuron as any).threshold || 30
       },
       state: {
         v: state.voltage,
-        u: neuron.u || 0, // 恢复变量
+        u: (neuron as any).u || 0, // 恢复变量
         spike: state.isSpiking,
         lastSpikeTime: state.lastSpikeTime
       }
@@ -38,7 +38,7 @@ export class NeuronAdapter {
   /**
    * 从SNNNode更新NetworkNode
    */
-  static updateFromSNNNode(networkNode: any, snnNode: SNNNode): void {
+  static updateFromSNNNode(networkNode: any, snnNode: UINode): void {
     // 更新神经元参数
     if (snnNode.params) {
       networkNode.neuron.a = snnNode.params.a;

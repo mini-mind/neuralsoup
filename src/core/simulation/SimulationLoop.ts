@@ -24,7 +24,9 @@ export class SimulationLoop {
     if (this.isRunning) {
       return;
     }
-    console.log('启动仿真循环...');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('启动仿真循环...');
+    }
     this.isRunning = true;
     this.lastTime = performance.now();
     this.onTick = onTick;
@@ -35,7 +37,9 @@ export class SimulationLoop {
    * 停止仿真循环。
    */
   stop(): void {
-    console.log('停止仿真循环...');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('停止仿真循环...');
+    }
     this.isRunning = false;
   }
 

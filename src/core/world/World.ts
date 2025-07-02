@@ -9,9 +9,6 @@ import type { IWorld } from './types';
 import type { IAgent } from '../entities/types';
 import { BaseWorld } from './BaseWorld';
 import { LuminousGardenWorld } from './luminous-garden/LuminousGardenWorld';
-import { EchoChamberWorld } from './echo-chamber/EchoChamberWorld';
-import { SentientSwarmWorld } from './sentient-swarm/SentientSwarmWorld';
-import { ChromaticComposerWorld } from './chromatic-composer/ChromaticComposerWorld';
 import { LightSeekerWorld } from './light-seeker/LightSeekerWorld';
 
 export class World extends BaseWorld {
@@ -22,17 +19,12 @@ export class World extends BaseWorld {
 
   /**
    * 创建指定类型的世界实例
+   * 现在只支持两个关卡：追光者和光影花园
    */
   static createWorld(width: number, height: number, worldType: string): IWorld {
     switch (worldType) {
       case 'luminous-garden':
         return new LuminousGardenWorld(width, height);
-      case 'echo-chamber':
-        return new EchoChamberWorld(width, height);
-      case 'sentient-swarm':
-        return new SentientSwarmWorld(width, height);
-      case 'chromatic-composer':
-        return new ChromaticComposerWorld(width, height);
       case 'light-seeker':
         return new LightSeekerWorld(width, height);
       default:
@@ -44,11 +36,11 @@ export class World extends BaseWorld {
     // 默认实现为空，子类可以重写
   }
 
-  updateWorldLogic(deltaTime: number): void {
+  updateWorldLogic(_deltaTime: number): void {
     // 默认实现为空，子类可以重写
   }
 
-  handleAgentInteractions(agent: IAgent): void {
+  handleAgentInteractions(_agent: IAgent): void {
     // 默认实现为空，子类可以重写
   }
 

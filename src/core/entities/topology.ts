@@ -1,7 +1,5 @@
-import type { INeuron, NodeState, NeuronState } from './neuron';
+import type { INeuron, NodeState } from './neuron';
 import type { ISynapse, SynapseState } from './synapse';
-import { IzhikevichNeuron } from './neuron';
-import { STDPSynapse } from './synapse';
 
 /**
  * 神经网络节点类
@@ -150,7 +148,9 @@ export class NetworkTopology {
     const postNodeExists = this.nodes.has(synapse.postNeuronId);
     
     if (!preNodeExists && !postNodeExists) {
-      console.warn(`Cannot add edge: at least one node must be in the network topology`);
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`Cannot add edge: at least one node must be in the network topology`);
+      }
       return null;
     }
     
@@ -290,10 +290,14 @@ export class NetworkTopology {
     };
     
     for (const node of this.nodes.values()) {
-      const nodeType = node.neuron.type;
-      if (nodeType === 'input' || nodeType === 'hidden' || nodeType === 'output') {
-        nodesByType[nodeType]++;
+      const neuronType = node.neuron.type;
+      // 根据神经元类型统计，而不是网络层次
+      if (neuronType === 'izhikevich') {
+        nodesByType.hidden++; // 将Izhikevich归类为隐藏层
+      } else if (neuronType === 'lif') {
+        nodesByType.output++; // 将LIF归类为输出层
       }
+      // 输入层通常由感受器节点处理，这里不统计
     }
     
     const avgWeight = edgeCount > 0 

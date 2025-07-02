@@ -70,7 +70,7 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
         const nodes = registry.getAllNodes();
 
         // 检查当前SNN拓扑中是否已经包含这些节点
-        const existingNodeIds = new Set(snnTopology.nodes.map(n => n.id));
+        const existingNodeIds = new Set(snnTopology.nodes.map((n: any) => n.id));
         const newNodes = nodes.filter(n => !existingNodeIds.has(n.id));
 
         if (newNodes.length > 0) {
@@ -599,7 +599,7 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
   };
 
   // Handle double-click creation
-  const handleDoubleClickCreation = (e: React.MouseEvent, worldPos: Vector2D) => {
+  const handleDoubleClickCreation = (_e: React.MouseEvent, worldPos: Vector2D) => {
     // Only allow creating regular nodes, no longer support creating groups
     const nodeId = `node-${Date.now()}`;
     const newNode = {
@@ -810,7 +810,7 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
         networkTopology.removeNode(selectedNodeId);
 
         // 从SNN拓扑中删除对应的节点
-        const updatedSNNNodes = snnTopology.nodes.filter(n => n.id !== selectedNodeId);
+        const updatedSNNNodes = snnTopology.nodes.filter((n: any) => n.id !== selectedNodeId);
         globalState.setState({
           selectedNodeId: null,
           snnTopology: { ...snnTopology, nodes: updatedSNNNodes }
@@ -827,7 +827,7 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
         networkTopology.removeEdge(selectedEdgeId);
 
         // 从SNN拓扑中删除对应的边
-        const updatedSNNEdges = snnTopology.edges.filter(e => e.id !== selectedEdgeId);
+        const updatedSNNEdges = snnTopology.edges.filter((e: any) => e.id !== selectedEdgeId);
         globalState.setState({
           selectedEdgeId: null,
           snnTopology: { ...snnTopology, edges: updatedSNNEdges }
@@ -858,7 +858,7 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
 
       if (nodesToDelete.length > 0) {
         // 从SNN拓扑中删除对应的节点
-        const updatedSNNNodes = snnTopology.nodes.filter(n => !nodesToDelete.includes(n.id));
+        const updatedSNNNodes = snnTopology.nodes.filter((n: any) => !nodesToDelete.includes(n.id));
         globalState.setState({
           snnTopology: { ...snnTopology, nodes: updatedSNNNodes }
         });
@@ -876,7 +876,7 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
       });
 
       // 从SNN拓扑中删除对应的边
-      const updatedSNNEdges = snnTopology.edges.filter(e => !interactionState.selectedEdges.includes(e.id));
+      const updatedSNNEdges = snnTopology.edges.filter((e: any) => !interactionState.selectedEdges.includes(e.id));
       globalState.setState({
         snnTopology: { ...snnTopology, edges: updatedSNNEdges }
       });
@@ -933,7 +933,7 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
 
       if (nodesToDelete.length > 0) {
         // 从SNN拓扑中删除对应的节点
-        const updatedSNNNodes = snnTopology.nodes.filter(n => !nodesToDelete.includes(n.id));
+        const updatedSNNNodes = snnTopology.nodes.filter((n: any) => !nodesToDelete.includes(n.id));
         globalState.setState({
           snnTopology: { ...snnTopology, nodes: updatedSNNNodes }
         });
@@ -958,7 +958,7 @@ const GraphEditor = React.forwardRef<HTMLDivElement, GraphEditorProps>(({
       if (activeElement && (
         activeElement.tagName === 'INPUT' ||
         activeElement.tagName === 'TEXTAREA' ||
-        activeElement.contentEditable === 'true'
+        (activeElement as HTMLElement).contentEditable === 'true'
       )) {
         return;
       }

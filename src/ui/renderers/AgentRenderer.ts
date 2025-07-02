@@ -46,7 +46,7 @@ export class AgentRenderer {
   private drawAgent(
     graphics: PIXI.Graphics,
     agent: IAgent,
-    visionAngle: number,
+    _visionAngle: number,
   ): void {
     graphics.clear();
 
@@ -142,7 +142,7 @@ export class AgentRenderer {
   /**
    * 绘制主agent的8方向视觉分区线
    */
-  private drawVisionDirections(graphics: PIXI.Graphics, x: number, y: number, agentRadius: number): void {
+  private drawVisionDirections(graphics: PIXI.Graphics, x: number, y: number, _agentRadius: number): void {
     const visionRange = 120;
     const directions = [
       0,           // 0度（右）

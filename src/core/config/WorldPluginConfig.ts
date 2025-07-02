@@ -26,27 +26,6 @@ export const WORLD_PLUGIN_CONFIGS: Record<string, WorldPluginConfig> = {
     enabledSensors: ['light_receptor', 'visual_receptor'],
     enabledEffectors: ['movement_controller', 'rotation_controller'],
     description: '光影花园：启用光感受器、视觉感受器和基础移动控制器，支持复杂的光影环境导航'
-  },
-  
-  'echo-chamber': {
-    worldType: 'echo-chamber',
-    enabledSensors: ['sonar_receptor', 'audio_receptor'],
-    enabledEffectors: ['movement_controller', 'rotation_controller', 'sonar_emitter'],
-    description: '回声洞穴：启用声纳相关感受器和效应器，支持声纳导航和回声定位'
-  },
-  
-  'sentient-swarm': {
-    worldType: 'sentient-swarm',
-    enabledSensors: ['visual_receptor', 'signal_receptor', 'proximity_receptor'],
-    enabledEffectors: ['movement_controller', 'rotation_controller', 'signal_emitter'],
-    description: '意识集群：启用多种感受器和通信效应器，支持群体智能和协作行为'
-  },
-  
-  'chromatic-composer': {
-    worldType: 'chromatic-composer',
-    enabledSensors: ['color_receptor', 'audio_receptor', 'rhythm_receptor'],
-    enabledEffectors: ['movement_controller', 'rotation_controller', 'color_emitter', 'audio_emitter'],
-    description: '律动色域：启用色彩和音频相关插件，支持艺术创作和感官体验'
   }
 };
 

@@ -92,8 +92,8 @@ export class SensorDataManager {
         // 计算总强度用于调试
         const totalIntensity = visualInputs.reduce((sum, v) => sum + v, 0) / 1600; // 归一化（因为放大倍数改为200）
 
-        // 输出调试信息
-        if (totalIntensity > 0.01) { // 降低阈值
+        // 开发环境调试信息
+        if (process.env.NODE_ENV === 'development' && totalIntensity > 0.01) {
           console.log(`Visual input processed: inputs=[${visualInputs.map(v => (v/200).toFixed(2)).join(', ')}], spikes=${spikeResults.filter(Boolean).length}/8`);
         }
 
@@ -132,8 +132,8 @@ export class SensorDataManager {
         // 更新光感受器
         const isActive = lightReceptor.update(data.lightIntensity, 1.0);
 
-        // 输出调试信息
-        if (data.lightIntensity > 0.001) {
+        // 开发环境调试信息
+        if (process.env.NODE_ENV === 'development' && data.lightIntensity > 0.001) {
           const voltage = lightReceptor.getLightNode().getState().voltage;
           console.log(`Light input processed: intensity=${data.lightIntensity.toFixed(4)}, active=${isActive}, voltage=${voltage.toFixed(2)}`);
         }
@@ -309,7 +309,9 @@ export class SensorDataManager {
       lightGroup.pluginInstance.reset();
     }
 
-    console.log('All sensors reset');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('All sensors reset');
+    }
   }
 
   /**

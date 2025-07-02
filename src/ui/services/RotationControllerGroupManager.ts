@@ -1,4 +1,4 @@
-import { VoltageAccumulatorNode } from '../../core/entities/types';
+// import { VoltageAccumulatorNode } from '../../core/entities/types';
 import { RotationController, MovementController } from '../../core/entities/neuron';
 import { NodeGroup, Vector2D } from '../types/editor.types';
 
@@ -148,7 +148,7 @@ export class MovementControllerGroupManager {
   private static readonly NODE_COUNT = 4; // 上下左右
   private static readonly GROUP_WIDTH = 150;
   private static readonly GROUP_HEIGHT = 80;
-  private static readonly TITLE_BAR_HEIGHT = 20;
+  // private static readonly _TITLE_BAR_HEIGHT = 20;
 
   /**
    * 创建移动控制器组

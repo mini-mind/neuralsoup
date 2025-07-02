@@ -64,8 +64,6 @@ export type {
   InteractionState,
   SelectionBox,
   CanvasTransform,
-  GraphNode,
-  GraphEdge,
   
   // 向后兼容别名
   SNNNode,

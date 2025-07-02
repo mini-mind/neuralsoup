@@ -99,7 +99,7 @@ export class STDPSynapse implements ISynapse {
   /**
    * 处理突触传递和STDP学习
    */
-  process(preSpike: boolean, preNeuron: INeuron, postNeuron: INeuron, deltaTime: number = 1): number {
+  process(preSpike: boolean, _preNeuron: INeuron, postNeuron: INeuron, deltaTime: number = 1): number {
     this.currentTime += deltaTime;
     
     // 衰减突触后电流
@@ -210,7 +210,7 @@ export class BasicSynapse implements ISynapse {
   /**
    * 处理突触传递
    */
-  process(preSpike: boolean, preNeuron: INeuron, postNeuron: INeuron, deltaTime: number = 1): number {
+  process(preSpike: boolean, _preNeuron: INeuron, postNeuron: INeuron, deltaTime: number = 1): number {
     this.currentTime += deltaTime;
     
     // 衰减突触后电流

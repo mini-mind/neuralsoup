@@ -272,19 +272,14 @@ export function runAllInteractionTests() {
   }
 }
 
-// 在浏览器环境中暴露测试函数
-if (typeof window !== 'undefined') {
-  (window as any).mouseInteractionTest = {
-    runAllInteractionTests,
-    testMouseEventListeners,
-    testCanvasSize,
-    testTabSwitching,
-    testHelpTooltip,
-    testPluginVisibility,
-    testWheelZoom,
-    testNodeSelection
-  };
-  
-  console.log('鼠标交互测试已加载。在浏览器控制台中运行:');
-  console.log('mouseInteractionTest.runAllInteractionTests()');
-}
+// 导出测试函数供手动调用
+export {
+  runAllInteractionTests,
+  testMouseEventListeners,
+  testCanvasSize,
+  testTabSwitching,
+  testHelpTooltip,
+  testPluginVisibility,
+  testWheelZoom,
+  testNodeSelection
+};

@@ -48,42 +48,7 @@
   color: #4ade80;
 }
 
-/* 拖拽分割条 */
-.resize-handle {
-  width: 6px;
-  background: #444;
-  cursor: col-resize;
-  position: relative;
-  flex-shrink: 0;
-  transition: background-color 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 
-.resize-handle:hover,
-.resize-handle.dragging {
-  background: #6366f1;
-}
-
-.resize-indicator {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 0;
-}
-
-.resize-line {
-  width: 2px;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 1px;
-}
-
-.resize-handle:hover .resize-line,
-.resize-handle.dragging .resize-line {
-  background: rgba(255, 255, 255, 0.8);
-}
 
 .simulation-area {
   flex: 1;

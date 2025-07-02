@@ -2,7 +2,7 @@ import { VisualReceptorGroupManager, HealthReceptorGroupManager } from "./Visual
 import { RotationControllerGroupManager, MovementControllerGroupManager } from "./RotationControllerGroupManager";
 import { GradientMovementControllerGroupManager } from "./GradientMovementControllerGroupManager";
 import { LightReceptorGroupManager } from "./LightReceptorGroupManager";
-import { NodeGroup, Vector2D } from "../types/editor.types";
+import { NodeGroup } from "../types/editor.types";
 import { globalPluginManager } from "../../core/services/PluginManager";
 
 /**

@@ -21,6 +21,21 @@ export interface UINode {
   selected?: boolean;
   // 可以包含对核心神经元的引用
   neuron?: INeuron;
+  // 神经元参数（用于UI编辑）
+  params?: {
+    a?: number;
+    b?: number;
+    c?: number;
+    d?: number;
+    threshold?: number;
+  };
+  // 神经元状态（用于UI显示）
+  state?: {
+    v?: number;
+    u?: number;
+    spike?: boolean;
+    lastSpikeTime?: number;
+  };
 }
 
 /**

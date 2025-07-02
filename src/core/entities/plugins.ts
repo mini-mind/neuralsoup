@@ -4,7 +4,7 @@
  * 感受器和效应器是包含多个内部节点的复合组件
  */
 
-import { IProcessableNode, NodeState } from './neuron';
+import { IProcessableNode } from './neuron';
 import { VoltageInputNode, VoltageAccumulatorNode } from './types';
 
 /**
@@ -180,7 +180,7 @@ export abstract class AbstractSensor extends AbstractPlugin {
   /**
    * 感受器的通用处理方法
    */
-  process(inputs: number[], deltaTime: number = 1): number[] {
+  process(inputs: number[], _deltaTime: number = 1): number[] {
     const results: number[] = [];
     const inputNodes = this.getInputNodes();
 

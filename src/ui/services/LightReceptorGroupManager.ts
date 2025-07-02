@@ -4,9 +4,8 @@
  */
 
 import { LightReceptor } from '../../core/entities/neuron';
-import { VoltageInputNode } from '../../core/entities/types';
-import type { NodeGroup } from '../types/NodeTypes';
-import type { Vector2D } from '../types/CommonTypes';
+// import { VoltageInputNode } from '../../core/entities/types';
+import type { NodeGroup, Vector2D } from '../types/editor.types';
 
 export class LightReceptorGroupManager {
   private static readonly NODE_COUNT = 1;
@@ -63,25 +62,9 @@ export class LightReceptorGroupManager {
       width: this.GROUP_WIDTH,
       height: this.GROUP_HEIGHT,
       nodes: nodes.map(n => n.id),
-      isCollapsed: false,
+      collapsed: false,
       pluginInstance: lightReceptor,
-      // 组的拖拽和缩放处理
-      setPosition: (x: number, y: number) => {
-        const deltaX = x - group.x;
-        const deltaY = y - group.y;
-        group.x = x;
-        group.y = y;
-        
-        // 更新所有节点的位置
-        nodes.forEach(node => {
-          node.x += deltaX;
-          node.y += deltaY;
-          node.setPosition(node.x, node.y);
-        });
-        
-        // 更新插件实例位置
-        lightReceptor.setPosition(x, y);
-      },
+      // 组的拖拽和缩放处理通过外部管理器处理
       scale: (factor: number, centerX: number, centerY: number) => {
         // 缩放组
         const newX = centerX + (group.x - centerX) * factor;
@@ -114,7 +97,7 @@ export class LightReceptorGroupManager {
   /**
    * 获取节点的相对位置
    */
-  private static getNodeRelativePosition(index: number): Vector2D {
+  private static getNodeRelativePosition(_index: number): Vector2D {
     // 单个节点居中放置
     return {
       x: this.GROUP_WIDTH / 2 - 15, // 节点宽度约30，所以偏移15
@@ -125,7 +108,7 @@ export class LightReceptorGroupManager {
   /**
    * 更新组的标题位置
    */
-  static updateGroupTitlePosition(group: NodeGroup): void {
+  static updateGroupTitlePosition(_group: NodeGroup): void {
     // 光感受器组的标题位置固定在顶部
     // 这个方法供渲染器调用
   }
@@ -161,10 +144,10 @@ export class LightReceptorGroupManager {
    * 切换组的折叠状态
    */
   static toggleCollapse(group: NodeGroup): void {
-    group.isCollapsed = !group.isCollapsed;
-    
+    group.collapsed = !group.collapsed;
+
     // 根据折叠状态调整高度
-    if (group.isCollapsed) {
+    if (group.collapsed) {
       group.height = 30; // 只显示标题的高度
     } else {
       group.height = this.GROUP_HEIGHT; // 恢复完整高度
@@ -180,7 +163,7 @@ export class LightReceptorGroupManager {
     isActive: boolean;
   } {
     return {
-      title: group.title,
+      title: group.title || 'Untitled Group',
       nodeCount: this.NODE_COUNT,
       isActive: group.pluginInstance ? true : false
     };

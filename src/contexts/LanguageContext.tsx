@@ -171,7 +171,32 @@ const translations = {
     "simulation.pause": "暂停仿真",
     "simulation.start": "开始仿真",
 
-    // 世界类型 - 光影花园
+    // 关卡系统
+    "level.light-seeker.name": "第一关：追光者",
+    "level.light-seeker.description": "在这个世界中，智能体需要寻找并追逐移动的光源。光球会在世界中随机移动，智能体需要学会感知光线并向光源移动。",
+    "level.light-seeker.feature1": "动态移动的光球",
+    "level.light-seeker.feature2": "基础光感受器",
+    "level.light-seeker.feature3": "简单的追光行为",
+
+    "level.luminous-garden.name": "第二关：光影花园",
+    "level.luminous-garden.description": "一个充满光斑和暗物质的复杂环境。智能体需要在光明与黑暗之间找到平衡，学会利用光能并避开危险的暗物质。",
+    "level.luminous-garden.feature1": "光斑提供能量",
+    "level.luminous-garden.feature2": "暗物质消耗能量",
+    "level.luminous-garden.feature3": "复杂的生存策略",
+
+    // 世界选择界面
+    "world.selection.title": "选择关卡",
+    "world.selection.subtitle": "选择一个关卡开始你的神经网络训练之旅",
+    "world.selection.progress": "进度：{completed}/{total}",
+    "world.selection.difficulty.easy": "简单",
+    "world.selection.difficulty.medium": "中等",
+    "world.selection.difficulty.hard": "困难",
+    "world.selection.estimatedTime": "预计时间：{time}分钟",
+    "world.selection.locked": "未解锁",
+    "world.selection.completed": "已完成",
+    "world.selection.current": "当前关卡",
+
+    // 世界类型 - 光影花园（保持向后兼容）
     "world.luminous-garden.name": "光影花园",
     "world.luminous-garden.description": "一个充满动态光影的神秘世界，智能体需要学会趋光避暗，在能量与环境的平衡中生存。",
     "world.luminous-garden.feature1": "动态光斑提供能量补充",
@@ -364,7 +389,32 @@ const translations = {
     "simulation.pause": "Pause Simulation",
     "simulation.start": "Start Simulation",
 
-    // 世界类型 - 光影花园
+    // Level system
+    "level.light-seeker.name": "Level 1: Light Seeker",
+    "level.light-seeker.description": "In this world, agents need to find and chase moving light sources. Light orbs move randomly in the world, and agents need to learn to perceive light and move towards light sources.",
+    "level.light-seeker.feature1": "Dynamic moving light orbs",
+    "level.light-seeker.feature2": "Basic light receptors",
+    "level.light-seeker.feature3": "Simple light-seeking behavior",
+
+    "level.luminous-garden.name": "Level 2: Luminous Garden",
+    "level.luminous-garden.description": "A complex environment filled with light patches and dark matter. Agents need to find balance between light and darkness, learning to utilize light energy and avoid dangerous dark matter.",
+    "level.luminous-garden.feature1": "Light patches provide energy",
+    "level.luminous-garden.feature2": "Dark matter consumes energy",
+    "level.luminous-garden.feature3": "Complex survival strategies",
+
+    // World selection interface
+    "world.selection.title": "Select Level",
+    "world.selection.subtitle": "Choose a level to start your neural network training journey",
+    "world.selection.progress": "Progress: {completed}/{total}",
+    "world.selection.difficulty.easy": "Easy",
+    "world.selection.difficulty.medium": "Medium",
+    "world.selection.difficulty.hard": "Hard",
+    "world.selection.estimatedTime": "Estimated time: {time} minutes",
+    "world.selection.locked": "Locked",
+    "world.selection.completed": "Completed",
+    "world.selection.current": "Current Level",
+
+    // World types - Luminous Garden (backward compatibility)
     "world.luminous-garden.name": "Luminous Garden",
     "world.luminous-garden.description": "A mysterious world filled with dynamic light and shadow, where agents must learn to seek light and avoid darkness, surviving in the balance between energy and environment.",
     "world.luminous-garden.feature1": "Dynamic light patches provide energy",

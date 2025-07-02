@@ -44,10 +44,10 @@ const SynapseDetailEditor: React.FC<SynapseDetailEditorProps> = ({
             连接ID: <strong>{synapse.id}</strong>
           </p>
           <p style={{ margin: "4px 0" }}>
-            源节点: <strong>{synapse.from}</strong>
+            源节点: <strong>{(synapse as any).from}</strong>
           </p>
           <p style={{ margin: "4px 0" }}>
-            目标节点: <strong>{synapse.to}</strong>
+            目标节点: <strong>{(synapse as any).to}</strong>
           </p>
         </div>
       </div>

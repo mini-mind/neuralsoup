@@ -88,16 +88,10 @@ export function runAllTests() {
   }
 }
 
-// 如果直接运行此文件，执行测试
-if (typeof window !== 'undefined') {
-  // 在浏览器环境中，将测试函数暴露到全局作用域
-  (window as any).pluginSystemTest = {
-    runAllTests,
-    testWorldPluginConfigs,
-    testPluginEnabledStates,
-    testPluginManager
-  };
-  
-  console.log('插件系统测试已加载。在浏览器控制台中运行:');
-  console.log('pluginSystemTest.runAllTests()');
-}
+// 导出测试函数供手动调用
+export {
+  runAllTests,
+  testWorldPluginConfigs,
+  testPluginEnabledStates,
+  testPluginManager
+};

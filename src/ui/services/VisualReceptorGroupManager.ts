@@ -1,4 +1,4 @@
-import { VoltageInputNode } from '../../core/entities/types';
+// import { VoltageInputNode } from '../../core/entities/types';
 import { VisualReceptor, HealthReceptor } from '../../core/entities/neuron';
 import { NodeGroup, Vector2D } from '../types/editor.types';
 
@@ -91,8 +91,8 @@ export class VisualReceptorGroupManager {
     newPosition: Vector2D, 
     nodes: any[]
   ): { group: NodeGroup; nodes: any[] } {
-    const deltaX = newPosition.x - group.x;
-    const deltaY = newPosition.y - group.y;
+    // const _deltaX = newPosition.x - group.x;
+    // const _deltaY = newPosition.y - group.y;
 
     // 更新组位置
     const updatedGroup = { ...group, x: newPosition.x, y: newPosition.y };

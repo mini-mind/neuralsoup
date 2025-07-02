@@ -33,6 +33,7 @@ export interface InteractionState {
 export interface NodeGroup {
   id: string;
   type: string; // 不再限制类型，可以是任意字符串
+  title?: string; // 组标题
   x: number;
   y: number;
   width: number;

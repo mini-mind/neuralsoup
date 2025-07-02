@@ -201,3 +201,146 @@
     font-size: 15px;
   }
 }
+
+/* 世界选择标签页样式 */
+.world-selection-tab {
+  padding: 20px;
+  color: #ffffff;
+}
+
+.world-selection-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.world-selection-header h3 {
+  color: #ffffff;
+  font-size: 24px;
+  margin: 0 0 8px 0;
+  font-weight: 600;
+}
+
+.world-selection-header p {
+  color: #cccccc;
+  font-size: 14px;
+  margin: 0;
+}
+
+.current-level-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+}
+
+.current-level-card {
+  background: linear-gradient(135deg, #2a2a2a 0%, #1e1e1e 100%);
+  border-radius: 12px;
+  padding: 20px;
+  border: 2px solid #333;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 500px;
+}
+
+.current-level-card .level-icon {
+  font-size: 32px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.level-details {
+  flex: 1;
+}
+
+.level-details h4 {
+  color: #ffffff;
+  font-size: 18px;
+  margin: 0 0 8px 0;
+  font-weight: 600;
+}
+
+.level-details p {
+  color: #cccccc;
+  font-size: 14px;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+.level-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.level-meta .difficulty {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #4CAF50;
+  color: white;
+  text-transform: uppercase;
+}
+
+.level-meta .time {
+  color: #999;
+  font-size: 12px;
+}
+
+.select-level-button {
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  border: none;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.select-level-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+}
+
+.select-level-button:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .world-selection-tab {
+    padding: 16px;
+  }
+
+  .current-level-card {
+    padding: 16px;
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .current-level-card .level-icon {
+    font-size: 24px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .level-details h4 {
+    font-size: 16px;
+  }
+
+  .level-meta {
+    justify-content: center;
+  }
+}

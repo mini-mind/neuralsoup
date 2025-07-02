@@ -4,7 +4,7 @@
 
 import * as PIXI from "pixi.js";
 import type {
-  IWorldEntity, ILightPatch, IDarkMatter, ICrystalShard, IWall, IFood, IMufflingZone,
+  IWorldEntity, ILightPatch, IDarkMatter, IWall, IFood, IMufflingZone,
   IResourcePatch, ISignalBeacon, IThreat, IColorPool, IRhythmNode, ICanvasTrace, ILightOrb
 } from "../../core/world/types";
 

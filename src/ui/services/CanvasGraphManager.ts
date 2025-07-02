@@ -1,6 +1,5 @@
 import { NetworkTopology } from '../../core/entities/topology';
 import { BasicSynapse } from '../../core/entities/synapse';
-import { Vector2D } from '../types/editor.types';
 
 /**
  * 画布图结构管理器
@@ -22,19 +21,25 @@ export class CanvasGraphManager {
     const endNode = this.networkTopology.getNode(toNodeId);
     
     if (!startNode && !endNode) {
-      console.warn('无法创建边：至少需要一个节点在网络拓扑中');
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('无法创建边：至少需要一个节点在网络拓扑中');
+      }
       return false;
     }
 
     // 检查是否已存在连接
     if (this.edgeExists(fromNodeId, toNodeId)) {
-      console.warn('连接已存在');
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('连接已存在');
+      }
       return false;
     }
 
     // 自环检测
     if (fromNodeId === toNodeId) {
-      console.warn('不允许创建自环');
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('不允许创建自环');
+      }
       return false;
     }
 

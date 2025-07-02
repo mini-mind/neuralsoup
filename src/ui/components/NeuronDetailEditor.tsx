@@ -79,10 +79,10 @@ const NeuronDetailEditor: React.FC<NeuronDetailEditorProps> = ({
           }}
         >
           <div>
-            膜电位: <strong>{neuron.state?.v.toFixed(2) || "N/A"} mV</strong>
+            膜电位: <strong>{neuron.state?.v?.toFixed(2) || "N/A"} mV</strong>
           </div>
           <div>
-            恢复变量: <strong>{neuron.state?.u.toFixed(2) || "N/A"}</strong>
+            恢复变量: <strong>{neuron.state?.u?.toFixed(2) || "N/A"}</strong>
           </div>
           <div>
             发放状态: <strong>{neuron.state?.spike ? "发放中" : "静息"}</strong>
@@ -90,7 +90,7 @@ const NeuronDetailEditor: React.FC<NeuronDetailEditorProps> = ({
           <div>
             最后发放:{" "}
             <strong>
-              {neuron.state?.lastSpikeTime.toFixed(1) || "N/A"} ms
+              {neuron.state?.lastSpikeTime?.toFixed(1) || "N/A"} ms
             </strong>
           </div>
         </div>

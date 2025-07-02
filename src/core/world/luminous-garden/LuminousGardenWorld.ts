@@ -106,7 +106,7 @@ export class LuminousGardenWorld extends BaseWorld {
     
     let healthChange = 0;
     let inLightArea = false;
-    let inDarkArea = false;
+    // let _inDarkArea = false;
     
     // 检查与光斑的交互（亮区补充健康）
     for (const lightPatch of this.lightPatches.values()) {
@@ -131,7 +131,7 @@ export class LuminousGardenWorld extends BaseWorld {
         const distance = Math.sqrt(dx * dx + dy * dy);
         
         if (distance < darkMatter.radius) {
-          inDarkArea = true;
+          // _inDarkArea = true;
           // 在暗物质中，持续失去健康直到0
           const drainRate = darkMatter.drainRate;
           healthChange = Math.min(healthChange, -drainRate * deltaTime);
@@ -159,7 +159,7 @@ export class LuminousGardenWorld extends BaseWorld {
     }
   }
 
-  handleAgentInteractions(agent: IAgent): void {
+  handleAgentInteractions(_agent: IAgent): void {
     // 健康交互已在 updateHealthEffects 中处理
     // 这里可以添加其他类型的交互
   }
@@ -210,7 +210,7 @@ export class LuminousGardenWorld extends BaseWorld {
       brain: {} as any, // 简化实现
       sensors: [],
       effectors: [],
-      update: (world: any) => {
+      update: (_world: any) => {
         // 简单的更新逻辑已在世界中处理
       }
     };
@@ -220,7 +220,7 @@ export class LuminousGardenWorld extends BaseWorld {
    * 更新主agent的视觉感受器输入
    * 8个方向，每个方向统计亮区数量
    */
-  private updateMainAgentVision(deltaTime: number): void {
+  private updateMainAgentVision(_deltaTime: number): void {
     const mainAgent = this.agents.get('0');
     if (!mainAgent) return;
 
@@ -246,16 +246,16 @@ export class LuminousGardenWorld extends BaseWorld {
     const inputs = new Array(8).fill(0);
     
     // 8个方向，每个方向45度范围
-    const directions = [
-      0,           // 0度（右）
-      Math.PI / 4, // 45度
-      Math.PI / 2, // 90度（上）
-      3 * Math.PI / 4, // 135度
-      Math.PI,     // 180度（左）
-      5 * Math.PI / 4, // 225度
-      3 * Math.PI / 2, // 270度（下）
-      7 * Math.PI / 4  // 315度
-    ];
+    // const _directions = [
+    //   0,           // 0度（右）
+    //   Math.PI / 4, // 45度
+    //   Math.PI / 2, // 90度（上）
+    //   3 * Math.PI / 4, // 135度
+    //   Math.PI,     // 180度（左）
+    //   5 * Math.PI / 4, // 225度
+    //   3 * Math.PI / 2, // 270度（下）
+    //   7 * Math.PI / 4  // 315度
+    // ];
 
     // 检查每个亮区在哪个方向范围内
     for (const lightPatch of this.lightPatches.values()) {

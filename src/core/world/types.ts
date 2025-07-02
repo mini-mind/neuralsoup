@@ -139,6 +139,11 @@ export interface IWall extends IWorldEntity {
   width: number;
   height: number;
   reflectivity: number; // 反射系数 (0-1)
+
+  /**
+   * 反射声波
+   */
+  reflectSound(sourceX: number, sourceY: number, intensity: number): any;
 }
 
 /**
@@ -150,6 +155,16 @@ export interface IFood extends IWorldEntity {
   radius: number;
   echoSignature: string; // 回声特征
   isConsumed: boolean;
+
+  /**
+   * 消耗食物并返回营养值
+   */
+  consume(): number;
+
+  /**
+   * 生成回声
+   */
+  generateEcho(sourceX: number, sourceY: number, intensity: number): any;
 }
 
 /**
@@ -159,6 +174,11 @@ export interface IMufflingZone extends IWorldEntity {
   entityType: 'muffling-zone';
   radius: number;
   absorptionRate: number; // 声波吸收率 (0-1)
+
+  /**
+   * 吸收声波
+   */
+  absorbSound(sourceX: number, sourceY: number, intensity: number): number;
 }
 
 // === 意识集群世界实体 ===
@@ -194,6 +214,16 @@ export interface ISignalBeacon extends IWorldEntity {
   range: number;
   duration: number;
   createdBy: string; // 创建者ID
+
+  /**
+   * 检查指定位置是否在信号范围内
+   */
+  isInRange(x: number, y: number): boolean;
+
+  /**
+   * 获取指定位置的信号强度
+   */
+  getSignalStrength(x: number, y: number): number;
 }
 
 /**
@@ -207,6 +237,21 @@ export interface IThreat extends IWorldEntity {
   radius: number;
   targetX: number;
   targetY: number;
+
+  /**
+   * 检测目标
+   */
+  canDetect(x: number, y: number): boolean;
+
+  /**
+   * 设置狩猎目标
+   */
+  setHuntingTarget(agentId: string, x: number, y: number): void;
+
+  /**
+   * 攻击目标
+   */
+  attack(agentId: string): number;
 }
 
 // === 律动色域世界实体 ===
@@ -230,6 +275,16 @@ export interface IRhythmNode extends IWorldEntity {
   amplitude: number; // 脉冲强度
   phase: number; // 当前相位
   range: number; // 影响范围
+
+  /**
+   * 检查指定位置是否在节拍影响范围内
+   */
+  isInRange(x: number, y: number): boolean;
+
+  /**
+   * 获取指定位置的节拍强度
+   */
+  getBeatStrength(x: number, y: number): number;
 }
 
 /**
@@ -242,6 +297,16 @@ export interface ICanvasTrace extends IWorldEntity {
   width: number;
   fadeRate: number; // 淡化速度
   points: Array<{ x: number; y: number; timestamp: number }>;
+
+  /**
+   * 获取路径的总长度
+   */
+  getPathLength(): number;
+
+  /**
+   * 获取路径的复杂度（转向次数）
+   */
+  getPathComplexity(): number;
 }
 
 // === 追光者世界实体 ===
@@ -264,4 +329,9 @@ export interface ILightOrb extends IWorldEntity {
    * 检查指定位置是否在光球的影响范围内
    */
   isInInfluenceRange(x: number, y: number): boolean;
+
+  /**
+   * 获取光球的当前状态信息
+   */
+  getState(): any;
 }

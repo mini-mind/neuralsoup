@@ -15,12 +15,7 @@ import { demoSNNTopology, createDemoNetworkTopology } from './demoData';
 import { useLanguage } from '../contexts/LanguageContext';
 import { SensorDataManager } from '../ui/services/SensorDataManager';
 
-// 在开发环境中导入测试脚本
-if (process.env.NODE_ENV === 'development') {
-  import('../test/plugin-system-test');
-  import('../test/mouse-interaction-test');
-  import('../test/node-interaction-test');
-}
+
 
 const App: React.FC = () => {
   const [rightPanelWidth, setRightPanelWidth] = useState(window.innerWidth / 2); // 初始50/50分屏
@@ -156,7 +151,13 @@ const App: React.FC = () => {
 
   const handleHorizontalResize = (deltaX: number) => {
     const newWidth = rightPanelWidth - deltaX;
-    if (newWidth > 300 && newWidth < window.innerWidth - 300) {
+    const splitterWidth = 8; // 分割器宽度
+    const minPanelWidth = 300; // 面板最小宽度
+    const maxRightPanelWidth = window.innerWidth - minPanelWidth - splitterWidth; // 右侧面板最大宽度
+    const minRightPanelWidth = minPanelWidth; // 右侧面板最小宽度
+
+    // 确保新宽度在合理范围内，并且分割器始终可见
+    if (newWidth >= minRightPanelWidth && newWidth <= maxRightPanelWidth) {
       setRightPanelWidth(newWidth);
     }
   };

@@ -166,11 +166,7 @@ export class PerformanceMonitor {
 // 导出全局实例
 export const globalPerformanceMonitor = PerformanceMonitor.getInstance();
 
-// 在开发环境中暴露到全局作用域
+// 在开发环境中暴露到全局作用域（仅用于调试）
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   (window as any).performanceMonitor = globalPerformanceMonitor;
-  console.log('性能监控器已加载。使用方法:');
-  console.log('performanceMonitor.startMonitoring() - 开始监控');
-  console.log('performanceMonitor.printReport() - 查看报告');
-  console.log('performanceMonitor.stopMonitoring() - 停止监控');
 }

@@ -13,9 +13,9 @@ import '../styles/game-area.css';
  * 它包含了Canvas、统计信息浮层和游戏控制按钮。
  */
 const SimulationArea: React.FC = () => {
-  const { t } = useLanguage();
+  const { t: _t } = useLanguage();
   const [isRunning, setIsRunning] = useState(false);
-  const [fps, setFps] = useState(60);
+  const [_fps, _setFps] = useState(60);
 
   useEffect(() => {
     // 监听仿真状态变化
@@ -25,7 +25,7 @@ const SimulationArea: React.FC = () => {
 
     // 模拟FPS更新（实际应该从仿真循环中获取）
     const fpsInterval = setInterval(() => {
-      setFps(Math.floor(Math.random() * 10) + 55); // 55-65 FPS范围的模拟数据
+      _setFps(Math.floor(Math.random() * 10) + 55); // 55-65 FPS范围的模拟数据
     }, 100);
 
     return () => {
@@ -34,7 +34,7 @@ const SimulationArea: React.FC = () => {
     };
   }, []);
 
-  const handlePlayPause = () => {
+  const _handlePlayPause = () => {
     if (isRunning) {
       globalEventBus.emit('ui:stop', {});
     } else {

@@ -165,4 +165,12 @@ export class LightOrb implements IWorldEntity {
       influenceRadius: this.influenceRadius
     };
   }
+
+  /**
+   * 检查与其他实体的碰撞
+   */
+  checkCollision(_other: IWorldEntity): boolean {
+    // 光球不参与碰撞检测
+    return false;
+  }
 }

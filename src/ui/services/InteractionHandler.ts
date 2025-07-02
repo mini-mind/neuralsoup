@@ -1,5 +1,5 @@
 import { NetworkTopology } from '../../core/entities/topology';
-import { Vector2D, InteractionState, NodeGroup, CanvasTransform } from '../types/editor.types';
+import { Vector2D, NodeGroup, CanvasTransform } from '../types/editor.types';
 import { canvasToWorld, distanceToLineSegment, distance } from '../utils/geometry.utils';
 import { VisualReceptorGroupManager } from './VisualReceptorGroupManager';
 import { RotationControllerGroupManager } from './RotationControllerGroupManager';
@@ -127,7 +127,7 @@ export class InteractionHandler {
           }
         };
 
-        const nodeRadius = getNodeRadius(node.type, scale);
+        const nodeRadius = getNodeRadius(node.neuron.type, scale);
         const padding = 5; // 边界内边距
         // 标题栏高度需要考虑缩放，但保持最小值
         const titleBarHeight = Math.max(20, 20 * Math.sqrt(scale));
@@ -258,7 +258,7 @@ export class InteractionHandler {
     worldPos: Vector2D,
     groups: NodeGroup[],
     canvasScale: number,
-    canvasOffset: Vector2D
+    _canvasOffset: Vector2D
   ): NodeGroup | null {
     const buttonSize = 12;
     const buttonMargin = 4;
@@ -291,7 +291,7 @@ export class InteractionHandler {
     worldPos: Vector2D,
     groups: NodeGroup[],
     canvasScale: number,
-    canvasOffset: Vector2D
+    _canvasOffset: Vector2D
   ): NodeGroup | null {
     for (const group of groups) {
       // 计算标题栏的偏移量和尺寸
