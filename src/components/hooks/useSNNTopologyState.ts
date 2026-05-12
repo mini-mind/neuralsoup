@@ -1,9 +1,14 @@
 import { useState, useCallback } from 'react';
-import { SNNNode, SNNSynapse, Receptor, Effector, ReceptorInput, EffectorOutput, ReceptorModality } from '../../types/simulation';
+import { SNNNode, SNNSynapse, Receptor, Effector } from '../../types/simulation';
 
 export interface DetailModalData {
   type: 'neuron' | 'synapse' | 'receptor' | 'effector';
   data: any;
+}
+
+export interface SelectionStateData {
+  nodeIds: string[];
+  synapseId: string | null;
 }
 
 export interface SelectionState {
@@ -27,6 +32,13 @@ export interface DragState {
   offsetY: number;
 }
 
+export interface ConnectionDragState {
+  element: any;
+  fromType: 'node' | 'receptor' | 'effector';
+  startX: number;
+  startY: number;
+}
+
 export interface CanvasState {
   offset: { x: number; y: number };
   scale: number;
@@ -41,14 +53,16 @@ export const useSNNTopologyState = () => {
   const [effectors, setEffectors] = useState<Effector[]>([]);
 
   // 选择状态
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
-  const [selectedSynapse, setSelectedSynapse] = useState<string | null>(null);
-  const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
+  const [selection, setSelection] = useState<SelectionStateData>({
+    nodeIds: [],
+    synapseId: null
+  });
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
   // 交互状态
   const [dragging, setDragging] = useState<DragState | null>(null);
   const [connecting, setConnecting] = useState<ConnectionState | null>(null);
+  const [pendingConnection, setPendingConnection] = useState<ConnectionDragState | null>(null);
   const [isSelecting, setIsSelecting] = useState<SelectionState | null>(null);
   const [showDetailModal, setShowDetailModal] = useState<DetailModalData | null>(null);
 
@@ -63,12 +77,49 @@ export const useSNNTopologyState = () => {
   // 感受器滚动状态
   const [receptorScrollX, setReceptorScrollX] = useState(0);
 
+  const selectedNodes = selection.nodeIds;
+  const selectedNode = selection.nodeIds.length === 1 ? selection.nodeIds[0] : null;
+  const selectedSynapse = selection.synapseId;
+
   // 辅助方法
   const clearSelection = useCallback(() => {
-    setSelectedNode(null);
-    setSelectedSynapse(null);
-    setSelectedNodes([]);
+    setSelection({
+      nodeIds: [],
+      synapseId: null
+    });
   }, []);
+
+  const setSelectedNode = useCallback((nodeId: string | null) => {
+    setSelection({
+      nodeIds: nodeId ? [nodeId] : [],
+      synapseId: null
+    });
+  }, []);
+
+  const setSelectedNodes = useCallback((nodeIds: string[]) => {
+    setSelection({
+      nodeIds,
+      synapseId: null
+    });
+  }, []);
+
+  const setSelectedSynapse = useCallback((synapseId: string | null) => {
+    setSelection({
+      nodeIds: [],
+      synapseId
+    });
+  }, []);
+
+  const resetInteractionState = useCallback(() => {
+    clearSelection();
+    setHoveredNode(null);
+    setDragging(null);
+    setConnecting(null);
+    setPendingConnection(null);
+    setIsSelecting(null);
+    setShowDetailModal(null);
+    setReceptorScrollX(0);
+  }, [clearSelection]);
 
   const addNode = useCallback((node: SNNNode) => {
     setNodes(prev => [...prev, node]);
@@ -95,12 +146,14 @@ export const useSNNTopologyState = () => {
     synapses,
     receptors,
     effectors,
+    selection,
     selectedNode,
     selectedSynapse,
     selectedNodes,
     hoveredNode,
     dragging,
     connecting,
+    pendingConnection,
     isSelecting,
     showDetailModal,
     canvasOffset,
@@ -114,12 +167,14 @@ export const useSNNTopologyState = () => {
     setSynapses,
     setReceptors,
     setEffectors,
+    setSelection,
     setSelectedNode,
     setSelectedSynapse,
     setSelectedNodes,
     setHoveredNode,
     setDragging,
     setConnecting,
+    setPendingConnection,
     setIsSelecting,
     setShowDetailModal,
     setCanvasOffset,
@@ -130,6 +185,7 @@ export const useSNNTopologyState = () => {
 
     // 辅助方法
     clearSelection,
+    resetInteractionState,
     addNode,
     removeNodes,
     addSynapse,

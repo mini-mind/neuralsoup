@@ -1,11 +1,12 @@
 {
-  "name": "dynn-embodied-ai",
+  "name": "neuralsoup",
   "version": "1.0.0",
   "description": "基于PixiJS+React的具身智能体仿真 - 浮游生物SNN仿真",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "type-check": "tsc --noEmit",
     "preview": "vite preview"
   },
   "keywords": ["pixi.js", "react", "snn", "embodied-ai", "simulation"],

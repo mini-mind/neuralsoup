@@ -11,6 +11,12 @@ export class AgentController {
   private keyStates: { [key: string]: boolean } = {};
   private compiledScript: Function | null = null;
   private enablePlayerInputInScript: boolean = false;
+  private readonly handleKeyDown = (e: KeyboardEvent) => {
+    this.keyStates[e.key.toLowerCase()] = true;
+  };
+  private readonly handleKeyUp = (e: KeyboardEvent) => {
+    this.keyStates[e.key.toLowerCase()] = false;
+  };
 
   constructor() {
     this.setupKeyboardControls();
@@ -20,13 +26,8 @@ export class AgentController {
    * 设置键盘控制监听
    */
   private setupKeyboardControls(): void {
-    window.addEventListener('keydown', (e) => {
-      this.keyStates[e.key.toLowerCase()] = true;
-    });
-    
-    window.addEventListener('keyup', (e) => {
-      this.keyStates[e.key.toLowerCase()] = false;
-    });
+    window.addEventListener('keydown', this.handleKeyDown);
+    window.addEventListener('keyup', this.handleKeyUp);
   }
 
   /**
@@ -53,6 +54,10 @@ export class AgentController {
     
     // 创建新的皮质柱
     this.createCorticalColumn(agentId, visionCells);
+  }
+
+  public hasCorticalColumn(agentId: number): boolean {
+    return this.corticalColumns.has(agentId);
   }
 
   /**
@@ -191,7 +196,7 @@ export class AgentController {
   /**
    * 更新随机游走的智能体
    */
-  private updateRandomAgent(agent: Agent, deltaTime: number): void {
+  private updateRandomAgent(agent: Agent, _deltaTime: number): void {
     if (Math.random() < 0.02) {
       agent.angle += (Math.random() - 0.5) * 0.5;
     }
@@ -266,5 +271,7 @@ export class AgentController {
    */
   public destroy(): void {
     this.corticalColumns.clear();
+    window.removeEventListener('keydown', this.handleKeyDown);
+    window.removeEventListener('keyup', this.handleKeyUp);
   }
 } 

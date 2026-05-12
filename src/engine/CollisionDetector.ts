@@ -6,6 +6,7 @@
 import { Agent, Food, Obstacle } from '../types/simulation';
 
 export class CollisionDetector {
+  private static readonly AGENT_RADIUS = 15;
   
   /**
    * 处理所有碰撞
@@ -15,14 +16,19 @@ export class CollisionDetector {
     totalRewards: number;
     totalCollisions: number;
   } {
-    const foodsToRemove: Food[] = [];
+    const foodsToRemove = new Map<number, Food>();
     let totalRewards = 0;
     let totalCollisions = 0;
 
     for (const agent of agents) {
       // 检查智能体与食物的碰撞
-      const foodCollisions = this.checkFoodCollisions(agent, foods);
-      foodsToRemove.push(...foodCollisions.foodsToRemove);
+      const foodCollisions = this.checkFoodCollisions(
+        agent,
+        foods.filter(food => !foodsToRemove.has(food.id))
+      );
+      for (const food of foodCollisions.foodsToRemove) {
+        foodsToRemove.set(food.id, food);
+      }
       totalRewards += foodCollisions.reward;
 
       // 检查智能体与障碍物的碰撞
@@ -35,7 +41,7 @@ export class CollisionDetector {
     }
 
     return {
-      foodsToRemove,
+      foodsToRemove: [...foodsToRemove.values()],
       totalRewards,
       totalCollisions
     };
@@ -57,7 +63,7 @@ export class CollisionDetector {
       const distance = Math.sqrt(dx * dx + dy * dy);
       
       // 智能体半径约为15，食物半径为8
-      if (distance < 15 + food.radius) {
+      if (distance < CollisionDetector.AGENT_RADIUS + food.radius) {
         // 碰撞检测成功
         foodsToRemove.push(food);
         
@@ -83,18 +89,27 @@ export class CollisionDetector {
     let collisions = 0;
 
     for (const obstacle of obstacles) {
-      const dx = agent.x - obstacle.x;
-      const dy = agent.y - obstacle.y;
+      const nearestX = Math.max(obstacle.x - obstacle.radius, Math.min(agent.x, obstacle.x + obstacle.radius));
+      const nearestY = Math.max(obstacle.y - obstacle.radius, Math.min(agent.y, obstacle.y + obstacle.radius));
+      const dx = agent.x - nearestX;
+      const dy = agent.y - nearestY;
       const distance = Math.sqrt(dx * dx + dy * dy);
       
-      // 智能体半径为15
-      if (distance < 15 + obstacle.radius) {
-        // 碰撞处理：推开智能体
-        const pushDistance = (15 + obstacle.radius) - distance + 1;
-        const pushAngle = Math.atan2(dy, dx);
-        
-        agent.x += Math.cos(pushAngle) * pushDistance;
-        agent.y += Math.sin(pushAngle) * pushDistance;
+      if (distance < CollisionDetector.AGENT_RADIUS) {
+        const pushDistance = CollisionDetector.AGENT_RADIUS - distance + 1;
+
+        if (distance > 0) {
+          agent.x += (dx / distance) * pushDistance;
+          agent.y += (dy / distance) * pushDistance;
+        } else {
+          const fromCenterX = agent.x - obstacle.x;
+          const fromCenterY = agent.y - obstacle.y;
+          if (Math.abs(fromCenterX) > Math.abs(fromCenterY)) {
+            agent.x += Math.sign(fromCenterX || 1) * pushDistance;
+          } else {
+            agent.y += Math.sign(fromCenterY || 1) * pushDistance;
+          }
+        }
         
         // 减少健康值和增加压力
         agent.health = Math.max(0, agent.health - 5);
@@ -158,18 +173,20 @@ export class CollisionDetector {
     const dy = agent.y - food.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
     
-    return distance < 15 + food.radius;
+    return distance < CollisionDetector.AGENT_RADIUS + food.radius;
   }
 
   /**
    * 检查单个智能体与障碍物的碰撞（用于路径规划）
    */
   public checkSingleAgentObstacleCollision(agent: Agent, obstacle: Obstacle): boolean {
-    const dx = agent.x - obstacle.x;
-    const dy = agent.y - obstacle.y;
+    const nearestX = Math.max(obstacle.x - obstacle.radius, Math.min(agent.x, obstacle.x + obstacle.radius));
+    const nearestY = Math.max(obstacle.y - obstacle.radius, Math.min(agent.y, obstacle.y + obstacle.radius));
+    const dx = agent.x - nearestX;
+    const dy = agent.y - nearestY;
     const distance = Math.sqrt(dx * dx + dy * dy);
     
-    return distance < 15 + obstacle.radius;
+    return distance < CollisionDetector.AGENT_RADIUS;
   }
 
   /**

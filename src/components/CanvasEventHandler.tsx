@@ -1,4 +1,12 @@
 import { SNNNode, SNNSynapse, Receptor, Effector } from '../types/simulation';
+import {
+  EDITOR_LAYOUT,
+  getEffectorFrame,
+  getEffectorOutputPosition,
+  getNodeCenter,
+  getReceptorFrame,
+  getReceptorInputPosition
+} from './utils/editorGeometry';
 
 interface CanvasEventHandlerProps {
   canvasRef: React.RefObject<HTMLCanvasElement>;
@@ -7,18 +15,20 @@ interface CanvasEventHandlerProps {
   effectors: Effector[];
   canvasOffset: { x: number; y: number };
   canvasScale?: number;
+  receptorScrollX?: number;
 }
 
 interface ClickedElement {
-  type: 'neuron' | 'synapse' | 'receptor' | 'receptor-tab' | 'receptor-area' | 'effector';
+  type: 'neuron' | 'receptor' | 'receptor-area' | 'effector';
   element: any;
-  modalityIndex?: number;
 }
 
 /**
  * 画布事件处理工具类
  */
 export class CanvasEventHandler {
+  private static readonly SELF_SYNAPSE_LOOP_SIZE = 40;
+
   /**
    * 获取鼠标位置
    */
@@ -39,44 +49,28 @@ export class CanvasEventHandler {
   static detectClickedElement(
     x: number, 
     y: number, 
-    { canvasRef, nodes, receptors, effectors, canvasOffset, canvasScale = 1.0 }: CanvasEventHandlerProps
+    { canvasRef, nodes, receptors, effectors, canvasOffset, canvasScale = 1.0, receptorScrollX = 0 }: CanvasEventHandlerProps
   ): ClickedElement | null {
     const canvas = canvasRef.current;
     if (!canvas) return null;
 
-    // 检测感受器 - 占满宽度的布局
-    const receptorX = 20;
-    const receptorY = 20;
-    const receptorWidth = canvas.width - 40;
+    const receptorFrame = getReceptorFrame(canvas, receptors[0]);
     
     for (const receptor of receptors) {
-      if (x >= receptorX && x <= receptorX + receptorWidth &&
-          y >= receptorY && y <= receptorY + receptor.height) {
-        
-        // 检测模态标签点击
-        const tabHeight = 30;
-        const tabWidth = receptorWidth / receptor.modalities.length;
-        
-        if (y >= receptorY && y <= receptorY + tabHeight) {
-          const tabIndex = Math.floor((x - receptorX) / tabWidth);
-          if (tabIndex >= 0 && tabIndex < receptor.modalities.length) {
-            return {
-              type: 'receptor-tab' as const,
-              element: receptor,
-              modalityIndex: tabIndex
-            };
-          }
-        }
-        
+      if (
+        x >= receptorFrame.x &&
+        x <= receptorFrame.x + receptorFrame.width &&
+        y >= receptorFrame.y &&
+        y <= receptorFrame.y + receptor.height
+      ) {
         // 检测输入点击（仅在激活的模态中）
         const activeModality = receptor.modalities.find(m => m.type === receptor.activeModality);
         if (activeModality && activeModality.isExpanded) {
           for (const input of activeModality.inputs) {
-            const inputX = receptorX + input.x;
-            const inputY = receptorY + tabHeight + input.y;
-            const distance = Math.sqrt((x - inputX) ** 2 + (y - inputY) ** 2);
+            const position = getReceptorInputPosition(receptorFrame, input, receptorScrollX);
+            const distance = Math.sqrt((x - position.x) ** 2 + (y - position.y) ** 2);
             
-            if (distance <= 5) { // 5像素半径
+            if (distance <= EDITOR_LAYOUT.receptorInputRadius) {
               return {
                 type: 'receptor' as const,
                 element: input
@@ -92,20 +86,14 @@ export class CanvasEventHandler {
       }
     }
 
-    // 检测效应器 - 占满宽度的布局
-    const effectorX = 20;
-    const effectorY = canvas.height - 120;
-    const effectorWidth = canvas.width - 40;
+    const effectorFrame = getEffectorFrame(canvas, effectors[0]);
     
     for (const effector of effectors) {
-      for (let index = 0; index < effector.outputs.length; index++) {
-        const output = effector.outputs[index];
-        const spacing = effectorWidth / (effector.outputs.length + 1);
-        const outputX = effectorX + spacing * (index + 1);
-        const outputY = effectorY + output.y;
-        const distance = Math.sqrt((x - outputX) ** 2 + (y - outputY) ** 2);
+      for (const output of effector.outputs) {
+        const position = getEffectorOutputPosition(effectorFrame, output);
+        const distance = Math.sqrt((x - position.x) ** 2 + (y - position.y) ** 2);
         
-        if (distance <= 10) { // 10像素半径
+        if (distance <= EDITOR_LAYOUT.effectorOutputRadius) {
           return {
             type: 'effector' as const,
             element: output
@@ -117,11 +105,10 @@ export class CanvasEventHandler {
     // 检测神经元 - 应用缩放
     for (const node of nodes) {
       if (node.type === 'neuron') {
-        const nodeX = (node.x + canvasOffset.x) * canvasScale;
-        const nodeY = (node.y + canvasOffset.y) * canvasScale;
-        const distance = Math.sqrt((x - nodeX - 25) ** 2 + (y - nodeY - 25) ** 2);
+        const center = getNodeCenter(node, canvasOffset, canvasScale);
+        const distance = Math.sqrt((x - center.x) ** 2 + (y - center.y) ** 2);
         
-        if (distance <= 25) { // 25像素半径
+        if (distance <= EDITOR_LAYOUT.nodeRadius) {
           return {
             type: 'neuron' as const,
             element: node
@@ -140,21 +127,25 @@ export class CanvasEventHandler {
     x: number, 
     y: number, 
     synapses: SNNSynapse[],
-    { canvasRef, nodes, receptors, effectors, canvasOffset, canvasScale = 1.0 }: CanvasEventHandlerProps
+    { canvasRef, nodes, receptors, effectors, canvasOffset, canvasScale = 1.0, receptorScrollX = 0 }: CanvasEventHandlerProps
   ): SNNSynapse | null {
     const canvas = canvasRef.current;
     if (!canvas) return null;
 
-    const receptorX = 20;
-    const receptorY = 20;
-    const receptorWidth = canvas.width - 40;
-    const effectorX = 20;
-    const effectorY = canvas.height - 120;
-    const effectorWidth = canvas.width - 40;
+    const receptorFrame = getReceptorFrame(canvas, receptors[0]);
+    const effectorFrame = getEffectorFrame(canvas, effectors[0]);
 
     for (const synapse of synapses) {
+      if (synapse.from === synapse.to) {
+        const selfLoopDistance = this.distanceToSelfLoop(x, y, synapse, nodes, canvasOffset, canvasScale);
+        if (selfLoopDistance <= 8) {
+          return synapse;
+        }
+        continue;
+      }
+
       const { fromX, fromY, toX, toY } = this.getSynapseEndpoints(
-        synapse, nodes, receptors, effectors, receptorX, receptorY, effectorX, effectorY, canvasOffset, canvasScale, effectorWidth
+        synapse, nodes, receptors, effectors, receptorFrame, effectorFrame, canvasOffset, canvasScale, receptorScrollX
       );
       
       const distance = this.distanceToLine(x, y, fromX, fromY, toX, toY);
@@ -201,6 +192,40 @@ export class CanvasEventHandler {
     }
   }
 
+  private static distanceToSelfLoop(
+    px: number,
+    py: number,
+    synapse: SNNSynapse,
+    nodes: SNNNode[],
+    canvasOffset: { x: number; y: number },
+    canvasScale: number
+  ): number {
+    const node = nodes.find(candidate => candidate.id === synapse.from);
+    if (!node) {
+      return Infinity;
+    }
+
+    const center = getNodeCenter(node, canvasOffset, canvasScale);
+    const loopPoints = [
+      { x: center.x, y: center.y - 20 },
+      { x: center.x + CanvasEventHandler.SELF_SYNAPSE_LOOP_SIZE, y: center.y - CanvasEventHandler.SELF_SYNAPSE_LOOP_SIZE },
+      { x: center.x + CanvasEventHandler.SELF_SYNAPSE_LOOP_SIZE, y: center.y + CanvasEventHandler.SELF_SYNAPSE_LOOP_SIZE },
+      { x: center.x + 20, y: center.y }
+    ];
+
+    let minDistance = Infinity;
+    for (let i = 0; i < loopPoints.length - 1; i++) {
+      const start = loopPoints[i];
+      const end = loopPoints[i + 1];
+      minDistance = Math.min(
+        minDistance,
+        this.distanceToLine(px, py, start.x, start.y, end.x, end.y)
+      );
+    }
+
+    return minDistance;
+  }
+
   /**
    * 获取突触连接的端点位置
    */
@@ -209,17 +234,17 @@ export class CanvasEventHandler {
     nodes: SNNNode[], 
     receptors: Receptor[], 
     effectors: Effector[],
-    receptorX: number, 
-    receptorY: number, 
-    effectorX: number, 
-    effectorY: number,
+    receptorFrame: { x: number; y: number; width: number; height: number },
+    effectorFrame: { x: number; y: number; width: number; height: number },
     canvasOffset: { x: number; y: number },
     canvasScale: number,
-    effectorWidth?: number
+    receptorScrollX: number
   ) {
     const fromNode = nodes.find(n => n.id === synapse.from);
     let fromReceptor = null;
     let fromInput = null;
+    let fromEffector = null;
+    let fromOutput = null;
     
     // 查找感受器输入点
     for (const receptor of receptors) {
@@ -229,6 +254,17 @@ export class CanvasEventHandler {
         if (input) {
           fromReceptor = receptor;
           fromInput = input;
+          break;
+        }
+      }
+    }
+
+    if (!fromReceptor && !fromInput) {
+      for (const effector of effectors) {
+        const output = effector.outputs.find(o => o.id === synapse.from);
+        if (output) {
+          fromEffector = effector;
+          fromOutput = output;
           break;
         }
       }
@@ -243,24 +279,31 @@ export class CanvasEventHandler {
 
     // 确定起点
     if (fromNode) {
-      fromX = (fromNode.x + canvasOffset.x) * canvasScale + 25;
-      fromY = (fromNode.y + canvasOffset.y) * canvasScale + 25;
+      const center = getNodeCenter(fromNode, canvasOffset, canvasScale);
+      fromX = center.x;
+      fromY = center.y;
     } else if (fromReceptor && fromInput) {
-      fromX = receptorX + fromInput.x;
-      fromY = receptorY + 30 + fromInput.y; // 30为标签高度
+      const position = getReceptorInputPosition(receptorFrame, fromInput, receptorScrollX);
+      fromX = position.x;
+      fromY = position.y;
+    } else if (fromEffector && fromOutput) {
+      const position = getEffectorOutputPosition(effectorFrame, fromOutput);
+      fromX = position.x;
+      fromY = position.y;
     }
 
     // 确定终点
     if (toNode) {
-      toX = (toNode.x + canvasOffset.x) * canvasScale + 25;
-      toY = (toNode.y + canvasOffset.y) * canvasScale + 25;
+      const center = getNodeCenter(toNode, canvasOffset, canvasScale);
+      toX = center.x;
+      toY = center.y;
     } else if (toEffector) {
       const outputIndex = toEffector.outputs.findIndex(o => o.id === synapse.to);
       if (outputIndex !== -1) {
         const output = toEffector.outputs[outputIndex];
-        const spacing = (effectorWidth || 760) / (toEffector.outputs.length + 1); // 使用传入的宽度或默认值
-        toX = effectorX + spacing * (outputIndex + 1);
-        toY = effectorY + output.y;
+        const position = getEffectorOutputPosition(effectorFrame, output);
+        toX = position.x;
+        toY = position.y;
       }
     }
 

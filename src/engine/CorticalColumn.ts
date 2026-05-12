@@ -17,14 +17,14 @@ export class CorticalColumn {
   private dt: number;
   
   // 网络参数
-  private weights: number[][][];
-  private biases: number[][];
+  private weights: number[][][] = [];
+  private biases: number[][] = [];
   private layerSizes: number[];
   
   // 神经元状态
-  private membranePotentials: number[][];
-  private spikeMask: number[][];
-  private refractoryTimers: number[][];
+  private membranePotentials: number[][] = [];
+  private spikeMask: number[][] = [];
+  private refractoryTimers: number[][] = [];
   
   // 网络参数
   private readonly V_THRESHOLD = -55.0;

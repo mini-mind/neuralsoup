@@ -11,3 +11,7 @@ __pycache__/
 node_modules/
 dist/
 .cursor
+.harness-active
+harness-progress.txt
+harness-tasks.json
+harness-init.sh

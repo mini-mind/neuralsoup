@@ -5,6 +5,10 @@
 
 import { Agent, Food, Obstacle } from '../types/simulation';
 
+const WALL_MARGIN = 100;
+const WALL_THICKNESS = 20;
+const AGENT_RADIUS = 15;
+
 export class WorldManager {
   private worldWidth: number;
   private worldHeight: number;
@@ -15,39 +19,24 @@ export class WorldManager {
   }
 
   /**
-   * 更新世界尺寸
-   */
-  public updateDimensions(width: number, height: number): void {
-    this.worldWidth = width;
-    this.worldHeight = height;
-  }
-
-  /**
    * 创建智能体
    */
-  public createAgents(): Agent[] {
+  public createAgents(mainAgentId: number): Agent[] {
     const agents: Agent[] = [];
     const agentCount = 5;
-    
-    // 获取墙内区域的范围
-    const wallMargin = 100;
-    const wallThickness = 20;
-    const innerLeftBound = wallMargin + wallThickness;
-    const innerRightBound = this.worldWidth - wallMargin - wallThickness;
-    const innerTopBound = wallMargin + wallThickness;
-    const innerBottomBound = this.worldHeight - wallMargin - wallThickness;
+    const bounds = this.getInnerBounds();
     
     for (let i = 0; i < agentCount; i++) {
       let x, y;
       
-      if (i === 0) {
+      if (i === mainAgentId) {
         // 主智能体放在世界中心附近
-        x = this.worldWidth / 2 + (Math.random() - 0.5) * 200;
-        y = this.worldHeight / 2 + (Math.random() - 0.5) * 200;
+        x = this.clampToInnerBounds(this.worldWidth / 2 + (Math.random() - 0.5) * 200, bounds.left, bounds.right);
+        y = this.clampToInnerBounds(this.worldHeight / 2 + (Math.random() - 0.5) * 200, bounds.top, bounds.bottom);
       } else {
         // 野生智能体在墙内随机位置
-        x = innerLeftBound + Math.random() * (innerRightBound - innerLeftBound);
-        y = innerTopBound + Math.random() * (innerBottomBound - innerTopBound);
+        x = bounds.left + Math.random() * (bounds.right - bounds.left);
+        y = bounds.top + Math.random() * (bounds.bottom - bounds.top);
       }
       
       const agent: Agent = {
@@ -59,11 +48,11 @@ export class WorldManager {
         health: 100,
         energy: 100,
         visionCells: [],
-        visualInput: new Array(108).fill(0),
-        controlType: i === 0 ? 'snn' : 'random',
-              motivation: 0,
-      stress: 0,
-      homeostasis: 0.5,
+        visualInput: [],
+        controlType: i === mainAgentId ? 'snn' : 'random',
+        motivation: 0,
+        stress: 0,
+        homeostasis: 0.5,
         totalReward: 0,
         collisionCount: 0
       };
@@ -72,7 +61,7 @@ export class WorldManager {
     }
     
     console.log('Total agents created:', agents.length);
-    console.log('Wall inner bounds:', { left: innerLeftBound, right: innerRightBound, top: innerTopBound, bottom: innerBottomBound });
+    console.log('Wall inner bounds:', bounds);
     
     return agents;
   }
@@ -80,51 +69,15 @@ export class WorldManager {
   /**
    * 生成食物
    */
-  public generateFood(agents: Agent[]): Food[] {
+  public generateFood(_agents: Agent[]): Food[] {
     const foods: Food[] = [];
     const foodCount = 15;
-    
-    // 获取墙内区域的范围
-    const wallMargin = 100;
-    const wallThickness = 20;
-    const innerLeftBound = wallMargin + wallThickness;
-    const innerRightBound = this.worldWidth - wallMargin - wallThickness;
-    const innerTopBound = wallMargin + wallThickness;
-    const innerBottomBound = this.worldHeight - wallMargin - wallThickness;
-    
-    // 获取主智能体位置（用于测试）
-    const mainAgent = agents.find(agent => agent.controlType === 'snn');
+    const bounds = this.getInnerBounds();
     
     for (let i = 0; i < foodCount; i++) {
-      let x, y;
-      
-      // 前5个食物用于测试视野角度限制（如果主agent在墙内）
-      if (i < 5 && mainAgent && 
-          mainAgent.x >= innerLeftBound && mainAgent.x <= innerRightBound &&
-          mainAgent.y >= innerTopBound && mainAgent.y <= innerBottomBound) {
-        
-        const testPositions = [
-          { angle: 0, distance: 100 }, // 正前方
-          { angle: Math.PI, distance: 100 }, // 正后方
-          { angle: -Math.PI / 3, distance: 100 }, // 左侧
-          { angle: Math.PI / 3, distance: 100 }, // 右侧
-          { angle: -Math.PI / 2, distance: 100 } // 左侧外
-        ];
-        
-        const pos = testPositions[i];
-        const testAngle = mainAgent.angle + pos.angle;
-        x = mainAgent.x + Math.cos(testAngle) * pos.distance;
-        y = mainAgent.y + Math.sin(testAngle) * pos.distance;
-        
-        // 确保在墙内范围内
-        x = Math.max(innerLeftBound, Math.min(innerRightBound, x));
-        y = Math.max(innerTopBound, Math.min(innerBottomBound, y));
-      } else {
-        // 其他食物在墙内随机分布
-        x = innerLeftBound + Math.random() * (innerRightBound - innerLeftBound);
-        y = innerTopBound + Math.random() * (innerBottomBound - innerTopBound);
-      }
-      
+      const x = bounds.left + Math.random() * (bounds.right - bounds.left);
+      const y = bounds.top + Math.random() * (bounds.bottom - bounds.top);
+
       foods.push({
         id: i,
         x: x,
@@ -135,7 +88,7 @@ export class WorldManager {
     }
     
     console.log('Generated foods:', foods.length);
-    console.log('Food spawn area:', { left: innerLeftBound, right: innerRightBound, top: innerTopBound, bottom: innerBottomBound });
+    console.log('Food spawn area:', bounds);
     
     return foods;
   }
@@ -145,11 +98,9 @@ export class WorldManager {
    */
   public generateObstacles(): Obstacle[] {
     const obstacles: Obstacle[] = [];
-    const wallThickness = 20;
-    const wallMargin = 100;
-    const innerWidth = this.worldWidth - wallMargin * 2;
-    const innerHeight = this.worldHeight - wallMargin * 2;
-    const obstacleSize = wallThickness;
+    const innerWidth = this.worldWidth - WALL_MARGIN * 2;
+    const innerHeight = this.worldHeight - WALL_MARGIN * 2;
+    const obstacleSize = WALL_THICKNESS;
 
     // 计算沿边界放置障碍物的数量
     const numHorizontal = Math.floor(innerWidth / obstacleSize);
@@ -162,16 +113,16 @@ export class WorldManager {
       // 顶部墙
       obstacles.push({
         id: idCounter++,
-        x: wallMargin + i * obstacleSize + obstacleSize / 2,
-        y: wallMargin + obstacleSize / 2,
+        x: WALL_MARGIN + i * obstacleSize + obstacleSize / 2,
+        y: WALL_MARGIN + obstacleSize / 2,
         radius: obstacleSize / 2,
         isMoving: false,
       });
       // 底部墙
       obstacles.push({
         id: idCounter++,
-        x: wallMargin + i * obstacleSize + obstacleSize / 2,
-        y: wallMargin + innerHeight - obstacleSize / 2,
+        x: WALL_MARGIN + i * obstacleSize + obstacleSize / 2,
+        y: WALL_MARGIN + innerHeight - obstacleSize / 2,
         radius: obstacleSize / 2,
         isMoving: false,
       });
@@ -182,16 +133,16 @@ export class WorldManager {
       // 左侧墙
       obstacles.push({
         id: idCounter++,
-        x: wallMargin + obstacleSize / 2,
-        y: wallMargin + i * obstacleSize + obstacleSize / 2,
+        x: WALL_MARGIN + obstacleSize / 2,
+        y: WALL_MARGIN + i * obstacleSize + obstacleSize / 2,
         radius: obstacleSize / 2,
         isMoving: false,
       });
       // 右侧墙
       obstacles.push({
         id: idCounter++,
-        x: wallMargin + innerWidth - obstacleSize / 2,
-        y: wallMargin + i * obstacleSize + obstacleSize / 2,
+        x: WALL_MARGIN + innerWidth - obstacleSize / 2,
+        y: WALL_MARGIN + i * obstacleSize + obstacleSize / 2,
         radius: obstacleSize / 2,
         isMoving: false,
       });
@@ -203,11 +154,22 @@ export class WorldManager {
   }
 
   /**
-   * 处理智能体的边界碰撞（循环世界）
+   * 处理智能体的边界碰撞（有界世界）
    */
   public handleBoundaryCollision(agent: Agent): void {
-    agent.x = ((agent.x % this.worldWidth) + this.worldWidth) % this.worldWidth;
-    agent.y = ((agent.y % this.worldHeight) + this.worldHeight) % this.worldHeight;
+    const bounds = this.getInnerBounds();
+    const clampedX = this.clampToInnerBounds(agent.x, bounds.left, bounds.right);
+    const clampedY = this.clampToInnerBounds(agent.y, bounds.top, bounds.bottom);
+
+    if (clampedX !== agent.x) {
+      agent.x = clampedX;
+      agent.velocity.x = 0;
+    }
+
+    if (clampedY !== agent.y) {
+      agent.y = clampedY;
+      agent.velocity.y = 0;
+    }
   }
 
   /**
@@ -237,5 +199,28 @@ export class WorldManager {
 
   public get height(): number {
     return this.worldHeight;
+  }
+
+  public getWorldBounds() {
+    return {
+      x: WALL_MARGIN + WALL_THICKNESS + AGENT_RADIUS,
+      y: WALL_MARGIN + WALL_THICKNESS + AGENT_RADIUS,
+      width: this.worldWidth - (WALL_MARGIN + WALL_THICKNESS + AGENT_RADIUS) * 2,
+      height: this.worldHeight - (WALL_MARGIN + WALL_THICKNESS + AGENT_RADIUS) * 2
+    };
+  }
+
+  private getInnerBounds() {
+    const bounds = this.getWorldBounds();
+    return {
+      left: bounds.x,
+      right: bounds.x + bounds.width,
+      top: bounds.y,
+      bottom: bounds.y + bounds.height
+    };
+  }
+
+  private clampToInnerBounds(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
   }
 } 

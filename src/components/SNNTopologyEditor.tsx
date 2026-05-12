@@ -23,7 +23,6 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({ width, height, vi
     synapses,
     receptors,
     effectors,
-    selectedNode,
     selectedSynapse,
     connecting,
     canvasOffset,
@@ -39,16 +38,30 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({ width, height, vi
     setReceptors,
     setEffectors,
     setShowDetailModal,
-    setEnablePlayerControlOverride
+    setEnablePlayerControlOverride,
+    resetInteractionState
   } = state;
 
   // 初始化默认的SNN结构
   useEffect(() => {
     setReceptors([createDefaultReceptor(visionCells)]);
+    setSynapses(prevSynapses => prevSynapses.filter(synapse => {
+      if (!synapse.from.startsWith('vision-')) {
+        return true;
+      }
+
+      const parts = synapse.from.split('-');
+      const index = Number(parts[2]);
+      return Number.isFinite(index) && index < visionCells;
+    }));
+    resetInteractionState();
+  }, [visionCells, setReceptors, setSynapses, resetInteractionState]);
+
+  useEffect(() => {
     setEffectors([createDefaultEffector()]);
     setNodes(createDefaultNodes());
     setSynapses([]);
-  }, [visionCells, setReceptors, setEffectors, setNodes, setSynapses]);
+  }, [setEffectors, setNodes, setSynapses]);
 
   // 绘制画布内容
   const draw = useCallback(() => {
@@ -58,7 +71,6 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({ width, height, vi
       synapses,
       receptors,
       effectors,
-      selectedNode,
       selectedSynapse,
       connecting,
       canvasOffset,
@@ -68,7 +80,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({ width, height, vi
       hoveredNode,
       receptorScrollX
     });
-  }, [nodes, synapses, receptors, effectors, selectedNode, selectedSynapse, connecting, canvasOffset, canvasScale, isSelecting, selectedNodes, hoveredNode, receptorScrollX]);
+  }, [nodes, synapses, receptors, effectors, selectedSynapse, connecting, canvasOffset, canvasScale, isSelecting, selectedNodes, hoveredNode, receptorScrollX]);
 
   // 画布重绘
   useEffect(() => {
@@ -178,28 +190,32 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({ width, height, vi
   // 添加键盘事件监听
   useEffect(() => {
     window.addEventListener('keydown', events.handleKeyDown);
+    window.addEventListener('mouseup', events.stopInteraction);
     return () => {
       window.removeEventListener('keydown', events.handleKeyDown);
+      window.removeEventListener('mouseup', events.stopInteraction);
     };
-  }, [events.handleKeyDown]);
+  }, [events.handleKeyDown, events.stopInteraction]);
 
   return (
     <div className="snn-topology-editor">
       {/* 头部 - 标题和控制选项 */}
       <div className="editor-header">
         <div className="header-left">
-          <h4>模型编辑器</h4>
+          <h4>拓扑沙盒</h4>
           <span style={{fontSize: '11px', color: '#94a3b8'}}>({width}×{height})</span>
           <div 
             className="help-button" 
-            data-tooltip="模型编辑器操作指南:
+            data-tooltip="拓扑沙盒操作指南:
 双击空白处 - 添加新神经元
 左键拖拽 - 框选多个神经元或拖拽神经元
 Ctrl+左键 - 多选神经元
 Ctrl+拖拽节点 - 创建连接（hover高亮可连接目标）
 右键拖拽 - 平移画布
 Delete键 - 删除选中元素
-滚轮 - 缩放画布视图（包括网格）"
+滚轮 - 缩放画布视图（包括网格）
+
+当前沙盒仅用于独立编辑和观察局部脉冲拓扑，不会驱动左侧运行中的智能体。"
           >
             <span>?</span>
           </div>
@@ -243,7 +259,6 @@ Delete键 - 删除选中元素
                   setNodes(prev => prev.map(node => 
                     node.id === updatedNeuron.id ? updatedNeuron : node
                   ));
-                  setShowDetailModal(null);
                 }}
               />
             )}
@@ -254,7 +269,6 @@ Delete键 - 删除选中元素
                   setSynapses(prev => prev.map(synapse => 
                     synapse.id === updatedSynapse.id ? updatedSynapse : synapse
                   ));
-                  setShowDetailModal(null);
                 }}
               />
             )}

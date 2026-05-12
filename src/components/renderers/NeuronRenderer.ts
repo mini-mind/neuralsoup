@@ -9,7 +9,6 @@ export class NeuronRenderer {
     nodes: SNNNode[], 
     canvasOffset: { x: number; y: number }, 
     canvasScale: number, 
-    selectedNode: string | null, 
     selectedNodes: string[],
     hoveredNode: string | null = null
   ) {
@@ -26,12 +25,11 @@ export class NeuronRenderer {
         const v = node.state?.v || -65;
         const normalizedV = Math.max(0, (v + 65) / 95);
         ctx.fillStyle = selectedNodes.includes(node.id) ? '#a855f7' : // 紫色选中
-                       selectedNode === node.id ? '#a855f7' : // 紫色选中
                        `rgba(59, 130, 246, ${0.3 + normalizedV * 0.7})`; // 蓝色渐变
         ctx.fill();
         
         // 绘制边框 - 添加hover高亮效果
-        const isSelected = selectedNodes.includes(node.id) || selectedNode === node.id;
+        const isSelected = selectedNodes.includes(node.id);
         const isHovered = hoveredNode === node.id;
         
         if (isSelected) {

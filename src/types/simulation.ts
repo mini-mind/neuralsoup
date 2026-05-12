@@ -35,7 +35,7 @@ export interface SNNNode {
   id: string;
   x: number;
   y: number;
-  type: 'input' | 'neuron' | 'output';
+  type: 'neuron';
   label: string;
   params?: IZNeuronParams; // 神经元参数（仅神经元类型有）
   state?: IZNeuronState;   // 神经元状态（仅神经元类型有）
@@ -53,7 +53,7 @@ export interface SNNSynapse {
 }
 
 // 感受器模态类型
-export type ModalityType = 'vision' | 'audio' | 'touch';
+export type ModalityType = 'vision';
 
 // 感受器（输入连接点组）
 export interface Receptor {
@@ -116,8 +116,8 @@ export interface Agent {
   energy: number;
   
   // 视觉系统
-  visionCells: VisionCell[]; // 8个视野格子
-  visualInput: number[]; // 24维视觉输入(8格子 × 3颜色)
+  visionCells: VisionCell[]; // 运行时由 VisionSystem 配置决定数量，默认 36 格
+  visualInput: number[]; // 运行时维度 = visionCells * 3，默认 108 维
   
   // 控制类型
   controlType: 'snn' | 'random' | 'keyboard' | 'script'; // SNN控制、随机游走、键盘控制或脚本控制
@@ -156,7 +156,7 @@ export interface Obstacle {
 export interface World {
   width: number;
   height: number;
-  wallThickness: number;
+  mainAgentId: number;
   agents: Agent[];
   foods: Food[];
   obstacles: Obstacle[];

@@ -14,7 +14,6 @@ import { CollisionDetector } from './CollisionDetector';
 
 export class SimulationEngine {
   // 核心系统
-  private app: PIXI.Application;
   private renderer: WorldRenderer;
   private visionSystem: VisionSystem;
   private agentController: AgentController;
@@ -37,6 +36,7 @@ export class SimulationEngine {
   
   // 主控智能体ID
   private mainAgentId: number = 0;
+  private currentControlMode: 'snn' | 'random' | 'keyboard' | 'script' = 'keyboard';
   
   // 统计数据
   private stats = {
@@ -46,24 +46,15 @@ export class SimulationEngine {
   };
 
   // 回调函数
-  public onStatsUpdate?: (stats: any) => void;
+  public onStatsUpdate?: (stats: SimulationState['stats']) => void;
 
   constructor(app: PIXI.Application, initialWidth: number = 1600, initialHeight: number = 1200) {
-    this.app = app;
-    
     // 初始化各个系统
     this.renderer = new WorldRenderer(app);
     this.visionSystem = new VisionSystem();
     this.agentController = new AgentController();
     this.worldManager = new WorldManager(initialWidth, initialHeight);
     this.collisionDetector = new CollisionDetector();
-  }
-
-  /**
-   * 更新世界尺寸
-   */
-  public updateWorldDimensions(newWidth: number, newHeight: number): void {
-    this.worldManager.updateDimensions(newWidth, newHeight);
   }
 
   /**
@@ -95,8 +86,8 @@ export class SimulationEngine {
     for (const agent of this.agents) {
       this.visionSystem.initializeVisionCells(agent);
       
-      // 如果是SNN控制的智能体，更新皮质柱配置
-      if (agent.controlType === 'snn' && params.visionCells) {
+      // 主智能体可能在脚本/手动模式下切回SNN，维度变更时也必须保持模型同步。
+      if (params.visionCells && (agent.id === this.mainAgentId || agent.controlType === 'snn')) {
         this.agentController.updateCorticalColumnConfiguration(agent.id, params.visionCells);
       }
     }
@@ -132,7 +123,7 @@ export class SimulationEngine {
     this.renderer.setWorldDimensions(this.worldManager.width, this.worldManager.height);
     
     // 创建游戏世界
-    this.agents = this.worldManager.createAgents();
+    this.agents = this.worldManager.createAgents(this.mainAgentId);
     this.foods = this.worldManager.generateFood(this.agents);
     this.obstacles = this.worldManager.generateObstacles();
     
@@ -215,6 +206,7 @@ export class SimulationEngine {
     this.foods = [];
     this.obstacles = [];
     this.initialize();
+    this.setControlMode(this.currentControlMode);
   }
 
   /**
@@ -283,7 +275,7 @@ export class SimulationEngine {
     this.renderer.renderWorld({
       width: this.worldManager.width,
       height: this.worldManager.height,
-      wallThickness: 0,
+      mainAgentId: this.mainAgentId,
       agents: this.agents,
       foods: this.foods,
       obstacles: this.obstacles,
@@ -318,7 +310,7 @@ export class SimulationEngine {
         fps: this.fps,
         totalReward: this.stats.totalRewards,
         collisionCount: this.stats.totalCollisions,
-        neuralState: this.stats.averageNeuralState
+        neuralState: { ...this.stats.averageNeuralState }
       });
     }
   }
@@ -342,20 +334,27 @@ export class SimulationEngine {
    */
   getState(): SimulationState {
     return {
-      agents: this.agents,
-      foods: this.foods,
-      obstacles: this.obstacles,
-      worldBounds: {
-        x: 0,
-        y: 0,
-        width: this.worldManager.width,
-        height: this.worldManager.height
-      },
+      agents: this.agents.map(agent => ({
+        ...agent,
+        velocity: { ...agent.velocity },
+        visionCells: agent.visionCells.map(cell => ({
+          ...cell,
+          color: { ...cell.color }
+        })),
+        visualInput: [...agent.visualInput],
+        visionSprites: agent.visionSprites ? [...agent.visionSprites] : undefined
+      })),
+      foods: this.foods.map(food => ({ ...food })),
+      obstacles: this.obstacles.map(obstacle => ({
+        ...obstacle,
+        velocity: obstacle.velocity ? { ...obstacle.velocity } : undefined
+      })),
+      worldBounds: this.worldManager.getWorldBounds(),
       stats: {
         fps: this.fps,
         totalReward: this.stats.totalRewards,
         collisionCount: this.stats.totalCollisions,
-        neuralState: this.stats.averageNeuralState
+        neuralState: { ...this.stats.averageNeuralState }
       }
     };
   }
@@ -364,8 +363,12 @@ export class SimulationEngine {
    * 设置控制模式
    */
   public setControlMode(newMode: 'snn' | 'random' | 'keyboard' | 'script'): void {
+    this.currentControlMode = newMode;
     const mainAgent = this.getMainAgent();
     if (mainAgent) {
+      if (newMode === 'snn' && !this.agentController.hasCorticalColumn(mainAgent.id)) {
+        this.agentController.createCorticalColumn(mainAgent.id, this.visionSystem.getVisionCells());
+      }
       mainAgent.controlType = newMode;
       console.log(`Control mode changed to: ${newMode}`);
     }

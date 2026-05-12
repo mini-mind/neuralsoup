@@ -4,15 +4,11 @@
 
 ### 系统要求
 - Node.js 18+
-- npm 或 yarn
+- npm
 - 现代浏览器（支持WebGL）
 
 ### 快速启动
 ```bash
-# 克隆项目
-git clone <repository-url>
-cd neuralsoup
-
 # 安装依赖
 npm install
 
@@ -23,6 +19,8 @@ npm run dev
 npm run type-check
 ```
 
+说明：仓库当前提交的是 `package-lock.json`，默认依赖解析真源为 npm。锁文件中的 tarball URL 指向 `registry.npmmirror.com`，如需在其他 registry 环境复现，请显式配置对应 npm registry。
+
 ## 项目结构
 
 ```
@@ -32,25 +30,20 @@ neuralsoup/
 │   ├── main.tsx               # 应用入口
 │   ├── components/            # React组件
 │   │   ├── SNNTopologyEditor.tsx        # SNN编辑器主组件
-│   │   ├── CanvasEventHandler.tsx       # 画布事件处理
+│   │   ├── CanvasEventHandler.tsx       # 画布命中检测与坐标转换
 │   │   ├── hooks/                       # 自定义Hooks
-│   │   ├── renderers/                   # 渲染器组件
-│   │   ├── topology/                    # 拓扑编辑相关
-│   │   │   └── canvas/                  # 画布渲染模块
-│   │   └── utils/                       # 组件工具函数
+│   │   ├── renderers/                   # 编辑器子渲染器
+│   │   └── utils/                       # 编辑器几何与默认数据
 │   ├── engine/                # 仿真引擎
 │   │   ├── SimulationEngine.ts          # 主仿真引擎
 │   │   ├── WorldManager.ts              # 世界管理器
-│   │   ├── systems/                     # 系统模块
-│   │   │   └── rendering/               # 渲染系统
-│   │   └── renderers/                   # 渲染器
-│   │       └── effects/                 # 特效系统
+│   │   ├── WorldRenderer.ts             # Pixi 世界渲染
+│   │   └── VisionSystem.ts              # 感知系统
 │   ├── types/                 # TypeScript类型定义
-│   ├── utils/                 # 工具函数
-│   │   └── canvas/            # 画布相关工具
-│   └── styles/                # 样式文件
+│   ├── index.css              # 全局样式
+│   └── App.css                # 宿主样式
 ├── docs/                      # 项目文档
-└── public/                    # 静态资源
+└── index.html                 # Vite HTML入口
 ```
 
 ## 核心概念
@@ -62,15 +55,15 @@ neuralsoup/
 ```typescript
 // 状态管理Hook
 const {
-  nodes, synapses, receptors, effectors,
-  addNode, removeNode, updateNode
+  nodes, synapses, receptors, effectors, selection,
+  addNode, removeNodes, addSynapse
 } = useSNNTopologyState();
 
 // 事件处理Hook
 const {
   handleMouseDown, handleMouseMove, handleMouseUp,
   handleDoubleClick, handleKeyDown
-} = useSNNTopologyEvents();
+} = useSNNTopologyEvents({ canvasRef, state });
 ```
 
 ### 2. 模块化渲染系统
@@ -80,17 +73,21 @@ const {
 ```typescript
 // 主渲染协调器
 class CanvasRenderer {
-  static draw(props: CanvasRendererProps) {
-    // 协调各个子渲染器
-    GridRenderer.draw(ctx, ...);
+  static draw(state: CanvasRendererProps) {
+    // 协调各个子渲染器与共享几何
     NeuronRenderer.draw(ctx, ...);
-    SynapseRenderer.draw(ctx, ...);
   }
 }
 
 // 专用渲染器
 class NeuronRenderer {
-  static draw(ctx: CanvasRenderingContext2D, nodes: SNNNode[]) {
+  static draw(
+    ctx: CanvasRenderingContext2D,
+    nodes: SNNNode[],
+    canvasOffset: { x: number; y: number },
+    canvasScale: number,
+    selectedNodes: string[]
+  ) {
     // 专门负责神经元渲染
   }
 }
@@ -105,15 +102,15 @@ interface SNNNode {
   id: string;
   x: number;
   y: number;
-  type: 'inhibitory' | 'excitatory';
-  params: IZNeuronParams;
-  state: IZNeuronState;
+  type: 'neuron';
+  params?: IZNeuronParams;
+  state?: IZNeuronState;
 }
 
 interface SNNSynapse {
   id: string;
-  fromId: string;
-  toId: string;
+  from: string;
+  to: string;
   weight: number;
   delay: number;
 }
@@ -144,10 +141,9 @@ refactor(engine): 重构渲染系统模块化
 
 ### 3. 分支管理
 
-- `main` - 主分支，稳定版本
-- `develop` - 开发分支，功能集成
-- `feature/*` - 功能分支
-- `hotfix/*` - 紧急修复分支
+- `main` - 当前本地主分支
+- `origin/dev`、`origin/main`、`origin/release` - 当前可见远端分支
+- 如需引入新的分支约定，先以仓库当前实际分支结构为准更新文档
 
 ## 最佳实践
 
@@ -161,9 +157,9 @@ const MultiPurposeComponent = () => {
 };
 
 // ✅ 职责分离
-const CanvasRenderer = () => {}; // 只负责渲染
-const CanvasEventHandler = () => {}; // 只负责事件
-const useSNNState = () => {}; // 只负责状态
+class CanvasRenderer {} // 只负责渲染
+class CanvasEventHandler {} // 只负责命中检测与坐标转换
+const useSNNTopologyState = () => {}; // 只负责状态
 ```
 
 **组合优于继承**
@@ -171,32 +167,21 @@ const useSNNState = () => {}; // 只负责状态
 // ✅ 通过组合实现复杂功能
 const SNNTopologyEditor = () => {
   const state = useSNNTopologyState();
-  const events = useSNNTopologyEvents();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const events = useSNNTopologyEvents({ canvasRef, state });
   
   return (
-    <div>
-      <CanvasRenderer {...state} />
-      <CanvasEventHandler {...events} />
-    </div>
+    <canvas
+      ref={canvasRef}
+      onMouseDown={events.handleMouseDown}
+      onMouseMove={events.handleMouseMove}
+      onMouseUp={events.handleMouseUp}
+    />
   );
 };
 ```
 
 ### 2. 性能优化技巧
-
-**使用React.memo防止不必要重渲染**
-```typescript
-const NeuronRenderer = React.memo(({ nodes }: { nodes: SNNNode[] }) => {
-  // 只在nodes变化时重新渲染
-});
-```
-
-**使用useMemo缓存计算结果**
-```typescript
-const expensiveCalculation = useMemo(() => {
-  return nodes.map(node => calculateSomething(node));
-}, [nodes]);
-```
 
 **PixiJS对象池管理**
 ```typescript
@@ -220,7 +205,7 @@ class ErrorBoundary extends React.Component {
 **异步操作错误处理**
 ```typescript
 try {
-  await simulationEngine.initialize();
+  simulationEngine.initialize();
 } catch (error) {
   console.error('Simulation initialization failed:', error);
   // 显示用户友好的错误信息
@@ -296,11 +281,11 @@ useEffect(() => {
 2. 在`NeuronRenderer`中添加渲染逻辑
 3. 在相关Hook中添加处理逻辑
 
-### 2. 新增仿真特效
+### 2. 扩展世界渲染
 
-1. 在`engine/renderers/effects/`创建新特效类
-2. 实现`initialize`、`update`、`render`方法
-3. 在`WorldRenderer`中注册和使用
+1. 先判断能力应落在 `WorldRenderer`、`VisionSystem` 还是编辑器渲染链
+2. 直接扩展现有模块，不要重新引入不存在的 `engine/renderers/effects/` 目录
+3. 同步更新相关类型与文档，保持目录说明和真实结构一致
 
 ### 3. 集成新的学习算法
 
@@ -318,7 +303,7 @@ npm run dev
 ### 生产构建
 ```bash
 npm run build
-npm run preview  # 预览构建结果
+npx vite preview --host 0.0.0.0 --port 4173  # 预览构建结果
 ```
 
 ### Docker部署
@@ -326,25 +311,16 @@ npm run preview  # 预览构建结果
 FROM node:18-alpine
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 COPY . .
 RUN npm run build
-EXPOSE 3000
-CMD ["npm", "run", "preview"]
+EXPOSE 4173
+CMD ["npx", "vite", "preview", "--host", "0.0.0.0", "--port", "4173"]
 ```
 
 ## 代码风格
 
-### ESLint配置
-项目使用ESLint确保代码质量，主要规则：
-- 使用TypeScript严格模式
-- 优先使用函数组件和Hooks
-- 强制使用分号和单引号
-- 禁止console.log（开发环境除外）
-
-### 格式化
-使用Prettier自动格式化代码，配置：
-- 2空格缩进
-- 单引号字符串
-- 行末分号
-- 尾随逗号 
+### 当前校验
+当前仓库中应保持通过的最小校验集：
+- `npm run type-check`
+- `npm run build`

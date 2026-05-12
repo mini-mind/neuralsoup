@@ -3,10 +3,8 @@ import { SNNNode, Receptor, Effector, ReceptorInput, EffectorOutput, ReceptorMod
 export const createDefaultReceptor = (visionCells: number = 36): Receptor => {
   // 创建视觉感受器 - 增加节点间距，优化排布
   const visionInputs: ReceptorInput[] = [];
-  const nodeSize = 12; // 固定节点尺寸
   const nodeSpacing = 24; // 增加节点间距，减少密集程度
   const startX = 16; // 增加起始X位置
-  const receptorHeight = 80; // 增加感受器高度以适应新排布
   
   // 计算感受器内容宽度（所有节点）
   const contentWidth = startX * 2 + visionCells * nodeSpacing;

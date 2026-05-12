@@ -1,6 +1,6 @@
 # NeuralSoup - 具身智能体仿真系统
 
-基于 TypeScript + React + PixiJS 的脉冲神经网络编辑器和智能体仿真平台。
+`neuralsoup` 是一个基于 TypeScript + React + PixiJS 的脉冲神经网络编辑器和具身智能体仿真平台。
 
 ## 核心特性
 
@@ -14,28 +14,28 @@
 ```bash
 npm install  # 安装依赖
 npm run dev  # 启动开发服务器 (http://localhost:3000)
+npm run type-check  # 运行类型检查
 ```
 
 ## 项目结构
 
 ```
 src/
-├── components/          # React组件
-│   ├── SNNTopologyEditor.tsx     # SNN编辑器
-│   ├── hooks/                    # 状态管理Hook
-│   └── topology/canvas/          # 画布渲染
-├── engine/              # 仿真引擎
-│   ├── systems/rendering/        # 渲染系统
-│   └── renderers/effects/        # 特效系统
-├── types/               # TypeScript类型
-└── utils/canvas/        # 画布工具
+├── App.tsx              # 顶层编排与控制面
+├── components/          # 编辑器与仿真宿主组件
+│   ├── hooks/           # 编辑器交互状态与事件
+│   ├── renderers/       # 编辑器子渲染器
+│   └── utils/           # 编辑器几何与默认数据
+├── engine/              # 仿真核心引擎
+├── types/               # 共享类型定义
+└── main.tsx             # 应用入口
 ```
 
 ## 使用指南
 
 ### SNN编辑器
 - 双击空白处：添加神经元
-- Ctrl+拖拽：创建连接
+- Ctrl+按下节点后拖拽：创建连接
 - Delete键：删除选中元素
 - 滚轮：缩放画布
 

@@ -1,9 +1,16 @@
 import React from 'react';
-import { SNNNode, SNNSynapse, Receptor, Effector, ReceptorModality } from '../types/simulation';
+import { SNNNode, SNNSynapse, Receptor, Effector } from '../types/simulation';
 import { ReceptorRenderer } from './renderers/ReceptorRenderer';
 import { EffectorRenderer } from './renderers/EffectorRenderer';
 import { NeuronRenderer } from './renderers/NeuronRenderer';
-import { drawArrow, drawSelfConnection, getWeightColor } from './utils/renderUtils';
+import { drawArrow } from './utils/renderUtils';
+import {
+  getEffectorFrame,
+  getEffectorOutputPosition,
+  getNodeCenter,
+  getReceptorFrame,
+  getReceptorInputPosition
+} from './utils/editorGeometry';
 
 interface CanvasRendererProps {
   canvasRef: React.RefObject<HTMLCanvasElement>;
@@ -11,7 +18,6 @@ interface CanvasRendererProps {
   synapses: SNNSynapse[];
   receptors: Receptor[];
   effectors: Effector[];
-  selectedNode: string | null;
   selectedSynapse: string | null;
   connecting: {
     from: string;
@@ -42,7 +48,6 @@ export class CanvasRenderer {
     synapses,
     receptors,
     effectors,
-    selectedNode,
     selectedSynapse,
     connecting,
     canvasOffset,
@@ -62,38 +67,33 @@ export class CanvasRenderer {
     ctx.fillStyle = '#1e1e1e';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 计算固定位置 - 使用百分比布局确保在可视区域内
-    const receptorX = 10; // 稍微增加边距
-    const receptorY = 10; // 稍微增加边距
-    const receptorWidth = canvas.width - 20; // 减少宽度
-    const effectorX = 10; // 稍微增加边距
-    const effectorY = canvas.height - 100; // 留更多底部空间，避免被边框遮挡
-    const effectorWidth = canvas.width - 20; // 减少宽度
+    const receptorFrame = getReceptorFrame(canvas, receptors[0]);
+    const effectorFrame = getEffectorFrame(canvas, effectors[0]);
+
+    // 网格应位于所有交互内容之下，避免盖住连接线和框选反馈。
+    this.drawGrid(ctx, canvas.width, canvas.height, canvasOffset, canvasScale);
 
     // 绘制感受器
-    ReceptorRenderer.draw(ctx, receptors, receptorX, receptorY, receptorWidth, receptorScrollX);
+    ReceptorRenderer.draw(ctx, receptors, receptorFrame, receptorScrollX);
 
     // 绘制效应器
-    EffectorRenderer.draw(ctx, effectors, effectorX, effectorY, effectorWidth);
+    EffectorRenderer.draw(ctx, effectors, effectorFrame);
 
     // 绘制突触连接
-    this.drawSynapses(ctx, synapses, nodes, receptors, effectors, receptorX, receptorY, effectorX, effectorY, canvasOffset, canvasScale, selectedSynapse, effectorWidth);
+    this.drawSynapses(ctx, synapses, nodes, receptors, effectors, receptorFrame, effectorFrame, canvasOffset, canvasScale, selectedSynapse, receptorScrollX);
 
     // 绘制神经元
-    NeuronRenderer.draw(ctx, nodes, canvasOffset, canvasScale, selectedNode, selectedNodes, hoveredNode);
+    NeuronRenderer.draw(ctx, nodes, canvasOffset, canvasScale, selectedNodes, hoveredNode);
 
     // 绘制正在连接的线
     if (connecting) {
-      this.drawConnectingLine(ctx, connecting, nodes, receptors, effectors, receptorX, receptorY, effectorX, effectorY, canvasOffset, canvasScale);
+      this.drawConnectingLine(ctx, connecting, nodes, receptors, effectors, receptorFrame, effectorFrame, canvasOffset, canvasScale, receptorScrollX);
     }
 
     // 绘制框选
     if (isSelecting) {
       this.drawSelectionBox(ctx, isSelecting);
     }
-
-    // 添加网格背景（可选）
-    this.drawGrid(ctx, canvas.width, canvas.height, canvasOffset, canvasScale);
   }
 
   private static drawGrid(ctx: CanvasRenderingContext2D, width: number, height: number, canvasOffset: { x: number; y: number }, canvasScale: number) {
@@ -128,18 +128,16 @@ export class CanvasRenderer {
     nodes: SNNNode[], 
     receptors: Receptor[], 
     effectors: Effector[],
-    receptorX: number, 
-    receptorY: number, 
-    effectorX: number, 
-    effectorY: number,
+    receptorFrame: { x: number; y: number; width: number; height: number },
+    effectorFrame: { x: number; y: number; width: number; height: number },
     canvasOffset: { x: number; y: number },
     canvasScale: number,
     selectedSynapse: string | null,
-    effectorWidth: number
+    receptorScrollX: number
   ) {
     synapses.forEach(synapse => {
       const { fromX, fromY, toX, toY } = this.getSynapseEndpoints(
-        synapse, nodes, receptors, effectors, receptorX, receptorY, effectorX, effectorY, canvasOffset, canvasScale, effectorWidth
+        synapse, nodes, receptors, effectors, receptorFrame, effectorFrame, canvasOffset, canvasScale, receptorScrollX
       );
 
       // 检查是否是自连接（同一个节点）
@@ -199,12 +197,11 @@ export class CanvasRenderer {
     nodes: SNNNode[], 
     receptors: Receptor[], 
     effectors: Effector[],
-    receptorX: number, 
-    receptorY: number, 
-    effectorX: number,
-    effectorY: number,
+    receptorFrame: { x: number; y: number; width: number; height: number },
+    effectorFrame: { x: number; y: number; width: number; height: number },
     canvasOffset: { x: number; y: number },
-    canvasScale: number
+    canvasScale: number,
+    receptorScrollX: number
   ) {
     ctx.setLineDash([5, 5]);
     ctx.strokeStyle = '#a855f7'; // 紫色连接线
@@ -215,29 +212,30 @@ export class CanvasRenderer {
     if (connecting.fromType === 'node') {
       const fromNode = nodes.find(n => n.id === connecting.from);
       if (fromNode) {
-        fromX = (fromNode.x + canvasOffset.x) * canvasScale + 25;
-        fromY = (fromNode.y + canvasOffset.y) * canvasScale + 25;
+        const center = getNodeCenter(fromNode, canvasOffset, canvasScale);
+        fromX = center.x;
+        fromY = center.y;
       }
     } else if (connecting.fromType === 'receptor') {
-      // 查找感受器输入点
       for (const receptor of receptors) {
         const activeModality = receptor.modalities.find(m => m.type === receptor.activeModality);
         if (activeModality) {
           const input = activeModality.inputs.find(i => i.id === connecting.from);
           if (input) {
-            fromX = receptorX + input.x;
-            fromY = receptorY + input.y;
+            const position = getReceptorInputPosition(receptorFrame, input, receptorScrollX);
+            fromX = position.x;
+            fromY = position.y;
             break;
           }
         }
       }
     } else if (connecting.fromType === 'effector') {
-      // 查找效应器输出点
       for (const effector of effectors) {
         const output = effector.outputs.find(o => o.id === connecting.from);
         if (output) {
-          fromX = effectorX + output.x;
-          fromY = effectorY + output.y;
+          const position = getEffectorOutputPosition(effectorFrame, output);
+          fromX = position.x;
+          fromY = position.y;
           break;
         }
       }
@@ -254,13 +252,11 @@ export class CanvasRenderer {
     nodes: SNNNode[], 
     receptors: Receptor[], 
     effectors: Effector[],
-    receptorX: number, 
-    receptorY: number, 
-    effectorX: number, 
-    effectorY: number,
+    receptorFrame: { x: number; y: number; width: number; height: number },
+    effectorFrame: { x: number; y: number; width: number; height: number },
     canvasOffset: { x: number; y: number },
     canvasScale: number,
-    effectorWidth: number
+    receptorScrollX: number
   ) {
     const fromNode = nodes.find(n => n.id === synapse.from);
     let fromReceptor = null;
@@ -303,25 +299,30 @@ export class CanvasRenderer {
 
     // 确定起点中心
     if (fromNode) {
-      fromCenterX = (fromNode.x + canvasOffset.x) * canvasScale + 25;
-      fromCenterY = (fromNode.y + canvasOffset.y) * canvasScale + 25;
+      const center = getNodeCenter(fromNode, canvasOffset, canvasScale);
+      fromCenterX = center.x;
+      fromCenterY = center.y;
     } else if (fromReceptor && fromInput) {
-      fromCenterX = receptorX + fromInput.x;
-      fromCenterY = receptorY + fromInput.y;
+      const position = getReceptorInputPosition(receptorFrame, fromInput, receptorScrollX);
+      fromCenterX = position.x;
+      fromCenterY = position.y;
     } else if (fromEffector && fromOutput) {
-      fromCenterX = effectorX + fromOutput.x;
-      fromCenterY = effectorY + fromOutput.y;
+      const position = getEffectorOutputPosition(effectorFrame, fromOutput);
+      fromCenterX = position.x;
+      fromCenterY = position.y;
     }
 
     // 确定终点中心
     if (toNode) {
-      toCenterX = (toNode.x + canvasOffset.x) * canvasScale + 25;
-      toCenterY = (toNode.y + canvasOffset.y) * canvasScale + 25;
+      const center = getNodeCenter(toNode, canvasOffset, canvasScale);
+      toCenterX = center.x;
+      toCenterY = center.y;
     } else if (toEffector) {
       const output = toEffector.outputs.find(o => o.id === synapse.to);
       if (output) {
-        toCenterX = effectorX + output.x;
-        toCenterY = effectorY + output.y;
+        const position = getEffectorOutputPosition(effectorFrame, output);
+        toCenterX = position.x;
+        toCenterY = position.y;
       }
     }
 

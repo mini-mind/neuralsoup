@@ -9,6 +9,7 @@ interface UseConnectionLogicProps {
   effectors: any[];
   canvasOffset: { x: number; y: number };
   canvasScale: number;
+  receptorScrollX: number;
   connecting: any;
   setConnecting: (connecting: any) => void;
   setHoveredNode: (nodeId: string | null) => void;
@@ -22,6 +23,7 @@ export const useConnectionLogic = ({
   effectors,
   canvasOffset,
   canvasScale,
+  receptorScrollX,
   connecting,
   setConnecting,
   setHoveredNode,
@@ -56,7 +58,8 @@ export const useConnectionLogic = ({
       receptors,
       effectors,
       canvasOffset,
-      canvasScale
+      canvasScale,
+      receptorScrollX
     });
     
     // 设置hover状态
@@ -65,7 +68,7 @@ export const useConnectionLogic = ({
     } else {
       setHoveredNode(null);
     }
-  }, [connecting, canvasRef, nodes, receptors, effectors, canvasOffset, canvasScale, setConnecting, setHoveredNode, canConnectTo]);
+  }, [connecting, canvasRef, nodes, receptors, effectors, canvasOffset, canvasScale, receptorScrollX, setConnecting, setHoveredNode, canConnectTo]);
 
   // 开始连接
   const startConnection = useCallback((element: any, elementType: string, x: number, y: number) => {
@@ -87,7 +90,8 @@ export const useConnectionLogic = ({
       receptors,
       effectors,
       canvasOffset,
-      canvasScale
+      canvasScale,
+      receptorScrollX
     });
 
     if (clicked && canConnectTo(clicked)) {
@@ -103,7 +107,7 @@ export const useConnectionLogic = ({
     
     setConnecting(null);
     setHoveredNode(null);
-  }, [connecting, canvasRef, nodes, receptors, effectors, canvasOffset, canvasScale, canConnectTo, addSynapse, setConnecting, setHoveredNode]);
+  }, [connecting, canvasRef, nodes, receptors, effectors, canvasOffset, canvasScale, receptorScrollX, canConnectTo, addSynapse, setConnecting, setHoveredNode]);
 
   // 取消连接
   const cancelConnection = useCallback(() => {

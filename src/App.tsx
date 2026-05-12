@@ -1,11 +1,23 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import SimulationCanvas from './components/SimulationCanvas';
 import SNNTopologyEditor from './components/SNNTopologyEditor';
 import AgentParametersModal, { AgentParameters } from './components/AgentParametersModal';
 import { SimulationEngine } from './engine/SimulationEngine';
+import type { SimulationState } from './types/simulation';
 import './App.css';
 
 type ControlMode = 'manual' | 'script' | 'snn';
+
+const mapControlModeToEngine = (mode: ControlMode): 'keyboard' | 'script' | 'snn' => {
+  switch (mode) {
+    case 'manual':
+      return 'keyboard';
+    case 'script':
+      return 'script';
+    case 'snn':
+      return 'snn';
+  }
+};
 
 const App: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
@@ -58,8 +70,7 @@ if (centerFood > 2) {
     visionRange: 250,
     visionAngle: 120
   });
-
-  const engineRef = useRef<SimulationEngine | null>(null);
+  const [engine, setEngine] = useState<SimulationEngine | null>(null);
 
   // 计算画布尺寸
   const calculateCanvasDimensions = useCallback(() => {
@@ -77,28 +88,33 @@ if (centerFood > 2) {
     };
   }, [calculateCanvasDimensions]);
 
+  useEffect(() => {
+    if (!engine) {
+      return;
+    }
+
+    engine.setScriptCode(scriptCode);
+    engine.setEnablePlayerInputInScript(enablePlayerInputInScript);
+    engine.setControlMode(mapControlModeToEngine(controlMode));
+  }, [engine, controlMode, scriptCode, enablePlayerInputInScript]);
+
   const handleStartPause = useCallback(() => {
+    if (!engine) {
+      return;
+    }
+
     if (!isRunning) {
-      // 开始运行
+      engine.start();
       setIsRunning(true);
       setIsPaused(false);
-      if (engineRef.current) {
-        engineRef.current.start();
-      }
     } else if (isPaused) {
-      // 从暂停状态恢复
+      engine.resume();
       setIsPaused(false);
-      if (engineRef.current) {
-        (engineRef.current as any).resume();
-      }
     } else {
-      // 暂停
+      engine.pause();
       setIsPaused(true);
-      if (engineRef.current) {
-        engineRef.current.pause();
-      }
     }
-  }, [isRunning, isPaused]);
+  }, [engine, isRunning, isPaused]);
 
   const handleReset = useCallback(() => {
     setIsRunning(false);
@@ -109,33 +125,27 @@ if (centerFood > 2) {
       collisionCount: 0,
       neuralState: { motivation: 0, stress: 0, homeostasis: 0.5 }
     });
-    if (engineRef.current) {
-      engineRef.current.reset();
+    if (engine) {
+      engine.reset();
     }
-  }, []);
+  }, [engine]);
 
-  const handleStatsUpdate = useCallback((newStats: any) => {
+  const handleStatsUpdate = useCallback((newStats: SimulationState['stats']) => {
     setStats(newStats);
   }, []);
 
   const handleEngineReady = useCallback((engine: SimulationEngine) => {
-    engineRef.current = engine;
-    
-    // 获取并设置初始参数
-    if (typeof (engine as any).getAgentParameters === 'function') {
-      const initialParams = (engine as any).getAgentParameters();
-      setAgentParameters(initialParams);
-    }
+    setEngine(engine);
+    setAgentParameters(engine.getAgentParameters());
   }, []);
 
   const handleAgentParametersApply = useCallback((params: AgentParameters) => {
     setAgentParameters(params);
-    
-    // 更新引擎参数
-    if (engineRef.current && typeof (engineRef.current as any).updateAgentParameters === 'function') {
-      (engineRef.current as any).updateAgentParameters(params);
+
+    if (engine) {
+      engine.updateAgentParameters(params);
     }
-  }, []);
+  }, [engine]);
 
   const formatNumber = (num: number): string => {
     return num.toLocaleString();
@@ -258,10 +268,6 @@ if (centerFood > 2) {
         <SimulationCanvas 
           width={canvasWidth}
           height={canvasHeight}
-          isRunning={isRunning && !isPaused}
-          controlMode={controlMode}
-          scriptCode={scriptCode}
-          enablePlayerInputInScript={enablePlayerInputInScript}
           onStatsUpdate={handleStatsUpdate}
           onEngineReady={handleEngineReady}
         />
@@ -320,7 +326,7 @@ if (centerFood > 2) {
             >
               <option value="manual">手动控制</option>
               <option value="script">脚本控制</option>
-              <option value="snn">模型控制</option>
+              <option value="snn">拓扑沙盒</option>
             </select>
           </div>
         </div>
