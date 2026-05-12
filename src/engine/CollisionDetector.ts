@@ -132,7 +132,7 @@ export class CollisionDetector {
     let collisions = 0;
 
     for (const otherAgent of agents) {
-      if (agent.id === otherAgent.id) continue;
+      if (agent.id >= otherAgent.id) continue;
       
       const dx = agent.x - otherAgent.x;
       const dy = agent.y - otherAgent.y;

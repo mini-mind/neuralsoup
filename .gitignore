@@ -10,6 +10,8 @@ __pycache__/
 .env.production.local
 node_modules/
 dist/
+playwright-report/
+test-results/
 .cursor
 .harness-active
 harness-progress.txt

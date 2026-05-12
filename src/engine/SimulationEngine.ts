@@ -47,6 +47,7 @@ export class SimulationEngine {
 
   // 回调函数
   public onStatsUpdate?: (stats: SimulationState['stats']) => void;
+  public onLifecycleChange?: (state: 'idle' | 'running' | 'paused') => void;
 
   constructor(app: PIXI.Application, initialWidth: number = 1600, initialHeight: number = 1200) {
     // 初始化各个系统
@@ -145,6 +146,7 @@ export class SimulationEngine {
     }
     
     this.renderWorld();
+    this.emitLifecycleChange();
     console.log(`仿真系统初始化完成: ${this.agents.length}个智能体`);
   }
 
@@ -156,6 +158,7 @@ export class SimulationEngine {
     this.isRunning = true;
     this.isPaused = false;
     this.lastTime = performance.now();
+    this.emitLifecycleChange();
     if (!this.gameLoopRunning) {
       this.gameLoopRunning = true;
       this.gameLoop();
@@ -168,6 +171,7 @@ export class SimulationEngine {
   pause(): void {
     console.log('暂停仿真...');
     this.isPaused = true;
+    this.emitLifecycleChange();
   }
 
   /**
@@ -177,6 +181,7 @@ export class SimulationEngine {
     console.log('恢复仿真...');
     this.isPaused = false;
     this.lastTime = performance.now();
+    this.emitLifecycleChange();
   }
 
   /**
@@ -187,6 +192,7 @@ export class SimulationEngine {
     this.isRunning = false;
     this.isPaused = false;
     this.gameLoopRunning = false;
+    this.emitLifecycleChange();
   }
 
   /**
@@ -196,6 +202,7 @@ export class SimulationEngine {
     this.stop();
     this.simulationTime = 0;
     this.frameCount = 0;
+    this.fps = 0;
     this.stats = {
       totalRewards: 0,
       totalCollisions: 0,
@@ -372,6 +379,18 @@ export class SimulationEngine {
       mainAgent.controlType = newMode;
       console.log(`Control mode changed to: ${newMode}`);
     }
+  }
+
+  public getLifecycleState(): 'idle' | 'running' | 'paused' {
+    if (!this.isRunning) {
+      return 'idle';
+    }
+
+    return this.isPaused ? 'paused' : 'running';
+  }
+
+  private emitLifecycleChange(): void {
+    this.onLifecycleChange?.(this.getLifecycleState());
   }
 
   /**

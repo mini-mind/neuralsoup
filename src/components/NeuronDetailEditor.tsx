@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { SNNNode } from '../types/simulation';
 
 interface NeuronDetailEditorProps {
@@ -9,6 +9,11 @@ interface NeuronDetailEditorProps {
 const NeuronDetailEditor: React.FC<NeuronDetailEditorProps> = ({ neuron, onUpdate }) => {
   const [label, setLabel] = useState(neuron.label);
   const [params, setParams] = useState(neuron.params || { a: 0.02, b: 0.2, c: -65, d: 8, threshold: 30 });
+
+  useEffect(() => {
+    setLabel(neuron.label);
+    setParams(neuron.params || { a: 0.02, b: 0.2, c: -65, d: 8, threshold: 30 });
+  }, [neuron.id]);
 
   const handleParamChange = (paramName: keyof typeof params, value: number) => {
     const newParams = { ...params, [paramName]: value };
@@ -39,6 +44,7 @@ const NeuronDetailEditor: React.FC<NeuronDetailEditorProps> = ({ neuron, onUpdat
           神经元标签:
         </label>
         <input
+          data-testid="neuron-label-input"
           type="text"
           value={label}
           onChange={(e) => handleLabelChange(e.target.value)}

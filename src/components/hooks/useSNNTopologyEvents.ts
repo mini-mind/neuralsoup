@@ -62,8 +62,49 @@ export const useSNNTopologyEvents = ({ canvasRef, state }: UseSNNTopologyEventsP
     setHoveredNode,
     addSynapse
   });
+  const canStartConnectionFrom = useCallback((clickedType: 'neuron' | 'receptor' | 'effector') => {
+    return clickedType === 'neuron' || clickedType === 'receptor';
+  }, []);
 
-  const stopInteraction = useCallback(() => {
+  const completePointerInteraction = useCallback((x: number, y: number) => {
+    if (connecting) {
+      connectionLogic.finishConnection(x, y);
+    }
+    state.setPendingConnection(null);
+    
+    if (isSelecting) {
+      const { startX, startY, currentX, currentY } = isSelecting;
+      const minX = Math.min(startX, currentX);
+      const maxX = Math.max(startX, currentX);
+      const minY = Math.min(startY, currentY);
+      const maxY = Math.max(startY, currentY);
+      
+      const selectedInBox = nodes
+        .filter(node => node.type === 'neuron')
+        .filter(node => {
+          const center = getNodeCenter(node, canvasOffset, canvasScale);
+          return center.x >= minX && center.x <= maxX && center.y >= minY && center.y <= maxY;
+        })
+        .map(node => node.id);
+      
+      setSelectedNodes(selectedInBox);
+      setIsSelecting(null);
+    }
+    
+    setDragging(null);
+    setIsDraggingCanvas(null);
+  }, [connecting, connectionLogic, isSelecting, nodes, canvasOffset, canvasScale, setSelectedNodes, setIsSelecting, setDragging, setIsDraggingCanvas, state]);
+
+  const stopInteraction = useCallback((event?: MouseEvent) => {
+    if (event && canvasRef.current) {
+      if (event.target === canvasRef.current) {
+        return;
+      }
+      const rect = canvasRef.current.getBoundingClientRect();
+      completePointerInteraction(event.clientX - rect.left, event.clientY - rect.top);
+      return;
+    }
+
     state.setPendingConnection(null);
     setDragging(null);
     setIsDraggingCanvas(null);
@@ -71,7 +112,7 @@ export const useSNNTopologyEvents = ({ canvasRef, state }: UseSNNTopologyEventsP
     if (connecting) {
       connectionLogic.cancelConnection();
     }
-  }, [connecting, connectionLogic, setDragging, setIsDraggingCanvas, setIsSelecting, state]);
+  }, [canvasRef, completePointerInteraction, connecting, connectionLogic, setDragging, setIsDraggingCanvas, setIsSelecting, state]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = CanvasEventHandler.getMousePos(e, canvasRef);
@@ -93,12 +134,13 @@ export const useSNNTopologyEvents = ({ canvasRef, state }: UseSNNTopologyEventsP
       if (clicked) {
         if (clicked.type === 'neuron' || clicked.type === 'receptor' || clicked.type === 'effector') {
           if (e.ctrlKey) {
+            if (!canStartConnectionFrom(clicked.type)) {
+              return;
+            }
             const fromType =
               clicked.type === 'receptor'
                 ? 'receptor'
-                : clicked.type === 'effector'
-                  ? 'effector'
-                  : 'node';
+                : 'node';
             state.setPendingConnection({
               element: clicked.element,
               fromType,
@@ -142,7 +184,7 @@ export const useSNNTopologyEvents = ({ canvasRef, state }: UseSNNTopologyEventsP
         }
       }
     }
-  }, [canvasRef, nodes, synapses, receptors, effectors, selectedNodes, canvasOffset, canvasScale, receptorScrollX, setSelectedNode, setSelectedNodes, setDragging, setSelectedSynapse, setIsDraggingCanvas, setIsSelecting, clearSelection, state]);
+  }, [canStartConnectionFrom, canvasRef, nodes, synapses, receptors, effectors, selectedNodes, canvasOffset, canvasScale, receptorScrollX, setSelectedNode, setSelectedNodes, setDragging, setSelectedSynapse, setIsDraggingCanvas, setIsSelecting, clearSelection, state]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = CanvasEventHandler.getMousePos(e, canvasRef);
@@ -211,35 +253,6 @@ export const useSNNTopologyEvents = ({ canvasRef, state }: UseSNNTopologyEventsP
     }
   }, [canvasRef, connecting, connectionLogic, isSelecting, isDraggingCanvas, dragging, selectedNodes, nodes, canvasOffset, canvasScale, setIsSelecting, setCanvasOffset, setIsDraggingCanvas, setNodes, state]);
 
-  const completePointerInteraction = useCallback((x: number, y: number) => {
-    if (connecting) {
-      connectionLogic.finishConnection(x, y);
-    }
-    state.setPendingConnection(null);
-    
-    if (isSelecting) {
-      const { startX, startY, currentX, currentY } = isSelecting;
-      const minX = Math.min(startX, currentX);
-      const maxX = Math.max(startX, currentX);
-      const minY = Math.min(startY, currentY);
-      const maxY = Math.max(startY, currentY);
-      
-      const selectedInBox = nodes
-        .filter(node => node.type === 'neuron')
-        .filter(node => {
-          const center = getNodeCenter(node, canvasOffset, canvasScale);
-          return center.x >= minX && center.x <= maxX && center.y >= minY && center.y <= maxY;
-        })
-        .map(node => node.id);
-      
-      setSelectedNodes(selectedInBox);
-      setIsSelecting(null);
-    }
-    
-    setDragging(null);
-    setIsDraggingCanvas(null);
-  }, [connecting, connectionLogic, isSelecting, nodes, canvasOffset, canvasScale, setSelectedNodes, setIsSelecting, setDragging, setIsDraggingCanvas, state]);
-
   const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = CanvasEventHandler.getMousePos(e, canvasRef);
     completePointerInteraction(x, y);
@@ -267,12 +280,9 @@ export const useSNNTopologyEvents = ({ canvasRef, state }: UseSNNTopologyEventsP
     });
 
     if (clicked && clicked.type === 'neuron') {
-      state.setShowDetailModal({ type: 'neuron', data: clicked.element });
+      state.setShowDetailModal({ type: 'neuron', id: clicked.element.id });
     } else if (clickedSynapse) {
-      const synapse = synapses.find(s => s.id === clickedSynapse.id);
-      if (synapse) {
-        state.setShowDetailModal({ type: 'synapse', data: synapse });
-      }
+      state.setShowDetailModal({ type: 'synapse', id: clickedSynapse.id });
     } else if (!clicked) {
       const newNode: SNNNode = {
         id: `neuron-${Date.now()}`,
@@ -317,16 +327,17 @@ export const useSNNTopologyEvents = ({ canvasRef, state }: UseSNNTopologyEventsP
       const zoom = Math.exp(wheel * zoomIntensity);
       
       const newScale = Math.max(0.5, Math.min(3.0, canvasScale * zoom));
-      
-      const factor = newScale / canvasScale - 1;
-      setCanvasOffset(prev => ({
-        x: prev.x - (x / canvasScale - prev.x) * factor,
-        y: prev.y - (y / canvasScale - prev.y) * factor
-      }));
+      const worldX = x / canvasScale - canvasOffset.x;
+      const worldY = y / canvasScale - canvasOffset.y;
+
+      setCanvasOffset({
+        x: x / newScale - worldX,
+        y: y / newScale - worldY
+      });
       
       setCanvasScale(newScale);
     }
-  }, [canvasRef, canvasScale, receptors, state, setCanvasOffset, setCanvasScale]);
+  }, [canvasRef, canvasOffset.x, canvasOffset.y, canvasScale, receptors, state, setCanvasOffset, setCanvasScale]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();

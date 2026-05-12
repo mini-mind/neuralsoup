@@ -2,8 +2,8 @@ import { useState, useCallback } from 'react';
 import { SNNNode, SNNSynapse, Receptor, Effector } from '../../types/simulation';
 
 export interface DetailModalData {
-  type: 'neuron' | 'synapse' | 'receptor' | 'effector';
-  data: any;
+  type: 'neuron' | 'synapse';
+  id: string;
 }
 
 export interface SelectionStateData {
@@ -72,8 +72,6 @@ export const useSNNTopologyState = () => {
   const [isDraggingCanvas, setIsDraggingCanvas] = useState<{ startX: number; startY: number } | null>(null);
 
   // 控制状态
-  const [enablePlayerControlOverride, setEnablePlayerControlOverride] = useState(false);
-  
   // 感受器滚动状态
   const [receptorScrollX, setReceptorScrollX] = useState(0);
 
@@ -159,7 +157,6 @@ export const useSNNTopologyState = () => {
     canvasOffset,
     canvasScale,
     isDraggingCanvas,
-    enablePlayerControlOverride,
     receptorScrollX,
 
     // 设置器
@@ -180,7 +177,6 @@ export const useSNNTopologyState = () => {
     setCanvasOffset,
     setCanvasScale,
     setIsDraggingCanvas,
-    setEnablePlayerControlOverride,
     setReceptorScrollX,
 
     // 辅助方法

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './AgentParametersModal.css';
 
 interface AgentParametersModalProps {
@@ -22,6 +22,12 @@ const AgentParametersModal: React.FC<AgentParametersModalProps> = ({
 }) => {
   const [params, setParams] = useState<AgentParameters>(currentParams);
 
+  useEffect(() => {
+    if (isOpen) {
+      setParams(currentParams);
+    }
+  }, [currentParams, isOpen]);
+
   const handleApply = () => {
     onApply(params);
     onClose();
@@ -38,11 +44,11 @@ const AgentParametersModal: React.FC<AgentParametersModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content agent-params-modal" onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay" data-testid="agent-params-modal-overlay" onClick={onClose}>
+      <div className="modal-content agent-params-modal" data-testid="agent-params-modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h3>智能体参数设置</h3>
-          <button className="close-button" onClick={onClose}>×</button>
+          <button className="close-button" data-testid="agent-params-close" onClick={onClose}>×</button>
         </div>
         
         <div className="modal-body">
@@ -54,6 +60,7 @@ const AgentParametersModal: React.FC<AgentParametersModalProps> = ({
                 <span className="param-label">视野单元格数量</span>
                 <div className="param-control">
                   <input
+                    data-testid="vision-cells-range"
                     type="range"
                     min="1"
                     max="72"
@@ -63,6 +70,7 @@ const AgentParametersModal: React.FC<AgentParametersModalProps> = ({
                     className="param-slider"
                   />
                   <input
+                    data-testid="vision-cells-input"
                     type="number"
                     min="1"
                     max="72"
@@ -83,6 +91,7 @@ const AgentParametersModal: React.FC<AgentParametersModalProps> = ({
                 <span className="param-label">视野范围 (像素)</span>
                 <div className="param-control">
                   <input
+                    data-testid="vision-range-range"
                     type="range"
                     min="100"
                     max="500"
@@ -92,6 +101,7 @@ const AgentParametersModal: React.FC<AgentParametersModalProps> = ({
                     className="param-slider"
                   />
                   <input
+                    data-testid="vision-range-input"
                     type="number"
                     min="100"
                     max="500"
@@ -112,6 +122,7 @@ const AgentParametersModal: React.FC<AgentParametersModalProps> = ({
                 <span className="param-label">视野角度 (度)</span>
                 <div className="param-control">
                   <input
+                    data-testid="vision-angle-range"
                     type="range"
                     min="30"
                     max="180"
@@ -121,6 +132,7 @@ const AgentParametersModal: React.FC<AgentParametersModalProps> = ({
                     className="param-slider"
                   />
                   <input
+                    data-testid="vision-angle-input"
                     type="number"
                     min="30"
                     max="180"
@@ -139,14 +151,14 @@ const AgentParametersModal: React.FC<AgentParametersModalProps> = ({
         </div>
 
         <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={handleReset}>
+          <button className="btn btn-secondary" data-testid="agent-params-reset-defaults" onClick={handleReset}>
             重置默认值
           </button>
           <div className="footer-buttons">
-            <button className="btn btn-secondary" onClick={onClose}>
+            <button className="btn btn-secondary" data-testid="agent-params-cancel" onClick={onClose}>
               取消
             </button>
-            <button className="btn btn-primary" onClick={handleApply}>
+            <button className="btn btn-primary" data-testid="agent-params-apply" onClick={handleApply}>
               应用设置
             </button>
           </div>

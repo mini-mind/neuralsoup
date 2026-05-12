@@ -6,6 +6,7 @@ import type { SimulationState } from '../types/simulation';
 interface SimulationCanvasProps {
   onStatsUpdate: (stats: SimulationState['stats']) => void;
   onEngineReady: (engine: SimulationEngine) => void;
+  onLifecycleChange: (state: 'idle' | 'running' | 'paused') => void;
   width: number;
   height: number;
 }
@@ -13,20 +14,22 @@ interface SimulationCanvasProps {
 const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   onStatsUpdate,
   onEngineReady,
+  onLifecycleChange,
   width,
   height
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<SimulationEngine | null>(null);
   const appRef = useRef<PIXI.Application | null>(null);
+  const [isEngineReady, setIsEngineReady] = React.useState(false);
+  const [engineInstanceId, setEngineInstanceId] = React.useState(0);
 
   useEffect(() => {
     if (!canvasRef.current) {
       return;
     }
-    const app = appRef.current;
 
-    if (!app) {
+    if (!appRef.current) {
       console.log('Creating new PIXI app with dimensions:', width, height);
       const newApp = new PIXI.Application({
         width: width,
@@ -55,6 +58,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       console.log('Creating simulation engine with world size:', fixedWorldWidth, fixedWorldHeight);
       const newEngine = new SimulationEngine(newApp, fixedWorldWidth, fixedWorldHeight);
       newEngine.onStatsUpdate = onStatsUpdate;
+      newEngine.onLifecycleChange = onLifecycleChange;
       engineRef.current = newEngine;
       newEngine.initialize();
       
@@ -66,28 +70,53 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       }
       
       onEngineReady(newEngine);
+      setIsEngineReady(true);
+      setEngineInstanceId((prev) => prev + 1);
       console.log('Simulation engine initialized and ready');
-    } else {
-      // 已存在时只更新视口尺寸，仿真世界尺寸保持固定。
-      console.log('Resizing existing app to:', width, height);
-      app.renderer.resize(width, height);
     }
 
     return () => {
-      if (appRef.current && !canvasRef.current?.isConnected) {
+      if (appRef.current) {
         console.log('Cleaning up PIXI app and engine');
         engineRef.current?.destroy();
-        appRef.current?.destroy();
+        appRef.current?.destroy(true, { children: true, texture: true, baseTexture: true });
         appRef.current = null;
         engineRef.current = null;
+        setIsEngineReady(false);
+        setEngineInstanceId(0);
       }
     };
-  }, [width, height, onStatsUpdate, onEngineReady]);
+  }, [onEngineReady]);
+
+  useEffect(() => {
+    if (!appRef.current) {
+      return;
+    }
+
+    console.log('Resizing existing app to:', width, height);
+    appRef.current.renderer.resize(width, height);
+  }, [width, height]);
+
+  useEffect(() => {
+    if (engineRef.current) {
+      engineRef.current.onStatsUpdate = onStatsUpdate;
+    }
+  }, [onStatsUpdate]);
+
+  useEffect(() => {
+    if (engineRef.current) {
+      engineRef.current.onLifecycleChange = onLifecycleChange;
+      onLifecycleChange(engineRef.current.getLifecycleState());
+    }
+  }, [onLifecycleChange]);
 
   return (
     <div 
       ref={canvasRef} 
       className="simulation-canvas"
+      data-testid="simulation-canvas"
+      data-engine-ready={isEngineReady ? 'true' : 'false'}
+      data-engine-instance-id={String(engineInstanceId)}
       style={{ 
         width: '100%', 
         height: '100%', 

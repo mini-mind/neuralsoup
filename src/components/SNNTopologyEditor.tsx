@@ -1,8 +1,9 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useMemo, useRef, useEffect, useCallback } from 'react';
 import { CanvasRenderer } from './CanvasRenderer';
 import { useSNNTopologyState } from './hooks/useSNNTopologyState';
 import { useSNNTopologyEvents } from './hooks/useSNNTopologyEvents';
 import { createDefaultReceptor, createDefaultEffector, createDefaultNodes } from './utils/defaultSNNData';
+import { getNodeCenter } from './utils/editorGeometry';
 import NeuronDetailEditor from './NeuronDetailEditor';
 import SynapseDetailEditor from './SynapseDetailEditor';
 import './SNNTopologyEditor.css';
@@ -31,16 +32,34 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({ width, height, vi
     selectedNodes,
     hoveredNode,
     showDetailModal,
-    enablePlayerControlOverride,
     receptorScrollX,
     setNodes,
     setSynapses,
     setReceptors,
     setEffectors,
     setShowDetailModal,
-    setEnablePlayerControlOverride,
     resetInteractionState
   } = state;
+
+  const activeNeuron = useMemo(
+    () => showDetailModal?.type === 'neuron'
+      ? nodes.find(node => node.id === showDetailModal.id) ?? null
+      : null,
+    [nodes, showDetailModal]
+  );
+  const activeSynapse = useMemo(
+    () => showDetailModal?.type === 'synapse'
+      ? synapses.find(synapse => synapse.id === showDetailModal.id) ?? null
+      : null,
+    [showDetailModal, synapses]
+  );
+  const nodeCentersSummary = useMemo(
+    () => nodes.map((node) => {
+      const center = getNodeCenter(node, canvasOffset, canvasScale);
+      return `${node.id}:${Math.round(center.x)},${Math.round(center.y)}`;
+    }).join('|'),
+    [canvasOffset, canvasScale, nodes]
+  );
 
   // 初始化默认的SNN结构
   useEffect(() => {
@@ -62,6 +81,20 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({ width, height, vi
     setNodes(createDefaultNodes());
     setSynapses([]);
   }, [setEffectors, setNodes, setSynapses]);
+
+  useEffect(() => {
+    if (!showDetailModal) {
+      return;
+    }
+
+    if (showDetailModal.type === 'neuron' && !activeNeuron) {
+      setShowDetailModal(null);
+    }
+
+    if (showDetailModal.type === 'synapse' && !activeSynapse) {
+      setShowDetailModal(null);
+    }
+  }, [activeNeuron, activeSynapse, setShowDetailModal, showDetailModal]);
 
   // 绘制画布内容
   const draw = useCallback(() => {
@@ -87,48 +120,47 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({ width, height, vi
     draw();
   }, [draw]);
 
-  // 效应器脉冲累积和衰减
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setEffectors(prevEffectors => 
-        prevEffectors.map(effector => ({
-          ...effector,
-          outputs: effector.outputs.map(output => {
-            const now = Date.now();
-            const timeDelta = (now - output.lastUpdateTime) / 1000;
-            
-            const newAccumulation = Math.max(0, output.pulseAccumulation * Math.pow(output.decayRate, timeDelta * 5));
-            
-            return {
-              ...output,
-              pulseAccumulation: newAccumulation,
-              signal: newAccumulation / 100,
-              lastUpdateTime: now
-            };
-          })
-        }))
-      );
-    }, 50);
-
-    return () => clearInterval(interval);
-  }, [setEffectors]);
-
   // 神经元脉冲发放和突触传播
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
+      const latestNodes = nodes;
+      const latestSynapses = synapses;
+      const activeVisionInputs = receptors[0]?.modalities.find((modality) => modality.type === 'vision')?.inputs ?? [];
+      const effectorsById = new Map(
+        effectors.flatMap((effector) => effector.outputs.map((output) => [output.id, output]))
+      );
+      const spikesByNodeId = new Map(
+        latestNodes
+          .filter((node) => node.state?.spike)
+          .map((node) => [node.id, node.state?.lastSpikeTime ?? 0])
+      );
+
+      const getSynapseInput = (synapseFrom: string) => {
+        if (synapseFrom.startsWith('vision-')) {
+          const input = activeVisionInputs.find((candidate) => candidate.id === synapseFrom);
+          return input ? input.voltage * 20 : 0;
+        }
+
+        const sourceNode = latestNodes.find((candidate) => candidate.id === synapseFrom);
+        if (sourceNode?.state?.spike) {
+          return 12;
+        }
+
+        return 0;
+      };
       
       // 更新神经元状态并检测脉冲发放
-      setNodes(prevNodes => 
+      setNodes(prevNodes =>
         prevNodes.map(node => {
           if (node.type === 'neuron' && node.state) {
             let v = node.state.v;
             let u = node.state.u;
             
             let input = 0;
-            synapses.forEach(synapse => {
+            latestSynapses.forEach(synapse => {
               if (synapse.to === node.id) {
-                input += Math.random() * 5 - 2.5;
+                input += getSynapseInput(synapse.from) * synapse.weight;
               }
             });
             
@@ -157,35 +189,65 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({ width, height, vi
           return node;
         })
       );
-      
-      // 传播脉冲到效应器
-      const currentTime = Date.now();
-      nodes.forEach(node => {
-        if (node.state?.spike) {
-          synapses.forEach(synapse => {
-            if (synapse.from === node.id) {
-              setEffectors(prevEffectors => 
-                prevEffectors.map(effector => ({
-                  ...effector,
-                  outputs: effector.outputs.map(output => 
-                    output.id === synapse.to 
-                      ? {
-                          ...output,
-                          pulseAccumulation: Math.min(100, output.pulseAccumulation + Math.abs(synapse.weight) * 10),
-                          lastUpdateTime: currentTime
-                        }
-                      : output
-                  )
-                }))
-              );
+
+      setEffectors((prevEffectors) =>
+        prevEffectors.map((effector) => ({
+          ...effector,
+          outputs: effector.outputs.map((output) => {
+            const previousOutput = effectorsById.get(output.id) ?? output;
+            const timeDelta = (now - previousOutput.lastUpdateTime) / 1000;
+            const decayedAccumulation = Math.max(
+              0,
+              previousOutput.pulseAccumulation * Math.pow(previousOutput.decayRate, timeDelta * 5)
+            );
+
+            const incomingPulse = latestSynapses.reduce((total, synapse) => {
+              if (synapse.to !== output.id) {
+                return total;
+              }
+
+              const lastSpikeTime = spikesByNodeId.get(synapse.from);
+              if (!lastSpikeTime || now - lastSpikeTime > synapse.delay * 100) {
+                return total;
+              }
+
+              return total + Math.max(0, synapse.weight) * 10;
+            }, 0);
+
+            const nextAccumulation = Math.min(100, decayedAccumulation + incomingPulse);
+
+            return {
+              ...output,
+              pulseAccumulation: nextAccumulation,
+              signal: nextAccumulation / 100,
+              lastUpdateTime: now
+            };
+          })
+        }))
+      );
+
+      setReceptors((prevReceptors) =>
+        prevReceptors.map((receptor) => ({
+          ...receptor,
+          modalities: receptor.modalities.map((modality) => {
+            if (modality.type !== 'vision') {
+              return modality;
             }
-          });
-        }
-      });
+
+            return {
+              ...modality,
+              inputs: modality.inputs.map((input, index) => ({
+                ...input,
+                voltage: (Math.sin(now / 350 + index * 0.35) + 1) / 2
+              }))
+            };
+          })
+        }))
+      );
     }, 100);
 
     return () => clearInterval(interval);
-  }, [nodes, synapses, setNodes, setEffectors]);
+  }, [nodes, synapses, receptors, effectors, setNodes, setEffectors, setReceptors]);
 
   // 添加键盘事件监听
   useEffect(() => {
@@ -198,7 +260,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({ width, height, vi
   }, [events.handleKeyDown, events.stopInteraction]);
 
   return (
-    <div className="snn-topology-editor">
+    <div className="snn-topology-editor" data-testid="topology-editor">
       {/* 头部 - 标题和控制选项 */}
       <div className="editor-header">
         <div className="header-left">
@@ -210,7 +272,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({ width, height, vi
 双击空白处 - 添加新神经元
 左键拖拽 - 框选多个神经元或拖拽神经元
 Ctrl+左键 - 多选神经元
-Ctrl+拖拽节点 - 创建连接（hover高亮可连接目标）
+Ctrl+从感受器或神经元拖拽 - 创建可执行连接
 右键拖拽 - 平移画布
 Delete键 - 删除选中元素
 滚轮 - 缩放画布视图（包括网格）
@@ -221,16 +283,7 @@ Delete键 - 删除选中元素
           </div>
         </div>
         <div className="editor-controls">
-          <div className="control-options">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={enablePlayerControlOverride}
-                onChange={(e) => setEnablePlayerControlOverride(e.target.checked)}
-              />
-              玩家控制覆盖输出
-            </label>
-          </div>
+          <div className="control-options" data-testid="topology-execution-mode">感受器驱动脉冲拓扑</div>
         </div>
       </div>
 
@@ -238,6 +291,7 @@ Delete键 - 删除选中元素
         ref={canvasRef}
         width={width}
         height={height}
+        data-testid="topology-canvas"
         onMouseDown={events.handleMouseDown}
         onMouseMove={events.handleMouseMove}
         onMouseUp={events.handleMouseUp}
@@ -248,13 +302,24 @@ Delete键 - 删除选中元素
         tabIndex={0}
         style={{ outline: 'none' }}
       />
+      <div
+        className="diagnostic-strip"
+        data-testid="topology-state-summary"
+      >
+        <span data-testid="topology-node-count">{nodes.length}</span>
+        <span data-testid="topology-synapse-count">{synapses.length}</span>
+        <span data-testid="topology-selected-count">{selectedNodes.length}</span>
+        <span data-testid="topology-selected-synapse">{selectedSynapse ?? 'none'}</span>
+        <span data-testid="topology-vision-cells">{visionCells}</span>
+        <span data-testid="topology-node-centers">{nodeCentersSummary}</span>
+      </div>
       
       {showDetailModal && (
-        <div className="modal-overlay" onClick={() => setShowDetailModal(null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            {showDetailModal.type === 'neuron' && (
+        <div className="modal-overlay" data-testid="topology-detail-modal-overlay" onClick={() => setShowDetailModal(null)}>
+          <div className="modal-content" data-testid="topology-detail-modal" onClick={e => e.stopPropagation()}>
+            {showDetailModal.type === 'neuron' && activeNeuron && (
               <NeuronDetailEditor
-                neuron={showDetailModal.data}
+                neuron={activeNeuron}
                 onUpdate={(updatedNeuron) => {
                   setNodes(prev => prev.map(node => 
                     node.id === updatedNeuron.id ? updatedNeuron : node
@@ -262,9 +327,9 @@ Delete键 - 删除选中元素
                 }}
               />
             )}
-            {showDetailModal.type === 'synapse' && (
+            {showDetailModal.type === 'synapse' && activeSynapse && (
               <SynapseDetailEditor
-                synapse={showDetailModal.data}
+                synapse={activeSynapse}
                 onUpdate={(updatedSynapse) => {
                   setSynapses(prev => prev.map(synapse => 
                     synapse.id === updatedSynapse.id ? updatedSynapse : synapse

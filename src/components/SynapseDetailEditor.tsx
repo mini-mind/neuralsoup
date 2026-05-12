@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { SNNSynapse } from '../types/simulation';
 
 interface SynapseDetailEditorProps {
@@ -9,6 +9,11 @@ interface SynapseDetailEditorProps {
 const SynapseDetailEditor: React.FC<SynapseDetailEditorProps> = ({ synapse, onUpdate }) => {
   const [weight, setWeight] = useState(synapse.weight);
   const [delay, setDelay] = useState(synapse.delay);
+
+  useEffect(() => {
+    setWeight(synapse.weight);
+    setDelay(synapse.delay);
+  }, [synapse.id]);
 
   const handleWeightChange = (newWeight: number) => {
     setWeight(newWeight);

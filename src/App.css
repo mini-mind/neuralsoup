@@ -170,6 +170,18 @@
   padding: 16px;
 }
 
+.diagnostic-strip {
+  display: flex;
+  gap: 12px;
+  padding: 6px 16px;
+  border-bottom: 1px solid #3f3f46;
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+
 /* 手动控制样式 */
 .manual-control h4 {
   margin: 0 0 16px 0;

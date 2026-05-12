@@ -20,8 +20,7 @@ const mapControlModeToEngine = (mode: ControlMode): 'keyboard' | 'script' | 'snn
 };
 
 const App: React.FC = () => {
-  const [isRunning, setIsRunning] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
+  const [runState, setRunState] = useState<'idle' | 'running' | 'paused'>('idle');
   const [controlMode, setControlMode] = useState<ControlMode>('manual');
   const [enablePlayerInputInScript, setEnablePlayerInputInScript] = useState(false);
   const [scriptCode, setScriptCode] = useState(`// 脚本控制示例
@@ -103,22 +102,16 @@ if (centerFood > 2) {
       return;
     }
 
-    if (!isRunning) {
+    if (runState === 'idle') {
       engine.start();
-      setIsRunning(true);
-      setIsPaused(false);
-    } else if (isPaused) {
+    } else if (runState === 'paused') {
       engine.resume();
-      setIsPaused(false);
     } else {
       engine.pause();
-      setIsPaused(true);
     }
-  }, [engine, isRunning, isPaused]);
+  }, [engine, runState]);
 
   const handleReset = useCallback(() => {
-    setIsRunning(false);
-    setIsPaused(false);
     setStats({
       fps: 0,
       totalReward: 0,
@@ -137,6 +130,7 @@ if (centerFood > 2) {
   const handleEngineReady = useCallback((engine: SimulationEngine) => {
     setEngine(engine);
     setAgentParameters(engine.getAgentParameters());
+    setRunState(engine.getLifecycleState());
   }, []);
 
   const handleAgentParametersApply = useCallback((params: AgentParameters) => {
@@ -155,7 +149,7 @@ if (centerFood > 2) {
     switch (controlMode) {
       case 'manual':
         return (
-          <div className="manual-control">
+          <div className="manual-control" data-testid="manual-control-panel">
             <h4>手动控制说明</h4>
             <div className="control-instructions">
               <div className="instruction-section">
@@ -205,12 +199,14 @@ if (centerFood > 2) {
         
       case 'script':
         return (
-          <div className="script-control">
+          <div className="script-control" data-testid="script-control-panel">
             <div className="script-header">
               <h4>脚本控制</h4>
               <div className="script-options">
-                <label className="checkbox-label">
+                <label className="checkbox-label" htmlFor="script-player-override">
                   <input
+                    id="script-player-override"
+                    data-testid="script-player-override"
                     type="checkbox"
                     checked={enablePlayerInputInScript}
                     onChange={(e) => setEnablePlayerInputInScript(e.target.checked)}
@@ -221,6 +217,7 @@ if (centerFood > 2) {
             </div>
             <div className="script-editor">
               <textarea
+                data-testid="script-code-input"
                 value={scriptCode}
                 onChange={(e) => setScriptCode(e.target.value)}
                 placeholder="输入JavaScript控制脚本..."
@@ -230,14 +227,18 @@ if (centerFood > 2) {
                 <p><strong>输入参数:</strong> inputs ({agentParameters.visionCells * 3}维视觉数组)</p>
                 <p><strong>返回值:</strong> [左转, 前进, 右转] 强度数组 (0-1)</p>
                 <p><strong>玩家控制:</strong> {enablePlayerInputInScript ? 'W/A/D键可覆盖脚本输出' : '仅脚本控制'}</p>
-                <button className="btn-small" onClick={() => {
+                <button
+                  className="btn-small"
+                  data-testid="script-syntax-check"
+                  onClick={() => {
                   try {
                     new Function('inputs', scriptCode);
                     alert('脚本语法检查通过！');
                   } catch (e) {
                     alert('脚本语法错误：' + (e as Error).message);
                   }
-                }}>
+                }}
+                >
                   语法检查
                 </button>
               </div>
@@ -262,30 +263,31 @@ if (centerFood > 2) {
   };
 
   return (
-    <div className="app">
+    <div className="app" data-testid="app-shell">
       {/* 左侧游戏区域 */}
-      <div className="game-area">
+      <div className="game-area" data-testid="simulation-panel">
         <SimulationCanvas 
           width={canvasWidth}
           height={canvasHeight}
           onStatsUpdate={handleStatsUpdate}
           onEngineReady={handleEngineReady}
+          onLifecycleChange={setRunState}
         />
       </div>
       
       {/* 右侧控制区域 */}
-      <div className="control-area">
+      <div className="control-area" data-testid="control-panel">
         {/* 统一控制行：FPS、奖励、按钮、情绪、控制方式 */}
         <div className="unified-control-row">
           <div className="stats-section">
             <div className="stat-item">
               <span className="stat-label">FPS</span>
-              <span className="stat-value">{stats.fps.toFixed(1)}</span>
+              <span className="stat-value" data-testid="fps-value">{stats.fps.toFixed(1)}</span>
             </div>
             
             <div className="stat-item">
               <span className="stat-label">奖励</span>
-              <span className="stat-value positive">{formatNumber(stats.totalReward)}</span>
+              <span className="stat-value positive" data-testid="reward-value">{formatNumber(stats.totalReward)}</span>
             </div>
           </div>
           
@@ -293,15 +295,19 @@ if (centerFood > 2) {
             <button 
               onClick={handleStartPause}
               className="btn btn-primary"
-              title={isRunning ? (isPaused ? '继续' : '暂停') : '开始'}
+              title={runState === 'idle' ? '开始' : runState === 'paused' ? '继续' : '暂停'}
+              aria-label={runState === 'idle' ? '开始' : runState === 'paused' ? '继续' : '暂停'}
+              data-testid="start-pause-button"
             >
-              {isRunning ? (isPaused ? '▶' : '⏸') : '▶'}
+              {runState === 'running' ? '⏸' : '▶'}
             </button>
             
             <button 
               onClick={handleReset}
               className="btn btn-secondary"
               title="重置"
+              aria-label="重置"
+              data-testid="reset-button"
             >
               ⏹
             </button>
@@ -310,6 +316,8 @@ if (centerFood > 2) {
               onClick={() => setShowAgentParamsModal(true)}
               className="btn btn-secondary"
               title="智能体参数设置"
+              aria-label="智能体参数设置"
+              data-testid="agent-params-button"
             >
               ⚙️
             </button>
@@ -323,12 +331,21 @@ if (centerFood > 2) {
               value={controlMode} 
               onChange={(e) => setControlMode(e.target.value as ControlMode)}
               className="mode-select"
+              data-testid="control-mode-select"
             >
               <option value="manual">手动控制</option>
               <option value="script">脚本控制</option>
               <option value="snn">拓扑沙盒</option>
             </select>
           </div>
+        </div>
+
+        <div className="diagnostic-strip" data-testid="app-diagnostics">
+          <span data-testid="simulation-run-state">{runState}</span>
+          <span data-testid="control-mode-value">{controlMode}</span>
+          <span data-testid="vision-cells-value">{agentParameters.visionCells}</span>
+          <span data-testid="vision-range-value">{agentParameters.visionRange}</span>
+          <span data-testid="vision-angle-value">{agentParameters.visionAngle}</span>
         </div>
 
         {/* 动态内容区域 */}
