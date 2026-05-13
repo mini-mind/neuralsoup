@@ -4,7 +4,7 @@
  * 使用模块化组件管理不同功能
  */
 
-import * as PIXI from 'pixi.js';
+import * as PIXI from './pixi';
 import { Agent, Food, Obstacle, SimulationState } from '../types/simulation';
 import { WorldRenderer } from './WorldRenderer';
 import { VisionSystem } from './VisionSystem';

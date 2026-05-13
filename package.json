@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "type-check": "tsc --noEmit",
+    "check:pixi-imports": "node scripts/check-pixi-imports.mjs",
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
@@ -22,7 +23,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "pixi.js": "^7.4.0",
+    "pixi.js-legacy": "^7.4.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

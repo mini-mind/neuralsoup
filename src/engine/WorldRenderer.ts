@@ -2,7 +2,7 @@
  * 世界渲染器 - 使用PixiJS渲染仿真场景
  */
 
-import * as PIXI from 'pixi.js';
+import * as PIXI from './pixi';
 import { World, Agent, Food, Obstacle } from '../types/simulation';
 
 export class WorldRenderer {

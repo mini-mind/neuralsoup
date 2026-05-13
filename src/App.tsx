@@ -127,10 +127,15 @@ if (centerFood > 2) {
     setStats(newStats);
   }, []);
 
-  const handleEngineReady = useCallback((engine: SimulationEngine) => {
-    setEngine(engine);
-    setAgentParameters(engine.getAgentParameters());
-    setRunState(engine.getLifecycleState());
+  const handleEngineReady = useCallback((nextEngine: SimulationEngine | null) => {
+    setEngine(nextEngine);
+
+    if (!nextEngine) {
+      return;
+    }
+
+    setAgentParameters(nextEngine.getAgentParameters());
+    setRunState(nextEngine.getLifecycleState());
   }, []);
 
   const handleAgentParametersApply = useCallback((params: AgentParameters) => {

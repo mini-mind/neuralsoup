@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test';
+import type { Page, TestInfo } from '@playwright/test';
 
 const selectors = {
   simulationCanvas: '[data-testid="simulation-canvas"]',
+  renderError: '[data-testid="simulation-render-error"]',
   runState: '[data-testid="simulation-run-state"]',
   controlModeValue: '[data-testid="control-mode-value"]',
   controlModeSelect: '[data-testid="control-mode-select"]',
@@ -32,6 +34,200 @@ const selectors = {
   neuronLabelInput: '[data-testid="neuron-label-input"]'
 } as const;
 
+type StartupDiagnostics = {
+  consoleErrors: string[];
+  pageErrors: string[];
+};
+
+type DiagnosticsSnapshot = {
+  consoleErrorCount: number;
+  pageErrorCount: number;
+};
+
+type DiagnosticsExpectation = 'none' | 'expected-render-init-errors';
+
+const diagnosticsByPage = new WeakMap<Page, StartupDiagnostics>();
+const diagnosticsExpectationsByPage = new WeakMap<Page, DiagnosticsExpectation>();
+
+const degradedRendererProjectName = 'chromium-webgl-disabled';
+const expectedRenderInitErrorPrefix = 'Failed to initialize simulation canvas:';
+const expectedScriptCompileErrorPrefix = '脚本编译错误:';
+
+const installStartupDiagnostics = (page: Page) => {
+  const diagnostics: StartupDiagnostics = {
+    consoleErrors: [],
+    pageErrors: []
+  };
+
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      diagnostics.consoleErrors.push(message.text());
+    }
+  });
+
+  page.on('pageerror', (error) => {
+    diagnostics.pageErrors.push(error.message);
+  });
+
+  diagnosticsByPage.set(page, diagnostics);
+};
+
+const getStartupDiagnostics = (page: Page) => {
+  const diagnostics = diagnosticsByPage.get(page);
+  if (!diagnostics) {
+    throw new Error('Startup diagnostics were not installed for this page');
+  }
+
+  return diagnostics;
+};
+
+const setDiagnosticsExpectation = (page: Page, expectation: DiagnosticsExpectation) => {
+  diagnosticsExpectationsByPage.set(page, expectation);
+};
+
+const getDiagnosticsExpectation = (page: Page) => diagnosticsExpectationsByPage.get(page) ?? 'none';
+
+const isDegradedRendererProject = (testInfo: TestInfo) => testInfo.project.name === degradedRendererProjectName;
+
+const takeDiagnosticsSnapshot = (page: Page): DiagnosticsSnapshot => {
+  const diagnostics = getStartupDiagnostics(page);
+  return {
+    consoleErrorCount: diagnostics.consoleErrors.length,
+    pageErrorCount: diagnostics.pageErrors.length
+  };
+};
+
+const disableWebGLContexts = async (page: Page) => {
+  await page.addInitScript(() => {
+    const originalGetContext = HTMLCanvasElement.prototype.getContext;
+
+    HTMLCanvasElement.prototype.getContext = function getContextOverride(
+      contextType: string,
+      ...args: unknown[]
+    ) {
+      if (contextType === 'webgl' || contextType === 'webgl2' || contextType === 'experimental-webgl') {
+        return null;
+      }
+
+      return originalGetContext.call(this, contextType, ...(args as []));
+    };
+  });
+};
+
+const waitForRenderOutcome = async (page: Page) =>
+  expect
+    .poll(
+      async () => {
+        if (await page.locator(selectors.renderError).isVisible().catch(() => false)) {
+          return 'render-error';
+        }
+
+        return await page.locator(selectors.simulationCanvas).getAttribute('data-engine-ready');
+      },
+      {
+        timeout: 10_000,
+        message: 'expected simulation renderer to become ready or show an explicit render error'
+      }
+    )
+    .toMatch(/^(true|render-error)$/);
+
+const getRenderOutcome = async (page: Page) => {
+  await waitForRenderOutcome(page);
+  return (await page.locator(selectors.renderError).isVisible().catch(() => false)) ? 'render-error' : 'ready';
+};
+
+const expectDegradedRenderErrorUI = async (page: Page) => {
+  await expect(page.locator(selectors.renderError)).toBeVisible();
+  await expect(page.locator(selectors.renderError)).toContainText('渲染初始化失败');
+  await expect(page.locator(selectors.runState)).toBeVisible();
+  await expect(page.locator(selectors.startPauseButton)).toBeVisible();
+  await expect(page.locator(selectors.controlModeSelect)).toBeVisible();
+};
+
+const expectInteractiveRenderReady = async (page: Page, testInfo: TestInfo) => {
+  const outcome = await getRenderOutcome(page);
+  if (outcome === 'ready') {
+    await expectReadyCanvas(page);
+    await expectNoUnhandledStartupErrors(page);
+    return true;
+  }
+
+  if (!isDegradedRendererProject(testInfo)) {
+    throw new Error('Expected the standard renderer path to become ready, but the render error UI was shown.');
+  }
+
+  setDiagnosticsExpectation(page, 'expected-render-init-errors');
+  await expectDegradedRenderErrorUI(page);
+  return false;
+};
+
+const flushTeardownDiagnostics = async (page: Page) => {
+  if (page.isClosed()) {
+    return;
+  }
+
+  await page.goto('about:blank', { waitUntil: 'load' });
+  await page.waitForTimeout(50);
+};
+
+const expectNoUnhandledStartupErrors = async (page: Page) => {
+  const diagnostics = getStartupDiagnostics(page);
+  expect(diagnostics.pageErrors, `Unexpected page errors: ${diagnostics.pageErrors.join('\n')}`).toEqual([]);
+  expect(
+    diagnostics.consoleErrors,
+    `Unexpected console errors: ${diagnostics.consoleErrors.join('\n')}`
+  ).toEqual([]);
+};
+
+const expectOnlyExpectedRenderInitErrors = async (page: Page) => {
+  const diagnostics = getStartupDiagnostics(page);
+  expect(diagnostics.pageErrors, `Unexpected page errors: ${diagnostics.pageErrors.join('\n')}`).toEqual([]);
+  expect(diagnostics.consoleErrors, 'Expected at least one PIXI initialization console error').not.toHaveLength(0);
+  expect(
+    diagnostics.consoleErrors.every((message) => message.startsWith(expectedRenderInitErrorPrefix)),
+    `Unexpected console errors: ${diagnostics.consoleErrors.join('\n')}`
+  ).toBe(true);
+};
+
+const expectAndClearExpectedScriptCompileErrors = async (page: Page, snapshot: DiagnosticsSnapshot) => {
+  const diagnostics = getStartupDiagnostics(page);
+
+  await expect
+    .poll(
+      () => {
+        const newConsoleErrors = diagnostics.consoleErrors.slice(snapshot.consoleErrorCount);
+        const newPageErrors = diagnostics.pageErrors.slice(snapshot.pageErrorCount);
+        return newPageErrors.length === 0 && newConsoleErrors.length > 0;
+      },
+      {
+        timeout: 5_000,
+        message: 'Expected script compile diagnostics to be emitted after the syntax check action'
+      }
+    )
+    .toBe(true);
+
+  const newPageErrors = diagnostics.pageErrors.slice(snapshot.pageErrorCount);
+  const newConsoleErrors = diagnostics.consoleErrors.slice(snapshot.consoleErrorCount);
+
+  expect(newPageErrors, `Unexpected page errors: ${newPageErrors.join('\n')}`).toEqual([]);
+  expect(newConsoleErrors, 'Expected at least one script compile console error').not.toHaveLength(0);
+  expect(
+    newConsoleErrors.every((message) => message.startsWith(expectedScriptCompileErrorPrefix)),
+    `Unexpected console errors: ${newConsoleErrors.join('\n')}`
+  ).toBe(true);
+  diagnostics.consoleErrors.splice(snapshot.consoleErrorCount, newConsoleErrors.length);
+};
+
+const expectReadyCanvas = async (page: Page) => {
+  await expect(page.locator(selectors.simulationCanvas)).toHaveAttribute('data-engine-ready', 'true');
+
+  const actualCanvas = page.locator(`${selectors.simulationCanvas} canvas`);
+  await expect(actualCanvas).toHaveCount(1);
+  await expect(actualCanvas).toBeVisible();
+
+  return actualCanvas;
+};
+
 const parseNodeCenters = (summary: string) =>
   summary
     .split('|')
@@ -42,12 +238,72 @@ const parseNodeCenters = (summary: string) =>
       return { id, x, y };
     });
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, testInfo) => {
+  installStartupDiagnostics(page);
+  setDiagnosticsExpectation(page, 'none');
+
+  if (isDegradedRendererProject(testInfo)) {
+    await disableWebGLContexts(page);
+  }
+
   await page.goto('/');
-  await expect(page.locator(selectors.simulationCanvas)).toHaveAttribute('data-engine-ready', 'true');
 });
 
-test('simulation lifecycle controls update visible run state', async ({ page }) => {
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status === 'skipped') {
+    return;
+  }
+
+  await flushTeardownDiagnostics(page);
+
+  if (getDiagnosticsExpectation(page) === 'expected-render-init-errors') {
+    await expectOnlyExpectedRenderInitErrors(page);
+    return;
+  }
+
+  await expectNoUnhandledStartupErrors(page);
+});
+
+test('startup initializes a visible simulation canvas without runtime errors', async ({ page }, testInfo) => {
+  test.skip(isDegradedRendererProject(testInfo), 'This assertion targets the standard renderer path.');
+
+  await expect(getRenderOutcome(page)).resolves.toBe('ready');
+  await expectReadyCanvas(page);
+  await expectNoUnhandledStartupErrors(page);
+});
+
+test('degraded renderer path falls back cleanly or surfaces an explicit render error', async ({ page }, testInfo) => {
+  test.skip(!isDegradedRendererProject(testInfo), 'This assertion targets the degraded renderer path only.');
+
+  const outcome = await getRenderOutcome(page);
+  if (outcome === 'ready') {
+    const actualCanvas = await expectReadyCanvas(page);
+    const contextKinds = await actualCanvas.evaluate((canvas) => ({
+      has2d: Boolean(canvas.getContext('2d')),
+      hasWebgl: Boolean(canvas.getContext('webgl') || canvas.getContext('webgl2') || canvas.getContext('experimental-webgl'))
+    }));
+
+    expect(contextKinds.has2d).toBe(true);
+    expect(contextKinds.hasWebgl).toBe(false);
+
+    await expect(page.locator(selectors.runState)).toHaveText('idle');
+    await expect(page.locator(selectors.startPauseButton)).toBeVisible();
+    await page.locator(selectors.startPauseButton).click();
+    await expect(page.locator(selectors.runState)).toHaveText('running');
+    await page.locator(selectors.startPauseButton).click();
+    await expect(page.locator(selectors.runState)).toHaveText('paused');
+    return;
+  }
+
+  setDiagnosticsExpectation(page, 'expected-render-init-errors');
+  await expectDegradedRenderErrorUI(page);
+});
+
+test('simulation lifecycle controls update visible run state', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
   const initialEngineInstanceId = await page.locator(selectors.simulationCanvas).getAttribute('data-engine-instance-id');
   await expect(page.locator(selectors.runState)).toHaveText('idle');
 
@@ -73,7 +329,11 @@ test('simulation lifecycle controls update visible run state', async ({ page }) 
   await expect(page.locator('[data-testid="fps-value"]')).toHaveText('0.0');
 });
 
-test('agent parameter modal persists applied values and discards cancelled drafts', async ({ page }) => {
+test('agent parameter modal persists applied values and discards cancelled drafts', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
   await page.locator(selectors.agentParamsButton).click();
   await expect(page.locator(selectors.paramsModal)).toBeVisible();
 
@@ -104,7 +364,11 @@ test('agent parameter modal persists applied values and discards cancelled draft
   await expect(page.locator(selectors.visionAngleValue)).toHaveText('120');
 });
 
-test('control mode switching and script syntax check stay coherent', async ({ page }) => {
+test('control mode switching and script syntax check stay coherent', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
   await expect(page.locator(selectors.manualPanel)).toBeVisible();
 
   await page.locator(selectors.controlModeSelect).selectOption('script');
@@ -117,9 +381,18 @@ test('control mode switching and script syntax check stay coherent', async ({ pa
   });
   await page.locator(selectors.scriptSyntaxCheck).click();
 
+  const invalidScriptDiagnostics = takeDiagnosticsSnapshot(page);
   await page.locator(selectors.scriptCodeInput).fill('return [');
   page.once('dialog', async (dialog) => {
     await expect(dialog.message()).toContain('脚本语法错误');
+    await dialog.accept();
+  });
+  await page.locator(selectors.scriptSyntaxCheck).click();
+  await expectAndClearExpectedScriptCompileErrors(page, invalidScriptDiagnostics);
+
+  await page.locator(selectors.scriptCodeInput).fill('return [0, 0];');
+  page.once('dialog', async (dialog) => {
+    await expect(dialog.message()).toContain('脚本语法检查通过');
     await dialog.accept();
   });
   await page.locator(selectors.scriptSyntaxCheck).click();
@@ -136,7 +409,11 @@ test('control mode switching and script syntax check stay coherent', async ({ pa
   await expect(page.locator(selectors.manualPanel)).toBeVisible();
 });
 
-test('topology sandbox supports creating, selecting, deleting, and editing a neuron', async ({ page }) => {
+test('topology sandbox supports creating, selecting, deleting, and editing a neuron', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
   await page.locator(selectors.controlModeSelect).selectOption('snn');
   await expect(page.locator(selectors.topologyEditor)).toBeVisible();
 

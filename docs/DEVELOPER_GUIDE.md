@@ -12,12 +12,21 @@
 # 安装依赖
 npm install
 
-# 启动开发服务器
-npm run dev
+# 启动热更新开发服务器
+npm run dev -- --host 0.0.0.0 --port 3000
 
 # 运行类型检查
 npm run type-check
+
+# 校验 Pixi 入口约束
+npm run check:pixi-imports
 ```
+
+外部访问说明：
+
+- Vite 开发服务必须显式绑定 `0.0.0.0`，否则默认仅监听本机回环地址。
+- 绑定后可通过 `http://<服务器IP>:3000` 从外部访问。
+- 若外部仍无法访问，优先检查云安全组、主机防火墙、NAT/端口映射和反向代理配置。
 
 说明：仓库当前提交的是 `package-lock.json`，默认依赖解析真源为 npm。锁文件中的 tarball URL 指向 `registry.npmmirror.com`，如需在其他 registry 环境复现，请显式配置对应 npm registry。
 
@@ -191,7 +200,13 @@ const graphic = objectPool.getGraphic();
 objectPool.returnGraphic(graphic);
 ```
 
-### 3. 错误处理策略
+### 3. Pixi 运行时入口原则
+
+- Pixi 运行时入口保持单一，实际入口文件为 `src/engine/pixi.ts`。
+- 除 `src/engine/pixi.ts` 外，其他模块不得直接从 `pixi.js`、`pixi.js-legacy` 或 `@pixi/*` import；类型、构造器和扩展注册都应经由该入口统一导出。
+- 如需调整 Pixi 版本或 fallback 策略，只改 `src/engine/pixi.ts`，并同步运行 `npm run check:pixi-imports` 与渲染结果验证，避免运行时分叉。
+
+### 4. 错误处理策略
 
 **全局错误边界**
 ```typescript
@@ -297,8 +312,34 @@ useEffect(() => {
 
 ### 开发部署
 ```bash
-npm run dev
+npm run dev -- --host 0.0.0.0 --port 3000
 ```
+
+当前仓库推荐把“热启动部署”理解为 Vite 开发模式常驻运行。它适合联调、UI 调整和交互开发，不适合作为正式生产服务。
+
+如果需要后台常驻，可用例如下：
+
+```bash
+nohup npm run dev -- --host 0.0.0.0 --port 3000 > vite-dev.log 2>&1 &
+```
+
+检查监听状态：
+
+```bash
+ss -ltnp | rg ':3000\\b'
+```
+
+检查本机 IP：
+
+```bash
+hostname -I
+```
+
+边界说明：
+
+- `npm run dev -- --host 0.0.0.0 --port 3000` 是开发态热更新服务，适合联调和临时环境排查。
+- 对外开放开发态端口时，默认同时暴露 HMR 与源码映射等开发能力，不应替代正式发布链路。
+- 若需要让他人通过 IP 临时访问开发环境，除了监听 `0.0.0.0` 外，还要确认安全组、防火墙、NAT/端口映射和代理转发配置一致。
 
 ### 生产构建
 ```bash
@@ -306,7 +347,13 @@ npm run build
 npx vite preview --host 0.0.0.0 --port 4173  # 预览构建结果
 ```
 
-### Docker部署
+边界说明：
+
+- `npm run build` 生成可发布的静态产物。
+- `npx vite preview` 只用于本地或预发阶段快速验收构建结果，不承担正式生产 SLA、进程托管或边缘缓存职责。
+- 正式生产部署应由静态文件服务器、对象存储/CDN 或受管反向代理承接构建产物，而不是长期直接运行 Vite preview。
+
+### Docker 构建预览（非生产）
 ```dockerfile
 FROM node:18-alpine
 WORKDIR /app
@@ -318,9 +365,12 @@ EXPOSE 4173
 CMD ["npx", "vite", "preview", "--host", "0.0.0.0", "--port", "4173"]
 ```
 
+说明：该镜像仅用于容器内验收 `dist/` 构建结果，不应用作正式生产服务。正式生产请将 `npm run build` 产物交给静态文件服务器、对象存储/CDN 或反向代理托管。
+
 ## 代码风格
 
 ### 当前校验
 当前仓库中应保持通过的最小校验集：
 - `npm run type-check`
 - `npm run build`
+- `npm run check:pixi-imports`
