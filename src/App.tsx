@@ -1,7 +1,5 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import SimulationCanvas from './components/SimulationCanvas';
-import SNNTopologyEditor from './components/SNNTopologyEditor';
-import AgentParametersModal, { AgentParameters } from './components/AgentParametersModal';
 import {
   createDefaultBrainGraph,
   reconcileBrainGraphVisionCells,
@@ -12,9 +10,11 @@ import type { SimulationControlMode } from './domain/world';
 import type { SimulationLifecycleState } from './engine/SimulationEngine';
 import type { BrainGraphRuntimeStatus } from './types/brainGraphRuntime';
 import type { SimulationState } from './types/simulation';
+import EditorToolbar from './components/editor/EditorToolbar';
+import GraphEditorPanel from './components/editor/GraphEditorPanel';
+import SettingsPanel from './components/editor/SettingsPanel';
+import type { AgentParameters, EditorTab, SettingsSection } from './components/editor/types';
 import './App.css';
-
-type AppControlMode = Extract<SimulationControlMode, 'keyboard' | 'snn'>;
 
 const INITIAL_STATS: SimulationState['stats'] = {
   fps: 0,
@@ -38,11 +38,31 @@ const areAgentParametersEqual = (left: AgentParameters, right: AgentParameters):
   );
 };
 
+const isEditableOrInteractiveTarget = (target: EventTarget | null): boolean => {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+
+  if (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    target instanceof HTMLButtonElement
+  ) {
+    return true;
+  }
+
+  if (target instanceof HTMLElement && target.isContentEditable) {
+    return true;
+  }
+
+  return Boolean(target.closest('button, input, textarea, select, [contenteditable="true"], [contenteditable=""]'));
+};
+
 const App: React.FC = () => {
   const [runState, setRunState] = useState<SimulationLifecycleState>('idle');
   const [requestedLifecycleState, setRequestedLifecycleState] = useState<SimulationLifecycleState>('idle');
   const [resetToken, setResetToken] = useState(0);
-  const [controlMode, setControlMode] = useState<AppControlMode>('keyboard');
   const [stats, setStats] = useState<SimulationState['stats']>(INITIAL_STATS);
   const [brainGraph, setBrainGraph] = useState<BrainGraph>(() => createDefaultBrainGraph(36));
   const [brainGraphRuntimeStatus, setBrainGraphRuntimeStatus] = useState<BrainGraphRuntimeStatus>(() =>
@@ -50,12 +70,19 @@ const App: React.FC = () => {
   );
   const [canvasWidth, setCanvasWidth] = useState(window.innerWidth * 0.6);
   const [canvasHeight, setCanvasHeight] = useState(window.innerHeight);
-  const [showAgentParamsModal, setShowAgentParamsModal] = useState(false);
   const [agentParameters, setAgentParameters] = useState<AgentParameters>({
     visionCells: 36,
     visionRange: 250,
     visionAngle: 120
   });
+  const [draftAgentParameters, setDraftAgentParameters] = useState<AgentParameters>({
+    visionCells: 36,
+    visionRange: 250,
+    visionAngle: 120
+  });
+  const [editorTab, setEditorTab] = useState<EditorTab>('graph');
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>('agent-parameters');
+  const requestedLifecycleStateRef = useRef<SimulationLifecycleState>('idle');
   const brainGraphIssues = validateBrainGraph(brainGraph);
   const installedBrainGraph = brainGraphRuntimeStatus.appliedGraph;
 
@@ -72,20 +99,28 @@ const App: React.FC = () => {
     };
   }, [calculateCanvasDimensions]);
 
+  const setLifecycleRequest = useCallback((nextState: SimulationLifecycleState) => {
+    requestedLifecycleStateRef.current = nextState;
+    setRequestedLifecycleState(nextState);
+  }, []);
+
   const handleStartPause = useCallback(() => {
-    if (runState === 'idle' || runState === 'paused') {
-      setRequestedLifecycleState('running');
+    if (
+      requestedLifecycleStateRef.current === 'idle' ||
+      requestedLifecycleStateRef.current === 'paused'
+    ) {
+      setLifecycleRequest('running');
       return;
     }
 
-    setRequestedLifecycleState('paused');
-  }, [runState]);
+    setLifecycleRequest('paused');
+  }, [setLifecycleRequest]);
 
   const handleReset = useCallback(() => {
     setStats(INITIAL_STATS);
-    setRequestedLifecycleState('idle');
+    setLifecycleRequest('idle');
     setResetToken((current) => current + 1);
-  }, []);
+  }, [setLifecycleRequest]);
 
   const handleStatsUpdate = useCallback((newStats: SimulationState['stats']) => {
     setStats(newStats);
@@ -94,6 +129,30 @@ const App: React.FC = () => {
   const handleLifecycleChange = useCallback((nextState: SimulationLifecycleState) => {
     setRunState(nextState);
   }, []);
+
+  useEffect(() => {
+    const handleLifecycleHotkey = (event: KeyboardEvent) => {
+      if (
+        event.code !== 'Space' ||
+        event.repeat ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        isEditableOrInteractiveTarget(event.target)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      handleStartPause();
+    };
+
+    window.addEventListener('keydown', handleLifecycleHotkey);
+
+    return () => {
+      window.removeEventListener('keydown', handleLifecycleHotkey);
+    };
+  }, [handleStartPause]);
 
   const handleAgentParametersApply = useCallback((params: AgentParameters) => {
     setAgentParameters((current) => (areAgentParametersEqual(current, params) ? current : params));
@@ -109,6 +168,10 @@ const App: React.FC = () => {
     setAgentParameters((current) => (areAgentParametersEqual(current, params) ? current : params));
   }, []);
 
+  useEffect(() => {
+    setDraftAgentParameters(agentParameters);
+  }, [agentParameters]);
+
   const handleBrainGraphChange = useCallback((nextGraph: BrainGraph) => {
     setBrainGraph(nextGraph);
   }, []);
@@ -120,77 +183,17 @@ const App: React.FC = () => {
   const formatNumber = (num: number): string => {
     return num.toLocaleString();
   };
+  const applyDraftAgentParameters = useCallback(() => {
+    handleAgentParametersApply(draftAgentParameters);
+  }, [draftAgentParameters, handleAgentParametersApply]);
 
-  const renderControlContent = () => {
-    switch (controlMode) {
-      case 'keyboard':
-        return (
-          <div className="manual-control" data-testid="manual-control-panel">
-            <h4>手动控制说明</h4>
-            <div className="control-instructions">
-              <div className="instruction-section">
-                <h5>键盘控制</h5>
-                <ul>
-                  <li><kbd>W</kbd> 或 <kbd>↑</kbd> - 前进</li>
-                  <li><kbd>A</kbd> 或 <kbd>←</kbd> - 左转</li>
-                  <li><kbd>D</kbd> 或 <kbd>→</kbd> - 右转</li>
-                  <li>支持多键同时按下（如W+A边前进边左转）</li>
-                  <li>A+D同时按下会抵消转向</li>
-                </ul>
-              </div>
-
-              <div className="instruction-section">
-                <h5>视觉系统</h5>
-                <ul>
-                  <li>{agentParameters.visionAngle}度前方视野</li>
-                  <li>{agentParameters.visionCells}个感受格子</li>
-                  <li>每格子RGB颜色输入</li>
-                  <li>共{agentParameters.visionCells * 3}维输入向量</li>
-                  <li>视野范围：{agentParameters.visionRange}像素</li>
-                </ul>
-              </div>
-
-              <div className="instruction-section">
-                <h5>环境元素</h5>
-                <ul>
-                  <li>🟢 绿色：食物（正奖励）</li>
-                  <li>⚫ 黑色：移动障碍物</li>
-                  <li>⚪ 灰色：静止障碍物</li>
-                  <li>🔵 蓝色：其他智能体</li>
-                </ul>
-              </div>
-
-              <div className="instruction-section">
-                <h5>神经系统</h5>
-                <ul>
-                  <li>动机（多巴胺）：奖励预测误差</li>
-                  <li>压力（去甲肾上腺素）：环境不确定性</li>
-                  <li>稳态（血清素）：风险规避阈值</li>
-                  <li>神经信号调节行为策略</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'snn':
-        return (
-          <div className="snn-control">
-            <SNNTopologyEditor
-              width={window.innerWidth * 0.4}
-              height={window.innerHeight - 80}
-              graph={brainGraph}
-              visionCells={agentParameters.visionCells}
-              onGraphChange={handleBrainGraphChange}
-              runtimeStatus={brainGraphRuntimeStatus}
-            />
-          </div>
-        );
-
-      default:
-        return null;
-    }
-  };
+  const resetDraftAgentParameters = useCallback(() => {
+    setDraftAgentParameters({
+      visionCells: 36,
+      visionRange: 250,
+      visionAngle: 120
+    });
+  }, []);
 
   return (
     <div className="app" data-testid="app-shell">
@@ -198,7 +201,7 @@ const App: React.FC = () => {
         <SimulationCanvas
           width={canvasWidth}
           height={canvasHeight}
-          controlMode={controlMode}
+          controlMode={'snn' as Extract<SimulationControlMode, 'keyboard' | 'snn'>}
           brainGraph={brainGraph}
           agentParameters={agentParameters}
           requestedLifecycleState={requestedLifecycleState}
@@ -208,71 +211,32 @@ const App: React.FC = () => {
           onAgentParametersChange={handleAgentParametersChange}
           onBrainGraphStatusChange={handleBrainGraphRuntimeStatusChange}
         />
+        <div className="game-stats-overlay">
+          <div className="game-stat-chip">
+            <span className="game-stat-key">FPS</span>
+            <span className="game-stat-value" data-testid="fps-value">{stats.fps.toFixed(1)}</span>
+          </div>
+          <div className="game-stat-chip">
+            <span className="game-stat-key">Reward</span>
+            <span className="game-stat-value positive" data-testid="reward-value">{formatNumber(stats.totalReward)}</span>
+          </div>
+        </div>
       </div>
 
       <div className="control-area" data-testid="control-panel">
-        <div className="unified-control-row">
-          <div className="stats-section">
-            <div className="stat-item">
-              <span className="stat-label">FPS</span>
-              <span className="stat-value" data-testid="fps-value">{stats.fps.toFixed(1)}</span>
-            </div>
+        <EditorToolbar
+          editorTab={editorTab}
+          runState={runState}
+          onEditorTabChange={setEditorTab}
+          onStartPause={handleStartPause}
+          onReset={handleReset}
+        />
 
-            <div className="stat-item">
-              <span className="stat-label">奖励</span>
-              <span className="stat-value positive" data-testid="reward-value">{formatNumber(stats.totalReward)}</span>
-            </div>
-          </div>
-
-          <div className="control-buttons">
-            <button
-              onClick={handleStartPause}
-              className="btn btn-primary"
-              title={runState === 'idle' ? '开始' : runState === 'paused' ? '继续' : '暂停'}
-              aria-label={runState === 'idle' ? '开始' : runState === 'paused' ? '继续' : '暂停'}
-              data-testid="start-pause-button"
-            >
-              {runState === 'running' ? '⏸' : '▶'}
-            </button>
-
-            <button
-              onClick={handleReset}
-              className="btn btn-secondary"
-              title="重置"
-              aria-label="重置"
-              data-testid="reset-button"
-            >
-              ⏹
-            </button>
-
-            <button
-              onClick={() => setShowAgentParamsModal(true)}
-              className="btn btn-secondary"
-              title="智能体参数设置"
-              aria-label="智能体参数设置"
-              data-testid="agent-params-button"
-            >
-              ⚙️
-            </button>
-          </div>
-
-          <div className="control-mode-selector">
-            <label>控制方式：</label>
-            <select
-              value={controlMode}
-              onChange={(e) => setControlMode(e.target.value as AppControlMode)}
-              className="mode-select"
-              data-testid="control-mode-select"
-            >
-              <option value="keyboard">手动控制</option>
-              <option value="snn">拓扑沙盒</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="diagnostic-strip" data-testid="app-diagnostics">
+        <div className="diagnostic-strip diagnostic-strip-hidden" data-testid="app-diagnostics" aria-hidden="true">
           <span data-testid="simulation-run-state">{runState}</span>
-          <span data-testid="control-mode-value">{controlMode}</span>
+          <span data-testid="control-mode-value">snn</span>
+          <span data-testid="editor-tab-value">{editorTab}</span>
+          <span data-testid="settings-section-value">{settingsSection}</span>
           <span data-testid="vision-cells-value">{agentParameters.visionCells}</span>
           <span data-testid="vision-range-value">{agentParameters.visionRange}</span>
           <span data-testid="vision-angle-value">{agentParameters.visionAngle}</span>
@@ -284,17 +248,30 @@ const App: React.FC = () => {
           <span data-testid="brain-graph-installed-synapse-count">{installedBrainGraph.synapses.length}</span>
         </div>
 
-        <div className={`content-area ${controlMode === 'snn' ? 'snn-mode' : ''}`}>
-          {renderControlContent()}
+        <div className={`content-area ${editorTab === 'graph' ? 'snn-mode' : 'settings-mode'}`}>
+          <GraphEditorPanel
+            isActive={editorTab === 'graph'}
+            graph={brainGraph}
+            visionCells={agentParameters.visionCells}
+            runtimeStatus={brainGraphRuntimeStatus}
+            onGraphChange={handleBrainGraphChange}
+          />
+          <div
+            className={`content-panel settings-control ${editorTab === 'settings' ? 'is-active' : 'is-hidden'}`}
+            aria-hidden={editorTab !== 'settings'}
+          >
+            <SettingsPanel
+              agentParameters={agentParameters}
+              draftAgentParameters={draftAgentParameters}
+              settingsSection={settingsSection}
+              onSettingsSectionChange={setSettingsSection}
+              onDraftAgentParametersChange={setDraftAgentParameters}
+              onApply={applyDraftAgentParameters}
+              onResetDefaults={resetDraftAgentParameters}
+            />
+          </div>
         </div>
       </div>
-
-      <AgentParametersModal
-        isOpen={showAgentParamsModal}
-        onClose={() => setShowAgentParamsModal(false)}
-        onApply={handleAgentParametersApply}
-        currentParams={agentParameters}
-      />
     </div>
   );
 };

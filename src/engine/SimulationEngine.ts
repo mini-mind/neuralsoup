@@ -225,6 +225,7 @@ export class SimulationEngine {
     this.session.reset();
     this.session.setKeyboardInputState(this.keyboardInputState);
     this.setControlMode(this.currentControlMode);
+    this.setCameraTarget(this.getMainAgent());
     this.onBrainGraphStatusChange?.(this.getBrainGraphRuntimeStatus());
     this.renderWorld();
   }

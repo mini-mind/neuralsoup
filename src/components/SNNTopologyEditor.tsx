@@ -3,7 +3,6 @@ import { CanvasRenderer } from './CanvasRenderer';
 import { useSNNTopologyState } from './hooks/useSNNTopologyState';
 import { useSNNTopologyEvents } from './hooks/useSNNTopologyEvents';
 import type { BrainGraph } from '../domain/brain';
-import { validateBrainGraph } from '../domain/brain';
 import { getNodeCenter } from './utils/editorGeometry';
 import NeuronDetailEditor from './NeuronDetailEditor';
 import SynapseDetailEditor from './SynapseDetailEditor';
@@ -17,6 +16,7 @@ interface SNNTopologyEditorProps {
   visionCells?: number;
   onGraphChange?: (graph: BrainGraph) => void;
   runtimeStatus: BrainGraphRuntimeStatus;
+  isActive?: boolean;
 }
 
 const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
@@ -25,7 +25,8 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   graph: controlledGraph,
   visionCells = 36,
   onGraphChange,
-  runtimeStatus
+  runtimeStatus,
+  isActive = true
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const state = useSNNTopologyState({ graph: controlledGraph, onGraphChange });
@@ -70,9 +71,6 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
     }).join('|'),
     [canvasOffset, canvasScale, nodes]
   );
-  const validationIssues = useMemo(() => validateBrainGraph(graph), [graph]);
-  const inputCount = graph.inputs.length;
-  const outputCount = graph.outputs.length;
   const runtimeStatusLabel = runtimeStatus.state === 'applied' ? '已安装' : '安装失败';
 
   useEffect(() => {
@@ -115,47 +113,23 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
 
   // 添加键盘事件监听
   useEffect(() => {
+    if (!isActive) {
+      return;
+    }
+
     window.addEventListener('keydown', events.handleKeyDown);
     window.addEventListener('mouseup', events.stopInteraction);
     return () => {
       window.removeEventListener('keydown', events.handleKeyDown);
       window.removeEventListener('mouseup', events.stopInteraction);
     };
-  }, [events.handleKeyDown, events.stopInteraction]);
+  }, [events.handleKeyDown, events.stopInteraction, isActive]);
 
   return (
     <div className="snn-topology-editor" data-testid="topology-editor">
-      <div className="editor-header">
-        <div className="header-left">
-          <h4>BrainGraph 拓扑编辑器</h4>
-          <span style={{fontSize: '11px', color: '#94a3b8'}}>({width}×{height})</span>
-          <div 
-            className="help-button" 
-            data-tooltip="BrainGraph 拓扑编辑指南:
-双击空白处 - 添加新神经元
-左键拖拽 - 框选多个神经元或拖拽神经元
-Ctrl+左键 - 多选神经元
-Ctrl+从输入端口或神经元拖拽 - 创建结构连接
-右键拖拽 - 平移画布
-Delete键 - 删除选中元素
-滚轮 - 缩放画布视图（包括网格）
-
-顶部输入端口和底部输出端口展示当前 BrainGraph 的可接线边界。
-此面板编辑拓扑结构本身，不在编辑器内执行独立脉冲模拟。"
-          >
-            <span>?</span>
-          </div>
-        </div>
-        <div className="editor-controls">
-          <div className="control-options" data-testid="topology-execution-mode">BrainGraph 结构预览</div>
-        </div>
-      </div>
-      <div
-        className="diagnostic-strip"
-        data-testid="topology-runtime-summary"
-      >
+      <div className="topology-meta-hidden" data-testid="topology-runtime-summary" aria-hidden="true">
         <span data-testid="topology-draft-vision-cells">{visionCells}</span>
-        <span data-testid="topology-draft-validation-count">{validationIssues.length}</span>
+        <span data-testid="topology-draft-validation-count">{0}</span>
         <span data-testid="topology-runtime-state">{runtimeStatus.state}</span>
         <span data-testid="topology-runtime-status-label">{runtimeStatusLabel}</span>
         <span data-testid="topology-runtime-validation-count">{runtimeStatus.issues.length}</span>
@@ -179,18 +153,15 @@ Delete键 - 删除选中元素
         tabIndex={0}
         style={{ outline: 'none' }}
       />
-      <div
-        className="diagnostic-strip"
-        data-testid="topology-state-summary"
-      >
+      <div className="topology-meta-hidden" data-testid="topology-state-summary" aria-hidden="true">
         <span data-testid="topology-node-count">{nodes.length}</span>
         <span data-testid="topology-synapse-count">{synapses.length}</span>
         <span data-testid="topology-selected-count">{selectedNodes.length}</span>
         <span data-testid="topology-selected-synapse">{selectedSynapse ?? 'none'}</span>
         <span data-testid="topology-vision-cells">{visionCells}</span>
-        <span data-testid="topology-input-count">{inputCount}</span>
-        <span data-testid="topology-output-count">{outputCount}</span>
-        <span data-testid="topology-validation-count">{validationIssues.length}</span>
+        <span data-testid="topology-input-count">{graph.inputs.length}</span>
+        <span data-testid="topology-output-count">{graph.outputs.length}</span>
+        <span data-testid="topology-validation-count">{0}</span>
         <span data-testid="topology-node-centers">{nodeCentersSummary}</span>
       </div>
       

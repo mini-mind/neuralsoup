@@ -6,11 +6,17 @@ const selectors = {
   renderError: '[data-testid="simulation-render-error"]',
   runState: '[data-testid="simulation-run-state"]',
   controlModeValue: '[data-testid="control-mode-value"]',
-  controlModeSelect: '[data-testid="control-mode-select"]',
+  editorTabValue: '[data-testid="editor-tab-value"]',
+  settingsSectionValue: '[data-testid="settings-section-value"]',
+  editorTabSettings: '[data-testid="editor-tab-settings"]',
+  editorTabGraph: '[data-testid="editor-tab-graph"]',
   startPauseButton: '[data-testid="start-pause-button"]',
   resetButton: '[data-testid="reset-button"]',
-  agentParamsButton: '[data-testid="agent-params-button"]',
-  paramsModal: '[data-testid="agent-params-modal"]',
+  settingsPanel: '[data-testid="settings-panel"]',
+  settingsSidebar: '[data-testid="settings-sidebar"]',
+  settingsNavAgentParameters: '[data-testid="settings-nav-agent-parameters"]',
+  settingsNavKeyboardInputs: '[data-testid="settings-nav-keyboard-inputs"]',
+  agentParamsPanel: '[data-testid="agent-params-panel"]',
   visionCellsInput: '[data-testid="vision-cells-input"]',
   visionRangeInput: '[data-testid="vision-range-input"]',
   visionAngleInput: '[data-testid="vision-angle-input"]',
@@ -18,10 +24,10 @@ const selectors = {
   visionRangeValue: '[data-testid="vision-range-value"]',
   visionAngleValue: '[data-testid="vision-angle-value"]',
   paramsApply: '[data-testid="agent-params-apply"]',
-  paramsCancel: '[data-testid="agent-params-cancel"]',
   paramsResetDefaults: '[data-testid="agent-params-reset-defaults"]',
-  manualPanel: '[data-testid="manual-control-panel"]',
+  keyboardInputPanel: '[data-testid="keyboard-input-panel"]',
   topologyEditor: '[data-testid="topology-editor"]',
+  topologyViewport: '[data-testid="topology-viewport"]',
   topologyCanvas: '[data-testid="topology-canvas"]',
   topologyNodeCount: '[data-testid="topology-node-count"]',
   topologySelectedCount: '[data-testid="topology-selected-count"]',
@@ -123,7 +129,7 @@ const expectDegradedRenderErrorUI = async (page: Page) => {
   await expect(page.locator(selectors.renderError)).toContainText('渲染初始化失败');
   await expect(page.locator(selectors.runState)).toBeVisible();
   await expect(page.locator(selectors.startPauseButton)).toBeVisible();
-  await expect(page.locator(selectors.controlModeSelect)).toBeVisible();
+  await expect(page.locator(selectors.editorTabGraph)).toBeVisible();
 };
 
 const expectInteractiveRenderReady = async (page: Page, testInfo: TestInfo) => {
@@ -190,6 +196,15 @@ const parseNodeCenters = (summary: string) =>
       const [x, y] = coords.split(',').map((value) => Number.parseInt(value, 10));
       return { id, x, y };
     });
+
+const getCanvasBox = async (page: Page) => {
+  const box = await page.locator(selectors.topologyCanvas).boundingBox();
+  if (!box) {
+    throw new Error('Topology canvas bounding box not available');
+  }
+
+  return box;
+};
 
 test.beforeEach(async ({ page }, testInfo) => {
   installStartupDiagnostics(page);
@@ -282,13 +297,83 @@ test('simulation lifecycle controls update visible run state', async ({ page }, 
   await expect(page.locator('[data-testid="fps-value"]')).toHaveText('0.0');
 });
 
-test('agent parameter modal persists applied values and discards cancelled drafts', async ({ page }, testInfo) => {
+test('start pause control can be toggled from the keyboard when the button is focused', async ({ page }, testInfo) => {
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
   }
 
-  await page.locator(selectors.agentParamsButton).click();
-  await expect(page.locator(selectors.paramsModal)).toBeVisible();
+  const startPauseButton = page.locator(selectors.startPauseButton);
+
+  await startPauseButton.focus();
+  await expect(startPauseButton).toBeFocused();
+  await expect(page.locator(selectors.runState)).toHaveText('idle');
+
+  await page.keyboard.press('Space');
+  await expect(page.locator(selectors.runState)).toHaveText('running');
+
+  await expect(startPauseButton).toBeFocused();
+  await page.keyboard.press('Space');
+  await expect(page.locator(selectors.runState)).toHaveText('paused');
+
+  await expect(startPauseButton).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator(selectors.runState)).toHaveText('running');
+});
+
+test('space toggles simulation lifecycle globally but is ignored in editable controls', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await expect(page.locator(selectors.runState)).toHaveText('idle');
+
+  await page.locator(selectors.editorTabSettings).click();
+  await page.locator(selectors.settingsNavKeyboardInputs).click();
+  await expect(page.locator(selectors.keyboardInputPanel)).toBeVisible();
+  await page.locator(selectors.keyboardInputPanel).click();
+  await page.keyboard.press('Space');
+  await expect(page.locator(selectors.runState)).toHaveText('running');
+
+  await page.keyboard.press('Space');
+  await expect(page.locator(selectors.runState)).toHaveText('paused');
+
+  await page.locator(selectors.settingsNavAgentParameters).click();
+  await expect(page.locator(selectors.agentParamsPanel)).toBeVisible();
+  await page.locator(selectors.visionCellsInput).focus();
+  await page.keyboard.press('Space');
+  await expect(page.locator(selectors.runState)).toHaveText('paused');
+});
+
+test('reset keeps the existing renderer instance interactive and restartable', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  const engine = page.locator(selectors.simulationCanvas);
+  const initialEngineInstanceId = await engine.getAttribute('data-engine-instance-id');
+
+  await page.locator(selectors.startPauseButton).click();
+  await expect(page.locator(selectors.runState)).toHaveText('running');
+
+  await page.locator(selectors.resetButton).click();
+  await expect(page.locator(selectors.runState)).toHaveText('idle');
+  await expect(page.locator('[data-testid="fps-value"]')).toHaveText('0.0');
+  await expect(engine).toHaveAttribute('data-engine-ready', 'true');
+  await expect(engine).toHaveAttribute('data-engine-instance-id', initialEngineInstanceId ?? '1');
+
+  await page.locator(selectors.startPauseButton).click();
+  await expect(page.locator(selectors.runState)).toHaveText('running');
+});
+
+test('settings page persists applied agent parameter values and supports reset defaults', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabSettings).click();
+  await expect(page.locator(selectors.settingsPanel)).toBeVisible();
+  await expect(page.locator(selectors.settingsSectionValue)).toHaveText('agent-parameters');
+  await expect(page.locator(selectors.agentParamsPanel)).toBeVisible();
 
   await page.locator(selectors.visionCellsInput).fill('24');
   await page.locator(selectors.visionRangeInput).fill('300');
@@ -299,38 +384,81 @@ test('agent parameter modal persists applied values and discards cancelled draft
   await expect(page.locator(selectors.visionRangeValue)).toHaveText('300');
   await expect(page.locator(selectors.visionAngleValue)).toHaveText('90');
 
-  await page.locator(selectors.agentParamsButton).click();
+  await page.locator(selectors.editorTabGraph).click();
+  await page.locator(selectors.editorTabSettings).click();
+  await expect(page.locator(selectors.settingsNavAgentParameters)).toBeVisible();
   await expect(page.locator(selectors.visionCellsInput)).toHaveValue('24');
   await expect(page.locator(selectors.visionRangeInput)).toHaveValue('300');
   await expect(page.locator(selectors.visionAngleInput)).toHaveValue('90');
 
-  await page.locator(selectors.visionCellsInput).fill('18');
-  await page.locator(selectors.paramsCancel).click();
-
-  await page.locator(selectors.agentParamsButton).click();
-  await expect(page.locator(selectors.visionCellsInput)).toHaveValue('24');
-
   await page.locator(selectors.paramsResetDefaults).click();
+  await expect(page.locator(selectors.visionCellsInput)).toHaveValue('36');
+  await expect(page.locator(selectors.visionRangeInput)).toHaveValue('250');
+  await expect(page.locator(selectors.visionAngleInput)).toHaveValue('120');
   await page.locator(selectors.paramsApply).click();
   await expect(page.locator(selectors.visionCellsValue)).toHaveText('36');
   await expect(page.locator(selectors.visionRangeValue)).toHaveText('250');
   await expect(page.locator(selectors.visionAngleValue)).toHaveText('120');
 });
 
-test('control mode switching stays coherent between keyboard and snn', async ({ page }, testInfo) => {
+test('editor tabs switch between settings and graph view with settings sidebar navigation', async ({ page }, testInfo) => {
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
   }
 
-  await expect(page.locator(selectors.manualPanel)).toBeVisible();
-
-  await page.locator(selectors.controlModeSelect).selectOption('snn');
-  await expect(page.locator(selectors.controlModeValue)).toHaveText('snn');
+  await expect(page.locator(selectors.editorTabValue)).toHaveText('graph');
   await expect(page.locator(selectors.topologyEditor)).toBeVisible();
 
-  await page.locator(selectors.controlModeSelect).selectOption('keyboard');
-  await expect(page.locator(selectors.controlModeValue)).toHaveText('keyboard');
-  await expect(page.locator(selectors.manualPanel)).toBeVisible();
+  await page.locator(selectors.editorTabSettings).click();
+  await expect(page.locator(selectors.editorTabValue)).toHaveText('settings');
+  await expect(page.locator(selectors.settingsSidebar)).toBeVisible();
+  await expect(page.locator(selectors.agentParamsPanel)).toBeVisible();
+
+  await page.locator(selectors.settingsNavKeyboardInputs).click();
+  await expect(page.locator(selectors.settingsSectionValue)).toHaveText('keyboard-inputs');
+  await expect(page.locator(selectors.keyboardInputPanel)).toBeVisible();
+
+  await page.locator(selectors.settingsNavAgentParameters).click();
+  await expect(page.locator(selectors.settingsSectionValue)).toHaveText('agent-parameters');
+  await expect(page.locator(selectors.agentParamsPanel)).toBeVisible();
+
+  await page.locator(selectors.editorTabGraph).click();
+  await expect(page.locator(selectors.editorTabValue)).toHaveText('graph');
+  await expect(page.locator(selectors.controlModeValue)).toHaveText('snn');
+  await expect(page.locator(selectors.topologyEditor)).toBeVisible();
+});
+
+test('settings and graph tabs preserve sidebar and graph state across switches', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  const canvas = page.locator(selectors.topologyCanvas);
+  const box = await canvas.boundingBox();
+  if (!box) {
+    throw new Error('Topology canvas bounding box not available');
+  }
+
+  await expect(page.locator(selectors.topologyNodeCount)).toHaveText('2');
+  await canvas.dblclick({
+    position: {
+      x: Math.round(box.width * 0.58),
+      y: Math.round(box.height * 0.5)
+    }
+  });
+  await expect(page.locator(selectors.topologyNodeCount)).toHaveText('3');
+
+  await page.locator(selectors.editorTabSettings).click();
+  await page.locator(selectors.settingsNavKeyboardInputs).click();
+  await expect(page.locator(selectors.settingsSectionValue)).toHaveText('keyboard-inputs');
+
+  await page.locator(selectors.editorTabGraph).click();
+  await expect(page.locator(selectors.topologyNodeCount)).toHaveText('3');
+
+  await page.locator(selectors.editorTabSettings).click();
+  await expect(page.locator(selectors.settingsSectionValue)).toHaveText('keyboard-inputs');
+  await expect(page.locator(selectors.keyboardInputPanel)).toBeVisible();
 });
 
 test('topology sandbox supports creating, selecting, deleting, and editing a neuron', async ({ page }, testInfo) => {
@@ -338,16 +466,13 @@ test('topology sandbox supports creating, selecting, deleting, and editing a neu
     return;
   }
 
-  await page.locator(selectors.controlModeSelect).selectOption('snn');
+  await page.locator(selectors.editorTabGraph).click();
   await expect(page.locator(selectors.topologyEditor)).toBeVisible();
 
   const canvas = page.locator(selectors.topologyCanvas);
   await expect(page.locator(selectors.topologyNodeCount)).toHaveText('2');
 
-  const box = await canvas.boundingBox();
-  if (!box) {
-    throw new Error('Topology canvas bounding box not available');
-  }
+  const box = await getCanvasBox(page);
 
   await canvas.dblclick({
     position: {
@@ -390,4 +515,110 @@ test('topology sandbox supports creating, selecting, deleting, and editing a neu
   await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
   await page.locator(selectors.neuronLabelInput).fill('已编辑神经元');
   await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
+});
+
+test('graph view keeps topology selection state across settings tab switches', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await expect(page.locator(selectors.topologyEditor)).toBeVisible();
+
+  const canvas = page.locator(selectors.topologyCanvas);
+  const nodeCenters = parseNodeCenters(await page.locator(selectors.topologyNodeCenters).innerText());
+  const neuronOne = nodeCenters.find((node) => node.id === 'neuron-1');
+  if (!neuronOne) {
+    throw new Error('neuron-1 center not found');
+  }
+
+  await canvas.click({
+    position: {
+      x: neuronOne.x,
+      y: neuronOne.y
+    }
+  });
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
+
+  await page.locator(selectors.editorTabSettings).click();
+  await expect(page.locator(selectors.settingsPanel)).toBeVisible();
+  await page.locator(selectors.settingsNavKeyboardInputs).click();
+  await expect(page.locator(selectors.settingsSectionValue)).toHaveText('keyboard-inputs');
+
+  await page.locator(selectors.editorTabGraph).click();
+  await expect(page.locator(selectors.topologyEditor)).toBeVisible();
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
+});
+
+test('graph view uses the real narrow-screen container size and keeps node hit targets usable', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator(selectors.editorTabGraph).click();
+  await expect(page.locator(selectors.topologyEditor)).toBeVisible();
+
+  const viewportBox = await page.locator(selectors.topologyViewport).boundingBox();
+  const canvasBox = await getCanvasBox(page);
+  if (!viewportBox) {
+    throw new Error('Topology viewport bounding box not available');
+  }
+
+  expect(Math.round(canvasBox.width)).toBe(Math.round(viewportBox.width));
+  expect(Math.round(canvasBox.height)).toBe(Math.round(viewportBox.height));
+  expect(canvasBox.width).toBeLessThan(500);
+
+  const nodeCenters = parseNodeCenters(await page.locator(selectors.topologyNodeCenters).innerText());
+  const neuronOne = nodeCenters.find((node) => node.id === 'neuron-1');
+  if (!neuronOne) {
+    throw new Error('neuron-1 center not found');
+  }
+
+  await page.locator(selectors.topologyCanvas).click({
+    position: {
+      x: neuronOne.x,
+      y: neuronOne.y
+    }
+  });
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
+});
+
+test('topology sandbox remains clickable on a narrow viewport', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.setViewportSize({ width: 720, height: 1100 });
+  await page.locator(selectors.editorTabGraph).click();
+  await expect(page.locator(selectors.topologyEditor)).toBeVisible();
+
+  const canvas = page.locator(selectors.topologyCanvas);
+  const box = await canvas.boundingBox();
+  if (!box) {
+    throw new Error('Topology canvas bounding box not available');
+  }
+
+  await expect(page.locator(selectors.topologyNodeCount)).toHaveText('2');
+  await canvas.dblclick({
+    position: {
+      x: Math.round(box.width * 0.65),
+      y: Math.round(box.height * 0.48)
+    }
+  });
+  await expect(page.locator(selectors.topologyNodeCount)).toHaveText('3');
+
+  const nodeCenters = parseNodeCenters(await page.locator(selectors.topologyNodeCenters).innerText());
+  const createdNode = nodeCenters.find((node) => node.id.startsWith('neuron-'));
+  if (!createdNode) {
+    throw new Error('Created neuron center not found');
+  }
+
+  await canvas.click({
+    position: {
+      x: createdNode.x,
+      y: createdNode.y
+    }
+  });
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
 });

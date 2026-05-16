@@ -3,12 +3,11 @@
   height: 100vh;
   width: 100vw;
   overflow: hidden;
-  background: #1a1a1a;
-  color: #ffffff;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #111;
+  color: #d4d4d4;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* 左侧游戏区域 (60%) */
 .game-area {
   flex: 0 0 60%;
   position: relative;
@@ -16,263 +15,64 @@
   overflow: hidden;
 }
 
-/* 右侧控制区域 (40%) */
 .control-area {
   flex: 0 0 40%;
-  background: #2a2a2a;
-  border-left: 1px solid #444;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: #1e1e1e;
+  border-left: 1px solid #2b2b2b;
 }
 
-/* 统一控制行：包含所有控件 */
-.unified-control-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  background: #333;
-  border-bottom: 1px solid #444;
-  min-height: 60px;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.stats-section {
-  display: flex;
-  gap: 16px;
-}
-
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.stat-label {
-  font-size: 11px;
-  color: #aaa;
-  text-transform: uppercase;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-}
-
-.stat-value {
-  font-size: 16px;
-  font-weight: 700;
-  color: #ffffff;
-}
-
-.stat-value.positive {
-  color: #4ade80;
-}
-
-.control-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-.btn {
-  padding: 8px 12px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.2s ease;
-  min-width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-primary {
-  background: #6366f1;
-  color: white;
-}
-
-.btn-primary:hover {
-  background: #5855eb;
-  transform: translateY(-1px);
-}
-
-.btn-secondary {
-  background: #6b7280;
-  color: white;
-}
-
-.btn-secondary:hover {
-  background: #5b6471;
-  transform: translateY(-1px);
-}
-
-/* 情绪值显示 */
-.emotion-values {
-  display: flex;
-  gap: 12px;
-}
-
-.emotion-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.emotion-label {
-  font-size: 11px;
-  color: #aaa;
-  text-transform: uppercase;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-}
-
-.emotion-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: #f59e0b;
-}
-
-.control-mode-selector {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.control-mode-selector label {
-  font-size: 12px;
-  color: #ccc;
-  white-space: nowrap;
-}
-
-.mode-select {
-  padding: 6px 10px;
-  background: #444;
-  border: 1px solid #555;
-  border-radius: 4px;
-  color: #fff;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.mode-select:focus {
-  outline: none;
-  border-color: #6366f1;
-}
-
-/* 内容区域 */
-.content-area {
-  flex: 1;
-  overflow: auto;
-  padding: 16px;
-}
-
-.diagnostic-strip {
-  display: flex;
-  gap: 12px;
-  padding: 6px 16px;
-  border-bottom: 1px solid #3f3f46;
-  color: #94a3b8;
-  font-size: 11px;
-  line-height: 1.4;
-  white-space: nowrap;
-  overflow-x: auto;
-}
-
-/* 手动控制样式 */
-.manual-control h4 {
-  margin: 0 0 16px 0;
-  color: #fff;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.control-instructions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.instruction-section h5 {
-  margin: 0 0 8px 0;
-  color: #4ade80;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.instruction-section ul {
-  margin: 0;
-  padding-left: 16px;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.instruction-section li {
-  margin-bottom: 4px;
-  color: #ccc;
-}
-
-kbd {
-  background: #444;
-  border: 1px solid #666;
-  border-radius: 3px;
-  padding: 2px 6px;
-  font-family: monospace;
-  font-size: 11px;
-  color: #fff;
-}
-
-/* SNN控制样式 */
-.snn-control {
+.game-stats-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  overflow: hidden;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  gap: 8px;
+  z-index: 30;
+  pointer-events: none;
 }
 
-/* 当显示SNN控制时，调整content-area */
-.content-area.snn-mode {
+.game-stat-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  background: rgba(20, 20, 20, 0.82);
+  color: #d6d6d6;
+  font-size: 11px;
+  backdrop-filter: blur(4px);
+}
+
+.game-stat-key {
+  color: #8c8c8c;
+}
+
+.game-stat-value {
+  color: #f2f2f2;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-stat-value.positive {
+  color: #dcdcdc;
+}
+
+.diagnostic-strip-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
   padding: 0;
-  position: relative;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .app {
-    flex-direction: column;
-  }
-  
-  .game-area {
-    flex: 0 0 50%;
-  }
-  
-  .control-area {
-    flex: 0 0 50%;
-    border-left: none;
-    border-top: 1px solid #444;
-  }
-  
-  .unified-control-row {
-    flex-direction: column;
-    gap: 12px;
-    align-items: stretch;
-  }
-  
-  .stats-section {
-    justify-content: center;
-  }
-  
-  .control-instructions {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* 仿真画布样式 */
 .simulation-canvas {
   width: 100%;
   height: 100%;
@@ -285,4 +85,18 @@ kbd {
   display: block;
 }
 
- 
+@media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+  }
+
+  .game-area,
+  .control-area {
+    flex: 0 0 50%;
+  }
+
+  .control-area {
+    border-left: 0;
+    border-top: 1px solid #2b2b2b;
+  }
+}

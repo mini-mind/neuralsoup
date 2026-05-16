@@ -4,8 +4,8 @@ import type { BrainGraph } from '../domain/brain';
 import { SimulationEngine, type SimulationLifecycleState } from '../engine/SimulationEngine';
 import type { SimulationControlMode } from '../domain/world';
 import type { SimulationState } from '../types/simulation';
-import type { AgentParameters } from './AgentParametersModal';
 import type { BrainGraphRuntimeStatus } from '../types/brainGraphRuntime';
+import type { AgentParameters } from './editor/types';
 
 interface SimulationCanvasProps {
   onStatsUpdate: (stats: SimulationState['stats']) => void;
@@ -263,7 +263,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         }
         break;
     }
-  }, [requestedLifecycleState]);
+  }, [height, requestedLifecycleState, width]);
 
   useEffect(() => {
     const engine = engineRef.current;
