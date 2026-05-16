@@ -389,6 +389,7 @@ test('control mode switching and script syntax check stay coherent', async ({ pa
   });
   await page.locator(selectors.scriptSyntaxCheck).click();
   await expectAndClearExpectedScriptCompileErrors(page, invalidScriptDiagnostics);
+  await expect(page.locator('[data-testid="script-status-state"]')).toHaveText('compile-error');
 
   await page.locator(selectors.scriptCodeInput).fill('return [0, 0];');
   page.once('dialog', async (dialog) => {
@@ -396,6 +397,7 @@ test('control mode switching and script syntax check stay coherent', async ({ pa
     await dialog.accept();
   });
   await page.locator(selectors.scriptSyntaxCheck).click();
+  await expect(page.locator('[data-testid="script-status-state"]')).toHaveText('ready');
 
   await page.locator(selectors.scriptOverride).check();
   await expect(page.locator(selectors.scriptOverride)).toBeChecked();
@@ -404,8 +406,8 @@ test('control mode switching and script syntax check stay coherent', async ({ pa
   await expect(page.locator(selectors.controlModeValue)).toHaveText('snn');
   await expect(page.locator(selectors.topologyEditor)).toBeVisible();
 
-  await page.locator(selectors.controlModeSelect).selectOption('manual');
-  await expect(page.locator(selectors.controlModeValue)).toHaveText('manual');
+  await page.locator(selectors.controlModeSelect).selectOption('keyboard');
+  await expect(page.locator(selectors.controlModeValue)).toHaveText('keyboard');
   await expect(page.locator(selectors.manualPanel)).toBeVisible();
 });
 

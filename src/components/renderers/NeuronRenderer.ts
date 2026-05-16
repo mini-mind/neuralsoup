@@ -21,11 +21,8 @@ export class NeuronRenderer {
         ctx.beginPath();
         ctx.arc(x + 25, y + 25, 20, 0, 2 * Math.PI);
         
-        // 根据膜电位设置颜色
-        const v = node.state?.v || -65;
-        const normalizedV = Math.max(0, (v + 65) / 95);
         ctx.fillStyle = selectedNodes.includes(node.id) ? '#a855f7' : // 紫色选中
-                       `rgba(59, 130, 246, ${0.3 + normalizedV * 0.7})`; // 蓝色渐变
+                       'rgba(59, 130, 246, 0.72)';
         ctx.fill();
         
         // 绘制边框 - 添加hover高亮效果
@@ -44,28 +41,16 @@ export class NeuronRenderer {
         }
         ctx.stroke();
         
-        // 绘制脉冲效果
-        if (node.state?.spike) {
-          ctx.beginPath();
-          ctx.arc(x + 25, y + 25, 30, 0, 2 * Math.PI);
-          ctx.strokeStyle = '#fbbf24';
-          ctx.lineWidth = 3;
-          ctx.stroke();
-        }
-        
         // 绘制标签
         ctx.fillStyle = '#ffffff';
         ctx.font = '12px Arial';
         ctx.textAlign = 'center';
         ctx.fillText(node.label || `N${node.id}`, x + 25, y + 60);
-        
-        // 显示膜电位
-        if (node.state) {
-          ctx.fillStyle = '#94a3b8';
-          ctx.font = '10px Arial';
-          ctx.textAlign = 'center';
-          ctx.fillText(`${node.state.v.toFixed(1)}mV`, x + 25, y + 75);
-        }
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(node.id, x + 25, y + 75);
       }
     });
   }

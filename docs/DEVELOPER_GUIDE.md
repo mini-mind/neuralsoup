@@ -55,6 +55,20 @@ neuralsoup/
 └── index.html                 # Vite HTML入口
 ```
 
+## 架构重构方向
+
+当前仓库正在向不保历史兼容的清晰分层架构收口。涉及编辑器模型、仿真运行时、控制策略、Pixi 渲染或共享类型的改动，先阅读：
+
+- [彻底重构方案](./ARCHITECTURE_REFACTOR_PLAN.md)
+- [仓库级 agent 约束](../AGENTS.md)
+
+核心原则：
+
+- 编辑器和运行时必须共享同一个神经网络模型真源。
+- React 宿主只分发命令和展示快照，不直接操作仿真内部对象。
+- Pixi 是渲染 adapter，不承载领域决策。
+- 领域实体不包含渲染缓存、React 状态或 DOM 对象。
+
 ## 核心概念
 
 ### 1. Hook驱动的状态管理
@@ -121,7 +135,6 @@ interface SNNSynapse {
   from: string;
   to: string;
   weight: number;
-  delay: number;
 }
 ```
 
@@ -178,7 +191,7 @@ const SNNTopologyEditor = () => {
   const state = useSNNTopologyState();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const events = useSNNTopologyEvents({ canvasRef, state });
-  
+
   return (
     <canvas
       ref={canvasRef}

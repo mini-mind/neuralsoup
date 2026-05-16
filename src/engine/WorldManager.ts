@@ -49,7 +49,6 @@ export class WorldManager {
         energy: 100,
         visionCells: [],
         visualInput: [],
-        controlType: i === mainAgentId ? 'snn' : 'random',
         motivation: 0,
         stress: 0,
         homeostasis: 0.5,

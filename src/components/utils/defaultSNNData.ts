@@ -1,53 +1,100 @@
-import { SNNNode, Receptor, Effector, ReceptorInput, EffectorOutput, ReceptorModality } from '../../types/simulation';
+import {
+  createDefaultBrainGraph,
+  reconcileBrainGraphVisionCells as reconcileBrainGraphVisionPorts,
+  type BrainGraph,
+  type BrainInputPort,
+  type BrainNeuronNode,
+  type BrainOutputPort,
+  type BrainSynapse,
+  type IzhikevichNeuronParameters,
+} from '../../domain/brain';
+import {
+  SNNNode,
+  Receptor,
+  Effector,
+  ReceptorInput,
+  EffectorOutput,
+  ReceptorModality,
+  SNNSynapse,
+} from '../../types/simulation';
 
-export const createDefaultReceptor = (visionCells: number = 36): Receptor => {
-  // 创建视觉感受器 - 增加节点间距，优化排布
-  const visionInputs: ReceptorInput[] = [];
-  const nodeSpacing = 24; // 增加节点间距，减少密集程度
-  const startX = 16; // 增加起始X位置
-  
-  // 计算感受器内容宽度（所有节点）
-  const contentWidth = startX * 2 + visionCells * nodeSpacing;
-  const minReceptorWidth = 200; // 最小感受器宽度
-  const receptorWidth = Math.max(minReceptorWidth, contentWidth);
-  
-  // 生成R通道输入 - 第1行
-  for (let i = 0; i < visionCells; i++) {
-    visionInputs.push({
-      id: `vision-R-${i}`,
-      x: startX + i * nodeSpacing,
-      y: 16, // R通道在顶部，增加间距
-      label: `R${i}`,
-      voltage: 0,
-      colorType: 'R'
-    });
-  }
-  
-  // 生成G通道输入 - 第2行
-  for (let i = 0; i < visionCells; i++) {
-    visionInputs.push({
-      id: `vision-G-${i}`,
-      x: startX + i * nodeSpacing,
-      y: 36, // G通道在中间，增加间距
-      label: `G${i}`,
-      voltage: 0,
-      colorType: 'G'
-    });
-  }
-  
-  // 生成B通道输入 - 第3行
-  for (let i = 0; i < visionCells; i++) {
-    visionInputs.push({
-      id: `vision-B-${i}`,
-      x: startX + i * nodeSpacing,
-      y: 56, // B通道在底部，增加间距
-      label: `B${i}`,
-      voltage: 0,
-      colorType: 'B'
-    });
-  }
+export const DEFAULT_EDITOR_NEURON_PARAMS: IzhikevichNeuronParameters = {
+  a: 0.02,
+  b: 0.2,
+  c: -65,
+  d: 8,
+  threshold: 30,
+};
 
-  // 只保留视觉模态
+const getPortRowY = (channel: BrainInputPort['channel']): number => {
+  switch (channel) {
+    case 'R':
+      return 16;
+    case 'G':
+      return 36;
+    case 'B':
+      return 56;
+  }
+};
+
+const createReceptorInputsFromGraph = (graph: BrainGraph): ReceptorInput[] => {
+  const nodeSpacing = 24;
+  const startX = 16;
+
+  return graph.inputs.map((input) => ({
+    id: input.id,
+    x: startX + input.index * nodeSpacing,
+    y: getPortRowY(input.channel),
+    label: input.label,
+    voltage: 0,
+    colorType: input.channel,
+  }));
+};
+
+const getEffectorX = (output: BrainOutputPort): number => 20 + output.index * 70;
+
+const createDefaultGraph = (visionCells: number): BrainGraph => createDefaultBrainGraph(visionCells);
+
+const mapNeuronToEditorNode = (neuron: BrainNeuronNode): SNNNode => ({
+  id: neuron.id,
+  x: neuron.position.x,
+  y: neuron.position.y,
+  type: 'neuron',
+  label: neuron.label,
+  params: { ...neuron.params },
+});
+
+const mapSynapseToEditorSynapse = (synapse: BrainSynapse): SNNSynapse => ({
+  id: synapse.id,
+  from: synapse.from,
+  to: synapse.to,
+  weight: synapse.weight,
+});
+
+const mapEditorNodeToNeuron = (node: SNNNode): BrainNeuronNode => ({
+  id: node.id,
+  label: node.label,
+  position: {
+    x: node.x,
+    y: node.y,
+  },
+  params: { ...(node.params ?? DEFAULT_EDITOR_NEURON_PARAMS) },
+});
+
+const mapEditorSynapseToBrainSynapse = (synapse: SNNSynapse): BrainSynapse => ({
+  id: synapse.id,
+  from: synapse.from,
+  to: synapse.to,
+  weight: synapse.weight,
+});
+
+export const createReceptorFromGraph = (graph: BrainGraph): Receptor => {
+  const visionInputs = createReceptorInputsFromGraph(graph);
+  const firstInputX = visionInputs[0]?.x ?? 16;
+  const lastInputX = visionInputs[visionInputs.length - 1]?.x ?? firstInputX;
+  const contentWidth = lastInputX + firstInputX;
+  const receptorWidth = Math.max(200, contentWidth);
+
   const modalities: ReceptorModality[] = [
     {
       type: 'vision',
@@ -68,101 +115,63 @@ export const createDefaultReceptor = (visionCells: number = 36): Receptor => {
   };
 };
 
-export const createDefaultEffector = (): Effector => {
-  // 创建效应器 - 初始值改为0
-  const defaultEffectorOutputs: EffectorOutput[] = [
-    { 
-      id: 'output-left', 
-      x: 20, 
-      y: 25, 
-      label: '左转', 
-      signal: 0,
-      pulseAccumulation: 0, // 初始值改为0
-      decayRate: 0.85, // 加快衰减速率
-      lastUpdateTime: Date.now()
-    },
-    { 
-      id: 'output-forward', 
-      x: 90, 
-      y: 25, 
-      label: '前进', 
-      signal: 0,
-      pulseAccumulation: 0, // 初始值改为0
-      decayRate: 0.85, // 加快衰减速率
-      lastUpdateTime: Date.now()
-    },
-    { 
-      id: 'output-right', 
-      x: 160, 
-      y: 25, 
-      label: '右转', 
-      signal: 0,
-      pulseAccumulation: 0, // 初始值改为0
-      decayRate: 0.85, // 加快衰减速率
-      lastUpdateTime: Date.now()
-    },
-    { 
-      id: 'output-motivation', 
-      x: 230, 
-      y: 25, 
-      label: '动机', 
-      signal: 0,
-      pulseAccumulation: 0,
-      decayRate: 0.85,
-      lastUpdateTime: Date.now()
-    },
-    { 
-      id: 'output-stress', 
-      x: 300, 
-      y: 25, 
-      label: '压力', 
-      signal: 0,
-      pulseAccumulation: 0,
-      decayRate: 0.85,
-      lastUpdateTime: Date.now()
-    },
-    { 
-      id: 'output-homeostasis', 
-      x: 370, 
-      y: 25, 
-      label: '稳态', 
-      signal: 0,
-      pulseAccumulation: 0,
-      decayRate: 0.85,
-      lastUpdateTime: Date.now()
-    }
-  ];
+export const createEffectorFromGraph = (graph: BrainGraph): Effector => {
+  const outputs: EffectorOutput[] = graph.outputs.map((output) => ({
+    id: output.id,
+    x: getEffectorX(output),
+    y: 25,
+    label: output.label,
+    signal: 0,
+    pulseAccumulation: 0,
+    decayRate: 0.85,
+    lastUpdateTime: 0,
+  }));
 
   return {
     id: 'effector-1',
     x: 0,
     y: 0,
-    width: 410, // 增加宽度以容纳新的输出
-    height: 60, // 固定高度60px，与渲染器一致
-    outputs: defaultEffectorOutputs
+    width: 60 + outputs.length * 70,
+    height: 60,
+    outputs
   };
 };
 
-export const createDefaultNodes = (): SNNNode[] => {
-  // 创建示例神经元 - 居左放置
-  return [
-    {
-      id: 'neuron-1',
-      x: 50, // 居左放置
-      y: 150,
-      type: 'neuron',
-      label: '神经元1',
-      params: { a: 0.02, b: 0.2, c: -65, d: 8, threshold: 30 },
-      state: { v: -65, u: 0, spike: false, lastSpikeTime: 0 }
-    },
-    {
-      id: 'neuron-2',
-      x: 50, // 居左放置
-      y: 250,
-      type: 'neuron',
-      label: '神经元2',
-      params: { a: 0.02, b: 0.2, c: -65, d: 8, threshold: 30 },
-      state: { v: -65, u: 0, spike: false, lastSpikeTime: 0 }
-    }
-  ];
-}; 
+export const createNodesFromGraph = (graph: BrainGraph): SNNNode[] =>
+  graph.neurons.map(mapNeuronToEditorNode);
+
+export const createSynapsesFromGraph = (graph: BrainGraph): SNNSynapse[] =>
+  graph.synapses.map(mapSynapseToEditorSynapse);
+
+export const updateGraphNeuronsFromNodes = (
+  graph: BrainGraph,
+  nodes: SNNNode[]
+): BrainGraph => ({
+  ...graph,
+  neurons: nodes.map(mapEditorNodeToNeuron),
+});
+
+export const updateGraphSynapsesFromEditorSynapses = (
+  graph: BrainGraph,
+  synapses: SNNSynapse[]
+): BrainGraph => ({
+  ...graph,
+  synapses: synapses.map(mapEditorSynapseToBrainSynapse),
+});
+
+export const reconcileBrainGraphVisionCells = (
+  graph: BrainGraph,
+  visionCells: number
+): BrainGraph => reconcileBrainGraphVisionPorts(graph, visionCells);
+
+export const createDefaultEditorGraph = (visionCells: number = 36): BrainGraph =>
+  createDefaultGraph(visionCells);
+
+export const createDefaultReceptor = (visionCells: number = 36): Receptor =>
+  createReceptorFromGraph(createDefaultGraph(visionCells));
+
+export const createDefaultEffector = (visionCells: number = 36): Effector =>
+  createEffectorFromGraph(createDefaultGraph(visionCells));
+
+export const createDefaultNodes = (visionCells: number = 36): SNNNode[] =>
+  createNodesFromGraph(createDefaultGraph(visionCells));

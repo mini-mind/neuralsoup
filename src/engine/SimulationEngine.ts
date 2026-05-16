@@ -5,12 +5,19 @@
  */
 
 import * as PIXI from './pixi';
-import { Agent, Food, Obstacle, SimulationState } from '../types/simulation';
+import { Agent, SimulationState } from '../types/simulation';
 import { WorldRenderer } from './WorldRenderer';
 import { VisionSystem } from './VisionSystem';
 import { AgentController } from './AgentController';
 import { WorldManager } from './WorldManager';
 import { CollisionDetector } from './CollisionDetector';
+import { SimulationSession } from '../runtime/SimulationSession';
+import type { SimulationControlMode } from '../domain/world';
+import type { ScriptControlStatus } from './AgentController';
+import type { BrainGraph } from '../domain/brain';
+import type { BrainGraphRuntimeStatus } from '../types/brainGraphRuntime';
+
+export type SimulationLifecycleState = 'idle' | 'running' | 'paused';
 
 export class SimulationEngine {
   // 核心系统
@@ -19,6 +26,7 @@ export class SimulationEngine {
   private agentController: AgentController;
   private worldManager: WorldManager;
   private collisionDetector: CollisionDetector;
+  private session: SimulationSession;
   
   // 运行状态
   private isRunning: boolean = false;
@@ -28,26 +36,21 @@ export class SimulationEngine {
   private fps: number = 0;
   private simulationTime: number = 0;
   private frameCount: number = 0;
-  
-  // 游戏实体
-  private agents: Agent[] = [];
-  private foods: Food[] = [];
-  private obstacles: Obstacle[] = [];
+  private keyboardInputState = {
+    turnLeft: false,
+    moveForward: false,
+    turnRight: false
+  };
   
   // 主控智能体ID
-  private mainAgentId: number = 0;
-  private currentControlMode: 'snn' | 'random' | 'keyboard' | 'script' = 'keyboard';
-  
-  // 统计数据
-  private stats = {
-    totalRewards: 0,
-    totalCollisions: 0,
-    averageNeuralState: { motivation: 0, stress: 0, homeostasis: 0.5 }
-  };
+  private readonly mainAgentId: number = 0;
+  private currentControlMode: SimulationControlMode = 'keyboard';
 
   // 回调函数
   public onStatsUpdate?: (stats: SimulationState['stats']) => void;
-  public onLifecycleChange?: (state: 'idle' | 'running' | 'paused') => void;
+  public onLifecycleChange?: (state: SimulationLifecycleState) => void;
+  public onScriptStatusChange?: (status: ScriptControlStatus) => void;
+  public onBrainGraphStatusChange?: (status: BrainGraphRuntimeStatus) => void;
 
   constructor(app: PIXI.Application, initialWidth: number = 1600, initialHeight: number = 1200) {
     // 初始化各个系统
@@ -56,6 +59,25 @@ export class SimulationEngine {
     this.agentController = new AgentController();
     this.worldManager = new WorldManager(initialWidth, initialHeight);
     this.collisionDetector = new CollisionDetector();
+    this.session = new SimulationSession(
+      {
+        visionSystem: this.visionSystem,
+        agentController: this.agentController,
+        worldManager: this.worldManager,
+        collisionDetector: this.collisionDetector
+      },
+      {
+        world: {
+          width: initialWidth,
+          height: initialHeight,
+          mainAgentId: this.mainAgentId
+        },
+        initialControlMode: this.currentControlMode
+      }
+    );
+    this.agentController.onScriptStatusChange = (status) => {
+      this.onScriptStatusChange?.(status);
+    };
   }
 
   /**
@@ -63,6 +85,7 @@ export class SimulationEngine {
    */
   public setScriptCode(code: string): void {
     this.agentController.setScriptCode(code);
+    this.onScriptStatusChange?.(this.agentController.getScriptStatus());
   }
 
   /**
@@ -70,6 +93,37 @@ export class SimulationEngine {
    */
   public setEnablePlayerInputInScript(enable: boolean): void {
     this.agentController.setEnablePlayerInputInScript(enable);
+  }
+
+  public setBrainGraph(graph: BrainGraph): BrainGraphRuntimeStatus {
+    const status = this.session.setBrainGraph(graph);
+    this.onBrainGraphStatusChange?.(status);
+    return status;
+  }
+
+  public getScriptStatus(): ScriptControlStatus {
+    return this.agentController.getScriptStatus();
+  }
+
+  public setKeyboardInputKey(key: string, isPressed: boolean): void {
+    switch (key) {
+      case 'a':
+      case 'arrowleft':
+        this.keyboardInputState.turnLeft = isPressed;
+        break;
+      case 'w':
+      case 'arrowup':
+        this.keyboardInputState.moveForward = isPressed;
+        break;
+      case 'd':
+      case 'arrowright':
+        this.keyboardInputState.turnRight = isPressed;
+        break;
+      default:
+        return;
+    }
+
+    this.session.setKeyboardInputState(this.keyboardInputState);
   }
 
   /**
@@ -80,19 +134,13 @@ export class SimulationEngine {
     visionRange?: number;
     visionAngle?: number;
   }): void {
-    // 更新视觉系统配置
-    this.visionSystem.updateConfiguration(params);
-    
-    // 为所有智能体重新初始化视野格子
-    for (const agent of this.agents) {
-      this.visionSystem.initializeVisionCells(agent);
-      
-      // 主智能体可能在脚本/手动模式下切回SNN，维度变更时也必须保持模型同步。
-      if (params.visionCells && (agent.id === this.mainAgentId || agent.controlType === 'snn')) {
-        this.agentController.updateCorticalColumnConfiguration(agent.id, params.visionCells);
-      }
-    }
-    
+    this.session.updateAgentParameters(params);
+    this.onBrainGraphStatusChange?.({
+      state: 'applied',
+      appliedGraph: this.session.getCurrentBrainGraph(),
+      issues: [],
+      message: null
+    });
     // 立即重新渲染世界，确保即使在暂停状态下也能看到变化
     this.renderWorld();
     
@@ -114,6 +162,10 @@ export class SimulationEngine {
     };
   }
 
+  public getBrainGraphRuntimeStatus(): BrainGraphRuntimeStatus {
+    return this.session.getBrainGraphRuntimeStatus();
+  }
+
   /**
    * 初始化仿真系统
    */
@@ -122,22 +174,8 @@ export class SimulationEngine {
     
     // 设置渲染器的世界尺寸
     this.renderer.setWorldDimensions(this.worldManager.width, this.worldManager.height);
-    
-    // 创建游戏世界
-    this.agents = this.worldManager.createAgents(this.mainAgentId);
-    this.foods = this.worldManager.generateFood(this.agents);
-    this.obstacles = this.worldManager.generateObstacles();
-    
-    // 初始化智能体
-    for (const agent of this.agents) {
-      this.visionSystem.initializeVisionCells(agent);
-      
-      // 为SNN控制的智能体创建神经网络
-      if (agent.controlType === 'snn') {
-        this.agentController.createCorticalColumn(agent.id, this.visionSystem.getVisionCells());
-        console.log('Created SNN agent:', agent.id, 'at position:', agent.x, agent.y);
-      }
-    }
+    this.session.initialize();
+    this.onBrainGraphStatusChange?.(this.getBrainGraphRuntimeStatus());
     
     // 设置镜头跟随主智能体
     const mainAgent = this.getMainAgent();
@@ -147,7 +185,7 @@ export class SimulationEngine {
     
     this.renderWorld();
     this.emitLifecycleChange();
-    console.log(`仿真系统初始化完成: ${this.agents.length}个智能体`);
+    console.log(`仿真系统初始化完成: ${this.session.getState().agents.length}个智能体`);
   }
 
   /**
@@ -203,17 +241,16 @@ export class SimulationEngine {
     this.simulationTime = 0;
     this.frameCount = 0;
     this.fps = 0;
-    this.stats = {
-      totalRewards: 0,
-      totalCollisions: 0,
-      averageNeuralState: { motivation: 0, stress: 0, homeostasis: 0.5 }
+    this.keyboardInputState = {
+      turnLeft: false,
+      moveForward: false,
+      turnRight: false
     };
-    
-    this.agents = [];
-    this.foods = [];
-    this.obstacles = [];
-    this.initialize();
+    this.session.reset();
+    this.session.setKeyboardInputState(this.keyboardInputState);
     this.setControlMode(this.currentControlMode);
+    this.onBrainGraphStatusChange?.(this.getBrainGraphRuntimeStatus());
+    this.renderWorld();
   }
 
   /**
@@ -228,13 +265,18 @@ export class SimulationEngine {
       const deltaTime = Math.min((currentTime - this.lastTime) / 1000, 0.033);
       this.lastTime = currentTime;
       
-      this.updateSimulation(deltaTime);
+      const stats = this.session.step(deltaTime);
       this.simulationTime += deltaTime;
       this.frameCount++;
       
       if (this.frameCount % 60 === 0) {
         this.fps = Math.round(1 / deltaTime);
       }
+
+      this.onStatsUpdate?.({
+        ...stats,
+        fps: this.fps
+      });
     } else if (this.isPaused) {
       this.lastTime = currentTime;
     }
@@ -245,88 +287,17 @@ export class SimulationEngine {
   };
 
   /**
-   * 更新仿真状态
-   */
-  private updateSimulation(deltaTime: number): void {
-    // 更新智能体
-    for (const agent of this.agents) {
-      // 更新视觉系统
-      this.visionSystem.updateVisionCells(agent, this.agents, this.foods, this.obstacles);
-      
-      // 更新智能体控制
-      this.agentController.updateAgent(agent, deltaTime);
-      
-      // 处理边界碰撞
-      this.worldManager.handleBoundaryCollision(agent);
-    }
-
-    // 更新移动障碍物
-    this.worldManager.updateMovingObstacles(this.obstacles, deltaTime);
-
-    // 处理碰撞
-    const collisionResult = this.collisionDetector.handleCollisions(this.agents, this.foods, this.obstacles);
-    
-    // 移除被吃掉的食物
-    this.foods = this.collisionDetector.removeFoods(this.foods, collisionResult.foodsToRemove);
-    
-    // 更新统计数据
-    this.stats.totalRewards += collisionResult.totalRewards;
-    this.stats.totalCollisions += collisionResult.totalCollisions;
-    this.updateStats();
-  }
-
-  /**
    * 渲染世界
    */
   private renderWorld(): void {
-    this.renderer.renderWorld({
-      width: this.worldManager.width,
-      height: this.worldManager.height,
-      mainAgentId: this.mainAgentId,
-      agents: this.agents,
-      foods: this.foods,
-      obstacles: this.obstacles,
-      visionRange: this.visionSystem.getVisionRange(),
-      visionAngle: this.visionSystem.getVisionAngle()
-    });
-  }
-
-  /**
-   * 更新统计数据
-   */
-  private updateStats(): void {
-    let totalMotivation = 0;
-    let totalStress = 0;
-    let totalHomeostasis = 0;
-    
-    for (const agent of this.agents) {
-      totalMotivation += agent.motivation;
-      totalStress += agent.stress;
-      totalHomeostasis += agent.homeostasis;
-    }
-    
-    this.stats.averageNeuralState = {
-      motivation: this.agents.length > 0 ? totalMotivation / this.agents.length : 0,
-      stress: this.agents.length > 0 ? totalStress / this.agents.length : 0,
-      homeostasis: this.agents.length > 0 ? totalHomeostasis / this.agents.length : 0.5
-    };
-
-    // 触发统计更新回调
-    if (this.onStatsUpdate) {
-      this.onStatsUpdate({
-        fps: this.fps,
-        totalReward: this.stats.totalRewards,
-        collisionCount: this.stats.totalCollisions,
-        neuralState: { ...this.stats.averageNeuralState }
-      });
-    }
+    this.renderer.renderWorld(this.session.getWorldSnapshot());
   }
 
   /**
    * 获取主智能体
    */
   getMainAgent(): Agent | null {
-    return this.agents.find(agent => agent.id === this.mainAgentId) || null;
+    return this.session.getMainAgent();
   }
 
   /**
@@ -340,48 +311,19 @@ export class SimulationEngine {
    * 获取仿真状态
    */
   getState(): SimulationState {
-    return {
-      agents: this.agents.map(agent => ({
-        ...agent,
-        velocity: { ...agent.velocity },
-        visionCells: agent.visionCells.map(cell => ({
-          ...cell,
-          color: { ...cell.color }
-        })),
-        visualInput: [...agent.visualInput],
-        visionSprites: agent.visionSprites ? [...agent.visionSprites] : undefined
-      })),
-      foods: this.foods.map(food => ({ ...food })),
-      obstacles: this.obstacles.map(obstacle => ({
-        ...obstacle,
-        velocity: obstacle.velocity ? { ...obstacle.velocity } : undefined
-      })),
-      worldBounds: this.worldManager.getWorldBounds(),
-      stats: {
-        fps: this.fps,
-        totalReward: this.stats.totalRewards,
-        collisionCount: this.stats.totalCollisions,
-        neuralState: { ...this.stats.averageNeuralState }
-      }
-    };
+    return this.session.getSimulationStateSnapshot(this.fps);
   }
 
   /**
    * 设置控制模式
    */
-  public setControlMode(newMode: 'snn' | 'random' | 'keyboard' | 'script'): void {
+  public setControlMode(newMode: SimulationControlMode): void {
     this.currentControlMode = newMode;
-    const mainAgent = this.getMainAgent();
-    if (mainAgent) {
-      if (newMode === 'snn' && !this.agentController.hasCorticalColumn(mainAgent.id)) {
-        this.agentController.createCorticalColumn(mainAgent.id, this.visionSystem.getVisionCells());
-      }
-      mainAgent.controlType = newMode;
-      console.log(`Control mode changed to: ${newMode}`);
-    }
+    this.session.setControlMode(newMode);
+    console.log(`Control mode changed to: ${newMode}`);
   }
 
-  public getLifecycleState(): 'idle' | 'running' | 'paused' {
+  public getLifecycleState(): SimulationLifecycleState {
     if (!this.isRunning) {
       return 'idle';
     }
@@ -398,7 +340,8 @@ export class SimulationEngine {
    */
   destroy(): void {
     this.stop();
+    this.agentController.onScriptStatusChange = undefined;
     this.agentController.destroy();
     this.renderer.destroy();
   }
-} 
+}

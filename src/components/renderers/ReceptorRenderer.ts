@@ -62,7 +62,7 @@ export class ReceptorRenderer {
           // 绘制输入节点
           ctx.beginPath();
           ctx.arc(inputX, inputY, 6, 0, 2 * Math.PI);
-          ctx.fillStyle = input.voltage > 0 ? '#ffffff' : '#4a5568';
+          ctx.fillStyle = '#ffffff';
           ctx.fill();
           
           // 根据RGB类型设置边界颜色
@@ -78,14 +78,6 @@ export class ReceptorRenderer {
           ctx.strokeStyle = borderColor;
           ctx.lineWidth = 2;
           ctx.stroke();
-
-          // 只在有电压时显示电压值（无其他文字）
-          if (input.voltage > 0) {
-            ctx.fillStyle = '#000000';
-            ctx.font = '6px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(input.voltage.toFixed(1), inputX, inputY + 2);
-          }
         }
       });
     }

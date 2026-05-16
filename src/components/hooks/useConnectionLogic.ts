@@ -18,7 +18,6 @@ interface UseConnectionLogicProps {
 }
 
 const DEFAULT_SYNAPSE_WEIGHT = 0.8;
-const DEFAULT_SYNAPSE_DELAY = 1;
 
 export const useConnectionLogic = ({
   canvasRef,
@@ -115,8 +114,7 @@ export const useConnectionLogic = ({
         id: `synapse-${Date.now()}`,
         from: connecting.from,
         to: clicked.element.id,
-        weight: DEFAULT_SYNAPSE_WEIGHT,
-        delay: DEFAULT_SYNAPSE_DELAY
+        weight: DEFAULT_SYNAPSE_WEIGHT
       };
       addSynapse(newSynapse);
     }

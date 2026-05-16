@@ -1,29 +1,63 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import * as PIXI from '../engine/pixi';
-import { SimulationEngine } from '../engine/SimulationEngine';
+import type { BrainGraph } from '../domain/brain';
+import { SimulationEngine, type SimulationLifecycleState } from '../engine/SimulationEngine';
+import type { ScriptControlStatus } from '../engine/AgentController';
+import type { SimulationControlMode } from '../domain/world';
 import type { SimulationState } from '../types/simulation';
+import type { AgentParameters } from './AgentParametersModal';
+import type { BrainGraphRuntimeStatus } from '../types/brainGraphRuntime';
 
 interface SimulationCanvasProps {
   onStatsUpdate: (stats: SimulationState['stats']) => void;
-  onEngineReady: (engine: SimulationEngine | null) => void;
-  onLifecycleChange: (state: 'idle' | 'running' | 'paused') => void;
+  onLifecycleChange: (state: SimulationLifecycleState) => void;
+  onAgentParametersChange: (params: AgentParameters) => void;
+  onScriptStatusChange: (status: ScriptControlStatus) => void;
+  onBrainGraphStatusChange: (status: BrainGraphRuntimeStatus) => void;
+  controlMode: Extract<SimulationControlMode, 'keyboard' | 'script' | 'snn'>;
+  brainGraph: BrainGraph;
+  scriptCode: string;
+  enablePlayerInputInScript: boolean;
+  agentParameters: AgentParameters;
+  requestedLifecycleState: SimulationLifecycleState;
+  resetToken: number;
   width: number;
   height: number;
 }
 
+const KEYBOARD_CONTROL_KEYS = ['w', 'a', 'd', 'arrowup', 'arrowleft', 'arrowright'] as const;
+
+const areAgentParametersEqual = (left: AgentParameters, right: AgentParameters): boolean => {
+  return (
+    left.visionCells === right.visionCells &&
+    left.visionRange === right.visionRange &&
+    left.visionAngle === right.visionAngle
+  );
+};
+
 const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   onStatsUpdate,
-  onEngineReady,
   onLifecycleChange,
+  onAgentParametersChange,
+  onScriptStatusChange,
+  onBrainGraphStatusChange,
+  controlMode,
+  brainGraph,
+  scriptCode,
+  enablePlayerInputInScript,
+  agentParameters,
+  requestedLifecycleState,
+  resetToken,
   width,
   height
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<SimulationEngine | null>(null);
   const appRef = useRef<PIXI.Application | null>(null);
-  const [isEngineReady, setIsEngineReady] = React.useState(false);
-  const [engineInstanceId, setEngineInstanceId] = React.useState(0);
-  const [renderError, setRenderError] = React.useState<string | null>(null);
+  const lastAppliedResetTokenRef = useRef(resetToken);
+  const [isEngineReady, setIsEngineReady] = useState(false);
+  const [engineInstanceId, setEngineInstanceId] = useState(0);
+  const [renderError, setRenderError] = useState<string | null>(null);
 
   useEffect(() => {
     const container = canvasRef.current;
@@ -36,7 +70,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       app,
       engine,
       appendedView,
-      errorMessage,
+      errorMessage
     }: {
       app: PIXI.Application | null;
       engine: SimulationEngine | null;
@@ -74,22 +108,11 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       setIsEngineReady(false);
       setEngineInstanceId(0);
       setRenderError(errorMessage);
-
-      try {
-        onEngineReady(null);
-      } catch (cleanupError) {
-        console.error('Failed to clear simulation engine during cleanup:', cleanupError);
-      }
-
-      try {
-        onLifecycleChange('idle');
-      } catch (cleanupError) {
-        console.error('Failed to notify idle lifecycle state during cleanup:', cleanupError);
-      }
+      onLifecycleChange('idle');
+      onScriptStatusChange({ state: 'idle', message: null });
     };
 
     if (!appRef.current) {
-      console.log('Creating new PIXI app with dimensions:', width, height);
       let newApp: PIXI.Application | null = null;
       let newEngine: SimulationEngine | null = null;
       let appendedView: HTMLCanvasElement | null = null;
@@ -97,48 +120,38 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
       try {
         newApp = new PIXI.Application({
-          width: width,
-          height: height,
-          backgroundColor: 0x87CEEB, // 天空蓝背景
+          width,
+          height,
+          backgroundColor: 0x87ceeb,
           antialias: true,
           resolution: window.devicePixelRatio || 1,
-          autoDensity: true,
+          autoDensity: true
         });
-
-        console.log('PIXI app created, canvas view:', newApp.view);
-        console.log('Canvas container before append:', container);
-        console.log('Canvas container children before:', container.children.length);
 
         appendedView = newApp.view as HTMLCanvasElement;
         container.appendChild(appendedView);
 
-        console.log('Canvas element appended to DOM');
-        console.log('Canvas container children after:', container.children.length);
-        console.log('Canvas view dimensions:', appendedView.width, appendedView.height);
-        console.log('Canvas view style:', appendedView.style.cssText);
-
-        // 创建仿真引擎 - 设置一个更大的固定世界尺寸
         const fixedWorldWidth = 3000;
         const fixedWorldHeight = 3000;
-        console.log('Creating simulation engine with world size:', fixedWorldWidth, fixedWorldHeight);
         newEngine = new SimulationEngine(newApp, fixedWorldWidth, fixedWorldHeight);
         newEngine.onStatsUpdate = onStatsUpdate;
         newEngine.onLifecycleChange = onLifecycleChange;
+        newEngine.onScriptStatusChange = onScriptStatusChange;
+        newEngine.onBrainGraphStatusChange = onBrainGraphStatusChange;
         newEngine.initialize();
 
-        // 设置镜头跟随主智能体
         const mainAgent = newEngine.getMainAgent();
         if (mainAgent) {
-          console.log('Setting camera target to main agent:', mainAgent.id);
           newEngine.setCameraTarget(mainAgent);
         }
 
         appRef.current = newApp;
         engineRef.current = newEngine;
-        onEngineReady(newEngine);
         setIsEngineReady(true);
         setEngineInstanceId((prev) => prev + 1);
-        console.log('Simulation engine initialized and ready');
+        onAgentParametersChange(newEngine.getAgentParameters());
+        onScriptStatusChange(newEngine.getScriptStatus());
+        onBrainGraphStatusChange(newEngine.getBrainGraphRuntimeStatus());
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown Pixi renderer error';
         console.error('Failed to initialize simulation canvas:', error);
@@ -146,7 +159,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
           app: newApp,
           engine: newEngine,
           appendedView,
-          errorMessage: message,
+          errorMessage: message
         });
         return;
       }
@@ -154,49 +167,217 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
     return () => {
       if (appRef.current || engineRef.current) {
-        console.log('Cleaning up PIXI app and engine');
         cleanupInitialization({
           app: appRef.current,
           engine: engineRef.current,
           appendedView: (appRef.current?.view as HTMLCanvasElement | undefined) ?? null,
-          errorMessage: null,
+          errorMessage: null
         });
       }
     };
-  }, [onEngineReady]);
+  }, [onAgentParametersChange, onBrainGraphStatusChange, onLifecycleChange, onScriptStatusChange, onStatsUpdate]);
 
   useEffect(() => {
     if (!appRef.current) {
       return;
     }
 
-    console.log('Resizing existing app to:', width, height);
     appRef.current.renderer.resize(width, height);
   }, [width, height]);
 
   useEffect(() => {
-    if (engineRef.current) {
-      engineRef.current.onStatsUpdate = onStatsUpdate;
+    if (!engineRef.current) {
+      return;
     }
+
+    engineRef.current.onStatsUpdate = onStatsUpdate;
   }, [onStatsUpdate]);
 
   useEffect(() => {
-    if (engineRef.current) {
-      engineRef.current.onLifecycleChange = onLifecycleChange;
-      onLifecycleChange(engineRef.current.getLifecycleState());
+    if (!engineRef.current) {
+      return;
     }
+
+    engineRef.current.onLifecycleChange = onLifecycleChange;
+    onLifecycleChange(engineRef.current.getLifecycleState());
   }, [onLifecycleChange]);
 
+  useEffect(() => {
+    if (!engineRef.current) {
+      return;
+    }
+
+    engineRef.current.onScriptStatusChange = onScriptStatusChange;
+    onScriptStatusChange(engineRef.current.getScriptStatus());
+  }, [onScriptStatusChange]);
+
+  useEffect(() => {
+    if (!engineRef.current) {
+      return;
+    }
+
+    engineRef.current.onBrainGraphStatusChange = onBrainGraphStatusChange;
+  }, [onBrainGraphStatusChange]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+
+    if (!engine) {
+      return;
+    }
+
+    engine.setControlMode(controlMode);
+  }, [controlMode]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+
+    if (!engine) {
+      return;
+    }
+
+    engine.setBrainGraph(brainGraph);
+  }, [brainGraph]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+
+    if (!engine) {
+      return;
+    }
+
+    engine.setScriptCode(scriptCode);
+  }, [scriptCode]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+
+    if (!engine) {
+      return;
+    }
+
+    engine.setEnablePlayerInputInScript(enablePlayerInputInScript);
+  }, [enablePlayerInputInScript]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+
+    if (!engine) {
+      return;
+    }
+
+    const currentParams = engine.getAgentParameters();
+    if (areAgentParametersEqual(currentParams, agentParameters)) {
+      return;
+    }
+
+    engine.updateAgentParameters(agentParameters);
+    engine.setBrainGraph(brainGraph);
+    onAgentParametersChange(engine.getAgentParameters());
+  }, [agentParameters, brainGraph, onAgentParametersChange]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+
+    if (!engine) {
+      return;
+    }
+
+    switch (requestedLifecycleState) {
+      case 'running':
+        if (engine.getLifecycleState() === 'idle') {
+          engine.start();
+        } else if (engine.getLifecycleState() === 'paused') {
+          engine.resume();
+        }
+        break;
+      case 'paused':
+        if (engine.getLifecycleState() === 'running') {
+          engine.pause();
+        }
+        break;
+      case 'idle':
+        if (engine.getLifecycleState() !== 'idle') {
+          engine.stop();
+        }
+        break;
+    }
+  }, [requestedLifecycleState]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+
+    if (!engine || lastAppliedResetTokenRef.current === resetToken) {
+      return;
+    }
+
+    lastAppliedResetTokenRef.current = resetToken;
+    engine.reset();
+    engine.setBrainGraph(brainGraph);
+    engine.setControlMode(controlMode);
+    engine.setScriptCode(scriptCode);
+    engine.setEnablePlayerInputInScript(enablePlayerInputInScript);
+    engine.updateAgentParameters(agentParameters);
+    engine.setBrainGraph(brainGraph);
+    onAgentParametersChange(engine.getAgentParameters());
+    onScriptStatusChange(engine.getScriptStatus());
+  }, [
+    agentParameters,
+    brainGraph,
+    controlMode,
+    enablePlayerInputInScript,
+    onAgentParametersChange,
+    onScriptStatusChange,
+    resetToken,
+    scriptCode
+  ]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!engineRef.current) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      if (!KEYBOARD_CONTROL_KEYS.includes(key as (typeof KEYBOARD_CONTROL_KEYS)[number])) {
+        return;
+      }
+
+      engineRef.current.setKeyboardInputKey(key, true);
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (!engineRef.current) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      if (!KEYBOARD_CONTROL_KEYS.includes(key as (typeof KEYBOARD_CONTROL_KEYS)[number])) {
+        return;
+      }
+
+      engineRef.current.setKeyboardInputKey(key, false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
   return (
-    <div 
-      ref={canvasRef} 
+    <div
+      ref={canvasRef}
       className="simulation-canvas"
       data-testid="simulation-canvas"
       data-engine-ready={isEngineReady ? 'true' : 'false'}
       data-engine-instance-id={String(engineInstanceId)}
-      style={{ 
-        width: '100%', 
-        height: '100%', 
+      style={{
+        width: '100%',
+        height: '100%',
         overflow: 'hidden',
         position: 'relative'
       }}
@@ -230,4 +411,4 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   );
 };
 
-export default SimulationCanvas; 
+export default SimulationCanvas;

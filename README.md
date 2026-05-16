@@ -63,6 +63,7 @@ src/
 ## 文档
 
 - 📖 [开发者指南](./docs/DEVELOPER_GUIDE.md) - 代码结构和开发规范
+- 🧭 [彻底重构方案](./docs/ARCHITECTURE_REFACTOR_PLAN.md) - 不保历史兼容的目标架构、findings 和迁移顺序
 - 🧠 [模型编辑器指南](./docs/model-editor-complete-guide.md) - SNN编辑器使用说明
 
 ## 技术栈

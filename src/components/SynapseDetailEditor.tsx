@@ -8,11 +8,9 @@ interface SynapseDetailEditorProps {
 
 const SynapseDetailEditor: React.FC<SynapseDetailEditorProps> = ({ synapse, onUpdate }) => {
   const [weight, setWeight] = useState(synapse.weight);
-  const [delay, setDelay] = useState(synapse.delay);
 
   useEffect(() => {
     setWeight(synapse.weight);
-    setDelay(synapse.delay);
   }, [synapse.id]);
 
   const handleWeightChange = (newWeight: number) => {
@@ -20,15 +18,6 @@ const SynapseDetailEditor: React.FC<SynapseDetailEditorProps> = ({ synapse, onUp
     const updatedSynapse = {
       ...synapse,
       weight: newWeight
-    };
-    onUpdate(updatedSynapse);
-  };
-
-  const handleDelayChange = (newDelay: number) => {
-    setDelay(newDelay);
-    const updatedSynapse = {
-      ...synapse,
-      delay: newDelay
     };
     onUpdate(updatedSynapse);
   };
@@ -84,45 +73,6 @@ const SynapseDetailEditor: React.FC<SynapseDetailEditorProps> = ({ synapse, onUp
       </div>
 
       <div style={{ marginBottom: '16px' }}>
-        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: '8px' }}>
-          传导延迟: {delay.toFixed(1)} ms
-        </label>
-        <input
-          type="range"
-          min="0.1"
-          max="10"
-          step="0.1"
-          value={delay}
-          onChange={(e) => handleDelayChange(parseFloat(e.target.value))}
-          style={{ width: '100%', marginBottom: '8px' }}
-        />
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#6c757d' }}>
-          <span>即时 (0.1ms)</span>
-          <span>中等 (5ms)</span>
-          <span>缓慢 (10ms)</span>
-        </div>
-        
-        <div style={{ marginTop: '8px' }}>
-          <input
-            type="number"
-            step="0.1"
-            min="0.1"
-            max="50"
-            value={delay}
-            onChange={(e) => handleDelayChange(parseFloat(e.target.value) || 0.1)}
-            style={{
-              width: '100%',
-              padding: '6px 8px',
-              border: '1px solid #ced4da',
-              borderRadius: '4px',
-              fontSize: '0.85rem'
-            }}
-            placeholder="精确延迟输入"
-          />
-        </div>
-      </div>
-
-      <div style={{ marginBottom: '16px' }}>
         <h6 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 600 }}>突触类型:</h6>
         <div style={{ 
           padding: '8px', 
@@ -140,10 +90,10 @@ const SynapseDetailEditor: React.FC<SynapseDetailEditorProps> = ({ synapse, onUp
 
       <div style={{ fontSize: '0.75rem', color: '#6c757d', lineHeight: 1.3 }}>
         <strong>突触说明:</strong><br/>
-        • 权重 &gt; 0: 兴奋性连接，增强目标神经元活动<br/>
-        • 权重 &lt; 0: 抑制性连接，抑制目标神经元活动<br/>
-        • 延迟: 脉冲从源神经元传导到目标神经元的时间<br/>
-        • 较大的权重值产生更强的影响
+        • 权重 &gt; 0: 正向影响目标节点的运行时输入<br/>
+        • 权重 &lt; 0: 负向影响目标节点的运行时输入<br/>
+        • 当前运行时按步聚合输入，不支持单独的突触传播延迟<br/>
+        • 当前编辑器仅修改连接定义，不在此面板内执行传播预览
       </div>
     </div>
   );

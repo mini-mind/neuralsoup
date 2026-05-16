@@ -49,7 +49,6 @@ export interface SNNSynapse {
   from: string; // 源节点ID
   to: string;   // 目标节点ID
   weight: number; // 连接权重
-  delay: number;  // 传导延迟 (ms)
 }
 
 // 感受器模态类型
@@ -118,9 +117,6 @@ export interface Agent {
   // 视觉系统
   visionCells: VisionCell[]; // 运行时由 VisionSystem 配置决定数量，默认 36 格
   visualInput: number[]; // 运行时维度 = visionCells * 3，默认 108 维
-  
-  // 控制类型
-  controlType: 'snn' | 'random' | 'keyboard' | 'script'; // SNN控制、随机游走、键盘控制或脚本控制
   
   // 神经状态
   motivation: number; // 动机 [0, 1]

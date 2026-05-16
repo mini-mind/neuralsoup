@@ -34,9 +34,7 @@ export class EffectorRenderer {
         ctx.beginPath();
         ctx.arc(outputX, outputY, 12, 0, 2 * Math.PI);
         
-        // 根据信号强度设置颜色
-        const intensity = Math.min(1, Math.abs(output.signal));
-        ctx.fillStyle = `rgba(245, 158, 11, ${0.3 + intensity * 0.7})`; // 黄色渐变
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.72)';
         ctx.fill();
         
         ctx.strokeStyle = '#f59e0b';
@@ -48,14 +46,6 @@ export class EffectorRenderer {
         ctx.font = '10px Arial';
         ctx.textAlign = 'center';
         ctx.fillText(output.label, outputX, outputY + 25);
-
-        // 显示信号值
-        if (Math.abs(output.signal) > 0.01) {
-          ctx.fillStyle = '#1e1e1e'; // 深色文字
-          ctx.font = 'bold 8px Arial';
-          ctx.textAlign = 'center';
-          ctx.fillText(output.signal.toFixed(2), outputX, outputY + 2);
-        }
       });
     });
   }

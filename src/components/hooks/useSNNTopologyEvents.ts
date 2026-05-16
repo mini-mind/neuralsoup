@@ -3,6 +3,7 @@ import { SNNNode } from '../../types/simulation';
 import { CanvasEventHandler } from '../CanvasEventHandler';
 import { useSNNTopologyState } from './useSNNTopologyState';
 import { useConnectionLogic } from './useConnectionLogic';
+import { DEFAULT_EDITOR_NEURON_PARAMS } from '../utils/defaultSNNData';
 import {
   getNodeCenter,
   getReceptorFrame,
@@ -290,8 +291,7 @@ export const useSNNTopologyEvents = ({ canvasRef, state }: UseSNNTopologyEventsP
         y: y / canvasScale - canvasOffset.y - 25,
         type: 'neuron',
         label: `神经元${nodes.length + 1}`,
-        params: { a: 0.02, b: 0.2, c: -65, d: 8, threshold: 30 },
-        state: { v: -65, u: 0, spike: false, lastSpikeTime: 0 }
+        params: { ...DEFAULT_EDITOR_NEURON_PARAMS },
       };
       addNode(newNode);
     }

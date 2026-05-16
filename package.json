@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test:domain": "node --import tsx --test $(find tests/domain -name '*.test.ts' | sort)",
     "type-check": "tsc --noEmit",
     "check:pixi-imports": "node scripts/check-pixi-imports.mjs",
     "preview": "vite preview",
@@ -29,10 +30,12 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
+    "@types/node": "^22.15.31",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.0.0",
     "typescript": "^5.0.0",
+    "tsx": "^4.20.6",
     "vite": "^5.0.0"
   }
 }

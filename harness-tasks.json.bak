@@ -1,0 +1,290 @@
+{
+  "version": 2,
+  "created": "2026-05-12T12:40:00Z",
+  "session_config": {
+    "concurrency_mode": "exclusive",
+    "max_tasks_per_session": 20,
+    "max_sessions": 50
+  },
+  "tasks": [
+    {
+      "id": "task-001",
+      "title": "Review full repository and publish prioritized findings with evidence",
+      "status": "completed",
+      "priority": "P0",
+      "depends_on": [],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": "7482576",
+      "validation": {
+        "command": "npm run build && npx tsc --noEmit",
+        "timeout_seconds": 300
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "step": 1,
+          "total": 3,
+          "description": "completed full-repository evidence review with parallel editor/engine/contract findings",
+          "timestamp": "2026-05-12T13:12:32Z"
+        }
+      ],
+      "completed_at": "2026-05-12T13:12:32Z"
+    },
+    {
+      "id": "task-002",
+      "title": "Decouple application orchestration from simulation lifecycle and UI control state",
+      "status": "completed",
+      "priority": "P0",
+      "depends_on": [
+        "task-001"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "validation": {
+        "command": "npm run build && npx tsc --noEmit",
+        "timeout_seconds": 300
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "step": 1,
+          "total": 3,
+          "description": "decoupled App/SimulationCanvas/SimulationEngine control surface and removed same-repo compatibility shims",
+          "timestamp": "2026-05-12T13:12:32Z"
+        },
+        {
+          "step": 2,
+          "total": 3,
+          "description": "synchronized SNN cortical-column reconfiguration with vision parameter changes and mode switches",
+          "timestamp": "2026-05-12T13:12:32Z"
+        },
+        {
+          "step": 3,
+          "total": 3,
+          "description": "aligned package/docs naming and developer-guide structure contracts with current repository reality",
+          "timestamp": "2026-05-12T13:51:44Z"
+        },
+        {
+          "step": 4,
+          "total": 4,
+          "description": "closed remaining docs and repo-hygiene P2s with .npmrc, harness ignores, and truthful topology-sandbox guidance",
+          "timestamp": "2026-05-12T14:39:19Z"
+        }
+      ],
+      "completed_at": "2026-05-12T14:39:19Z"
+    },
+    {
+      "id": "task-003",
+      "title": "Trim editor dead layers and tighten topology state and rendering boundaries",
+      "status": "completed",
+      "priority": "P1",
+      "depends_on": [
+        "task-001"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "validation": {
+        "command": "npm run build && npx tsc --noEmit",
+        "timeout_seconds": 300
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "step": 1,
+          "total": 3,
+          "description": "deleted dead renderer/style stacks and restored type-check baseline",
+          "timestamp": "2026-05-12T13:12:32Z"
+        },
+        {
+          "step": 2,
+          "total": 3,
+          "description": "started editor geometry/source-of-truth refactor and launched parallel re-review",
+          "timestamp": "2026-05-12T13:20:30Z"
+        },
+        {
+          "step": 3,
+          "total": 3,
+          "description": "unified editor node-selection source of truth and aligned receptor hit-testing with scrolled geometry",
+          "timestamp": "2026-05-12T13:51:44Z"
+        },
+        {
+          "step": 4,
+          "total": 4,
+          "description": "closed editor detail-modal auto-close, invalid receptor-synapse retention, self-loop hit-testing, focus-safe delete, and pointer-release cleanup gaps",
+          "timestamp": "2026-05-12T14:39:19Z"
+        }
+      ],
+      "completed_at": "2026-05-12T14:39:19Z"
+    },
+    {
+      "id": "task-004",
+      "title": "Split simulation engine responsibilities and remove redundant world and rendering ownership",
+      "status": "completed",
+      "priority": "P1",
+      "depends_on": [
+        "task-001"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "validation": {
+        "command": "npm run build && npx tsc --noEmit",
+        "timeout_seconds": 300
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "step": 1,
+          "total": 2,
+          "description": "removed world-generation visual-test fixture from production food spawning",
+          "timestamp": "2026-05-12T13:12:32Z"
+        },
+        {
+          "step": 2,
+          "total": 2,
+          "description": "aligned bounded-world semantics with wall obstacles, removed phantom wallThickness field, and removed visualInput bootstrap second source of truth",
+          "timestamp": "2026-05-12T13:51:44Z"
+        },
+        {
+          "step": 3,
+          "total": 3,
+          "description": "closed duplicate food consumption, square-wall collision semantics, reset control-mode drift, and mutable stats snapshot leaks",
+          "timestamp": "2026-05-12T14:39:19Z"
+        }
+      ],
+      "completed_at": "2026-05-12T14:39:19Z"
+    },
+    {
+      "id": "task-005",
+      "title": "Phase 1: establish BrainGraph/BrainProgram domain model and contract tests",
+      "status": "completed",
+      "priority": "P0",
+      "depends_on": [],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "validation": {
+        "command": "npm run type-check && npm run build",
+        "timeout_seconds": 300
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "step": 1,
+          "total": 1,
+          "description": "introduced domain/brain graph-program-validation modules, wired editor defaults to BrainGraph-derived presets, and added passing domain contracts",
+          "timestamp": "2026-05-16T10:43:29.401Z"
+        }
+      ],
+      "completed_at": "2026-05-16T10:43:29.401Z"
+    },
+    {
+      "id": "task-006",
+      "title": "Phase 2: extract world domain and SimulationSession runtime boundary",
+      "status": "pending",
+      "priority": "P0",
+      "depends_on": [
+        "task-005"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": "1cd97e2",
+      "validation": {
+        "command": "npm run type-check && npm run build",
+        "timeout_seconds": 300
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null
+    },
+    {
+      "id": "task-007",
+      "title": "Phase 3: split control policies and remove agent-bound control mode ownership",
+      "status": "pending",
+      "priority": "P0",
+      "depends_on": [
+        "task-006"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "validation": {
+        "command": "npm run type-check && npm run build",
+        "timeout_seconds": 300
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null
+    },
+    {
+      "id": "task-008",
+      "title": "Phase 4: narrow Pixi host and React orchestration onto snapshot-driven session APIs",
+      "status": "pending",
+      "priority": "P1",
+      "depends_on": [
+        "task-007"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "validation": {
+        "command": "npm run check:pixi-imports && npm run type-check && npm run build",
+        "timeout_seconds": 300
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null
+    },
+    {
+      "id": "task-009",
+      "title": "Phase 5: rebuild the editor onto BrainGraph and replace sandbox execution with real runtime preview plus end-to-end review",
+      "status": "pending",
+      "priority": "P1",
+      "depends_on": [
+        "task-008"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "validation": {
+        "command": "npm run check:pixi-imports && npm run type-check && npm run build && npm run test:e2e",
+        "timeout_seconds": 600
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null
+    }
+  ],
+  "session_count": 5,
+  "last_session": "2026-05-16T10:43:29.401Z"
+}

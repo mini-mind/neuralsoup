@@ -58,18 +58,13 @@ const NeuronDetailEditor: React.FC<NeuronDetailEditorProps> = ({ neuron, onUpdat
         />
       </div>
 
-      <div style={{ marginBottom: '16px' }}>
-        <h6 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 600 }}>当前状态:</h6>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.8rem' }}>
-          <div>膜电位: <strong>{neuron.state?.v.toFixed(2) || 'N/A'} mV</strong></div>
-          <div>恢复变量: <strong>{neuron.state?.u.toFixed(2) || 'N/A'}</strong></div>
-          <div>发放状态: <strong>{neuron.state?.spike ? '发放中' : '静息'}</strong></div>
-          <div>最后发放: <strong>{neuron.state?.lastSpikeTime.toFixed(1) || 'N/A'} ms</strong></div>
-        </div>
+      <div style={{ marginBottom: '16px', fontSize: '0.8rem', color: '#6c757d', lineHeight: 1.5 }}>
+        当前面板编辑的是 BrainGraph 中的神经元定义，包括标签、位置和 Izhikevich 参数。
+        运行时激活、电压和脉冲状态不在此编辑器内模拟。
       </div>
 
       <div>
-        <h6 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 600 }}>IZ神经元参数:</h6>
+        <h6 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 600 }}>Izhikevich 参数:</h6>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div style={{ background: '#f8f9fa', padding: '8px', borderRadius: '4px' }}>
             <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#6c757d', marginBottom: '4px' }}>

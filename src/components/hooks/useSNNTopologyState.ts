@@ -1,5 +1,14 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect, type SetStateAction } from 'react';
+import type { BrainGraph } from '../../domain/brain';
 import { SNNNode, SNNSynapse, Receptor, Effector } from '../../types/simulation';
+import {
+  createEffectorFromGraph,
+  createNodesFromGraph,
+  createReceptorFromGraph,
+  createSynapsesFromGraph,
+  updateGraphNeuronsFromNodes,
+  updateGraphSynapsesFromEditorSynapses,
+} from '../utils/defaultSNNData';
 
 export interface DetailModalData {
   type: 'neuron' | 'synapse';
@@ -45,12 +54,29 @@ export interface CanvasState {
   isDragging: { startX: number; startY: number } | null;
 }
 
-export const useSNNTopologyState = () => {
-  // 网络元素状态
-  const [nodes, setNodes] = useState<SNNNode[]>([]);
-  const [synapses, setSynapses] = useState<SNNSynapse[]>([]);
-  const [receptors, setReceptors] = useState<Receptor[]>([]);
-  const [effectors, setEffectors] = useState<Effector[]>([]);
+interface UseSNNTopologyStateOptions {
+  graph: BrainGraph;
+  onGraphChange?: (graph: BrainGraph) => void;
+}
+
+export const useSNNTopologyState = ({ graph, onGraphChange }: UseSNNTopologyStateOptions) => {
+  const graphRef = useRef(graph);
+
+  useEffect(() => {
+    graphRef.current = graph;
+  }, [graph]);
+
+  const setGraph = useCallback((value: SetStateAction<BrainGraph>) => {
+    const previousGraph = graphRef.current;
+    const nextGraph = typeof value === 'function' ? value(previousGraph) : value;
+
+    if (nextGraph === previousGraph) {
+      return;
+    }
+
+    graphRef.current = nextGraph;
+    onGraphChange?.(nextGraph);
+  }, [onGraphChange]);
 
   // 选择状态
   const [selection, setSelection] = useState<SelectionStateData>({
@@ -78,6 +104,34 @@ export const useSNNTopologyState = () => {
   const selectedNodes = selection.nodeIds;
   const selectedNode = selection.nodeIds.length === 1 ? selection.nodeIds[0] : null;
   const selectedSynapse = selection.synapseId;
+  const nodes = createNodesFromGraph(graph);
+  const synapses = createSynapsesFromGraph(graph);
+  const receptors: Receptor[] = [createReceptorFromGraph(graph)];
+  const effectors: Effector[] = [createEffectorFromGraph(graph)];
+
+  const setNodes = useCallback((value: SetStateAction<SNNNode[]>) => {
+    setGraph((prevGraph) => {
+      const prevNodes = createNodesFromGraph(prevGraph);
+      const nextNodes = typeof value === 'function' ? value(prevNodes) : value;
+      return updateGraphNeuronsFromNodes(prevGraph, nextNodes);
+    });
+  }, [setGraph]);
+
+  const setSynapses = useCallback((value: SetStateAction<SNNSynapse[]>) => {
+    setGraph((prevGraph) => {
+      const prevSynapses = createSynapsesFromGraph(prevGraph);
+      const nextSynapses = typeof value === 'function' ? value(prevSynapses) : value;
+      return updateGraphSynapsesFromEditorSynapses(prevGraph, nextSynapses);
+    });
+  }, [setGraph]);
+
+  const setReceptors = useCallback((_value: SetStateAction<Receptor[]>) => {
+    // Receptors are derived from BrainGraph inputs and are not independently mutable.
+  }, []);
+
+  const setEffectors = useCallback((_value: SetStateAction<Effector[]>) => {
+    // Effectors are derived from BrainGraph outputs and are not independently mutable.
+  }, []);
 
   // 辅助方法
   const clearSelection = useCallback(() => {
@@ -120,26 +174,27 @@ export const useSNNTopologyState = () => {
   }, [clearSelection]);
 
   const addNode = useCallback((node: SNNNode) => {
-    setNodes(prev => [...prev, node]);
-  }, []);
+    setNodes((prev) => [...prev, node]);
+  }, [setNodes]);
 
   const removeNodes = useCallback((nodeIds: string[]) => {
-    setNodes(prev => prev.filter(node => !nodeIds.includes(node.id)));
-    setSynapses(prev => prev.filter(synapse => 
+    setNodes((prev) => prev.filter((node) => !nodeIds.includes(node.id)));
+    setSynapses((prev) => prev.filter((synapse) =>
       !nodeIds.includes(synapse.from) && !nodeIds.includes(synapse.to)
     ));
-  }, []);
+  }, [setNodes, setSynapses]);
 
   const addSynapse = useCallback((synapse: SNNSynapse) => {
-    setSynapses(prev => [...prev, synapse]);
-  }, []);
+    setSynapses((prev) => [...prev, synapse]);
+  }, [setSynapses]);
 
   const removeSynapse = useCallback((synapseId: string) => {
-    setSynapses(prev => prev.filter(synapse => synapse.id !== synapseId));
-  }, []);
+    setSynapses((prev) => prev.filter((synapse) => synapse.id !== synapseId));
+  }, [setSynapses]);
 
   return {
     // 状态
+    graph,
     nodes,
     synapses,
     receptors,
@@ -160,6 +215,7 @@ export const useSNNTopologyState = () => {
     receptorScrollX,
 
     // 设置器
+    setGraph,
     setNodes,
     setSynapses,
     setReceptors,
@@ -187,4 +243,4 @@ export const useSNNTopologyState = () => {
     addSynapse,
     removeSynapse
   };
-}; 
+};
