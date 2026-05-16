@@ -20,11 +20,7 @@ const selectors = {
   paramsApply: '[data-testid="agent-params-apply"]',
   paramsCancel: '[data-testid="agent-params-cancel"]',
   paramsResetDefaults: '[data-testid="agent-params-reset-defaults"]',
-  scriptPanel: '[data-testid="script-control-panel"]',
   manualPanel: '[data-testid="manual-control-panel"]',
-  scriptCodeInput: '[data-testid="script-code-input"]',
-  scriptSyntaxCheck: '[data-testid="script-syntax-check"]',
-  scriptOverride: '[data-testid="script-player-override"]',
   topologyEditor: '[data-testid="topology-editor"]',
   topologyCanvas: '[data-testid="topology-canvas"]',
   topologyNodeCount: '[data-testid="topology-node-count"]',
@@ -39,11 +35,6 @@ type StartupDiagnostics = {
   pageErrors: string[];
 };
 
-type DiagnosticsSnapshot = {
-  consoleErrorCount: number;
-  pageErrorCount: number;
-};
-
 type DiagnosticsExpectation = 'none' | 'expected-render-init-errors';
 
 const diagnosticsByPage = new WeakMap<Page, StartupDiagnostics>();
@@ -51,7 +42,6 @@ const diagnosticsExpectationsByPage = new WeakMap<Page, DiagnosticsExpectation>(
 
 const degradedRendererProjectName = 'chromium-webgl-disabled';
 const expectedRenderInitErrorPrefix = 'Failed to initialize simulation canvas:';
-const expectedScriptCompileErrorPrefix = '脚本编译错误:';
 
 const installStartupDiagnostics = (page: Page) => {
   const diagnostics: StartupDiagnostics = {
@@ -88,14 +78,6 @@ const setDiagnosticsExpectation = (page: Page, expectation: DiagnosticsExpectati
 const getDiagnosticsExpectation = (page: Page) => diagnosticsExpectationsByPage.get(page) ?? 'none';
 
 const isDegradedRendererProject = (testInfo: TestInfo) => testInfo.project.name === degradedRendererProjectName;
-
-const takeDiagnosticsSnapshot = (page: Page): DiagnosticsSnapshot => {
-  const diagnostics = getStartupDiagnostics(page);
-  return {
-    consoleErrorCount: diagnostics.consoleErrors.length,
-    pageErrorCount: diagnostics.pageErrors.length
-  };
-};
 
 const disableWebGLContexts = async (page: Page) => {
   await page.addInitScript(() => {
@@ -187,35 +169,6 @@ const expectOnlyExpectedRenderInitErrors = async (page: Page) => {
     diagnostics.consoleErrors.every((message) => message.startsWith(expectedRenderInitErrorPrefix)),
     `Unexpected console errors: ${diagnostics.consoleErrors.join('\n')}`
   ).toBe(true);
-};
-
-const expectAndClearExpectedScriptCompileErrors = async (page: Page, snapshot: DiagnosticsSnapshot) => {
-  const diagnostics = getStartupDiagnostics(page);
-
-  await expect
-    .poll(
-      () => {
-        const newConsoleErrors = diagnostics.consoleErrors.slice(snapshot.consoleErrorCount);
-        const newPageErrors = diagnostics.pageErrors.slice(snapshot.pageErrorCount);
-        return newPageErrors.length === 0 && newConsoleErrors.length > 0;
-      },
-      {
-        timeout: 5_000,
-        message: 'Expected script compile diagnostics to be emitted after the syntax check action'
-      }
-    )
-    .toBe(true);
-
-  const newPageErrors = diagnostics.pageErrors.slice(snapshot.pageErrorCount);
-  const newConsoleErrors = diagnostics.consoleErrors.slice(snapshot.consoleErrorCount);
-
-  expect(newPageErrors, `Unexpected page errors: ${newPageErrors.join('\n')}`).toEqual([]);
-  expect(newConsoleErrors, 'Expected at least one script compile console error').not.toHaveLength(0);
-  expect(
-    newConsoleErrors.every((message) => message.startsWith(expectedScriptCompileErrorPrefix)),
-    `Unexpected console errors: ${newConsoleErrors.join('\n')}`
-  ).toBe(true);
-  diagnostics.consoleErrors.splice(snapshot.consoleErrorCount, newConsoleErrors.length);
 };
 
 const expectReadyCanvas = async (page: Page) => {
@@ -364,43 +317,12 @@ test('agent parameter modal persists applied values and discards cancelled draft
   await expect(page.locator(selectors.visionAngleValue)).toHaveText('120');
 });
 
-test('control mode switching and script syntax check stay coherent', async ({ page }, testInfo) => {
+test('control mode switching stays coherent between keyboard and snn', async ({ page }, testInfo) => {
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
   }
 
   await expect(page.locator(selectors.manualPanel)).toBeVisible();
-
-  await page.locator(selectors.controlModeSelect).selectOption('script');
-  await expect(page.locator(selectors.controlModeValue)).toHaveText('script');
-  await expect(page.locator(selectors.scriptPanel)).toBeVisible();
-
-  page.once('dialog', async (dialog) => {
-    await expect(dialog.message()).toContain('脚本语法检查通过');
-    await dialog.accept();
-  });
-  await page.locator(selectors.scriptSyntaxCheck).click();
-
-  const invalidScriptDiagnostics = takeDiagnosticsSnapshot(page);
-  await page.locator(selectors.scriptCodeInput).fill('return [');
-  page.once('dialog', async (dialog) => {
-    await expect(dialog.message()).toContain('脚本语法错误');
-    await dialog.accept();
-  });
-  await page.locator(selectors.scriptSyntaxCheck).click();
-  await expectAndClearExpectedScriptCompileErrors(page, invalidScriptDiagnostics);
-  await expect(page.locator('[data-testid="script-status-state"]')).toHaveText('compile-error');
-
-  await page.locator(selectors.scriptCodeInput).fill('return [0, 0];');
-  page.once('dialog', async (dialog) => {
-    await expect(dialog.message()).toContain('脚本语法检查通过');
-    await dialog.accept();
-  });
-  await page.locator(selectors.scriptSyntaxCheck).click();
-  await expect(page.locator('[data-testid="script-status-state"]')).toHaveText('ready');
-
-  await page.locator(selectors.scriptOverride).check();
-  await expect(page.locator(selectors.scriptOverride)).toBeChecked();
 
   await page.locator(selectors.controlModeSelect).selectOption('snn');
   await expect(page.locator(selectors.controlModeValue)).toHaveText('snn');

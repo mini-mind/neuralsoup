@@ -5,6 +5,8 @@
 ## 长期维护规则
 
 - 使用 npm 维护依赖，保留并更新 `package-lock.json`。
+- 未经用户明确准许，不要创建 git commit、tag 或改写历史。
+- 经用户明确准许需要提交时，git commit message 使用 `fix(scope):中文描述` 格式。
 - 默认开发服务使用 Vite；需要外部通过 IP 访问时，使用 `npm run dev -- --host 0.0.0.0 --port 3000`。
 - 除 `src/engine/pixi.ts` 外，不要直接从 `pixi.js`、`pixi.js-legacy` 或 `@pixi/*` import。
 - 修改 Pixi 依赖、Pixi 入口或渲染初始化逻辑后，运行 `npm run check:pixi-imports`。

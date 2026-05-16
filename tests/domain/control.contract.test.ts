@@ -60,55 +60,6 @@ test('keyboard policy moves forward and cancels opposite turns', () => {
   assert.equal(cancelTurnAgent.velocity.y, 0);
 });
 
-test('script policy exposes compile/runtime/shape errors and does not fallback to movement', () => {
-  const controller = new AgentController();
-  const compileErrorAgent = createAgent();
-
-  controller.setScriptCode('return [');
-  controller.updateAgent(compileErrorAgent, 1, {
-    controlMode: 'script',
-    keyboardInputState: {
-      turnLeft: false,
-      moveForward: false,
-      turnRight: false
-    }
-  });
-
-  assert.equal(controller.getScriptStatus().state, 'compile-error');
-  assert.equal(compileErrorAgent.x, 0);
-  assert.equal(compileErrorAgent.velocity.x, 0);
-
-  const runtimeErrorAgent = createAgent();
-  controller.setScriptCode('throw new Error("boom");');
-  controller.updateAgent(runtimeErrorAgent, 1, {
-    controlMode: 'script',
-    keyboardInputState: {
-      turnLeft: false,
-      moveForward: false,
-      turnRight: false
-    }
-  });
-
-  assert.equal(controller.getScriptStatus().state, 'runtime-error');
-  assert.equal(runtimeErrorAgent.x, 0);
-  assert.equal(runtimeErrorAgent.velocity.x, 0);
-
-  const invalidShapeAgent = createAgent();
-  controller.setScriptCode('return [1, 0];');
-  controller.updateAgent(invalidShapeAgent, 1, {
-    controlMode: 'script',
-    keyboardInputState: {
-      turnLeft: false,
-      moveForward: false,
-      turnRight: false
-    }
-  });
-
-  assert.equal(controller.getScriptStatus().state, 'invalid-output');
-  assert.equal(invalidShapeAgent.x, 0);
-  assert.equal(invalidShapeAgent.velocity.x, 0);
-});
-
 test('simulation session owns main-agent control mode and preserves it across reset', () => {
   const session = new SimulationSession({
     visionSystem: new VisionSystem(),

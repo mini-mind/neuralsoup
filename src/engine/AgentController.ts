@@ -25,79 +25,14 @@ export interface AgentUpdateContext {
   keyboardInputState: KeyboardInputState;
 }
 
-export type ScriptControlStatus =
-  | { state: 'idle'; message: null }
-  | { state: 'ready'; message: null }
-  | { state: 'compile-error'; message: string }
-  | { state: 'runtime-error'; message: string }
-  | { state: 'invalid-output'; message: string };
-
 export class AgentController {
   private brainPrograms: Map<number, BrainProgram> = new Map();
   private brainRuntimeStates: Map<number, BrainProgramRuntimeState> = new Map();
-  private compiledScript: Function | null = null;
-  private enablePlayerInputInScript: boolean = false;
-  private scriptStatus: ScriptControlStatus = {
-    state: 'idle',
-    message: null
-  };
-  public onScriptStatusChange?: (status: ScriptControlStatus) => void;
-
-  private updateScriptStatus(nextStatus: ScriptControlStatus): void {
-    if (
-      this.scriptStatus.state === nextStatus.state &&
-      this.scriptStatus.message === nextStatus.message
-    ) {
-      return;
-    }
-
-    this.scriptStatus = nextStatus;
-    this.onScriptStatusChange?.(this.scriptStatus);
-  }
 
   public setBrainGraph(agentId: number, graph: BrainGraph): void {
     const program = compileBrainGraph(graph);
     this.brainPrograms.set(agentId, program);
     this.brainRuntimeStates.set(agentId, createBrainProgramRuntimeState(program));
-  }
-
-  /**
-   * 设置脚本代码
-   */
-  public setScriptCode(code: string): void {
-    try {
-      this.compiledScript = new Function('inputs', code);
-      this.updateScriptStatus({
-        state: 'ready',
-        message: null
-      });
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      console.error('脚本编译错误:', e);
-      this.compiledScript = null;
-      this.updateScriptStatus({
-        state: 'compile-error',
-        message
-      });
-    }
-  }
-
-  /**
-   * 设置脚本模式下是否启用玩家输入
-   */
-  public setEnablePlayerInputInScript(enable: boolean): void {
-    this.enablePlayerInputInScript = enable;
-  }
-
-  public getScriptStatus(): ScriptControlStatus {
-    if (!this.compiledScript && this.scriptStatus.state === 'ready') {
-      return {
-        state: 'idle',
-        message: null
-      };
-    }
-
-    return this.scriptStatus;
   }
 
   /**
@@ -112,9 +47,6 @@ export class AgentController {
         break;
       case 'keyboard':
         this.updateKeyboardAgent(agent, deltaTime, keyboardInputs);
-        break;
-      case 'script':
-        this.updateScriptAgent(agent, deltaTime, keyboardInputs);
         break;
       case 'random':
         this.updateRandomAgent(agent, deltaTime);
@@ -140,59 +72,6 @@ export class AgentController {
     keyboardInputs: [number, number, number]
   ): void {
     this.applyAction(agent, keyboardInputs, deltaTime);
-  }
-
-  /**
-   * 更新脚本控制的智能体
-   */
-  private updateScriptAgent(
-    agent: Agent,
-    deltaTime: number,
-    keyboardInputs: [number, number, number]
-  ): void {
-    // 检查是否启用玩家输入
-    if (this.enablePlayerInputInScript) {
-      const hasKeyboardInput = keyboardInputs[0] > 0 || keyboardInputs[1] > 0 || keyboardInputs[2] > 0;
-      
-      if (hasKeyboardInput) {
-        this.applyAction(agent, keyboardInputs, deltaTime);
-        return;
-      }
-    }
-    
-    if (!this.compiledScript) {
-      this.applyAction(agent, [0, 0, 0], deltaTime);
-      return;
-    }
-    
-    try {
-      const result = this.compiledScript(agent.visualInput);
-      
-      if (Array.isArray(result) && result.length === 3) {
-        const clampedResult = result.map(val => Math.max(0, Math.min(1, Number(val) || 0)));
-        this.updateScriptStatus({
-          state: 'ready',
-          message: null
-        });
-        this.applyAction(agent, clampedResult, deltaTime);
-      } else {
-        const message = '脚本返回值格式错误，应返回[左转, 前进, 右转]强度数组';
-        console.warn(message);
-        this.updateScriptStatus({
-          state: 'invalid-output',
-          message
-        });
-        this.applyAction(agent, [0, 0, 0], deltaTime);
-      }
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      console.error('脚本执行错误:', e);
-      this.updateScriptStatus({
-        state: 'runtime-error',
-        message
-      });
-      this.applyAction(agent, [0, 0, 0], deltaTime);
-    }
   }
 
   /**

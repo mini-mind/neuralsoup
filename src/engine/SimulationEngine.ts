@@ -13,7 +13,6 @@ import { WorldManager } from './WorldManager';
 import { CollisionDetector } from './CollisionDetector';
 import { SimulationSession } from '../runtime/SimulationSession';
 import type { SimulationControlMode } from '../domain/world';
-import type { ScriptControlStatus } from './AgentController';
 import type { BrainGraph } from '../domain/brain';
 import type { BrainGraphRuntimeStatus } from '../types/brainGraphRuntime';
 
@@ -49,7 +48,6 @@ export class SimulationEngine {
   // 回调函数
   public onStatsUpdate?: (stats: SimulationState['stats']) => void;
   public onLifecycleChange?: (state: SimulationLifecycleState) => void;
-  public onScriptStatusChange?: (status: ScriptControlStatus) => void;
   public onBrainGraphStatusChange?: (status: BrainGraphRuntimeStatus) => void;
 
   constructor(app: PIXI.Application, initialWidth: number = 1600, initialHeight: number = 1200) {
@@ -75,34 +73,12 @@ export class SimulationEngine {
         initialControlMode: this.currentControlMode
       }
     );
-    this.agentController.onScriptStatusChange = (status) => {
-      this.onScriptStatusChange?.(status);
-    };
-  }
-
-  /**
-   * 设置脚本代码
-   */
-  public setScriptCode(code: string): void {
-    this.agentController.setScriptCode(code);
-    this.onScriptStatusChange?.(this.agentController.getScriptStatus());
-  }
-
-  /**
-   * 设置脚本模式下是否启用玩家输入
-   */
-  public setEnablePlayerInputInScript(enable: boolean): void {
-    this.agentController.setEnablePlayerInputInScript(enable);
   }
 
   public setBrainGraph(graph: BrainGraph): BrainGraphRuntimeStatus {
     const status = this.session.setBrainGraph(graph);
     this.onBrainGraphStatusChange?.(status);
     return status;
-  }
-
-  public getScriptStatus(): ScriptControlStatus {
-    return this.agentController.getScriptStatus();
   }
 
   public setKeyboardInputKey(key: string, isPressed: boolean): void {
@@ -340,7 +316,6 @@ export class SimulationEngine {
    */
   destroy(): void {
     this.stop();
-    this.agentController.onScriptStatusChange = undefined;
     this.agentController.destroy();
     this.renderer.destroy();
   }

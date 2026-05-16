@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useState } from 'react';
 import * as PIXI from '../engine/pixi';
 import type { BrainGraph } from '../domain/brain';
 import { SimulationEngine, type SimulationLifecycleState } from '../engine/SimulationEngine';
-import type { ScriptControlStatus } from '../engine/AgentController';
 import type { SimulationControlMode } from '../domain/world';
 import type { SimulationState } from '../types/simulation';
 import type { AgentParameters } from './AgentParametersModal';
@@ -12,12 +11,9 @@ interface SimulationCanvasProps {
   onStatsUpdate: (stats: SimulationState['stats']) => void;
   onLifecycleChange: (state: SimulationLifecycleState) => void;
   onAgentParametersChange: (params: AgentParameters) => void;
-  onScriptStatusChange: (status: ScriptControlStatus) => void;
   onBrainGraphStatusChange: (status: BrainGraphRuntimeStatus) => void;
-  controlMode: Extract<SimulationControlMode, 'keyboard' | 'script' | 'snn'>;
+  controlMode: Extract<SimulationControlMode, 'keyboard' | 'snn'>;
   brainGraph: BrainGraph;
-  scriptCode: string;
-  enablePlayerInputInScript: boolean;
   agentParameters: AgentParameters;
   requestedLifecycleState: SimulationLifecycleState;
   resetToken: number;
@@ -39,12 +35,9 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   onStatsUpdate,
   onLifecycleChange,
   onAgentParametersChange,
-  onScriptStatusChange,
   onBrainGraphStatusChange,
   controlMode,
   brainGraph,
-  scriptCode,
-  enablePlayerInputInScript,
   agentParameters,
   requestedLifecycleState,
   resetToken,
@@ -109,7 +102,6 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       setEngineInstanceId(0);
       setRenderError(errorMessage);
       onLifecycleChange('idle');
-      onScriptStatusChange({ state: 'idle', message: null });
     };
 
     if (!appRef.current) {
@@ -136,7 +128,6 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         newEngine = new SimulationEngine(newApp, fixedWorldWidth, fixedWorldHeight);
         newEngine.onStatsUpdate = onStatsUpdate;
         newEngine.onLifecycleChange = onLifecycleChange;
-        newEngine.onScriptStatusChange = onScriptStatusChange;
         newEngine.onBrainGraphStatusChange = onBrainGraphStatusChange;
         newEngine.initialize();
 
@@ -150,7 +141,6 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         setIsEngineReady(true);
         setEngineInstanceId((prev) => prev + 1);
         onAgentParametersChange(newEngine.getAgentParameters());
-        onScriptStatusChange(newEngine.getScriptStatus());
         onBrainGraphStatusChange(newEngine.getBrainGraphRuntimeStatus());
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown Pixi renderer error';
@@ -175,7 +165,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         });
       }
     };
-  }, [onAgentParametersChange, onBrainGraphStatusChange, onLifecycleChange, onScriptStatusChange, onStatsUpdate]);
+  }, [onAgentParametersChange, onBrainGraphStatusChange, onLifecycleChange, onStatsUpdate]);
 
   useEffect(() => {
     if (!appRef.current) {
@@ -207,15 +197,6 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       return;
     }
 
-    engineRef.current.onScriptStatusChange = onScriptStatusChange;
-    onScriptStatusChange(engineRef.current.getScriptStatus());
-  }, [onScriptStatusChange]);
-
-  useEffect(() => {
-    if (!engineRef.current) {
-      return;
-    }
-
     engineRef.current.onBrainGraphStatusChange = onBrainGraphStatusChange;
   }, [onBrainGraphStatusChange]);
 
@@ -238,26 +219,6 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
     engine.setBrainGraph(brainGraph);
   }, [brainGraph]);
-
-  useEffect(() => {
-    const engine = engineRef.current;
-
-    if (!engine) {
-      return;
-    }
-
-    engine.setScriptCode(scriptCode);
-  }, [scriptCode]);
-
-  useEffect(() => {
-    const engine = engineRef.current;
-
-    if (!engine) {
-      return;
-    }
-
-    engine.setEnablePlayerInputInScript(enablePlayerInputInScript);
-  }, [enablePlayerInputInScript]);
 
   useEffect(() => {
     const engine = engineRef.current;
@@ -315,22 +276,10 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     engine.reset();
     engine.setBrainGraph(brainGraph);
     engine.setControlMode(controlMode);
-    engine.setScriptCode(scriptCode);
-    engine.setEnablePlayerInputInScript(enablePlayerInputInScript);
     engine.updateAgentParameters(agentParameters);
     engine.setBrainGraph(brainGraph);
     onAgentParametersChange(engine.getAgentParameters());
-    onScriptStatusChange(engine.getScriptStatus());
-  }, [
-    agentParameters,
-    brainGraph,
-    controlMode,
-    enablePlayerInputInScript,
-    onAgentParametersChange,
-    onScriptStatusChange,
-    resetToken,
-    scriptCode
-  ]);
+  }, [agentParameters, brainGraph, controlMode, onAgentParametersChange, resetToken]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {

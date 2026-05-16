@@ -1,4 +1,4 @@
-export type SimulationControlMode = 'snn' | 'random' | 'keyboard' | 'script';
+export type SimulationControlMode = 'snn' | 'random' | 'keyboard';
 
 export interface WorldConfig {
   width: number;

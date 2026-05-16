@@ -9,24 +9,18 @@ import {
   type BrainGraph
 } from './domain/brain';
 import type { SimulationControlMode } from './domain/world';
-import type { ScriptControlStatus } from './engine/AgentController';
 import type { SimulationLifecycleState } from './engine/SimulationEngine';
 import type { BrainGraphRuntimeStatus } from './types/brainGraphRuntime';
 import type { SimulationState } from './types/simulation';
 import './App.css';
 
-type AppControlMode = Extract<SimulationControlMode, 'keyboard' | 'script' | 'snn'>;
+type AppControlMode = Extract<SimulationControlMode, 'keyboard' | 'snn'>;
 
 const INITIAL_STATS: SimulationState['stats'] = {
   fps: 0,
   totalReward: 0,
   collisionCount: 0,
   neuralState: { motivation: 0, stress: 0, homeostasis: 0.5 }
-};
-
-const INITIAL_SCRIPT_STATUS: ScriptControlStatus = {
-  state: 'idle',
-  message: null
 };
 
 const createAppliedBrainGraphStatus = (graph: BrainGraph): BrainGraphRuntimeStatus => ({
@@ -44,56 +38,11 @@ const areAgentParametersEqual = (left: AgentParameters, right: AgentParameters):
   );
 };
 
-const getScriptStatusLabel = (status: ScriptControlStatus): string => {
-  switch (status.state) {
-    case 'idle':
-      return '未就绪';
-    case 'ready':
-      return '就绪';
-    case 'compile-error':
-      return '编译错误';
-    case 'runtime-error':
-      return '运行错误';
-    case 'invalid-output':
-      return '返回值错误';
-  }
-};
-
 const App: React.FC = () => {
   const [runState, setRunState] = useState<SimulationLifecycleState>('idle');
   const [requestedLifecycleState, setRequestedLifecycleState] = useState<SimulationLifecycleState>('idle');
   const [resetToken, setResetToken] = useState(0);
   const [controlMode, setControlMode] = useState<AppControlMode>('keyboard');
-  const [enablePlayerInputInScript, setEnablePlayerInputInScript] = useState(false);
-  const [scriptCode, setScriptCode] = useState(`// 脚本控制示例
-// inputs: 视觉输入数组 (动态维度，取决于视野格子数量 × 3)
-// 返回: [左转, 前进, 右转] 强度数组 (0-1)
-
-// 获取视野格子数量
-const cellCount = inputs.length / 3;
-const cellsPerSection = Math.floor(cellCount / 3);
-
-// 分析前方视野区域
-const leftArea = inputs.slice(0, cellsPerSection * 3);                    // 左侧视野
-const centerArea = inputs.slice(cellsPerSection * 3, cellsPerSection * 6); // 中央视野
-const rightArea = inputs.slice(cellsPerSection * 6);                       // 右侧视野
-
-// 检测食物（绿色值高）
-const leftFood = leftArea.filter((_, i) => i % 3 === 1).reduce((a, b) => a + b, 0);
-const centerFood = centerArea.filter((_, i) => i % 3 === 1).reduce((a, b) => a + b, 0);
-const rightFood = rightArea.filter((_, i) => i % 3 === 1).reduce((a, b) => a + b, 0);
-
-// 简单的食物追踪逻辑
-if (centerFood > 2) {
-  return [0, 1, 0]; // 前方有食物，直接前进
-} else if (leftFood > rightFood) {
-  return [0.8, 0.6, 0]; // 左侧食物多，左转前进
-} else if (rightFood > leftFood) {
-  return [0, 0.6, 0.8]; // 右侧食物多，右转前进
-} else {
-  return [0.2, 0.8, 0.2]; // 没找到食物，缓慢前进并轻微摆动
-}`);
-  const [scriptStatus, setScriptStatus] = useState<ScriptControlStatus>(INITIAL_SCRIPT_STATUS);
   const [stats, setStats] = useState<SimulationState['stats']>(INITIAL_STATS);
   const [brainGraph, setBrainGraph] = useState<BrainGraph>(() => createDefaultBrainGraph(36));
   const [brainGraphRuntimeStatus, setBrainGraphRuntimeStatus] = useState<BrainGraphRuntimeStatus>(() =>
@@ -134,7 +83,6 @@ if (centerFood > 2) {
 
   const handleReset = useCallback(() => {
     setStats(INITIAL_STATS);
-    setScriptStatus(INITIAL_SCRIPT_STATUS);
     setRequestedLifecycleState('idle');
     setResetToken((current) => current + 1);
   }, []);
@@ -159,10 +107,6 @@ if (centerFood > 2) {
 
   const handleAgentParametersChange = useCallback((params: AgentParameters) => {
     setAgentParameters((current) => (areAgentParametersEqual(current, params) ? current : params));
-  }, []);
-
-  const handleScriptStatusChange = useCallback((nextStatus: ScriptControlStatus) => {
-    setScriptStatus(nextStatus);
   }, []);
 
   const handleBrainGraphChange = useCallback((nextGraph: BrainGraph) => {
@@ -229,59 +173,6 @@ if (centerFood > 2) {
           </div>
         );
 
-      case 'script':
-        return (
-          <div className="script-control" data-testid="script-control-panel">
-            <div className="script-header">
-              <h4>脚本控制</h4>
-              <div className="script-options">
-                <label className="checkbox-label" htmlFor="script-player-override">
-                  <input
-                    id="script-player-override"
-                    data-testid="script-player-override"
-                    type="checkbox"
-                    checked={enablePlayerInputInScript}
-                    onChange={(e) => setEnablePlayerInputInScript(e.target.checked)}
-                  />
-                  启用玩家控制信号
-                </label>
-              </div>
-            </div>
-            <div className="script-editor">
-              <textarea
-                data-testid="script-code-input"
-                value={scriptCode}
-                onChange={(e) => setScriptCode(e.target.value)}
-                placeholder="输入JavaScript控制脚本..."
-                className="script-textarea"
-              />
-              <div className="script-info">
-                <p><strong>输入参数:</strong> inputs ({agentParameters.visionCells * 3}维视觉数组)</p>
-                <p><strong>返回值:</strong> [左转, 前进, 右转] 强度数组 (0-1)</p>
-                <p><strong>玩家控制:</strong> {enablePlayerInputInScript ? 'W/A/D键可覆盖脚本输出' : '仅脚本控制'}</p>
-                <p data-testid="script-status-summary">
-                  <strong>脚本状态:</strong> {getScriptStatusLabel(scriptStatus)}
-                  {scriptStatus.message ? ` - ${scriptStatus.message}` : ''}
-                </p>
-                <button
-                  className="btn-small"
-                  data-testid="script-syntax-check"
-                  onClick={() => {
-                    try {
-                      new Function('inputs', scriptCode);
-                      alert('脚本语法检查通过！');
-                    } catch (e) {
-                      alert('脚本语法错误：' + (e as Error).message);
-                    }
-                  }}
-                >
-                  语法检查
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-
       case 'snn':
         return (
           <div className="snn-control">
@@ -309,15 +200,12 @@ if (centerFood > 2) {
           height={canvasHeight}
           controlMode={controlMode}
           brainGraph={brainGraph}
-          scriptCode={scriptCode}
-          enablePlayerInputInScript={enablePlayerInputInScript}
           agentParameters={agentParameters}
           requestedLifecycleState={requestedLifecycleState}
           resetToken={resetToken}
           onStatsUpdate={handleStatsUpdate}
           onLifecycleChange={handleLifecycleChange}
           onAgentParametersChange={handleAgentParametersChange}
-          onScriptStatusChange={handleScriptStatusChange}
           onBrainGraphStatusChange={handleBrainGraphRuntimeStatusChange}
         />
       </div>
@@ -377,7 +265,6 @@ if (centerFood > 2) {
               data-testid="control-mode-select"
             >
               <option value="keyboard">手动控制</option>
-              <option value="script">脚本控制</option>
               <option value="snn">拓扑沙盒</option>
             </select>
           </div>
@@ -395,8 +282,6 @@ if (centerFood > 2) {
           <span data-testid="brain-graph-runtime-message">{brainGraphRuntimeStatus.message ?? ''}</span>
           <span data-testid="brain-graph-installed-input-count">{installedBrainGraph.inputs.length}</span>
           <span data-testid="brain-graph-installed-synapse-count">{installedBrainGraph.synapses.length}</span>
-          <span data-testid="script-status-state">{scriptStatus.state}</span>
-          <span data-testid="script-status-message">{scriptStatus.message ?? ''}</span>
         </div>
 
         <div className={`content-area ${controlMode === 'snn' ? 'snn-mode' : ''}`}>
