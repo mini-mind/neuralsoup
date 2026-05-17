@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import SNNTopologyEditor from '../SNNTopologyEditor';
 import type { GraphIRDocument } from '../../domain/brain';
 import type { GraphIRRuntimeStatus } from '../../types/graphIRRuntime';
+import type { GraphPathItem } from './types';
 
 interface GraphEditorPanelProps {
   isActive: boolean;
@@ -9,6 +10,8 @@ interface GraphEditorPanelProps {
   visionCells: number;
   runtimeStatus: GraphIRRuntimeStatus;
   onDocumentChange: (document: GraphIRDocument) => void;
+  onGraphPathChange: (graphPath: GraphPathItem[]) => void;
+  onGraphPathNavigateRegister: (navigate: (pathId: string) => void) => void;
 }
 
 const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
@@ -16,7 +19,9 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
   document,
   visionCells,
   runtimeStatus,
-  onDocumentChange
+  onDocumentChange,
+  onGraphPathChange,
+  onGraphPathNavigateRegister
 }) => {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -65,6 +70,8 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
         document={document}
         visionCells={visionCells}
         onDocumentChange={onDocumentChange}
+        onGraphPathChange={onGraphPathChange}
+        onGraphPathNavigateRegister={onGraphPathNavigateRegister}
         runtimeStatus={runtimeStatus}
         isActive={isActive}
       />

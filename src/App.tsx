@@ -13,7 +13,7 @@ import type { SimulationState } from './types/simulation';
 import EditorToolbar from './components/editor/EditorToolbar';
 import GraphEditorPanel from './components/editor/GraphEditorPanel';
 import SettingsPanel from './components/editor/SettingsPanel';
-import type { AgentParameters, EditorTab, SettingsSection } from './components/editor/types';
+import type { AgentParameters, EditorTab, GraphPathItem, SettingsSection } from './components/editor/types';
 import './App.css';
 
 declare global {
@@ -85,10 +85,12 @@ const App: React.FC = () => {
     visionAngle: 120
   });
   const [editorTab, setEditorTab] = useState<EditorTab>('graph');
+  const [graphPath, setGraphPath] = useState<GraphPathItem[]>([{ id: 'root', label: 'root' }]);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('agent-parameters');
   const requestedLifecycleStateRef = useRef<SimulationLifecycleState>('idle');
   const graphIRIssues = validateGraphIRDocument(graphDocument);
   const graphDocumentRef = useRef(graphDocument);
+  const graphPathNavigateRef = useRef<(pathId: string) => void>(() => {});
   const installedGraphSummary = graphIRRuntimeStatus?.appliedSummary ?? null;
 
   const calculateCanvasDimensions = useCallback(() => {
@@ -210,6 +212,10 @@ const App: React.FC = () => {
     });
   }, []);
 
+  const handleGraphPathNavigate = useCallback((pathId: string) => {
+    graphPathNavigateRef.current(pathId);
+  }, []);
+
   useEffect(() => {
     if (!isE2ETestMode) {
       delete window.__NEURALSOUP_TEST_API__;
@@ -301,8 +307,10 @@ const App: React.FC = () => {
       <div className="control-area" data-testid="control-panel">
         <EditorToolbar
           editorTab={editorTab}
+          graphPath={graphPath}
           runState={runState}
           onEditorTabChange={setEditorTab}
+          onGraphPathNavigate={handleGraphPathNavigate}
           onStartPause={handleStartPause}
           onReset={handleReset}
         />
@@ -333,6 +341,10 @@ const App: React.FC = () => {
               visionCells={agentParameters.visionCells}
               runtimeStatus={graphIRRuntimeStatus}
               onDocumentChange={handleGraphDocumentChange}
+              onGraphPathChange={setGraphPath}
+              onGraphPathNavigateRegister={(navigate) => {
+                graphPathNavigateRef.current = navigate;
+              }}
             />
           ) : (
             <div

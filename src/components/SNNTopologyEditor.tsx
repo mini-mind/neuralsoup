@@ -6,6 +6,7 @@ import {
   type LiteralValue,
 } from '../domain/brain';
 import type { GraphIRRuntimeStatus } from '../types/graphIRRuntime';
+import type { GraphPathItem } from './editor/types';
 import NeuronDetailEditor from './NeuronDetailEditor';
 import SynapseDetailEditor from './SynapseDetailEditor';
 import { useSNNTopologyState } from './hooks/useSNNTopologyState';
@@ -17,6 +18,8 @@ interface SNNTopologyEditorProps {
   document: GraphIRDocument;
   visionCells?: number;
   onDocumentChange?: (document: GraphIRDocument) => void;
+  onGraphPathChange?: (graphPath: GraphPathItem[]) => void;
+  onGraphPathNavigateRegister?: (navigate: (pathId: string) => void) => void;
   runtimeStatus: GraphIRRuntimeStatus;
   isActive?: boolean;
 }
@@ -55,6 +58,8 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   document,
   visionCells = 36,
   onDocumentChange,
+  onGraphPathChange,
+  onGraphPathNavigateRegister,
   runtimeStatus,
   isActive = true,
 }) => {
@@ -91,6 +96,18 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
       cancelPendingLink();
     }
   }, [cancelPendingLink, isActive]);
+
+  useEffect(() => {
+    onGraphPathChange?.(breadcrumbs.map((item) => ({ id: item.id, label: item.label })));
+  }, [breadcrumbs, onGraphPathChange]);
+
+  useEffect(() => {
+    if (!onGraphPathNavigateRegister) {
+      return;
+    }
+
+    onGraphPathNavigateRegister(navigateToBreadcrumb);
+  }, [navigateToBreadcrumb, onGraphPathNavigateRegister]);
 
   useEffect(() => {
     if (!isActive) {
@@ -178,29 +195,11 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
           }
         }}
       >
-        <div className="topology-toolbar">
-          <div className="topology-breadcrumbs" data-testid="topology-breadcrumbs">
-            {breadcrumbs.map((item, index) => (
-              <button
-                key={item.id}
-                type="button"
-                className={`topology-breadcrumb ${index === breadcrumbs.length - 1 ? 'is-current' : ''}`}
-                data-testid={item.id === 'root' ? 'topology-breadcrumb-root' : `topology-breadcrumb-${item.id}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  navigateToBreadcrumb(item.id);
-                }}
-              >
-                {item.label}
-              </button>
-            ))}
+        {pendingLinkSourceId && (
+          <div className="topology-pending-link" data-testid="topology-pending-link">
+            选择目标叶子节点完成连接
           </div>
-          {pendingLinkSourceId && (
-            <div className="topology-pending-link" data-testid="topology-pending-link">
-              选择目标叶子节点完成连接
-            </div>
-          )}
-        </div>
+        )}
 
         <svg className="topology-links" aria-hidden="true">
           {links.map((link) => {
