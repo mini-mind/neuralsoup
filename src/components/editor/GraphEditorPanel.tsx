@@ -1,22 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react';
 import SNNTopologyEditor from '../SNNTopologyEditor';
-import type { BrainGraph } from '../../domain/brain';
-import type { BrainGraphRuntimeStatus } from '../../types/brainGraphRuntime';
+import type { GraphIRDocument } from '../../domain/brain';
+import type { GraphIRRuntimeStatus } from '../../types/graphIRRuntime';
 
 interface GraphEditorPanelProps {
   isActive: boolean;
-  graph: BrainGraph;
+  document: GraphIRDocument;
   visionCells: number;
-  runtimeStatus: BrainGraphRuntimeStatus;
-  onGraphChange: (graph: BrainGraph) => void;
+  runtimeStatus: GraphIRRuntimeStatus;
+  onDocumentChange: (document: GraphIRDocument) => void;
 }
 
 const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
   isActive,
-  graph,
+  document,
   visionCells,
   runtimeStatus,
-  onGraphChange
+  onDocumentChange
 }) => {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -62,9 +62,9 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
       <SNNTopologyEditor
         width={Math.max(viewport.width, 1)}
         height={Math.max(viewport.height, 1)}
-        graph={graph}
+        document={document}
         visionCells={visionCells}
-        onGraphChange={onGraphChange}
+        onDocumentChange={onDocumentChange}
         runtimeStatus={runtimeStatus}
         isActive={isActive}
       />

@@ -1,4 +1,4 @@
-import type { BrainOutputChannel, IzhikevichNeuronRuntimeState } from './types';
+import type { BrainOutputChannel, IzhikevichNeuronRuntimeState } from './shared';
 import type { BrainProgram } from './program';
 
 export interface BrainProgramRuntimeState {
@@ -14,19 +14,22 @@ const DEFAULT_RUNTIME_STATE = (): IzhikevichNeuronRuntimeState => ({
   v: -65,
   u: 0,
   spike: false,
-  lastSpikeTime: 0
+  lastSpikeTime: 0,
 });
 
 const clampUnit = (value: number): number => Math.max(0, Math.min(1, value));
 
 const sigmoid = (value: number): number => 1 / (1 + Math.exp(-value));
 
+const normalizeOutputSignal = (value: number): number =>
+  clampUnit((sigmoid(value * 2) - 0.5) * 2);
+
 export const createBrainProgramRuntimeState = (
   program: BrainProgram
 ): BrainProgramRuntimeState => ({
   neurons: new Map(
-    program.neuronNodes.map((neuron: BrainProgram['neuronNodes'][number]) => [neuron.id, DEFAULT_RUNTIME_STATE()])
-  )
+    program.neuronNodes.map((neuron) => [neuron.id, DEFAULT_RUNTIME_STATE()])
+  ),
 });
 
 export const resetBrainProgramRuntimeState = (
@@ -41,16 +44,24 @@ export const stepBrainProgram = (
 ): BrainProgramStepResult => {
   const previousNeurons = previousState.neurons;
   const nextNeurons = new Map<string, IzhikevichNeuronRuntimeState>();
+  const nextSignals = new Map<string, number>();
   const nextSpikes = new Map<string, number>();
 
-  const resolveInputSignal = (nodeId: string): number => {
-    const inputPort = program.nodeIndex.inputs.get(nodeId);
-    if (inputPort) {
-      return sensoryInputs[inputPort.index] ?? 0;
+  for (const binding of program.inputBindings) {
+    nextSignals.set(binding.nodeId, sensoryInputs[binding.index] ?? 0);
+  }
+
+  const resolveConnectionSignal = (sourceNodeId: string): number => {
+    if (nextSignals.has(sourceNodeId)) {
+      return nextSignals.get(sourceNodeId) ?? 0;
     }
 
-    const neuronState = previousNeurons.get(nodeId);
-    if (neuronState?.spike) {
+    if (nextSpikes.has(sourceNodeId)) {
+      return nextSpikes.get(sourceNodeId) ?? 0;
+    }
+
+    const sourceState = previousNeurons.get(sourceNodeId);
+    if (sourceState?.spike) {
       return 1;
     }
 
@@ -59,13 +70,9 @@ export const stepBrainProgram = (
 
   for (const neuron of program.neuronNodes) {
     const currentState = previousNeurons.get(neuron.id) ?? DEFAULT_RUNTIME_STATE();
-    const totalInput = program.synapses.reduce((sum: number, synapse: BrainProgram['synapses'][number]) => {
-      if (synapse.to !== neuron.id) {
-        return sum;
-      }
-
-      return sum + resolveInputSignal(synapse.from) * synapse.weight * 20;
-    }, 0);
+    const totalInput = neuron.inputConnections.reduce((sum, connection) => (
+      sum + resolveConnectionSignal(connection.sourceNodeId) * connection.weight * 20
+    ), 0);
 
     const nextV =
       currentState.v +
@@ -79,7 +86,7 @@ export const stepBrainProgram = (
         v: neuron.params.c,
         u: nextU + neuron.params.d,
         spike: true,
-        lastSpikeTime: timestamp
+        lastSpikeTime: timestamp,
       });
       nextSpikes.set(neuron.id, 1);
       continue;
@@ -89,40 +96,35 @@ export const stepBrainProgram = (
       v: nextV,
       u: nextU,
       spike: false,
-      lastSpikeTime: currentState.lastSpikeTime
+      lastSpikeTime: currentState.lastSpikeTime,
     });
     nextSpikes.set(neuron.id, 0);
   }
 
-  const outputs = program.outputPorts.reduce<Record<BrainOutputChannel, number>>(
-    (result, output: BrainProgram['outputPorts'][number]) => {
-      const totalSignal = program.synapses.reduce((sum: number, synapse: BrainProgram['synapses'][number]) => {
-        if (synapse.to !== output.id) {
-          return sum;
-        }
+  for (const signalNode of program.signalNodes.filter((node) => node.direction === 'output')) {
+    const totalSignal = signalNode.inputConnections.reduce((sum, connection) => (
+      sum + resolveConnectionSignal(connection.sourceNodeId) * connection.weight
+    ), 0);
+    nextSignals.set(signalNode.id, totalSignal);
+  }
 
-        const inputPort = program.nodeIndex.inputs.get(synapse.from);
-        if (inputPort) {
-          return sum + (sensoryInputs[inputPort.index] ?? 0) * synapse.weight;
-        }
-
-        return sum + (nextSpikes.get(synapse.from) ?? 0) * synapse.weight;
-      }, 0);
-
-      result[output.channel] = clampUnit(sigmoid(totalSignal * 2) * 1.2 - 0.1);
+  const outputs = program.outputBindings.reduce<Record<BrainOutputChannel, number>>(
+    (result, binding) => {
+      const totalSignal = nextSignals.get(binding.nodeId) ?? 0;
+      result[binding.channel] = normalizeOutputSignal(totalSignal);
       return result;
     },
     {
       'turn-left': 0,
       'move-forward': 0,
-      'turn-right': 0
+      'turn-right': 0,
     }
   );
 
   return {
     runtimeState: {
-      neurons: nextNeurons
+      neurons: nextNeurons,
     },
-    outputs
+    outputs,
   };
 };

@@ -1,187 +1,123 @@
 import React, { useEffect, useState } from 'react';
-import { SNNNode } from '../types/simulation';
+import type { IzhikevichNeuronParameters } from '../domain/brain';
+
+interface InspectorNeuron {
+  id: string;
+  label: string;
+  params: IzhikevichNeuronParameters;
+  readonly?: boolean;
+  description?: string;
+}
 
 interface NeuronDetailEditorProps {
-  neuron: SNNNode;
-  onUpdate: (updatedNeuron: SNNNode) => void;
+  neuron: InspectorNeuron;
+  onUpdate: (updatedNeuron: InspectorNeuron) => void;
 }
 
 const NeuronDetailEditor: React.FC<NeuronDetailEditorProps> = ({ neuron, onUpdate }) => {
   const [label, setLabel] = useState(neuron.label);
-  const [params, setParams] = useState(neuron.params || { a: 0.02, b: 0.2, c: -65, d: 8, threshold: 30 });
+  const [params, setParams] = useState(neuron.params);
 
   useEffect(() => {
     setLabel(neuron.label);
-    setParams(neuron.params || { a: 0.02, b: 0.2, c: -65, d: 8, threshold: 30 });
-  }, [neuron.id]);
+    setParams(neuron.params);
+  }, [neuron.id, neuron.label, neuron.params]);
 
-  const handleParamChange = (paramName: keyof typeof params, value: number) => {
-    const newParams = { ...params, [paramName]: value };
-    setParams(newParams);
-    
-    const updatedNeuron = {
+  const handleParamChange = (paramName: keyof IzhikevichNeuronParameters, value: number) => {
+    const nextParams = { ...params, [paramName]: value };
+    setParams(nextParams);
+    onUpdate({
       ...neuron,
       label,
-      params: newParams
-    };
-    onUpdate(updatedNeuron);
+      params: nextParams,
+    });
   };
 
-  const handleLabelChange = (newLabel: string) => {
-    setLabel(newLabel);
-    const updatedNeuron = {
+  const handleLabelChange = (nextLabel: string) => {
+    setLabel(nextLabel);
+    onUpdate({
       ...neuron,
-      label: newLabel,
-      params
-    };
-    onUpdate(updatedNeuron);
+      label: nextLabel,
+      params,
+    });
   };
 
   return (
-    <div style={{ padding: '0' }}>
-      <div style={{ marginBottom: '16px' }}>
-        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: '4px' }}>
-          神经元标签:
+    <div className="topology-detail-editor">
+      <div className="topology-detail-section">
+        <label className="topology-detail-label" htmlFor="neuron-label-input">
+          节点标签
         </label>
         <input
+          id="neuron-label-input"
           data-testid="neuron-label-input"
+          className="topology-detail-input"
           type="text"
           value={label}
-          onChange={(e) => handleLabelChange(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '6px 8px',
-            border: '1px solid #ced4da',
-            borderRadius: '4px',
-            fontSize: '0.85rem'
-          }}
+          onChange={(event) => handleLabelChange(event.target.value)}
         />
       </div>
 
-      <div style={{ marginBottom: '16px', fontSize: '0.8rem', color: '#6c757d', lineHeight: 1.5 }}>
-        当前面板编辑的是 BrainGraph 中的神经元定义，包括标签、位置和 Izhikevich 参数。
-        运行时激活、电压和脉冲状态不在此编辑器内模拟。
+      <div className="topology-detail-copy">
+        {neuron.description ?? '当前 inspector 直接回写 GraphIRDocument 中的参数覆盖，不再维护任何 legacy graph 真源。'}
       </div>
 
-      <div>
-        <h6 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 600 }}>Izhikevich 参数:</h6>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div style={{ background: '#f8f9fa', padding: '8px', borderRadius: '4px' }}>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#6c757d', marginBottom: '4px' }}>
-              恢复参数 (a):
-            </label>
+      {!neuron.readonly && (
+        <div className="topology-detail-grid">
+          <label className="topology-detail-field">
+            <span className="topology-detail-label">a</span>
             <input
+              className="topology-detail-input"
               type="number"
               step="0.001"
-              min="0"
-              max="1"
               value={params.a}
-              onChange={(e) => handleParamChange('a', parseFloat(e.target.value) || 0)}
-              style={{
-                width: '100%',
-                padding: '4px 6px',
-                border: '1px solid #ced4da',
-                borderRadius: '3px',
-                fontSize: '0.8rem'
-              }}
+              onChange={(event) => handleParamChange('a', Number.parseFloat(event.target.value) || 0)}
             />
-          </div>
-
-          <div style={{ background: '#f8f9fa', padding: '8px', borderRadius: '4px' }}>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#6c757d', marginBottom: '4px' }}>
-              敏感度参数 (b):
-            </label>
+          </label>
+          <label className="topology-detail-field">
+            <span className="topology-detail-label">b</span>
             <input
+              className="topology-detail-input"
               type="number"
               step="0.01"
-              min="0"
-              max="1"
               value={params.b}
-              onChange={(e) => handleParamChange('b', parseFloat(e.target.value) || 0)}
-              style={{
-                width: '100%',
-                padding: '4px 6px',
-                border: '1px solid #ced4da',
-                borderRadius: '3px',
-                fontSize: '0.8rem'
-              }}
+              onChange={(event) => handleParamChange('b', Number.parseFloat(event.target.value) || 0)}
             />
-          </div>
-
-          <div style={{ background: '#f8f9fa', padding: '8px', borderRadius: '4px' }}>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#6c757d', marginBottom: '4px' }}>
-              重置电位 (c):
-            </label>
+          </label>
+          <label className="topology-detail-field">
+            <span className="topology-detail-label">c</span>
             <input
+              className="topology-detail-input"
               type="number"
               step="1"
-              min="-100"
-              max="0"
               value={params.c}
-              onChange={(e) => handleParamChange('c', parseFloat(e.target.value) || 0)}
-              style={{
-                width: '100%',
-                padding: '4px 6px',
-                border: '1px solid #ced4da',
-                borderRadius: '3px',
-                fontSize: '0.8rem'
-              }}
+              onChange={(event) => handleParamChange('c', Number.parseFloat(event.target.value) || 0)}
             />
-          </div>
-
-          <div style={{ background: '#f8f9fa', padding: '8px', borderRadius: '4px' }}>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#6c757d', marginBottom: '4px' }}>
-              重置恢复 (d):
-            </label>
+          </label>
+          <label className="topology-detail-field">
+            <span className="topology-detail-label">d</span>
             <input
+              className="topology-detail-input"
               type="number"
               step="0.1"
-              min="0"
-              max="20"
               value={params.d}
-              onChange={(e) => handleParamChange('d', parseFloat(e.target.value) || 0)}
-              style={{
-                width: '100%',
-                padding: '4px 6px',
-                border: '1px solid #ced4da',
-                borderRadius: '3px',
-                fontSize: '0.8rem'
-              }}
+              onChange={(event) => handleParamChange('d', Number.parseFloat(event.target.value) || 0)}
             />
-          </div>
-
-          <div style={{ background: '#f8f9fa', padding: '8px', borderRadius: '4px' }}>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#6c757d', marginBottom: '4px' }}>
-              发放阈值:
-            </label>
+          </label>
+          <label className="topology-detail-field">
+            <span className="topology-detail-label">threshold</span>
             <input
+              className="topology-detail-input"
               type="number"
               step="1"
-              min="10"
-              max="50"
               value={params.threshold}
-              onChange={(e) => handleParamChange('threshold', parseFloat(e.target.value) || 30)}
-              style={{
-                width: '100%',
-                padding: '4px 6px',
-                border: '1px solid #ced4da',
-                borderRadius: '3px',
-                fontSize: '0.8rem'
-              }}
+              onChange={(event) => handleParamChange('threshold', Number.parseFloat(event.target.value) || 0)}
             />
-          </div>
+          </label>
         </div>
-      </div>
-
-      <div style={{ marginTop: '16px', fontSize: '0.75rem', color: '#6c757d', lineHeight: 1.3 }}>
-        <strong>参数说明:</strong><br/>
-        • a: 恢复速度 (0.02=常规, 0.1=快速)<br/>
-        • b: u对v的敏感度 (0.2=常规)<br/>
-        • c: 发放后重置的膜电位 (-65=常规)<br/>
-        • d: 发放后u的增量 (8=常规, 2=爆发型)
-      </div>
+      )}
     </div>
   );
 };
 
-export default NeuronDetailEditor; 
+export default NeuronDetailEditor;

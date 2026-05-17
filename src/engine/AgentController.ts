@@ -6,10 +6,10 @@
 import { Agent } from '../types/simulation';
 import type { SimulationControlMode } from '../domain/world';
 import {
-  compileBrainGraph,
+  compileGraphIRDocument,
   createBrainProgramRuntimeState,
   stepBrainProgram,
-  type BrainGraph,
+  type GraphIRDocument,
   type BrainProgram,
   type BrainProgramRuntimeState
 } from '../domain/brain';
@@ -29,8 +29,12 @@ export class AgentController {
   private brainPrograms: Map<number, BrainProgram> = new Map();
   private brainRuntimeStates: Map<number, BrainProgramRuntimeState> = new Map();
 
-  public setBrainGraph(agentId: number, graph: BrainGraph): void {
-    const program = compileBrainGraph(graph);
+  public setGraphIRDocument(agentId: number, document: GraphIRDocument): void {
+    const program = compileGraphIRDocument(document);
+    this.installBrainProgram(agentId, program);
+  }
+
+  public installBrainProgram(agentId: number, program: BrainProgram): void {
     this.brainPrograms.set(agentId, program);
     this.brainRuntimeStates.set(agentId, createBrainProgramRuntimeState(program));
   }

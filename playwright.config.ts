@@ -18,6 +18,10 @@ export default defineConfig({
   },
   webServer: {
     command: 'npm run dev -- --host 127.0.0.1 --port 3000',
+    env: {
+      ...process.env,
+      VITE_E2E: 'true'
+    },
     url: 'http://127.0.0.1:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 60_000

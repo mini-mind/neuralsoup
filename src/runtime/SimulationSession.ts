@@ -3,13 +3,17 @@ import { CollisionDetector } from '../engine/CollisionDetector';
 import { VisionSystem } from '../engine/VisionSystem';
 import { WorldManager } from '../engine/WorldManager';
 import {
-  createDefaultBrainGraph,
-  validateBrainGraph,
-  reconcileBrainGraphVisionCells,
-  type BrainGraph
+  compileGraphIRDocument,
+  createDefaultGraphIRDocument,
+  GraphIRValidationError,
+  reconcileGraphIRDocumentVisionCells,
+  summarizeGraphIRDocument,
+  validateGraphIRDocument,
+  type GraphIRDocument,
+  type GraphIRValidationIssue,
 } from '../domain/brain';
 import type { Agent, SimulationState, World } from '../types/simulation';
-import type { BrainGraphRuntimeStatus } from '../types/brainGraphRuntime';
+import type { GraphIRRuntimeStatus } from '../types/graphIRRuntime';
 import {
   type SimulationControlMode,
   type WorldConfig,
@@ -47,7 +51,8 @@ export class SimulationSession {
   private readonly config: WorldConfig;
 
   private currentControlMode: SimulationControlMode;
-  private currentBrainGraph: BrainGraph;
+  private currentGraphIRDocument: GraphIRDocument;
+  private graphIRRuntimeStatus: GraphIRRuntimeStatus;
   private keyboardInputState: SimulationSessionInputState = {
     turnLeft: false,
     moveForward: false,
@@ -69,7 +74,8 @@ export class SimulationSession {
       ...options.world
     });
     this.currentControlMode = options.initialControlMode ?? 'keyboard';
-    this.currentBrainGraph = createDefaultBrainGraph(this.visionSystem.getVisionCells());
+    this.currentGraphIRDocument = createDefaultGraphIRDocument(this.visionSystem.getVisionCells());
+    this.graphIRRuntimeStatus = this.createAppliedGraphIRRuntimeStatus(this.currentGraphIRDocument);
     this.state = createEmptyWorldState(this.config, this.worldManager.getWorldBounds());
   }
 
@@ -83,7 +89,7 @@ export class SimulationSession {
       this.visionSystem.initializeVisionCells(agent);
     }
 
-    this.syncMainAgentBrainProgram();
+    this.syncMainAgentProgram();
   }
 
   public reset(): void {
@@ -141,8 +147,7 @@ export class SimulationSession {
     }
 
     if (didVisionCellCountChange && mainAgent) {
-      this.currentBrainGraph = this.reconcileBrainGraph(mainAgent.visionCells.length);
-      this.syncMainAgentBrainProgram(mainAgent);
+      this.syncMainAgentProgram(mainAgent);
     }
   }
 
@@ -155,7 +160,7 @@ export class SimulationSession {
     }
 
     if (newMode === 'snn') {
-      this.syncMainAgentBrainProgram(mainAgent);
+      this.syncMainAgentProgram(mainAgent);
     }
   }
 
@@ -167,29 +172,32 @@ export class SimulationSession {
     this.keyboardInputState = { ...nextState };
   }
 
-  public setBrainGraph(graph: BrainGraph): BrainGraphRuntimeStatus {
+  public setGraphIRDocument(document: GraphIRDocument): GraphIRRuntimeStatus {
     const mainAgent = this.getMainAgent();
     const visionCells = mainAgent?.visionCells.length ?? this.visionSystem.getVisionCells();
-    const reconciledGraph = this.reconcileBrainGraph(visionCells, graph);
-    const issues = validateBrainGraph(reconciledGraph);
+    const reconciledDocument = this.reconcileGraphIR(visionCells, document);
+    const issues = validateGraphIRDocument(reconciledDocument);
 
     if (issues.length > 0) {
-      return {
-        state: 'invalid',
-        appliedGraph: this.currentBrainGraph,
-        issues,
-        message: issues.map((issue) => issue.message).join(' | ')
-      } satisfies BrainGraphRuntimeStatus;
+      return this.setInvalidGraphIRRuntimeStatus(issues);
     }
 
-    this.currentBrainGraph = reconciledGraph;
-    this.syncMainAgentBrainProgram(mainAgent);
-    return {
-      state: 'applied',
-      appliedGraph: this.currentBrainGraph,
-      issues: [],
-      message: null
-    } satisfies BrainGraphRuntimeStatus;
+    try {
+      this.applyGraphIRDocument(reconciledDocument, mainAgent);
+    } catch (error) {
+      if (error instanceof GraphIRValidationError) {
+        return this.setInvalidGraphIRRuntimeStatus(error.issues);
+      }
+
+      return this.setInvalidGraphIRRuntimeStatus([
+        {
+          code: 'runtime-binding-error',
+          message: error instanceof Error ? error.message : 'Unknown GraphIR runtime binding failure.',
+        },
+      ]);
+    }
+
+    return this.setAppliedGraphIRRuntimeStatus(reconciledDocument);
   }
 
   public getMainAgentControlMode(): SimulationControlMode {
@@ -201,17 +209,12 @@ export class SimulationSession {
     return agent ? this.getEffectiveControlMode(agent) : null;
   }
 
-  public getCurrentBrainGraph(): BrainGraph {
-    return this.currentBrainGraph;
+  public getCurrentGraphIRDocument(): GraphIRDocument {
+    return this.currentGraphIRDocument;
   }
 
-  public getBrainGraphRuntimeStatus(): BrainGraphRuntimeStatus {
-    return {
-      state: 'applied',
-      appliedGraph: this.currentBrainGraph,
-      issues: [],
-      message: null
-    };
+  public getGraphIRRuntimeStatus(): GraphIRRuntimeStatus {
+    return this.graphIRRuntimeStatus;
   }
 
   public isMainAgentBrainProgramConfigured(): boolean {
@@ -251,17 +254,56 @@ export class SimulationSession {
     return agent.id === this.config.mainAgentId ? this.currentControlMode : 'random';
   }
 
-  private syncMainAgentBrainProgram(mainAgent: Agent | null = this.getMainAgent()): void {
+  private syncMainAgentProgram(mainAgent: Agent | null = this.getMainAgent()): void {
     if (!mainAgent) {
       return;
     }
 
-    const graph = this.reconcileBrainGraph(mainAgent.visionCells.length);
-    this.currentBrainGraph = graph;
-    this.agentController.setBrainGraph(mainAgent.id, graph);
+    const graphIR = this.reconcileGraphIR(mainAgent.visionCells.length);
+    this.applyGraphIRDocument(graphIR, mainAgent);
+    this.setAppliedGraphIRRuntimeStatus(graphIR);
   }
 
-  private reconcileBrainGraph(visionCells: number, graph: BrainGraph = this.currentBrainGraph): BrainGraph {
-    return reconcileBrainGraphVisionCells(graph, visionCells);
+  private reconcileGraphIR(
+    visionCells: number,
+    document: GraphIRDocument = this.currentGraphIRDocument
+  ): GraphIRDocument {
+    return reconcileGraphIRDocumentVisionCells(document, visionCells);
+  }
+
+  private applyGraphIRDocument(document: GraphIRDocument, mainAgent: Agent | null): void {
+    const compiledProgram = compileGraphIRDocument(document);
+
+    if (mainAgent) {
+      this.agentController.installBrainProgram(mainAgent.id, compiledProgram);
+    }
+
+    this.currentGraphIRDocument = document;
+  }
+
+  private createAppliedGraphIRRuntimeStatus(document: GraphIRDocument): GraphIRRuntimeStatus {
+    return {
+      state: 'applied',
+      appliedDocument: document,
+      appliedSummary: summarizeGraphIRDocument(document),
+      issues: [],
+      message: null,
+    };
+  }
+
+  private setAppliedGraphIRRuntimeStatus(document: GraphIRDocument): GraphIRRuntimeStatus {
+    this.graphIRRuntimeStatus = this.createAppliedGraphIRRuntimeStatus(document);
+    return this.graphIRRuntimeStatus;
+  }
+
+  private setInvalidGraphIRRuntimeStatus(issues: GraphIRValidationIssue[]): GraphIRRuntimeStatus {
+    this.graphIRRuntimeStatus = {
+      state: 'invalid',
+      appliedDocument: this.currentGraphIRDocument,
+      appliedSummary: summarizeGraphIRDocument(this.currentGraphIRDocument),
+      issues,
+      message: issues.map((issue) => issue.message).join(' | '),
+    };
+    return this.graphIRRuntimeStatus;
   }
 }

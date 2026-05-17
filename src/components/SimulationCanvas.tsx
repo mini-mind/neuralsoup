@@ -1,19 +1,19 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as PIXI from '../engine/pixi';
-import type { BrainGraph } from '../domain/brain';
+import type { GraphIRDocument } from '../domain/brain';
 import { SimulationEngine, type SimulationLifecycleState } from '../engine/SimulationEngine';
 import type { SimulationControlMode } from '../domain/world';
 import type { SimulationState } from '../types/simulation';
-import type { BrainGraphRuntimeStatus } from '../types/brainGraphRuntime';
+import type { GraphIRRuntimeStatus } from '../types/graphIRRuntime';
 import type { AgentParameters } from './editor/types';
 
 interface SimulationCanvasProps {
   onStatsUpdate: (stats: SimulationState['stats']) => void;
   onLifecycleChange: (state: SimulationLifecycleState) => void;
   onAgentParametersChange: (params: AgentParameters) => void;
-  onBrainGraphStatusChange: (status: BrainGraphRuntimeStatus) => void;
+  onGraphIRStatusChange: (status: GraphIRRuntimeStatus) => void;
   controlMode: Extract<SimulationControlMode, 'keyboard' | 'snn'>;
-  brainGraph: BrainGraph;
+  graphDocument: GraphIRDocument;
   agentParameters: AgentParameters;
   requestedLifecycleState: SimulationLifecycleState;
   resetToken: number;
@@ -35,9 +35,9 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   onStatsUpdate,
   onLifecycleChange,
   onAgentParametersChange,
-  onBrainGraphStatusChange,
+  onGraphIRStatusChange,
   controlMode,
-  brainGraph,
+  graphDocument,
   agentParameters,
   requestedLifecycleState,
   resetToken,
@@ -128,7 +128,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         newEngine = new SimulationEngine(newApp, fixedWorldWidth, fixedWorldHeight);
         newEngine.onStatsUpdate = onStatsUpdate;
         newEngine.onLifecycleChange = onLifecycleChange;
-        newEngine.onBrainGraphStatusChange = onBrainGraphStatusChange;
+        newEngine.onGraphIRStatusChange = onGraphIRStatusChange;
         newEngine.initialize();
 
         const mainAgent = newEngine.getMainAgent();
@@ -141,7 +141,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         setIsEngineReady(true);
         setEngineInstanceId((prev) => prev + 1);
         onAgentParametersChange(newEngine.getAgentParameters());
-        onBrainGraphStatusChange(newEngine.getBrainGraphRuntimeStatus());
+        onGraphIRStatusChange(newEngine.getGraphIRRuntimeStatus());
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown Pixi renderer error';
         console.error('Failed to initialize simulation canvas:', error);
@@ -165,7 +165,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         });
       }
     };
-  }, [onAgentParametersChange, onBrainGraphStatusChange, onLifecycleChange, onStatsUpdate]);
+  }, [onAgentParametersChange, onGraphIRStatusChange, onLifecycleChange, onStatsUpdate]);
 
   useEffect(() => {
     if (!appRef.current) {
@@ -197,8 +197,8 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       return;
     }
 
-    engineRef.current.onBrainGraphStatusChange = onBrainGraphStatusChange;
-  }, [onBrainGraphStatusChange]);
+    engineRef.current.onGraphIRStatusChange = onGraphIRStatusChange;
+  }, [onGraphIRStatusChange]);
 
   useEffect(() => {
     const engine = engineRef.current;
@@ -217,8 +217,8 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       return;
     }
 
-    engine.setBrainGraph(brainGraph);
-  }, [brainGraph]);
+    engine.setGraphIRDocument(graphDocument);
+  }, [graphDocument]);
 
   useEffect(() => {
     const engine = engineRef.current;
@@ -233,9 +233,9 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     }
 
     engine.updateAgentParameters(agentParameters);
-    engine.setBrainGraph(brainGraph);
+    engine.setGraphIRDocument(graphDocument);
     onAgentParametersChange(engine.getAgentParameters());
-  }, [agentParameters, brainGraph, onAgentParametersChange]);
+  }, [agentParameters, graphDocument, onAgentParametersChange]);
 
   useEffect(() => {
     const engine = engineRef.current;
@@ -274,12 +274,12 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
     lastAppliedResetTokenRef.current = resetToken;
     engine.reset();
-    engine.setBrainGraph(brainGraph);
+    engine.setGraphIRDocument(graphDocument);
     engine.setControlMode(controlMode);
     engine.updateAgentParameters(agentParameters);
-    engine.setBrainGraph(brainGraph);
+    engine.setGraphIRDocument(graphDocument);
     onAgentParametersChange(engine.getAgentParameters());
-  }, [agentParameters, brainGraph, controlMode, onAgentParametersChange, resetToken]);
+  }, [agentParameters, graphDocument, controlMode, onAgentParametersChange, resetToken]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {

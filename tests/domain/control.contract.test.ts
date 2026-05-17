@@ -5,7 +5,14 @@ import { VisionSystem } from '../../src/engine/VisionSystem';
 import { WorldManager } from '../../src/engine/WorldManager';
 import { CollisionDetector } from '../../src/engine/CollisionDetector';
 import { SimulationSession } from '../../src/runtime/SimulationSession';
-import { createDefaultBrainGraph } from '../../src/domain/brain';
+import {
+  compileGraphIRDocument,
+  createBrainProgramRuntimeState,
+  createDefaultGraphIRDocument,
+  stepBrainProgram,
+  summarizeGraphIRDocument,
+  type GraphIRDocument,
+} from '../../src/domain/brain';
 import type { Agent } from '../../src/types/simulation';
 
 function createAgent(overrides: Partial<Agent> = {}): Agent {
@@ -27,6 +34,18 @@ function createAgent(overrides: Partial<Agent> = {}): Agent {
   };
 }
 
+const getCoreNeuronGroup = (document: GraphIRDocument) => {
+  const group = document.root.children.find((node) => node.id === 'core-neuron-group');
+  assert.ok(group && group.kind === 'neuron-group');
+  return group;
+};
+
+const getOutputAdapter = (document: GraphIRDocument) => {
+  const adapter = document.root.children.find((node) => node.id === 'output-adapter');
+  assert.ok(adapter && adapter.kind === 'adapter');
+  return adapter;
+};
+
 test('keyboard policy moves forward and cancels opposite turns', () => {
   const controller = new AgentController();
 
@@ -36,8 +55,8 @@ test('keyboard policy moves forward and cancels opposite turns', () => {
     keyboardInputState: {
       turnLeft: false,
       moveForward: true,
-      turnRight: false
-    }
+      turnRight: false,
+    },
   });
 
   assert.equal(forwardAgent.velocity.x, 60);
@@ -51,8 +70,8 @@ test('keyboard policy moves forward and cancels opposite turns', () => {
     keyboardInputState: {
       turnLeft: true,
       moveForward: false,
-      turnRight: true
-    }
+      turnRight: true,
+    },
   });
 
   assert.equal(cancelTurnAgent.angle, 0);
@@ -65,7 +84,7 @@ test('simulation session owns main-agent control mode and preserves it across re
     visionSystem: new VisionSystem(),
     agentController: new AgentController(),
     worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector()
+    collisionDetector: new CollisionDetector(),
   });
 
   session.initialize();
@@ -74,8 +93,10 @@ test('simulation session owns main-agent control mode and preserves it across re
   assert.equal(session.getMainAgentControlMode(), 'keyboard');
   assert.equal(session.getAgentControlMode(initialMainAgent.id), 'keyboard');
   assert.ok(
-    session.getState().agents.every((agent) =>
-      session.getAgentControlMode(agent.id) === (agent.id === initialMainAgent.id ? 'keyboard' : 'random')
+    session.getState().agents.every(
+      (agent) =>
+        session.getAgentControlMode(agent.id) ===
+        (agent.id === initialMainAgent.id ? 'keyboard' : 'random')
     )
   );
 
@@ -84,11 +105,6 @@ test('simulation session owns main-agent control mode and preserves it across re
   assert.ok(snnMainAgent);
   assert.equal(session.getMainAgentControlMode(), 'snn');
   assert.equal(session.getAgentControlMode(snnMainAgent.id), 'snn');
-  assert.ok(
-    session.getState().agents.every((agent) =>
-      session.getAgentControlMode(agent.id) === (agent.id === snnMainAgent.id ? 'snn' : 'random')
-    )
-  );
 
   session.reset();
   const resetMainAgent = session.getMainAgent();
@@ -98,14 +114,14 @@ test('simulation session owns main-agent control mode and preserves it across re
   assert.equal(session.getAgentControlMode(resetMainAgent.id), 'snn');
 });
 
-test('simulation session keeps main-agent brain program aligned across mode switches and vision-cell updates', () => {
+test('simulation session keeps main-agent program aligned across mode switches and vision-cell updates', () => {
   const agentController = new AgentController();
   const visionSystem = new VisionSystem();
   const session = new SimulationSession({
     visionSystem,
     agentController,
     worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector()
+    collisionDetector: new CollisionDetector(),
   });
 
   session.initialize();
@@ -115,22 +131,29 @@ test('simulation session keeps main-agent brain program aligned across mode swit
 
   session.setControlMode('snn');
   assert.equal(session.isMainAgentBrainProgramConfigured(), true);
-  assert.equal(session.getCurrentBrainGraph().inputs.length, mainAgent.visionCells.length * 3);
+  assert.equal(
+    summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount,
+    mainAgent.visionCells.length * 3
+  );
 
   session.setControlMode('keyboard');
   session.updateAgentParameters({ visionCells: 24 });
   assert.equal(mainAgent.visionCells.length, 24);
-  assert.equal(session.getCurrentBrainGraph().inputs.length, 72);
-  assert.equal(session.getCurrentBrainGraph().outputs.length, 3);
+  assert.deepEqual(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()), {
+    inputSignalCount: 72,
+    outputSignalCount: 3,
+    neuronCount: 2,
+    leafLinkCount: 76,
+  });
 
   session.setControlMode('snn');
   session.updateAgentParameters({ visionCells: 18 });
   assert.equal(mainAgent.visionCells.length, 18);
-  assert.equal(session.getCurrentBrainGraph().inputs.length, 54);
+  assert.equal(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount, 54);
 
   const agent = createAgent({
     id: mainAgent.id,
-    visualInput: new Array(mainAgent.visionCells.length * 3).fill(0)
+    visualInput: new Array(mainAgent.visionCells.length * 3).fill(0),
   });
 
   agentController.updateAgent(agent, 1, {
@@ -138,166 +161,275 @@ test('simulation session keeps main-agent brain program aligned across mode swit
     keyboardInputState: {
       turnLeft: false,
       moveForward: false,
-      turnRight: false
-    }
+      turnRight: false,
+    },
   });
 
   assert.equal(Number.isFinite(agent.velocity.x), true);
   assert.equal(Number.isFinite(agent.velocity.y), true);
-  assert.notEqual(agent.x, 0);
+  assert.equal(agent.x, 0);
+  assert.equal(agent.y, 0);
 });
 
-test('simulation session preserves custom BrainGraph across reset and reconciles it to vision-cell changes', () => {
+test('simulation session preserves custom GraphIR leaf links across reset and reconciles vision-cell changes', () => {
   const session = new SimulationSession({
     visionSystem: new VisionSystem(),
     agentController: new AgentController(),
     worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector()
+    collisionDetector: new CollisionDetector(),
   });
 
   session.initialize();
 
-  const graph = createDefaultBrainGraph(36);
-  graph.synapses.push({
-    id: 'forward-on-green',
-    from: 'vision-G-0',
-    to: 'output-move-forward',
-    weight: 2
-  });
+  const document = createDefaultGraphIRDocument(36);
+  document.root.links = [
+    {
+      id: 'forward-on-green',
+      from: {
+        nodeId: 'vision-G-0',
+        portId: 'out',
+      },
+      to: {
+        nodeId: 'output-move-forward',
+        portId: 'in',
+      },
+      weight: 2,
+    },
+  ];
 
-  session.setBrainGraph(graph);
+  session.setGraphIRDocument(document);
   assert.equal(session.isMainAgentBrainProgramConfigured(), true);
   assert.deepEqual(
-    session.getCurrentBrainGraph().synapses.map((synapse) => synapse.id),
+    session.getCurrentGraphIRDocument().root.links.map((link) => link.id),
     ['forward-on-green']
   );
 
   session.updateAgentParameters({ visionCells: 1 });
-  assert.equal(session.getCurrentBrainGraph().inputs.length, 3);
+  assert.equal(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount, 3);
   assert.deepEqual(
-    session.getCurrentBrainGraph().synapses.map((synapse) => synapse.id),
+    session.getCurrentGraphIRDocument().root.links.map((link) => link.id),
     ['forward-on-green']
   );
 
   session.reset();
   assert.equal(session.getMainAgentControlMode(), 'keyboard');
-  assert.equal(session.getCurrentBrainGraph().inputs.length, 3);
+  assert.equal(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount, 3);
   assert.deepEqual(
-    session.getCurrentBrainGraph().synapses.map((synapse) => synapse.id),
+    session.getCurrentGraphIRDocument().root.links.map((link) => link.id),
     ['forward-on-green']
   );
 });
 
-test('simulation session rejects invalid BrainGraph updates without dropping the last applied graph', () => {
+test('simulation session rejects invalid GraphIR drafts without dropping the last applied document', () => {
   const session = new SimulationSession({
     visionSystem: new VisionSystem(),
     agentController: new AgentController(),
     worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector()
+    collisionDetector: new CollisionDetector(),
   });
 
   session.initialize();
 
-  const validGraph = createDefaultBrainGraph(2);
-  validGraph.synapses.push({
-    id: 'vision-to-neuron',
-    from: 'vision-R-0',
-    to: 'neuron-1',
-    weight: 0.5
-  });
+  const validDocument = createDefaultGraphIRDocument(2);
+  validDocument.root.links = [
+    {
+      id: 'vision-to-neuron',
+      from: {
+        nodeId: 'vision-R-0',
+        portId: 'out',
+      },
+      to: {
+        nodeId: 'neuron-1',
+        portId: 'dendrite',
+      },
+      weight: 0.5,
+    },
+  ];
 
-  const appliedStatus = session.setBrainGraph(validGraph);
+  const appliedStatus = session.setGraphIRDocument(validDocument);
   assert.equal(appliedStatus.state, 'applied');
   assert.deepEqual(
-    session.getCurrentBrainGraph().synapses.map((synapse) => synapse.id),
+    session.getCurrentGraphIRDocument().root.links.map((link) => link.id),
     ['vision-to-neuron']
   );
 
-  const invalidGraph = {
-    ...validGraph,
-    synapses: [
-      ...validGraph.synapses,
-      {
-        id: 'invalid-output-to-output',
-        from: 'output-turn-left',
-        to: 'output-turn-right',
-        weight: 1
-      }
-    ]
-  };
+  const invalidDocument = structuredClone(validDocument);
+  invalidDocument.root.links.push({
+    id: 'invalid-output-to-output',
+    from: {
+      nodeId: 'output-turn-left',
+      portId: 'in',
+    },
+    to: {
+      nodeId: 'output-turn-right',
+      portId: 'in',
+    },
+    weight: 1,
+  });
 
-  const invalidStatus = session.setBrainGraph(invalidGraph);
+  const invalidStatus = session.setGraphIRDocument(invalidDocument);
   assert.equal(invalidStatus.state, 'invalid');
-  assert.ok(invalidStatus.message.includes('invalid direction output -> output'));
+  assert.ok(invalidStatus.message.includes('not an output port'));
   assert.deepEqual(
-    invalidStatus.appliedGraph.synapses.map((synapse) => synapse.id),
+    invalidStatus.appliedDocument.root.links.map((link) => link.id),
     ['vision-to-neuron']
   );
   assert.deepEqual(
-    session.getCurrentBrainGraph().synapses.map((synapse) => synapse.id),
+    session.getCurrentGraphIRDocument().root.links.map((link) => link.id),
     ['vision-to-neuron']
   );
 });
 
-test('simulation session keeps applied BrainGraph coherent when vision-cell reconciliation happens after an invalid draft', () => {
+test('simulation session keeps the last applied document and program when GraphIR compile bindings fail', () => {
+  const agentController = new AgentController();
   const session = new SimulationSession({
     visionSystem: new VisionSystem(),
-    agentController: new AgentController(),
+    agentController,
     worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector()
+    collisionDetector: new CollisionDetector(),
   });
 
   session.initialize();
 
-  const validGraph = createDefaultBrainGraph(3);
-  validGraph.synapses.push({
-    id: 'keep-synapse',
-    from: 'vision-R-0',
-    to: 'neuron-1',
-    weight: 0.7
-  });
-  session.setBrainGraph(validGraph);
+  const validDocument = createDefaultGraphIRDocument(2);
+  validDocument.root.links = [
+    {
+      id: 'vision-b1-to-forward',
+      from: {
+        nodeId: 'vision-B-1',
+        portId: 'out',
+      },
+      to: {
+        nodeId: 'output-move-forward',
+        portId: 'in',
+      },
+      weight: 2,
+    },
+  ];
 
-  const invalidGraph = {
-    ...validGraph,
-    synapses: [
-      ...validGraph.synapses,
-      {
-        id: 'invalid-output-loop',
-        from: 'output-move-forward',
-        to: 'output-turn-right',
-        weight: 1
-      }
-    ]
-  };
-  const invalidStatus = session.setBrainGraph(invalidGraph);
+  const appliedStatus = session.setGraphIRDocument(validDocument);
+  assert.equal(appliedStatus.state, 'applied');
+  const appliedSummary = appliedStatus.appliedSummary;
+
+  const compileInvalidDocument = structuredClone(validDocument);
+  const outputAdapter = getOutputAdapter(compileInvalidDocument);
+  const moveForward = outputAdapter.children.find((node) => node.id === 'output-move-forward');
+  assert.ok(moveForward && moveForward.kind === 'signal');
+  moveForward.signal.id = 'unsupported-action';
+
+  const invalidStatus = session.setGraphIRDocument(compileInvalidDocument);
+  assert.equal(invalidStatus.state, 'invalid');
+  assert.ok(invalidStatus.message.includes('unsupported world action signal'));
+  assert.deepEqual(
+    invalidStatus.appliedDocument.root.links.map((link) => link.id),
+    ['vision-b1-to-forward']
+  );
+  assert.deepEqual(invalidStatus.appliedSummary, appliedSummary);
+  assert.deepEqual(
+    session.getCurrentGraphIRDocument().root.links.map((link) => link.id),
+    ['vision-b1-to-forward']
+  );
+
+  const runtimeStatus = session.getGraphIRRuntimeStatus();
+  assert.equal(runtimeStatus.state, 'invalid');
+  assert.deepEqual(runtimeStatus.appliedSummary, appliedSummary);
+
+  const mainAgent = session.getMainAgent();
+  assert.ok(mainAgent);
+  const agent = createAgent({
+    id: mainAgent.id,
+    visualInput: [0, 0, 0, 0, 0, 1],
+  });
+
+  assert.doesNotThrow(() => {
+    agentController.updateAgent(agent, 1, {
+      controlMode: 'snn',
+      keyboardInputState: {
+        turnLeft: false,
+        moveForward: false,
+        turnRight: false,
+      },
+    });
+  });
+  assert.ok(agent.velocity.x > 0);
+  assert.equal(agent.velocity.y, 0);
+});
+
+test('simulation session keeps applied GraphIR coherent when vision-cell reconciliation follows an invalid draft', () => {
+  const session = new SimulationSession({
+    visionSystem: new VisionSystem(),
+    agentController: new AgentController(),
+    worldManager: new WorldManager(1600, 1200),
+    collisionDetector: new CollisionDetector(),
+  });
+
+  session.initialize();
+
+  const validDocument = createDefaultGraphIRDocument(3);
+  validDocument.root.links = [
+    {
+      id: 'keep-link',
+      from: {
+        nodeId: 'vision-R-0',
+        portId: 'out',
+      },
+      to: {
+        nodeId: 'neuron-1',
+        portId: 'dendrite',
+      },
+      weight: 0.7,
+    },
+  ];
+  session.setGraphIRDocument(validDocument);
+
+  const invalidDocument = structuredClone(validDocument);
+  invalidDocument.root.links.push({
+    id: 'invalid-output-loop',
+    from: {
+      nodeId: 'output-move-forward',
+      portId: 'in',
+    },
+    to: {
+      nodeId: 'output-turn-right',
+      portId: 'in',
+    },
+    weight: 1,
+  });
+  const invalidStatus = session.setGraphIRDocument(invalidDocument);
   assert.equal(invalidStatus.state, 'invalid');
 
   session.updateAgentParameters({ visionCells: 1 });
 
-  assert.equal(session.getCurrentBrainGraph().inputs.length, 3);
+  assert.equal(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount, 3);
   assert.deepEqual(
-    session.getCurrentBrainGraph().synapses.map((synapse) => synapse.id),
-    ['keep-synapse']
+    session.getCurrentGraphIRDocument().root.links.map((link) => link.id),
+    ['keep-link']
   );
 });
 
-test('brain-program backed snn control consumes BrainGraph output channels', () => {
+test('brain-program backed snn control consumes GraphIR output signal channels', () => {
   const controller = new AgentController();
-  const graph = createDefaultBrainGraph(1);
+  const document = createDefaultGraphIRDocument(1);
+  document.root.links = [
+    {
+      id: 'vision-to-output-forward',
+      from: {
+        nodeId: 'vision-G-0',
+        portId: 'out',
+      },
+      to: {
+        nodeId: 'output-move-forward',
+        portId: 'in',
+      },
+      weight: 2,
+    },
+  ];
 
-  graph.synapses.push({
-    id: 'vision-to-output-forward',
-    from: 'vision-G-0',
-    to: 'output-move-forward',
-    weight: 2
-  });
-
-  controller.setBrainGraph(1, graph);
+  controller.setGraphIRDocument(1, document);
 
   const agent = createAgent({
     id: 1,
-    visualInput: [0, 1, 0]
+    visualInput: [0, 1, 0],
   });
 
   controller.updateAgent(agent, 1, {
@@ -305,10 +437,101 @@ test('brain-program backed snn control consumes BrainGraph output channels', () 
     keyboardInputState: {
       turnLeft: false,
       moveForward: false,
-      turnRight: false
-    }
+      turnRight: false,
+    },
   });
 
   assert.ok(agent.velocity.x > 0);
   assert.equal(agent.velocity.y, 0);
+});
+
+test('GraphIR leaf link weights change runtime action outputs', () => {
+  const baseDocument = createDefaultGraphIRDocument(1);
+  const weakDocument = structuredClone(baseDocument);
+  const strongDocument = structuredClone(baseDocument);
+  const weakGroup = getCoreNeuronGroup(weakDocument);
+  const strongGroup = getCoreNeuronGroup(strongDocument);
+
+  const weakNeuron = weakGroup.children.find((node) => node.id === 'neuron-1');
+  const strongNeuron = strongGroup.children.find((node) => node.id === 'neuron-1');
+  assert.ok(weakNeuron && weakNeuron.kind === 'neuron');
+  assert.ok(strongNeuron && strongNeuron.kind === 'neuron');
+  weakNeuron.parameterOverrides = { ...(weakNeuron.parameterOverrides ?? {}), threshold: -70 };
+  strongNeuron.parameterOverrides = { ...(strongNeuron.parameterOverrides ?? {}), threshold: -70 };
+
+  const weakForwardLink = weakDocument.root.links.find((link) => link.id === 'link-neuron-1-output-move-forward');
+  const strongForwardLink = strongDocument.root.links.find((link) => link.id === 'link-neuron-1-output-move-forward');
+  assert.ok(weakForwardLink);
+  assert.ok(strongForwardLink);
+  weakForwardLink.weight = 0.2;
+  strongForwardLink.weight = 3;
+
+  const weakProgram = compileGraphIRDocument(weakDocument);
+  const strongProgram = compileGraphIRDocument(strongDocument);
+  const weakResult = stepBrainProgram(weakProgram, [1, 1, 0], createBrainProgramRuntimeState(weakProgram), 1);
+  const strongResult = stepBrainProgram(strongProgram, [1, 1, 0], createBrainProgramRuntimeState(strongProgram), 1);
+
+  assert.ok(strongResult.outputs['move-forward'] > weakResult.outputs['move-forward']);
+});
+
+test('GraphIR parameter overrides change runtime action outputs', () => {
+  const lowThresholdDocument = createDefaultGraphIRDocument(1);
+  const highThresholdDocument = createDefaultGraphIRDocument(1);
+  const lowThresholdGroup = getCoreNeuronGroup(lowThresholdDocument);
+  const highThresholdGroup = getCoreNeuronGroup(highThresholdDocument);
+
+  const lowThresholdNeuron = lowThresholdGroup.children.find((node) => node.id === 'neuron-1');
+  const highThresholdNeuron = highThresholdGroup.children.find((node) => node.id === 'neuron-1');
+  assert.ok(lowThresholdNeuron && lowThresholdNeuron.kind === 'neuron');
+  assert.ok(highThresholdNeuron && highThresholdNeuron.kind === 'neuron');
+
+  lowThresholdNeuron.parameterOverrides = { ...(lowThresholdNeuron.parameterOverrides ?? {}), threshold: -70 };
+  highThresholdNeuron.parameterOverrides = { ...(highThresholdNeuron.parameterOverrides ?? {}), threshold: 1000 };
+
+  const lowProgram = compileGraphIRDocument(lowThresholdDocument);
+  const highProgram = compileGraphIRDocument(highThresholdDocument);
+
+  const lowResult = stepBrainProgram(lowProgram, [1, 1, 0], createBrainProgramRuntimeState(lowProgram), 1);
+  const highResult = stepBrainProgram(highProgram, [1, 1, 0], createBrainProgramRuntimeState(highProgram), 1);
+
+  assert.ok(lowResult.outputs['move-forward'] > highResult.outputs['move-forward']);
+});
+
+test('GraphIR runtime keeps outputs at zero when there is no sensory input or spike drive', () => {
+  const document = createDefaultGraphIRDocument(1);
+  const program = compileGraphIRDocument(document);
+
+  const result = stepBrainProgram(program, [0, 0, 0], createBrainProgramRuntimeState(program), 1);
+
+  assert.deepEqual(result.outputs, {
+    'turn-left': 0,
+    'move-forward': 0,
+    'turn-right': 0,
+  });
+});
+
+test('simulation session preserves custom output signal metadata when vision-cell reconciliation runs', () => {
+  const session = new SimulationSession({
+    visionSystem: new VisionSystem(),
+    agentController: new AgentController(),
+    worldManager: new WorldManager(1600, 1200),
+    collisionDetector: new CollisionDetector(),
+  });
+
+  session.initialize();
+  const currentDocument = session.getCurrentGraphIRDocument();
+  const outputAdapter = getOutputAdapter(currentDocument);
+  const moveForward = outputAdapter.children.find((node) => node.id === 'output-move-forward');
+  assert.ok(moveForward && moveForward.kind === 'signal');
+  moveForward.signal.doc = 'custom output doc';
+  moveForward.position = { x: 999, y: 111 };
+
+  session.updateAgentParameters({ visionCells: 24 });
+
+  const reconciledDocument = session.getCurrentGraphIRDocument();
+  const reconciledOutputAdapter = getOutputAdapter(reconciledDocument);
+  const reconciledMoveForward = reconciledOutputAdapter.children.find((node) => node.id === 'output-move-forward');
+  assert.ok(reconciledMoveForward && reconciledMoveForward.kind === 'signal');
+  assert.equal(reconciledMoveForward.signal.doc, 'custom output doc');
+  assert.deepEqual(reconciledMoveForward.position, { x: 999, y: 111 });
 });

@@ -1,14 +1,14 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import SimulationCanvas from './components/SimulationCanvas';
 import {
-  createDefaultBrainGraph,
-  reconcileBrainGraphVisionCells,
-  validateBrainGraph,
-  type BrainGraph
+  createDefaultGraphIRDocument,
+  reconcileGraphIRDocumentVisionCells,
+  validateGraphIRDocument,
+  type GraphIRDocument,
 } from './domain/brain';
 import type { SimulationControlMode } from './domain/world';
 import type { SimulationLifecycleState } from './engine/SimulationEngine';
-import type { BrainGraphRuntimeStatus } from './types/brainGraphRuntime';
+import type { GraphIRRuntimeStatus } from './types/graphIRRuntime';
 import type { SimulationState } from './types/simulation';
 import EditorToolbar from './components/editor/EditorToolbar';
 import GraphEditorPanel from './components/editor/GraphEditorPanel';
@@ -16,19 +16,21 @@ import SettingsPanel from './components/editor/SettingsPanel';
 import type { AgentParameters, EditorTab, SettingsSection } from './components/editor/types';
 import './App.css';
 
+declare global {
+  interface Window {
+    __NEURALSOUP_TEST_API__?: {
+      injectValidDraftOnly: () => void;
+      injectInvalidGraphDraft: () => void;
+    };
+  }
+}
+
 const INITIAL_STATS: SimulationState['stats'] = {
   fps: 0,
   totalReward: 0,
   collisionCount: 0,
   neuralState: { motivation: 0, stress: 0, homeostasis: 0.5 }
 };
-
-const createAppliedBrainGraphStatus = (graph: BrainGraph): BrainGraphRuntimeStatus => ({
-  state: 'applied',
-  appliedGraph: graph,
-  issues: [],
-  message: null
-});
 
 const areAgentParametersEqual = (left: AgentParameters, right: AgentParameters): boolean => {
   return (
@@ -60,14 +62,16 @@ const isEditableOrInteractiveTarget = (target: EventTarget | null): boolean => {
 };
 
 const App: React.FC = () => {
+  const isE2ETestMode = import.meta.env.MODE === 'test' || import.meta.env.VITE_E2E === 'true';
   const [runState, setRunState] = useState<SimulationLifecycleState>('idle');
   const [requestedLifecycleState, setRequestedLifecycleState] = useState<SimulationLifecycleState>('idle');
   const [resetToken, setResetToken] = useState(0);
   const [stats, setStats] = useState<SimulationState['stats']>(INITIAL_STATS);
-  const [brainGraph, setBrainGraph] = useState<BrainGraph>(() => createDefaultBrainGraph(36));
-  const [brainGraphRuntimeStatus, setBrainGraphRuntimeStatus] = useState<BrainGraphRuntimeStatus>(() =>
-    createAppliedBrainGraphStatus(createDefaultBrainGraph(36))
+  const [graphDocument, setGraphDocument] = useState<GraphIRDocument>(() => createDefaultGraphIRDocument(36));
+  const [runtimeGraphDocument, setRuntimeGraphDocument] = useState<GraphIRDocument>(() =>
+    createDefaultGraphIRDocument(36)
   );
+  const [graphIRRuntimeStatus, setGraphIRRuntimeStatus] = useState<GraphIRRuntimeStatus | null>(null);
   const [canvasWidth, setCanvasWidth] = useState(window.innerWidth * 0.6);
   const [canvasHeight, setCanvasHeight] = useState(window.innerHeight);
   const [agentParameters, setAgentParameters] = useState<AgentParameters>({
@@ -83,8 +87,9 @@ const App: React.FC = () => {
   const [editorTab, setEditorTab] = useState<EditorTab>('graph');
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('agent-parameters');
   const requestedLifecycleStateRef = useRef<SimulationLifecycleState>('idle');
-  const brainGraphIssues = validateBrainGraph(brainGraph);
-  const installedBrainGraph = brainGraphRuntimeStatus.appliedGraph;
+  const graphIRIssues = validateGraphIRDocument(graphDocument);
+  const graphDocumentRef = useRef(graphDocument);
+  const installedGraphSummary = graphIRRuntimeStatus?.appliedSummary ?? null;
 
   const calculateCanvasDimensions = useCallback(() => {
     setCanvasWidth(window.innerWidth * 0.6);
@@ -130,6 +135,17 @@ const App: React.FC = () => {
     setRunState(nextState);
   }, []);
 
+  const updateGraphDocument = useCallback(
+    (nextDocument: GraphIRDocument, installToRuntime: boolean = true) => {
+      graphDocumentRef.current = nextDocument;
+      setGraphDocument(nextDocument);
+      if (installToRuntime) {
+        setRuntimeGraphDocument(nextDocument);
+      }
+    },
+    []
+  );
+
   useEffect(() => {
     const handleLifecycleHotkey = (event: KeyboardEvent) => {
       if (
@@ -156,13 +172,8 @@ const App: React.FC = () => {
 
   const handleAgentParametersApply = useCallback((params: AgentParameters) => {
     setAgentParameters((current) => (areAgentParametersEqual(current, params) ? current : params));
-    setBrainGraph((current) => reconcileBrainGraphVisionCells(current, params.visionCells));
-    setBrainGraphRuntimeStatus((current) =>
-      current.state === 'applied'
-        ? createAppliedBrainGraphStatus(reconcileBrainGraphVisionCells(current.appliedGraph, params.visionCells))
-        : current
-    );
-  }, []);
+    updateGraphDocument(reconcileGraphIRDocumentVisionCells(graphDocumentRef.current, params.visionCells));
+  }, [updateGraphDocument]);
 
   const handleAgentParametersChange = useCallback((params: AgentParameters) => {
     setAgentParameters((current) => (areAgentParametersEqual(current, params) ? current : params));
@@ -172,12 +183,16 @@ const App: React.FC = () => {
     setDraftAgentParameters(agentParameters);
   }, [agentParameters]);
 
-  const handleBrainGraphChange = useCallback((nextGraph: BrainGraph) => {
-    setBrainGraph(nextGraph);
-  }, []);
+  useEffect(() => {
+    graphDocumentRef.current = graphDocument;
+  }, [graphDocument]);
 
-  const handleBrainGraphRuntimeStatusChange = useCallback((nextStatus: BrainGraphRuntimeStatus) => {
-    setBrainGraphRuntimeStatus(nextStatus);
+  const handleGraphDocumentChange = useCallback((nextDocument: GraphIRDocument) => {
+    updateGraphDocument(nextDocument);
+  }, [updateGraphDocument]);
+
+  const handleGraphIRRuntimeStatusChange = useCallback((nextStatus: GraphIRRuntimeStatus) => {
+    setGraphIRRuntimeStatus(nextStatus);
   }, []);
 
   const formatNumber = (num: number): string => {
@@ -195,6 +210,66 @@ const App: React.FC = () => {
     });
   }, []);
 
+  useEffect(() => {
+    if (!isE2ETestMode) {
+      delete window.__NEURALSOUP_TEST_API__;
+      return;
+    }
+
+    window.__NEURALSOUP_TEST_API__ = {
+      injectValidDraftOnly: () => {
+        const current = graphDocumentRef.current;
+        if (current.root.links.some((link) => link.id === 'test-valid-draft-link-vision-R-0-neuron-2')) {
+          return;
+        }
+
+        updateGraphDocument(
+          {
+            ...current,
+            root: {
+              ...current.root,
+              links: [
+                ...current.root.links,
+                {
+                  id: 'test-valid-draft-link-vision-R-0-neuron-2',
+                  from: {
+                    nodeId: 'vision-R-0',
+                    portId: 'out'
+                  },
+                  to: {
+                    nodeId: 'neuron-2',
+                    portId: 'dendrite'
+                  },
+                  weight: 1
+                }
+              ]
+            }
+          },
+          false
+        );
+      },
+      injectInvalidGraphDraft: () => {
+        const current = graphDocumentRef.current;
+        const [firstLink, ...remainingLinks] = current.root.links;
+        if (!firstLink) {
+          return;
+        }
+
+        updateGraphDocument({
+          ...current,
+          root: {
+            ...current.root,
+            links: [firstLink, { ...firstLink, id: `${firstLink.id}-duplicate` }, ...remainingLinks]
+          }
+        });
+      }
+    };
+
+    return () => {
+      delete window.__NEURALSOUP_TEST_API__;
+    };
+  }, [isE2ETestMode, updateGraphDocument]);
+
   return (
     <div className="app" data-testid="app-shell">
       <div className="game-area" data-testid="simulation-panel">
@@ -202,14 +277,14 @@ const App: React.FC = () => {
           width={canvasWidth}
           height={canvasHeight}
           controlMode={'snn' as Extract<SimulationControlMode, 'keyboard' | 'snn'>}
-          brainGraph={brainGraph}
+          graphDocument={runtimeGraphDocument}
           agentParameters={agentParameters}
           requestedLifecycleState={requestedLifecycleState}
           resetToken={resetToken}
           onStatsUpdate={handleStatsUpdate}
           onLifecycleChange={handleLifecycleChange}
           onAgentParametersChange={handleAgentParametersChange}
-          onBrainGraphStatusChange={handleBrainGraphRuntimeStatusChange}
+          onGraphIRStatusChange={handleGraphIRRuntimeStatusChange}
         />
         <div className="game-stats-overlay">
           <div className="game-stat-chip">
@@ -240,22 +315,32 @@ const App: React.FC = () => {
           <span data-testid="vision-cells-value">{agentParameters.visionCells}</span>
           <span data-testid="vision-range-value">{agentParameters.visionRange}</span>
           <span data-testid="vision-angle-value">{agentParameters.visionAngle}</span>
-          <span data-testid="brain-graph-validation-count">{brainGraphIssues.length}</span>
-          <span data-testid="brain-graph-runtime-state">{brainGraphRuntimeStatus.state}</span>
-          <span data-testid="brain-graph-runtime-validation-count">{brainGraphRuntimeStatus.issues.length}</span>
-          <span data-testid="brain-graph-runtime-message">{brainGraphRuntimeStatus.message ?? ''}</span>
-          <span data-testid="brain-graph-installed-input-count">{installedBrainGraph.inputs.length}</span>
-          <span data-testid="brain-graph-installed-synapse-count">{installedBrainGraph.synapses.length}</span>
+          <span data-testid="graph-ir-validation-count">{graphIRIssues.length}</span>
+          <span data-testid="graph-ir-runtime-state">{graphIRRuntimeStatus?.state ?? ''}</span>
+          <span data-testid="graph-ir-runtime-validation-count">{graphIRRuntimeStatus?.issues.length ?? 0}</span>
+          <span data-testid="graph-ir-runtime-message">{graphIRRuntimeStatus?.message ?? ''}</span>
+          <span data-testid="graph-ir-installed-input-count">{installedGraphSummary?.inputSignalCount ?? 0}</span>
+          <span data-testid="graph-ir-installed-neuron-count">{installedGraphSummary?.neuronCount ?? 0}</span>
+          <span data-testid="graph-ir-installed-output-count">{installedGraphSummary?.outputSignalCount ?? 0}</span>
+          <span data-testid="graph-ir-installed-link-count">{installedGraphSummary?.leafLinkCount ?? 0}</span>
         </div>
 
         <div className={`content-area ${editorTab === 'graph' ? 'snn-mode' : 'settings-mode'}`}>
-          <GraphEditorPanel
-            isActive={editorTab === 'graph'}
-            graph={brainGraph}
-            visionCells={agentParameters.visionCells}
-            runtimeStatus={brainGraphRuntimeStatus}
-            onGraphChange={handleBrainGraphChange}
-          />
+          {graphIRRuntimeStatus ? (
+            <GraphEditorPanel
+              isActive={editorTab === 'graph'}
+              document={graphDocument}
+              visionCells={agentParameters.visionCells}
+              runtimeStatus={graphIRRuntimeStatus}
+              onDocumentChange={handleGraphDocumentChange}
+            />
+          ) : (
+            <div
+              className={`content-panel snn-control ${editorTab === 'graph' ? 'is-active' : 'is-hidden'}`}
+              data-testid="topology-viewport"
+              aria-hidden={editorTab !== 'graph'}
+            />
+          )}
           <div
             className={`content-panel settings-control ${editorTab === 'settings' ? 'is-active' : 'is-hidden'}`}
             aria-hidden={editorTab !== 'settings'}

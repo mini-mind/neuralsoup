@@ -6,17 +6,169 @@
   background: #1e1e1e;
 }
 
-.topology-canvas {
+.topology-surface {
+  position: relative;
   width: 100%;
   height: 100%;
-  display: block;
-  background: transparent;
-  border: 0;
-  cursor: crosshair;
+  overflow: auto;
+  padding-top: 52px;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    #1e1e1e;
+  background-size: 48px 48px;
 }
 
-.topology-canvas:focus {
-  outline: none;
+.topology-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px 8px;
+  background: linear-gradient(180deg, rgba(30, 30, 30, 0.96), rgba(30, 30, 30, 0.72));
+  backdrop-filter: blur(8px);
+}
+
+.topology-breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.topology-breadcrumb {
+  border: 1px solid #3a3a3a;
+  background: #242424;
+  color: #d8d8d8;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.topology-breadcrumb.is-current {
+  border-color: #888;
+  color: #fff;
+}
+
+.topology-pending-link {
+  color: #d8d8d8;
+  font-size: 12px;
+}
+
+.topology-links {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.topology-link {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.topology-link line {
+  stroke: rgba(226, 226, 226, 0.34);
+  stroke-width: 2;
+}
+
+.topology-link.is-selected line {
+  stroke: rgba(255, 255, 255, 0.94);
+}
+
+.topology-link.is-aggregate line {
+  stroke-dasharray: 8 6;
+}
+
+.topology-link text {
+  fill: #d0d0d0;
+  font-size: 12px;
+  text-anchor: middle;
+}
+
+.topology-node {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 12px;
+  border: 1px solid #393939;
+  border-radius: 10px;
+  background: rgba(32, 32, 32, 0.96);
+  color: #e4e4e4;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.16);
+  cursor: pointer;
+}
+
+.topology-node.is-selected {
+  border-color: #cfcfcf;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 14px 32px rgba(0, 0, 0, 0.28);
+}
+
+.topology-node.is-pending {
+  border-color: #d1a057;
+}
+
+.topology-node.is-proxy {
+  background: rgba(39, 39, 39, 0.82);
+  border-style: dashed;
+}
+
+.topology-node.is-adapter {
+  background: rgba(29, 35, 40, 0.96);
+}
+
+.topology-node.is-neuron-group {
+  background: rgba(36, 31, 28, 0.96);
+}
+
+.topology-node.is-neuron {
+  background: rgba(31, 35, 31, 0.96);
+}
+
+.topology-node.is-signal {
+  background: rgba(34, 34, 39, 0.96);
+}
+
+.topology-node-label {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.topology-node-kind {
+  color: #a8a8a8;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.topology-node-detail {
+  color: #bebebe;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.topology-node-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.topology-node-actions button {
+  border: 1px solid #4a4a4a;
+  background: #262626;
+  color: #ededed;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .topology-meta-hidden {
@@ -51,4 +203,73 @@
   background: #1f1f1f;
   color: #e0e0e0;
   box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45);
+}
+
+.topology-detail-editor {
+  display: grid;
+  gap: 16px;
+}
+
+.topology-detail-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.topology-detail-close {
+  border: 1px solid #4a4a4a;
+  background: #262626;
+  color: #ededed;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.topology-detail-section {
+  display: grid;
+  gap: 8px;
+}
+
+.topology-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.topology-detail-field {
+  display: grid;
+  gap: 6px;
+}
+
+.topology-detail-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #cfcfcf;
+}
+
+.topology-detail-input {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid #474747;
+  border-radius: 6px;
+  background: #262626;
+  color: #efefef;
+}
+
+.topology-detail-copy {
+  color: #b8b8b8;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .topology-node {
+    width: 150px !important;
+    min-height: 92px;
+  }
+
+  .topology-detail-grid {
+    grid-template-columns: 1fr;
+  }
 }

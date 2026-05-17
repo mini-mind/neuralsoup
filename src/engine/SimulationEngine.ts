@@ -13,8 +13,8 @@ import { WorldManager } from './WorldManager';
 import { CollisionDetector } from './CollisionDetector';
 import { SimulationSession } from '../runtime/SimulationSession';
 import type { SimulationControlMode } from '../domain/world';
-import type { BrainGraph } from '../domain/brain';
-import type { BrainGraphRuntimeStatus } from '../types/brainGraphRuntime';
+import type { GraphIRDocument } from '../domain/brain';
+import type { GraphIRRuntimeStatus } from '../types/graphIRRuntime';
 
 export type SimulationLifecycleState = 'idle' | 'running' | 'paused';
 
@@ -48,7 +48,7 @@ export class SimulationEngine {
   // 回调函数
   public onStatsUpdate?: (stats: SimulationState['stats']) => void;
   public onLifecycleChange?: (state: SimulationLifecycleState) => void;
-  public onBrainGraphStatusChange?: (status: BrainGraphRuntimeStatus) => void;
+  public onGraphIRStatusChange?: (status: GraphIRRuntimeStatus) => void;
 
   constructor(app: PIXI.Application, initialWidth: number = 1600, initialHeight: number = 1200) {
     // 初始化各个系统
@@ -75,9 +75,9 @@ export class SimulationEngine {
     );
   }
 
-  public setBrainGraph(graph: BrainGraph): BrainGraphRuntimeStatus {
-    const status = this.session.setBrainGraph(graph);
-    this.onBrainGraphStatusChange?.(status);
+  public setGraphIRDocument(document: GraphIRDocument): GraphIRRuntimeStatus {
+    const status = this.session.setGraphIRDocument(document);
+    this.onGraphIRStatusChange?.(status);
     return status;
   }
 
@@ -111,12 +111,7 @@ export class SimulationEngine {
     visionAngle?: number;
   }): void {
     this.session.updateAgentParameters(params);
-    this.onBrainGraphStatusChange?.({
-      state: 'applied',
-      appliedGraph: this.session.getCurrentBrainGraph(),
-      issues: [],
-      message: null
-    });
+    this.onGraphIRStatusChange?.(this.getGraphIRRuntimeStatus());
     // 立即重新渲染世界，确保即使在暂停状态下也能看到变化
     this.renderWorld();
     
@@ -138,8 +133,8 @@ export class SimulationEngine {
     };
   }
 
-  public getBrainGraphRuntimeStatus(): BrainGraphRuntimeStatus {
-    return this.session.getBrainGraphRuntimeStatus();
+  public getGraphIRRuntimeStatus(): GraphIRRuntimeStatus {
+    return this.session.getGraphIRRuntimeStatus();
   }
 
   /**
@@ -151,7 +146,7 @@ export class SimulationEngine {
     // 设置渲染器的世界尺寸
     this.renderer.setWorldDimensions(this.worldManager.width, this.worldManager.height);
     this.session.initialize();
-    this.onBrainGraphStatusChange?.(this.getBrainGraphRuntimeStatus());
+    this.onGraphIRStatusChange?.(this.getGraphIRRuntimeStatus());
     
     // 设置镜头跟随主智能体
     const mainAgent = this.getMainAgent();
@@ -226,7 +221,7 @@ export class SimulationEngine {
     this.session.setKeyboardInputState(this.keyboardInputState);
     this.setControlMode(this.currentControlMode);
     this.setCameraTarget(this.getMainAgent());
-    this.onBrainGraphStatusChange?.(this.getBrainGraphRuntimeStatus());
+    this.onGraphIRStatusChange?.(this.getGraphIRRuntimeStatus());
     this.renderWorld();
   }
 
@@ -297,6 +292,7 @@ export class SimulationEngine {
   public setControlMode(newMode: SimulationControlMode): void {
     this.currentControlMode = newMode;
     this.session.setControlMode(newMode);
+    this.onGraphIRStatusChange?.(this.getGraphIRRuntimeStatus());
     console.log(`Control mode changed to: ${newMode}`);
   }
 

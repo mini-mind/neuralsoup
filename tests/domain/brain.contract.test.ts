@@ -1,47 +1,86 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BrainGraphValidationError, compileBrainGraph, createDefaultBrainGraph, validateBrainGraph } from '../../src/domain/brain';
+import {
+  GraphIRValidationError,
+  collectNeuronNodes,
+  collectSignalNodes,
+  compileGraphIRDocument,
+  createDefaultGraphIRDocument,
+  summarizeGraphIRDocument,
+  validateGraphIRDocument,
+} from '../../src/domain/brain';
 
-test('default brain graph compiles into a program with vision-aligned ports', () => {
-  const graph = createDefaultBrainGraph(24);
-  const program = compileBrainGraph(graph);
+test('default GraphIR document compiles into a runtime program with vision-aligned bindings', () => {
+  const document = createDefaultGraphIRDocument(24);
+  const program = compileGraphIRDocument(document);
 
   assert.equal(program.inputPorts.length, 72);
   assert.equal(program.outputPorts.length, 3);
   assert.equal(program.neuronNodes.length, 2);
+  assert.equal(program.signalNodes.length, 75);
   assert.deepEqual(
     program.outputPorts.map((output) => output.channel),
     ['turn-left', 'move-forward', 'turn-right']
   );
+  assert.deepEqual(
+    program.outputBindings.map((binding) => binding.channel),
+    ['turn-left', 'move-forward', 'turn-right']
+  );
 });
 
-test('validation rejects dangling synapse references', () => {
-  const graph = createDefaultBrainGraph(12);
-  graph.synapses.push({
-    id: 'synapse-missing-target',
-    from: 'vision-R-0',
-    to: 'neuron-missing',
+test('default GraphIR summary reflects leaf topology counts', () => {
+  const document = createDefaultGraphIRDocument(4);
+
+  assert.deepEqual(summarizeGraphIRDocument(document), {
+    inputSignalCount: 12,
+    outputSignalCount: 3,
+    neuronCount: 2,
+    leafLinkCount: 16,
+  });
+  assert.equal(collectSignalNodes(document.root.children, 'input').length, 12);
+  assert.equal(collectSignalNodes(document.root.children, 'output').length, 3);
+  assert.equal(collectNeuronNodes(document.root.children).length, 2);
+});
+
+test('validation rejects dangling leaf link node references', () => {
+  const document = createDefaultGraphIRDocument(12);
+  document.root.links.push({
+    id: 'link-missing-target',
+    from: {
+      nodeId: 'vision-R-0',
+      portId: 'out',
+    },
+    to: {
+      nodeId: 'neuron-missing',
+      portId: 'dendrite',
+    },
     weight: 0.8,
   });
 
-  const issues = validateBrainGraph(graph);
+  const issues = validateGraphIRDocument(document);
   assert.equal(issues.length, 1);
-  assert.equal(issues[0]?.code, 'missing-synapse-target');
+  assert.equal(issues[0]?.code, 'missing-link-node');
 });
 
-test('validation rejects output-to-output or output-source synapses', () => {
-  const graph = createDefaultBrainGraph(8);
-  graph.synapses.push({
-    id: 'synapse-invalid-direction',
-    from: 'output-turn-left',
-    to: 'output-turn-right',
+test('validation rejects links that target output-only ports', () => {
+  const document = createDefaultGraphIRDocument(8);
+  document.root.links.push({
+    id: 'link-invalid-direction',
+    from: {
+      nodeId: 'vision-R-0',
+      portId: 'out',
+    },
+    to: {
+      nodeId: 'output-turn-right',
+      portId: 'out',
+    },
     weight: 1,
   });
 
   assert.throws(
-    () => compileBrainGraph(graph),
+    () => compileGraphIRDocument(document),
     (error: unknown) =>
-      error instanceof BrainGraphValidationError &&
-      error.issues.some((issue) => issue.includes('invalid direction output -> output'))
+      error instanceof GraphIRValidationError &&
+      error.issues.some((issue) => issue.code === 'invalid-link-direction')
   );
 });
