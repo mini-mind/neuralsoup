@@ -14,7 +14,7 @@ import { CollisionDetector } from './CollisionDetector';
 import { SimulationSession } from '../runtime/SimulationSession';
 import type { SimulationControlMode } from '../domain/world';
 import type { GraphIRDocument } from '../domain/brain';
-import type { GraphIRRuntimeStatus } from '../types/graphIRRuntime';
+import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../types/graphIRRuntime';
 
 export type SimulationLifecycleState = 'idle' | 'running' | 'paused';
 
@@ -49,6 +49,7 @@ export class SimulationEngine {
   public onStatsUpdate?: (stats: SimulationState['stats']) => void;
   public onLifecycleChange?: (state: SimulationLifecycleState) => void;
   public onGraphIRStatusChange?: (status: GraphIRRuntimeStatus) => void;
+  public onGraphIRActivityChange?: (snapshot: GraphIRRuntimeActivitySnapshot) => void;
 
   constructor(app: PIXI.Application, initialWidth: number = 1600, initialHeight: number = 1200) {
     // 初始化各个系统
@@ -78,6 +79,7 @@ export class SimulationEngine {
   public setGraphIRDocument(document: GraphIRDocument): GraphIRRuntimeStatus {
     const status = this.session.setGraphIRDocument(document);
     this.onGraphIRStatusChange?.(status);
+    this.onGraphIRActivityChange?.(this.getGraphIRRuntimeActivitySnapshot());
     return status;
   }
 
@@ -112,6 +114,7 @@ export class SimulationEngine {
   }): void {
     this.session.updateAgentParameters(params);
     this.onGraphIRStatusChange?.(this.getGraphIRRuntimeStatus());
+    this.onGraphIRActivityChange?.(this.getGraphIRRuntimeActivitySnapshot());
     // 立即重新渲染世界，确保即使在暂停状态下也能看到变化
     this.renderWorld();
     
@@ -137,6 +140,10 @@ export class SimulationEngine {
     return this.session.getGraphIRRuntimeStatus();
   }
 
+  public getGraphIRRuntimeActivitySnapshot(): GraphIRRuntimeActivitySnapshot {
+    return this.session.getGraphIRRuntimeActivitySnapshot();
+  }
+
   /**
    * 初始化仿真系统
    */
@@ -147,6 +154,7 @@ export class SimulationEngine {
     this.renderer.setWorldDimensions(this.worldManager.width, this.worldManager.height);
     this.session.initialize();
     this.onGraphIRStatusChange?.(this.getGraphIRRuntimeStatus());
+    this.onGraphIRActivityChange?.(this.getGraphIRRuntimeActivitySnapshot());
     
     // 设置镜头跟随主智能体
     const mainAgent = this.getMainAgent();
@@ -222,6 +230,7 @@ export class SimulationEngine {
     this.setControlMode(this.currentControlMode);
     this.setCameraTarget(this.getMainAgent());
     this.onGraphIRStatusChange?.(this.getGraphIRRuntimeStatus());
+    this.onGraphIRActivityChange?.(this.getGraphIRRuntimeActivitySnapshot());
     this.renderWorld();
   }
 
@@ -249,6 +258,7 @@ export class SimulationEngine {
         ...stats,
         fps: this.fps
       });
+      this.onGraphIRActivityChange?.(this.getGraphIRRuntimeActivitySnapshot());
     } else if (this.isPaused) {
       this.lastTime = currentTime;
     }
@@ -293,6 +303,7 @@ export class SimulationEngine {
     this.currentControlMode = newMode;
     this.session.setControlMode(newMode);
     this.onGraphIRStatusChange?.(this.getGraphIRRuntimeStatus());
+    this.onGraphIRActivityChange?.(this.getGraphIRRuntimeActivitySnapshot());
     console.log(`Control mode changed to: ${newMode}`);
   }
 

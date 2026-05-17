@@ -3,6 +3,8 @@ import type { BrainProgram } from './program';
 
 export interface BrainProgramRuntimeState {
   neurons: Map<string, IzhikevichNeuronRuntimeState>;
+  signals: Map<string, number>;
+  activeLeafNodeIds: string[];
 }
 
 export interface BrainProgramStepResult {
@@ -18,6 +20,7 @@ const DEFAULT_RUNTIME_STATE = (): IzhikevichNeuronRuntimeState => ({
 });
 
 const clampUnit = (value: number): number => Math.max(0, Math.min(1, value));
+const ACTIVE_SIGNAL_EPSILON = 1e-6;
 
 const sigmoid = (value: number): number => 1 / (1 + Math.exp(-value));
 
@@ -30,6 +33,8 @@ export const createBrainProgramRuntimeState = (
   neurons: new Map(
     program.neuronNodes.map((neuron) => [neuron.id, DEFAULT_RUNTIME_STATE()])
   ),
+  signals: new Map(program.signalNodes.map((signalNode) => [signalNode.id, 0])),
+  activeLeafNodeIds: [],
 });
 
 export const resetBrainProgramRuntimeState = (
@@ -46,9 +51,14 @@ export const stepBrainProgram = (
   const nextNeurons = new Map<string, IzhikevichNeuronRuntimeState>();
   const nextSignals = new Map<string, number>();
   const nextSpikes = new Map<string, number>();
+  const activeLeafNodeIds = new Set<string>();
 
   for (const binding of program.inputBindings) {
-    nextSignals.set(binding.nodeId, sensoryInputs[binding.index] ?? 0);
+    const signalValue = sensoryInputs[binding.index] ?? 0;
+    nextSignals.set(binding.nodeId, signalValue);
+    if (Math.abs(signalValue) > ACTIVE_SIGNAL_EPSILON) {
+      activeLeafNodeIds.add(binding.nodeId);
+    }
   }
 
   const resolveConnectionSignal = (sourceNodeId: string): number => {
@@ -89,6 +99,7 @@ export const stepBrainProgram = (
         lastSpikeTime: timestamp,
       });
       nextSpikes.set(neuron.id, 1);
+      activeLeafNodeIds.add(neuron.id);
       continue;
     }
 
@@ -111,7 +122,11 @@ export const stepBrainProgram = (
   const outputs = program.outputBindings.reduce<Record<BrainOutputChannel, number>>(
     (result, binding) => {
       const totalSignal = nextSignals.get(binding.nodeId) ?? 0;
-      result[binding.channel] = normalizeOutputSignal(totalSignal);
+      const outputValue = normalizeOutputSignal(totalSignal);
+      result[binding.channel] = outputValue;
+      if (outputValue > ACTIVE_SIGNAL_EPSILON) {
+        activeLeafNodeIds.add(binding.nodeId);
+      }
       return result;
     },
     {
@@ -124,6 +139,8 @@ export const stepBrainProgram = (
   return {
     runtimeState: {
       neurons: nextNeurons,
+      signals: nextSignals,
+      activeLeafNodeIds: [...activeLeafNodeIds],
     },
     outputs,
   };

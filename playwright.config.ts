@@ -11,19 +11,19 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? 'html' : 'list',
   use: {
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL: 'http://127.0.0.1:3001',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure'
   },
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 3000',
+    command: 'npm run dev -- --host 127.0.0.1 --port 3001',
     env: {
       ...process.env,
       VITE_E2E: 'true'
     },
-    url: 'http://127.0.0.1:3000',
-    reuseExistingServer: !process.env.CI,
+    url: 'http://127.0.0.1:3001',
+    reuseExistingServer: false,
     timeout: 60_000
   },
   projects: [

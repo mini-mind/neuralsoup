@@ -39,6 +39,14 @@ export class AgentController {
     this.brainRuntimeStates.set(agentId, createBrainProgramRuntimeState(program));
   }
 
+  public getBrainRuntimeState(agentId: number): BrainProgramRuntimeState | null {
+    return this.brainRuntimeStates.get(agentId) ?? null;
+  }
+
+  public getBrainProgram(agentId: number): BrainProgram | null {
+    return this.brainPrograms.get(agentId) ?? null;
+  }
+
   /**
    * 更新智能体控制
    */

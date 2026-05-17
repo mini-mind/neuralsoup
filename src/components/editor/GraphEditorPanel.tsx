@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import SNNTopologyEditor from '../SNNTopologyEditor';
 import type { GraphIRDocument } from '../../domain/brain';
-import type { GraphIRRuntimeStatus } from '../../types/graphIRRuntime';
+import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../../types/graphIRRuntime';
 import type { GraphPathItem } from './types';
 
 interface GraphEditorPanelProps {
@@ -9,6 +9,7 @@ interface GraphEditorPanelProps {
   document: GraphIRDocument;
   visionCells: number;
   runtimeStatus: GraphIRRuntimeStatus;
+  runtimeActivity: GraphIRRuntimeActivitySnapshot;
   onDocumentChange: (document: GraphIRDocument) => void;
   onGraphPathChange: (graphPath: GraphPathItem[]) => void;
   onGraphPathNavigateRegister: (navigate: (pathId: string) => void) => void;
@@ -19,6 +20,7 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
   document,
   visionCells,
   runtimeStatus,
+  runtimeActivity,
   onDocumentChange,
   onGraphPathChange,
   onGraphPathNavigateRegister
@@ -73,6 +75,7 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
         onGraphPathChange={onGraphPathChange}
         onGraphPathNavigateRegister={onGraphPathNavigateRegister}
         runtimeStatus={runtimeStatus}
+        runtimeActivity={runtimeActivity}
         isActive={isActive}
       />
     </div>

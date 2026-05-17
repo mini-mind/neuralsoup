@@ -1,5 +1,9 @@
 import type { GraphIRDocument, GraphIRDocumentSummary, GraphIRValidationIssue } from '../domain/brain';
 
+export interface GraphIRRuntimeActivitySnapshot {
+  activeNodeIds: string[];
+}
+
 export type GraphIRRuntimeStatus =
   | {
       state: 'applied';

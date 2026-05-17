@@ -8,7 +8,7 @@ import {
 } from './domain/brain';
 import type { SimulationControlMode } from './domain/world';
 import type { SimulationLifecycleState } from './engine/SimulationEngine';
-import type { GraphIRRuntimeStatus } from './types/graphIRRuntime';
+import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from './types/graphIRRuntime';
 import type { SimulationState } from './types/simulation';
 import EditorToolbar from './components/editor/EditorToolbar';
 import GraphEditorPanel from './components/editor/GraphEditorPanel';
@@ -21,6 +21,7 @@ declare global {
     __NEURALSOUP_TEST_API__?: {
       injectValidDraftOnly: () => void;
       injectInvalidGraphDraft: () => void;
+      getRuntimeActiveNodeIds: () => string[];
     };
   }
 }
@@ -72,8 +73,11 @@ const App: React.FC = () => {
     createDefaultGraphIRDocument(36)
   );
   const [graphIRRuntimeStatus, setGraphIRRuntimeStatus] = useState<GraphIRRuntimeStatus | null>(null);
-  const [canvasWidth, setCanvasWidth] = useState(window.innerWidth * 0.6);
-  const [canvasHeight, setCanvasHeight] = useState(window.innerHeight);
+  const [graphIRRuntimeActivity, setGraphIRRuntimeActivity] = useState<GraphIRRuntimeActivitySnapshot>({
+    activeNodeIds: []
+  });
+  const [canvasWidth, setCanvasWidth] = useState(1);
+  const [canvasHeight, setCanvasHeight] = useState(1);
   const [agentParameters, setAgentParameters] = useState<AgentParameters>({
     visionCells: 36,
     visionRange: 250,
@@ -91,20 +95,35 @@ const App: React.FC = () => {
   const graphIRIssues = validateGraphIRDocument(graphDocument);
   const graphDocumentRef = useRef(graphDocument);
   const graphPathNavigateRef = useRef<(pathId: string) => void>(() => {});
+  const simulationPanelRef = useRef<HTMLDivElement | null>(null);
   const installedGraphSummary = graphIRRuntimeStatus?.appliedSummary ?? null;
 
-  const calculateCanvasDimensions = useCallback(() => {
-    setCanvasWidth(window.innerWidth * 0.6);
-    setCanvasHeight(window.innerHeight);
-  }, []);
-
   useEffect(() => {
-    calculateCanvasDimensions();
-    window.addEventListener('resize', calculateCanvasDimensions);
-    return () => {
-      window.removeEventListener('resize', calculateCanvasDimensions);
+    const container = simulationPanelRef.current;
+    if (!container) {
+      return;
+    }
+
+    const updateCanvasDimensions = () => {
+      const rect = container.getBoundingClientRect();
+      setCanvasWidth((current) => {
+        const nextWidth = Math.max(1, Math.floor(rect.width));
+        return current === nextWidth ? current : nextWidth;
+      });
+      setCanvasHeight((current) => {
+        const nextHeight = Math.max(1, Math.floor(rect.height));
+        return current === nextHeight ? current : nextHeight;
+      });
     };
-  }, [calculateCanvasDimensions]);
+
+    updateCanvasDimensions();
+    const observer = new ResizeObserver(updateCanvasDimensions);
+    observer.observe(container);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   const setLifecycleRequest = useCallback((nextState: SimulationLifecycleState) => {
     requestedLifecycleStateRef.current = nextState;
@@ -197,6 +216,10 @@ const App: React.FC = () => {
     setGraphIRRuntimeStatus(nextStatus);
   }, []);
 
+  const handleGraphIRRuntimeActivityChange = useCallback((nextSnapshot: GraphIRRuntimeActivitySnapshot) => {
+    setGraphIRRuntimeActivity(nextSnapshot);
+  }, []);
+
   const formatNumber = (num: number): string => {
     return num.toLocaleString();
   };
@@ -268,17 +291,18 @@ const App: React.FC = () => {
             links: [firstLink, { ...firstLink, id: `${firstLink.id}-duplicate` }, ...remainingLinks]
           }
         });
-      }
+      },
+      getRuntimeActiveNodeIds: () => [...graphIRRuntimeActivity.activeNodeIds]
     };
 
     return () => {
       delete window.__NEURALSOUP_TEST_API__;
     };
-  }, [isE2ETestMode, updateGraphDocument]);
+  }, [graphIRRuntimeActivity.activeNodeIds, isE2ETestMode, updateGraphDocument]);
 
   return (
     <div className="app" data-testid="app-shell">
-      <div className="game-area" data-testid="simulation-panel">
+      <div ref={simulationPanelRef} className="game-area" data-testid="simulation-panel">
         <SimulationCanvas
           width={canvasWidth}
           height={canvasHeight}
@@ -291,6 +315,7 @@ const App: React.FC = () => {
           onLifecycleChange={handleLifecycleChange}
           onAgentParametersChange={handleAgentParametersChange}
           onGraphIRStatusChange={handleGraphIRRuntimeStatusChange}
+          onGraphIRActivityChange={handleGraphIRRuntimeActivityChange}
         />
         <div className="game-stats-overlay">
           <div className="game-stat-chip">
@@ -340,6 +365,7 @@ const App: React.FC = () => {
               document={graphDocument}
               visionCells={agentParameters.visionCells}
               runtimeStatus={graphIRRuntimeStatus}
+              runtimeActivity={graphIRRuntimeActivity}
               onDocumentChange={handleGraphDocumentChange}
               onGraphPathChange={setGraphPath}
               onGraphPathNavigateRegister={(navigate) => {

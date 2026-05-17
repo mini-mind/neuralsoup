@@ -13,7 +13,7 @@ import {
   type GraphIRValidationIssue,
 } from '../domain/brain';
 import type { Agent, SimulationState, World } from '../types/simulation';
-import type { GraphIRRuntimeStatus } from '../types/graphIRRuntime';
+import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../types/graphIRRuntime';
 import {
   type SimulationControlMode,
   type WorldConfig,
@@ -215,6 +215,22 @@ export class SimulationSession {
 
   public getGraphIRRuntimeStatus(): GraphIRRuntimeStatus {
     return this.graphIRRuntimeStatus;
+  }
+
+  public getGraphIRRuntimeActivitySnapshot(): GraphIRRuntimeActivitySnapshot {
+    const mainAgent = this.getMainAgent();
+    if (!mainAgent) {
+      return { activeNodeIds: [] };
+    }
+
+    const runtimeState = this.agentController.getBrainRuntimeState(mainAgent.id);
+    if (!runtimeState) {
+      return { activeNodeIds: [] };
+    }
+
+    return {
+      activeNodeIds: [...runtimeState.activeLeafNodeIds],
+    };
   }
 
   public isMainAgentBrainProgramConfigured(): boolean {

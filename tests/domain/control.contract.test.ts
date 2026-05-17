@@ -445,6 +445,48 @@ test('brain-program backed snn control consumes GraphIR output signal channels',
   assert.equal(agent.velocity.y, 0);
 });
 
+test('simulation session exposes the main-agent active GraphIR leaf node ids', () => {
+  const agentController = new AgentController();
+  const session = new SimulationSession({
+    visionSystem: new VisionSystem(),
+    agentController,
+    worldManager: new WorldManager(1600, 1200),
+    collisionDetector: new CollisionDetector(),
+  });
+
+  session.initialize();
+  session.setControlMode('snn');
+
+  const document = createDefaultGraphIRDocument(1);
+  const neuronGroup = getCoreNeuronGroup(document);
+  const neuron = neuronGroup.children.find((node) => node.id === 'neuron-1');
+  assert.ok(neuron && neuron.kind === 'neuron');
+  neuron.parameterOverrides = {
+    ...(neuron.parameterOverrides ?? {}),
+    threshold: -70,
+  };
+
+  const status = session.setGraphIRDocument(document);
+  assert.equal(status.state, 'applied');
+
+  const mainAgent = session.getMainAgent();
+  assert.ok(mainAgent);
+  mainAgent.visualInput = [1, 1, 0];
+  agentController.updateAgent(mainAgent, 1 / 60, {
+    controlMode: 'snn',
+    keyboardInputState: {
+      turnLeft: false,
+      moveForward: false,
+      turnRight: false,
+    },
+  });
+
+  assert.deepEqual(
+    new Set(session.getGraphIRRuntimeActivitySnapshot().activeNodeIds),
+    new Set(['vision-R-0', 'vision-G-0', 'neuron-1', 'output-move-forward'])
+  );
+});
+
 test('GraphIR leaf link weights change runtime action outputs', () => {
   const baseDocument = createDefaultGraphIRDocument(1);
   const weakDocument = structuredClone(baseDocument);

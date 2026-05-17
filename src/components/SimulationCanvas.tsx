@@ -4,7 +4,7 @@ import type { GraphIRDocument } from '../domain/brain';
 import { SimulationEngine, type SimulationLifecycleState } from '../engine/SimulationEngine';
 import type { SimulationControlMode } from '../domain/world';
 import type { SimulationState } from '../types/simulation';
-import type { GraphIRRuntimeStatus } from '../types/graphIRRuntime';
+import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../types/graphIRRuntime';
 import type { AgentParameters } from './editor/types';
 
 interface SimulationCanvasProps {
@@ -12,6 +12,7 @@ interface SimulationCanvasProps {
   onLifecycleChange: (state: SimulationLifecycleState) => void;
   onAgentParametersChange: (params: AgentParameters) => void;
   onGraphIRStatusChange: (status: GraphIRRuntimeStatus) => void;
+  onGraphIRActivityChange: (snapshot: GraphIRRuntimeActivitySnapshot) => void;
   controlMode: Extract<SimulationControlMode, 'keyboard' | 'snn'>;
   graphDocument: GraphIRDocument;
   agentParameters: AgentParameters;
@@ -36,6 +37,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   onLifecycleChange,
   onAgentParametersChange,
   onGraphIRStatusChange,
+  onGraphIRActivityChange,
   controlMode,
   graphDocument,
   agentParameters,
@@ -129,6 +131,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         newEngine.onStatsUpdate = onStatsUpdate;
         newEngine.onLifecycleChange = onLifecycleChange;
         newEngine.onGraphIRStatusChange = onGraphIRStatusChange;
+        newEngine.onGraphIRActivityChange = onGraphIRActivityChange;
         newEngine.initialize();
 
         const mainAgent = newEngine.getMainAgent();
@@ -142,6 +145,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         setEngineInstanceId((prev) => prev + 1);
         onAgentParametersChange(newEngine.getAgentParameters());
         onGraphIRStatusChange(newEngine.getGraphIRRuntimeStatus());
+        onGraphIRActivityChange(newEngine.getGraphIRRuntimeActivitySnapshot());
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown Pixi renderer error';
         console.error('Failed to initialize simulation canvas:', error);
@@ -165,7 +169,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         });
       }
     };
-  }, [onAgentParametersChange, onGraphIRStatusChange, onLifecycleChange, onStatsUpdate]);
+  }, [onAgentParametersChange, onGraphIRActivityChange, onGraphIRStatusChange, onLifecycleChange, onStatsUpdate]);
 
   useEffect(() => {
     if (!appRef.current) {
@@ -199,6 +203,15 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
     engineRef.current.onGraphIRStatusChange = onGraphIRStatusChange;
   }, [onGraphIRStatusChange]);
+
+  useEffect(() => {
+    if (!engineRef.current) {
+      return;
+    }
+
+    engineRef.current.onGraphIRActivityChange = onGraphIRActivityChange;
+    onGraphIRActivityChange(engineRef.current.getGraphIRRuntimeActivitySnapshot());
+  }, [onGraphIRActivityChange]);
 
   useEffect(() => {
     const engine = engineRef.current;

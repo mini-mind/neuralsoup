@@ -847,6 +847,26 @@ test('output SignalNodes produce action outputs at runtime', () => {
   assert.ok(result.outputs['move-forward'] > 0);
 });
 
+test('GraphIR runtime step exposes active leaf node ids for input, neuron, and output leaves', () => {
+  const document = createDefaultGraphIRDocument(1);
+  const neuronGroup = document.root.children.find((node) => node.id === 'core-neuron-group');
+  assert.ok(neuronGroup && neuronGroup.kind === 'neuron-group');
+  const neuron = neuronGroup.children.find((node) => node.id === 'neuron-1');
+  assert.ok(neuron && neuron.kind === 'neuron');
+  neuron.parameterOverrides = {
+    ...(neuron.parameterOverrides ?? {}),
+    threshold: -70,
+  };
+
+  const program = compileGraphIRDocument(document);
+  const result = stepBrainProgram(program, [1, 1, 0], createBrainProgramRuntimeState(program), 1);
+
+  assert.deepEqual(
+    new Set(result.runtimeState.activeLeafNodeIds),
+    new Set(['vision-R-0', 'vision-G-0', 'neuron-1', 'output-move-forward'])
+  );
+});
+
 test('compileGraphIRDocument rejects unsupported world action signal bindings', () => {
   const document = createDefaultGraphIRDocument(1);
   const outputAdapter = document.root.children.find((node) => node.id === 'output-adapter');

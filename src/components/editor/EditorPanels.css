@@ -132,6 +132,8 @@
 .content-area {
   position: relative;
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
   padding: 0;
 }
@@ -139,6 +141,7 @@
 .content-panel {
   position: absolute;
   inset: 0;
+  min-width: 0;
   min-height: 0;
 }
 
