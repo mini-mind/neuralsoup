@@ -1,73 +1,53 @@
-# NeuralSoup - 具身智能体仿真系统
+# NeuralSoup
 
-`neuralsoup` 是一个基于 TypeScript + React + PixiJS 的脉冲神经网络编辑器和具身智能体仿真平台。
+`neuralsoup` 是一个基于 TypeScript、React、Vite 和 PixiJS 的具身智能体仿真与神经网络拓扑编辑项目。
 
-## 核心特性
-
-- 🧠 **SNN编辑器**: 图形化神经网络设计
-- 🤖 **智能体仿真**: 120度视野，海洋环境
-- 🎨 **高性能渲染**: PixiJS + 对象池优化
-- 🔧 **模块化架构**: 清晰分层，易扩展
-
-## 快速开始
+## 快速启动
 
 ```bash
-npm install  # 安装依赖
-npm run dev -- --host 0.0.0.0 --port 3000  # 热启动开发服务器
-npm run type-check  # 运行类型检查
-npm run check:pixi-imports  # 校验 Pixi 入口约束
+npm install
+npm run dev -- --host 0.0.0.0 --port 3000
 ```
 
-开发服务器默认使用 Vite 热更新。若需要从局域网或云主机外部通过 IP 访问，请显式监听 `0.0.0.0`，然后使用：
+服务启动后访问：
 
 ```text
 http://<服务器IP>:3000
 ```
 
-说明：
-- `localhost:3000` 只能本机访问。
-- `0.0.0.0:3000` 表示监听全部网卡，是否能从外部访问还取决于安全组、防火墙和上游端口放通。
-- 云主机、容器或虚拟机场景下，还需要确认 NAT/端口映射、反向代理和宿主机防火墙已放通 `3000` 端口。
-- 若端口已被占用，可改成其他端口，例如 `npm run dev -- --host 0.0.0.0 --port 3001`。
-- `npm run dev` 仅用于热更新联调；正式产物请使用 `npm run build` 构建，并仅用 `npx vite preview --host 0.0.0.0 --port 4173` 做构建结果验收，不要把 Vite dev/preview 当作正式生产服务。
+## 常用命令
 
-Pixi 渲染链路当前遵循单一运行时入口原则：实际入口为 `src/engine/pixi.ts`。除该入口外，其他模块不得直接从 `pixi.js`、`pixi.js-legacy` 或 `@pixi/*` import；如需调整 Pixi 版本或 fallback，只改该入口并运行 `npm run check:pixi-imports` 验证。
-
-## 项目结构
-
+```bash
+npm run type-check
+npm run test:domain
+npm run check:pixi-imports
+npm run build
+npm run test:e2e
 ```
+
+## 目录
+
+```text
 src/
-├── App.tsx              # 顶层编排与控制面
-├── components/          # 编辑器与仿真宿主组件
-│   ├── hooks/           # 编辑器交互状态与事件
-│   ├── renderers/       # 编辑器子渲染器
-│   └── utils/           # 编辑器几何与默认数据
-├── engine/              # 仿真核心引擎
-├── types/               # 共享类型定义
-└── main.tsx             # 应用入口
+  App.tsx                 # 顶层 UI 编排
+  components/             # React 组件、拓扑编辑器和 canvas 渲染器
+  components/editor/      # 右侧编辑区的标签页、设置面板和工具栏
+  domain/                 # 纯领域模型和 brain/world 逻辑
+  engine/                 # 仿真引擎、Pixi 入口和世界渲染
+  runtime/                # 仿真 session 边界
+  types/                  # 共享类型
+tests/domain/             # 领域契约测试
+e2e/                      # Playwright 端到端测试
 ```
 
-## 使用指南
+## 交互
 
-### SNN编辑器
-- 双击空白处：添加神经元
-- Ctrl+按下节点后拖拽：创建连接
-- Delete键：删除选中元素
-- 滚轮：缩放画布
-
-### 仿真控制
-- 播放/暂停：控制仿真
-- 重置：重新初始化环境
-- 跟随模式：镜头跟随智能体
+- 左侧游戏区域负责仿真运行、奖励/FPS 展示和智能体观察。
+- 右侧编辑区顶部在 `Settings` 与 `GraphView` 之间切换。
+- `Settings` 内包含智能体参数和键盘覆盖说明。
+- `GraphView` 是拓扑沙盒：双击空白处添加神经元，`Ctrl` 拖拽节点创建连接，`Delete` 删除选中元素，滚轮缩放，右键拖拽平移。
+- 空格用于开始/继续或暂停仿真，输入控件聚焦时不会触发全局快捷键。
 
 ## 文档
 
-- 📖 [开发者指南](./docs/DEVELOPER_GUIDE.md) - 代码结构和开发规范
-- 🧭 [彻底重构方案](./docs/ARCHITECTURE_REFACTOR_PLAN.md) - 不保历史兼容的目标架构、findings 和迁移顺序
-- 🧠 [模型编辑器指南](./docs/model-editor-complete-guide.md) - SNN编辑器使用说明
-
-## 技术栈
-
-- TypeScript + React + PixiJS + Vite
-- 模块化架构，对象池优化
-- Hook状态管理，Canvas/WebGL渲染
+- [AGENTS.md](./AGENTS.md)：代理维护规则、命令、代码边界和验证要求。
