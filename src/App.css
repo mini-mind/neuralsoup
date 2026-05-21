@@ -9,7 +9,7 @@
 }
 
 .game-area {
-  flex: 0 0 60%;
+  flex: 0 1 auto;
   position: relative;
   min-width: 0;
   min-height: 0;
@@ -17,15 +17,67 @@
   overflow: hidden;
 }
 
+.app-splitter {
+  flex: 0 0 8px;
+  position: relative;
+  background: #171717;
+  outline: none;
+  z-index: 20;
+}
+
+.app-splitter::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #2b2b2b;
+}
+
+.app-splitter::after {
+  content: '';
+  position: absolute;
+  background: #555;
+  border-radius: 999px;
+  opacity: 0.85;
+}
+
+.app-splitter:hover::after,
+.app-splitter:focus-visible::after,
+.app.is-resizing .app-splitter::after {
+  background: #f08c28;
+}
+
+.app-splitter-inline {
+  cursor: col-resize;
+}
+
+.app-splitter-inline::after {
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 36px;
+  transform: translate(-50%, -50%);
+}
+
+.app-splitter-stacked {
+  cursor: row-resize;
+}
+
+.app-splitter-stacked::after {
+  top: 50%;
+  left: 50%;
+  width: 36px;
+  height: 2px;
+  transform: translate(-50%, -50%);
+}
+
 .control-area {
-  flex: 0 0 40%;
+  flex: 0 1 auto;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
   background: #1e1e1e;
-  border-left: 1px solid #2b2b2b;
 }
 
 .game-stats-overlay {
@@ -96,11 +148,10 @@
 
   .game-area,
   .control-area {
-    flex: 0 0 50%;
+    flex: 0 1 auto;
   }
 
-  .control-area {
-    border-left: 0;
-    border-top: 1px solid #2b2b2b;
+  .app-splitter {
+    width: 100%;
   }
 }

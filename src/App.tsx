@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, type CSSProperties } from 'react';
 import SimulationCanvas from './components/SimulationCanvas';
 import {
   createDefaultGraphIRDocument,
@@ -34,6 +34,21 @@ const INITIAL_STATS: SimulationState['stats'] = {
   totalReward: 0,
   collisionCount: 0,
   neuralState: { motivation: 0, stress: 0, homeostasis: 0.5 }
+};
+const STACKED_LAYOUT_BREAKPOINT = 768;
+const SPLIT_DIVIDER_SIZE = 8;
+const MIN_PANEL_SIZE = 280;
+
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
+
+const clampSplitRatio = (containerSize: number, ratio: number): number => {
+  if (containerSize <= MIN_PANEL_SIZE * 2 + SPLIT_DIVIDER_SIZE) {
+    return 0.5;
+  }
+
+  const minRatio = MIN_PANEL_SIZE / containerSize;
+  const maxRatio = (containerSize - MIN_PANEL_SIZE - SPLIT_DIVIDER_SIZE) / containerSize;
+  return clamp(ratio, minRatio, maxRatio);
 };
 
 const createInitialGraphIRRuntimeStatus = (document: GraphIRDocument): GraphIRRuntimeStatus => ({
@@ -80,6 +95,11 @@ const App: React.FC = () => {
     visionRange: 250,
     visionAngle: 120
   });
+  const [splitRatio, setSplitRatio] = useState(0.6);
+  const [isStackedLayout, setIsStackedLayout] = useState<boolean>(() => (
+    typeof window !== 'undefined' ? window.innerWidth <= STACKED_LAYOUT_BREAKPOINT : false
+  ));
+  const [isResizingSplit, setIsResizingSplit] = useState(false);
   const [editorTab, setEditorTab] = useState<EditorTab>('graph');
   const [graphPath, setGraphPath] = useState<GraphPathItem[]>([{ id: 'root', label: 'root' }]);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('agent-parameters');
@@ -87,8 +107,22 @@ const App: React.FC = () => {
   const graphIRIssues = validateGraphIRDocument(graphDocument);
   const graphDocumentRef = useRef(graphDocument);
   const graphPathNavigateRef = useRef<(pathId: string) => void>(() => {});
+  const appRef = useRef<HTMLDivElement | null>(null);
   const simulationPanelRef = useRef<HTMLDivElement | null>(null);
   const installedGraphSummary = graphIRRuntimeStatus.appliedSummary;
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(`(max-width: ${STACKED_LAYOUT_BREAKPOINT}px)`);
+    const updateLayoutMode = (event?: MediaQueryListEvent) => {
+      setIsStackedLayout(event ? event.matches : mediaQuery.matches);
+    };
+
+    updateLayoutMode();
+    mediaQuery.addEventListener('change', updateLayoutMode);
+    return () => {
+      mediaQuery.removeEventListener('change', updateLayoutMode);
+    };
+  }, []);
 
   useEffect(() => {
     const container = simulationPanelRef.current;
@@ -234,6 +268,110 @@ const App: React.FC = () => {
     graphPathNavigateRef.current(pathId);
   }, []);
 
+  const updateSplitRatioFromClientPoint = useCallback((clientX: number, clientY: number) => {
+    const appElement = appRef.current;
+    if (!appElement) {
+      return;
+    }
+
+    const rect = appElement.getBoundingClientRect();
+    const containerSize = isStackedLayout ? rect.height : rect.width;
+    if (containerSize <= 0) {
+      return;
+    }
+
+    const pointerOffset = isStackedLayout ? clientY - rect.top : clientX - rect.left;
+    setSplitRatio(clampSplitRatio(containerSize, pointerOffset / containerSize));
+  }, [isStackedLayout]);
+
+  const handleSplitPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const divider = event.currentTarget;
+    divider.setPointerCapture(event.pointerId);
+    setIsResizingSplit(true);
+    updateSplitRatioFromClientPoint(event.clientX, event.clientY);
+
+    const nextCursor = isStackedLayout ? 'row-resize' : 'col-resize';
+    document.body.style.cursor = nextCursor;
+    document.body.style.userSelect = 'none';
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      updateSplitRatioFromClientPoint(moveEvent.clientX, moveEvent.clientY);
+    };
+
+    const finishResize = () => {
+      setIsResizingSplit(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', finishResize);
+      window.removeEventListener('pointercancel', finishResize);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', finishResize);
+    window.addEventListener('pointercancel', finishResize);
+  }, [isStackedLayout, updateSplitRatioFromClientPoint]);
+
+  const handleSplitKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    const appElement = appRef.current;
+    if (!appElement) {
+      return;
+    }
+
+    const containerSize = isStackedLayout ? appElement.clientHeight : appElement.clientWidth;
+    const step = 0.04;
+    let nextRatio: number | null = null;
+
+    switch (event.key) {
+      case 'ArrowLeft':
+        if (!isStackedLayout) {
+          nextRatio = splitRatio - step;
+        }
+        break;
+      case 'ArrowRight':
+        if (!isStackedLayout) {
+          nextRatio = splitRatio + step;
+        }
+        break;
+      case 'ArrowUp':
+        if (isStackedLayout) {
+          nextRatio = splitRatio - step;
+        }
+        break;
+      case 'ArrowDown':
+        if (isStackedLayout) {
+          nextRatio = splitRatio + step;
+        }
+        break;
+      case 'Home':
+        nextRatio = 0;
+        break;
+      case 'End':
+        nextRatio = 1;
+        break;
+      default:
+        break;
+    }
+
+    if (nextRatio == null) {
+      return;
+    }
+
+    event.preventDefault();
+    setSplitRatio(clampSplitRatio(containerSize, nextRatio));
+  }, [isStackedLayout, splitRatio]);
+
+  const dividerHalfSize = SPLIT_DIVIDER_SIZE / 2;
+  const gamePanePercent = splitRatio * 100;
+  const controlPanePercent = 100 - gamePanePercent;
+  const gameAreaStyle: CSSProperties = {
+    flexBasis: `calc(${gamePanePercent}% - ${dividerHalfSize}px)`
+  };
+  const controlAreaStyle: CSSProperties = {
+    flexBasis: `calc(${controlPanePercent}% - ${dividerHalfSize}px)`
+  };
+
   useEffect(() => {
     if (!isE2ETestMode) {
       delete window.__NEURALSOUP_TEST_API__;
@@ -296,8 +434,17 @@ const App: React.FC = () => {
   }, [graphIRRuntimeActivity.activeNodeIds, isE2ETestMode, updateGraphDocument]);
 
   return (
-    <div className="app" data-testid="app-shell">
-      <div ref={simulationPanelRef} className="game-area" data-testid="simulation-panel">
+    <div
+      ref={appRef}
+      className={`app ${isStackedLayout ? 'app-stacked' : 'app-split'} ${isResizingSplit ? 'is-resizing' : ''}`}
+      data-testid="app-shell"
+    >
+      <div
+        ref={simulationPanelRef}
+        className="game-area"
+        data-testid="simulation-panel"
+        style={gameAreaStyle}
+      >
         <SimulationCanvas
           width={canvasWidth}
           height={canvasHeight}
@@ -324,7 +471,18 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      <div className="control-area" data-testid="control-panel">
+      <div
+        className={`app-splitter ${isStackedLayout ? 'app-splitter-stacked' : 'app-splitter-inline'}`}
+        data-testid="app-splitter"
+        role="separator"
+        aria-label="调整游戏区和编辑区大小"
+        aria-orientation={isStackedLayout ? 'horizontal' : 'vertical'}
+        tabIndex={0}
+        onPointerDown={handleSplitPointerDown}
+        onKeyDown={handleSplitKeyDown}
+      />
+
+      <div className="control-area" data-testid="control-panel" style={controlAreaStyle}>
         <EditorToolbar
           editorTab={editorTab}
           graphPath={graphPath}

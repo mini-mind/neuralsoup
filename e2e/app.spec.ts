@@ -3,6 +3,9 @@ import type { Page, TestInfo } from '@playwright/test';
 
 const selectors = {
   simulationCanvas: '[data-testid="simulation-canvas"]',
+  appSplitter: '[data-testid="app-splitter"]',
+  simulationPanel: '[data-testid="simulation-panel"]',
+  controlPanel: '[data-testid="control-panel"]',
   renderError: '[data-testid="simulation-render-error"]',
   runState: '[data-testid="simulation-run-state"]',
   controlModeValue: '[data-testid="control-mode-value"]',
@@ -1457,4 +1460,77 @@ test('graph view keeps context menu visible and actionable near the canvas edge'
 
   await page.locator(selectors.topologyContextNewNeuron).click();
   await expect(page.locator(selectors.topologyNodeCount)).toHaveText(String(beforeCount + 1));
+});
+
+test('layout splitter resizes the simulation and editor panels', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  const simulationPanel = page.locator(selectors.simulationPanel);
+  const controlPanel = page.locator(selectors.controlPanel);
+  const splitter = page.locator(selectors.appSplitter);
+
+  const beforeSimulationBox = await simulationPanel.boundingBox();
+  const beforeControlBox = await controlPanel.boundingBox();
+  const splitterBox = await splitter.boundingBox();
+  if (!beforeSimulationBox || !beforeControlBox || !splitterBox) {
+    throw new Error('Splitter layout bounding boxes are not available');
+  }
+
+  const horizontalLayout = splitterBox.height > splitterBox.width;
+  const dragFrom = {
+    x: splitterBox.x + splitterBox.width / 2,
+    y: splitterBox.y + splitterBox.height / 2,
+  };
+  const dragTo = horizontalLayout
+    ? { x: dragFrom.x + 120, y: dragFrom.y }
+    : { x: dragFrom.x, y: dragFrom.y + 120 };
+
+  await dragOnCanvas(page, dragFrom, dragTo);
+
+  await expect
+    .poll(async () => {
+      const simulationBox = await simulationPanel.boundingBox();
+      const controlBox = await controlPanel.boundingBox();
+      if (!simulationBox || !controlBox) {
+        throw new Error('Panel bounding boxes disappeared after splitter drag');
+      }
+
+      return horizontalLayout
+        ? {
+            simulationSpan: Math.round(simulationBox.width),
+            controlSpan: Math.round(controlBox.width),
+          }
+        : {
+            simulationSpan: Math.round(simulationBox.height),
+            controlSpan: Math.round(controlBox.height),
+          };
+    })
+    .not.toEqual(
+      horizontalLayout
+        ? {
+            simulationSpan: Math.round(beforeSimulationBox.width),
+            controlSpan: Math.round(beforeControlBox.width),
+          }
+        : {
+            simulationSpan: Math.round(beforeSimulationBox.height),
+            controlSpan: Math.round(beforeControlBox.height),
+          }
+    );
+
+  const afterSimulationBox = await simulationPanel.boundingBox();
+  const afterControlBox = await controlPanel.boundingBox();
+  if (!afterSimulationBox || !afterControlBox) {
+    throw new Error('Final panel bounding boxes are not available');
+  }
+
+  if (horizontalLayout) {
+    expect(afterSimulationBox.width).toBeGreaterThan(beforeSimulationBox.width + 40);
+    expect(afterControlBox.width).toBeLessThan(beforeControlBox.width - 40);
+    return;
+  }
+
+  expect(afterSimulationBox.height).toBeGreaterThan(beforeSimulationBox.height + 40);
+  expect(afterControlBox.height).toBeLessThan(beforeControlBox.height - 40);
 });
