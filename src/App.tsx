@@ -3,6 +3,7 @@ import SimulationCanvas from './components/SimulationCanvas';
 import {
   createDefaultGraphIRDocument,
   reconcileGraphIRDocumentVisionCells,
+  summarizeGraphIRDocument,
   validateGraphIRDocument,
   type GraphIRDocument,
 } from './domain/brain';
@@ -12,8 +13,10 @@ import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from './typ
 import type { SimulationState } from './types/simulation';
 import EditorToolbar from './components/editor/EditorToolbar';
 import GraphEditorPanel from './components/editor/GraphEditorPanel';
+import { isEditableOrInteractiveTarget } from './components/editor/graph/isEditableOrInteractiveTarget';
 import SettingsPanel from './components/editor/SettingsPanel';
 import type { AgentParameters, EditorTab, GraphPathItem, SettingsSection } from './components/editor/types';
+import type { GraphDocumentChangeOptions } from './components/hooks/useSNNTopologyState';
 import './App.css';
 
 declare global {
@@ -33,33 +36,20 @@ const INITIAL_STATS: SimulationState['stats'] = {
   neuralState: { motivation: 0, stress: 0, homeostasis: 0.5 }
 };
 
+const createInitialGraphIRRuntimeStatus = (document: GraphIRDocument): GraphIRRuntimeStatus => ({
+  state: 'applied',
+  appliedDocument: document,
+  appliedSummary: summarizeGraphIRDocument(document),
+  issues: [],
+  message: null
+});
+
 const areAgentParametersEqual = (left: AgentParameters, right: AgentParameters): boolean => {
   return (
     left.visionCells === right.visionCells &&
     left.visionRange === right.visionRange &&
     left.visionAngle === right.visionAngle
   );
-};
-
-const isEditableOrInteractiveTarget = (target: EventTarget | null): boolean => {
-  if (!(target instanceof Element)) {
-    return false;
-  }
-
-  if (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement ||
-    target instanceof HTMLButtonElement
-  ) {
-    return true;
-  }
-
-  if (target instanceof HTMLElement && target.isContentEditable) {
-    return true;
-  }
-
-  return Boolean(target.closest('button, input, textarea, select, [contenteditable="true"], [contenteditable=""]'));
 };
 
 const App: React.FC = () => {
@@ -72,7 +62,9 @@ const App: React.FC = () => {
   const [runtimeGraphDocument, setRuntimeGraphDocument] = useState<GraphIRDocument>(() =>
     createDefaultGraphIRDocument(36)
   );
-  const [graphIRRuntimeStatus, setGraphIRRuntimeStatus] = useState<GraphIRRuntimeStatus | null>(null);
+  const [graphIRRuntimeStatus, setGraphIRRuntimeStatus] = useState<GraphIRRuntimeStatus>(() =>
+    createInitialGraphIRRuntimeStatus(createDefaultGraphIRDocument(36))
+  );
   const [graphIRRuntimeActivity, setGraphIRRuntimeActivity] = useState<GraphIRRuntimeActivitySnapshot>({
     activeNodeIds: []
   });
@@ -96,7 +88,7 @@ const App: React.FC = () => {
   const graphDocumentRef = useRef(graphDocument);
   const graphPathNavigateRef = useRef<(pathId: string) => void>(() => {});
   const simulationPanelRef = useRef<HTMLDivElement | null>(null);
-  const installedGraphSummary = graphIRRuntimeStatus?.appliedSummary ?? null;
+  const installedGraphSummary = graphIRRuntimeStatus.appliedSummary;
 
   useEffect(() => {
     const container = simulationPanelRef.current;
@@ -208,8 +200,11 @@ const App: React.FC = () => {
     graphDocumentRef.current = graphDocument;
   }, [graphDocument]);
 
-  const handleGraphDocumentChange = useCallback((nextDocument: GraphIRDocument) => {
-    updateGraphDocument(nextDocument);
+  const handleGraphDocumentChange = useCallback((
+    nextDocument: GraphIRDocument,
+    options?: GraphDocumentChangeOptions
+  ) => {
+    updateGraphDocument(nextDocument, options?.installToRuntime ?? true);
   }, [updateGraphDocument]);
 
   const handleGraphIRRuntimeStatusChange = useCallback((nextStatus: GraphIRRuntimeStatus) => {
@@ -349,36 +344,28 @@ const App: React.FC = () => {
           <span data-testid="vision-range-value">{agentParameters.visionRange}</span>
           <span data-testid="vision-angle-value">{agentParameters.visionAngle}</span>
           <span data-testid="graph-ir-validation-count">{graphIRIssues.length}</span>
-          <span data-testid="graph-ir-runtime-state">{graphIRRuntimeStatus?.state ?? ''}</span>
-          <span data-testid="graph-ir-runtime-validation-count">{graphIRRuntimeStatus?.issues.length ?? 0}</span>
-          <span data-testid="graph-ir-runtime-message">{graphIRRuntimeStatus?.message ?? ''}</span>
-          <span data-testid="graph-ir-installed-input-count">{installedGraphSummary?.inputSignalCount ?? 0}</span>
-          <span data-testid="graph-ir-installed-neuron-count">{installedGraphSummary?.neuronCount ?? 0}</span>
-          <span data-testid="graph-ir-installed-output-count">{installedGraphSummary?.outputSignalCount ?? 0}</span>
-          <span data-testid="graph-ir-installed-link-count">{installedGraphSummary?.leafLinkCount ?? 0}</span>
+          <span data-testid="graph-ir-runtime-state">{graphIRRuntimeStatus.state}</span>
+          <span data-testid="graph-ir-runtime-validation-count">{graphIRRuntimeStatus.issues.length}</span>
+          <span data-testid="graph-ir-runtime-message">{graphIRRuntimeStatus.message ?? ''}</span>
+          <span data-testid="graph-ir-installed-input-count">{installedGraphSummary.inputSignalCount}</span>
+          <span data-testid="graph-ir-installed-neuron-count">{installedGraphSummary.neuronCount}</span>
+          <span data-testid="graph-ir-installed-output-count">{installedGraphSummary.outputSignalCount}</span>
+          <span data-testid="graph-ir-installed-link-count">{installedGraphSummary.leafLinkCount}</span>
         </div>
 
         <div className={`content-area ${editorTab === 'graph' ? 'snn-mode' : 'settings-mode'}`}>
-          {graphIRRuntimeStatus ? (
-            <GraphEditorPanel
-              isActive={editorTab === 'graph'}
-              document={graphDocument}
-              visionCells={agentParameters.visionCells}
-              runtimeStatus={graphIRRuntimeStatus}
-              runtimeActivity={graphIRRuntimeActivity}
-              onDocumentChange={handleGraphDocumentChange}
-              onGraphPathChange={setGraphPath}
-              onGraphPathNavigateRegister={(navigate) => {
-                graphPathNavigateRef.current = navigate;
-              }}
-            />
-          ) : (
-            <div
-              className={`content-panel snn-control ${editorTab === 'graph' ? 'is-active' : 'is-hidden'}`}
-              data-testid="topology-viewport"
-              aria-hidden={editorTab !== 'graph'}
-            />
-          )}
+          <GraphEditorPanel
+            isActive={editorTab === 'graph'}
+            document={graphDocument}
+            visionCells={agentParameters.visionCells}
+            runtimeStatus={graphIRRuntimeStatus}
+            runtimeActivity={graphIRRuntimeActivity}
+            onDocumentChange={handleGraphDocumentChange}
+            onGraphPathChange={setGraphPath}
+            onGraphPathNavigateRegister={(navigate) => {
+              graphPathNavigateRef.current = navigate;
+            }}
+          />
           <div
             className={`content-panel settings-control ${editorTab === 'settings' ? 'is-active' : 'is-hidden'}`}
             aria-hidden={editorTab !== 'settings'}

@@ -3,6 +3,7 @@ import SNNTopologyEditor from '../SNNTopologyEditor';
 import type { GraphIRDocument } from '../../domain/brain';
 import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../../types/graphIRRuntime';
 import type { GraphPathItem } from './types';
+import type { GraphDocumentChangeOptions } from '../hooks/useSNNTopologyState';
 
 interface GraphEditorPanelProps {
   isActive: boolean;
@@ -10,7 +11,7 @@ interface GraphEditorPanelProps {
   visionCells: number;
   runtimeStatus: GraphIRRuntimeStatus;
   runtimeActivity: GraphIRRuntimeActivitySnapshot;
-  onDocumentChange: (document: GraphIRDocument) => void;
+  onDocumentChange: (document: GraphIRDocument, options?: GraphDocumentChangeOptions) => void;
   onGraphPathChange: (graphPath: GraphPathItem[]) => void;
   onGraphPathNavigateRegister: (navigate: (pathId: string) => void) => void;
 }

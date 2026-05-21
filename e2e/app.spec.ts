@@ -36,6 +36,9 @@ const selectors = {
   topologyNodeCenters: '[data-testid="topology-node-centers"]',
   topologyCanvasOffset: '[data-testid="topology-canvas-offset"]',
   topologyCanvasScale: '[data-testid="topology-canvas-scale"]',
+  topologyContextMenu: '[data-testid="topology-context-menu"]',
+  topologyContextNewNeuron: '[data-testid="topology-context-new-neuron"]',
+  topologyContextAggregate: '[data-testid="topology-context-aggregate"]',
   topologyDetailModal: '[data-testid="topology-detail-modal"]',
   topologyDetailModalOverlay: '[data-testid="topology-detail-modal-overlay"]',
   topologyDetailClose: '[data-testid="topology-detail-close"]',
@@ -314,6 +317,27 @@ const injectValidDraftOnly = async (page: Page) => {
   await page.evaluate(() => {
     window.__NEURALSOUP_TEST_API__?.injectValidDraftOnly();
   });
+};
+
+const dispatchCanvasMouseSequence = async (
+  page: Page,
+  sequence: Array<{ type: 'mousedown' | 'mouseup'; x: number; y: number; button?: number }>
+) => {
+  await page.locator(selectors.topologyCanvas).evaluate((canvas, steps) => {
+    for (const step of steps) {
+      canvas.dispatchEvent(
+        new MouseEvent(step.type, {
+          bubbles: true,
+          cancelable: true,
+          clientX: step.x,
+          clientY: step.y,
+          button: step.button ?? 0,
+          buttons: step.type === 'mousedown' ? 1 : 0,
+          view: window,
+        })
+      );
+    }
+  }, sequence);
 };
 
 const getRuntimeActiveNodeIds = async (page: Page) =>
@@ -614,6 +638,44 @@ test('graph view syncs runtime active nodes from simulator hooks into visible hi
     .toBeGreaterThan(0);
 });
 
+test('graph view preserves active highlight when dragging a node after runtime activity is observed', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await page.locator(selectors.startPauseButton).click();
+
+  await expect
+    .poll(async () => {
+      const activeNode = page.locator('.topology-node.is-active').first();
+      const testId = await activeNode.getAttribute('data-testid').catch(() => null);
+      return testId ?? '';
+    })
+    .not.toEqual('');
+
+  const activeNodeTestId =
+    (await page.locator('.topology-node.is-active').first().getAttribute('data-testid')) ?? '';
+
+  await page.locator(selectors.startPauseButton).click();
+  await expect(page.locator(selectors.runState)).toHaveText('paused');
+
+  const activeNode = page.locator(`[data-testid="${activeNodeTestId}"]`);
+  await expect(activeNode).toHaveClass(/is-active/);
+
+  const beforeDrag = await activeNode.boundingBox();
+  if (!beforeDrag) {
+    throw new Error(`Bounding box not available for ${activeNodeTestId}`);
+  }
+
+  await activeNode.hover();
+  await page.mouse.down();
+  await page.mouse.move(beforeDrag.x + 48, beforeDrag.y + 24, { steps: 10 });
+  await page.mouse.up();
+
+  await expect(activeNode).toHaveClass(/is-active/);
+});
+
 test('graph view edits leaf params and leaf link weights through Graph IR inspectors', async ({ page }, testInfo) => {
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
@@ -728,6 +790,49 @@ test('graph view supports creating a leaf link and keeps state across tab switch
   await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
   await expect(page.locator(selectors.topologySelectedLink)).toHaveText(/link-vision-R-0-neuron-2-/);
   await expect(page.locator(selectors.topologyRuntimeSynapseCount)).toHaveText('113');
+});
+
+test('graph view routes link-covered left-drag through canvas gestures without losing link selection or detail', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await rightDragBetweenNodes(page, selectors.nodeVisionR0Proxy, selectors.nodeNeuronTwo);
+
+  const linkSelector = '[data-testid^="topology-link-link-vision-R-0-neuron-2-"]';
+  const linkLocator = page.locator(linkSelector).first();
+  await expect(linkLocator).toBeVisible();
+
+  const linkBox = await linkLocator.boundingBox();
+  if (!linkBox) {
+    throw new Error('Link bounding box not available');
+  }
+
+  const dragStart = {
+    x: linkBox.x + linkBox.width / 2,
+    y: linkBox.y + linkBox.height / 2,
+  };
+  const dragEnd = {
+    x: dragStart.x + 80,
+    y: dragStart.y + 80,
+  };
+
+  await dragOnCanvas(page, dragStart, dragEnd);
+
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('0');
+  await expect(page.locator('.topology-marquee')).toHaveCount(0);
+
+  await linkLocator.click();
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
+  await expect(page.locator(selectors.topologySelectedLink)).toHaveText(/link-vision-R-0-neuron-2-/);
+
+  await doubleClickAtCenter(page, linkSelector);
+  await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
+  await expect(page.locator(selectors.synapseWeightInput)).toBeVisible();
+  await page.locator(selectors.topologyDetailClose).click();
+  await expect(page.locator(selectors.topologyDetailModal)).toHaveCount(0);
 });
 
 test('graph view blocks duplicate and proxy-only links while preserving pending state safety', async ({ page }, testInfo) => {
@@ -850,6 +955,7 @@ test('graph view keyboard interactions remain safe after event hook removal', as
 
   await beginRightLinkFromNode(page, selectors.nodeVisionR0Proxy);
   await expect(page.locator(selectors.topologyPendingLink)).toBeVisible();
+  await page.mouse.up({ button: 'right' });
   await page.keyboard.press('Escape');
   await expect(page.locator(selectors.topologyPendingLink)).toHaveCount(0);
 
@@ -889,6 +995,272 @@ test('graph view uses the real narrow-screen container size and keeps hierarchic
   await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
 });
 
+test('graph view canvas resizes with its viewport after window size changes', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await expect(page.locator(selectors.topologyEditor)).toBeVisible();
+
+  const expectCanvasMatchesViewport = async () => {
+    const viewportBox = await page.locator(selectors.topologyViewport).boundingBox();
+    const canvasBox = await getCanvasBox(page);
+    if (!viewportBox) {
+      throw new Error('Topology viewport bounding box not available');
+    }
+
+    expect(Math.round(canvasBox.width)).toBe(Math.round(viewportBox.width));
+    expect(Math.round(canvasBox.height)).toBe(Math.round(viewportBox.height));
+  };
+
+  await expectCanvasMatchesViewport();
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await expectCanvasMatchesViewport();
+
+  await page.setViewportSize({ width: 420, height: 900 });
+  await expectCanvasMatchesViewport();
+});
+
+test('graph view keeps the same scene focus after viewport resize', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
+
+  const canvasBox = await getCanvasBox(page);
+  await page.mouse.move(canvasBox.x + 80, canvasBox.y + 80);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.move(canvasBox.x + 180, canvasBox.y + 140, { steps: 16 });
+  await page.mouse.up({ button: 'right' });
+
+  const getRelativeNodePosition = async () => {
+    const nodeCenter = await getLocatorCenter(page, selectors.nodeNeuronOne);
+    const nextCanvasBox = await getCanvasBox(page);
+    return {
+      x: nodeCenter.x - (nextCanvasBox.x + nextCanvasBox.width / 2),
+      y: nodeCenter.y - (nextCanvasBox.y + nextCanvasBox.height / 2),
+    };
+  };
+
+  const initialViewport = page.viewportSize();
+  if (!initialViewport) {
+    throw new Error('Viewport size not available');
+  }
+
+  const beforeResizeRelative = await getRelativeNodePosition();
+  const beforeResizeOffset = parsePointPair(await page.locator(selectors.topologyCanvasOffset).innerText());
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+
+  const afterResizeRelative = await getRelativeNodePosition();
+  const afterResizeOffset = parsePointPair(await page.locator(selectors.topologyCanvasOffset).innerText());
+
+  expect(afterResizeOffset.x - beforeResizeOffset.x).toBeCloseTo((1280 - initialViewport.width) / 2, 0);
+  expect(afterResizeOffset.y - beforeResizeOffset.y).toBeCloseTo((720 - initialViewport.height) / 2, 0);
+  expect(Math.abs(afterResizeRelative.x - beforeResizeRelative.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(afterResizeRelative.y - beforeResizeRelative.y)).toBeLessThanOrEqual(1);
+
+  await page.setViewportSize({ width: 420, height: 900 });
+
+  const finalRelative = await getRelativeNodePosition();
+  expect(Math.abs(finalRelative.x - beforeResizeRelative.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(finalRelative.y - beforeResizeRelative.y)).toBeLessThanOrEqual(1);
+});
+
+test('graph view opens canvas context menu and creates a neuron from it', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+
+  const beforeCount = Number.parseInt(await page.locator(selectors.topologyNodeCount).innerText(), 10);
+  const canvasBox = await getCanvasBox(page);
+  const point = { x: canvasBox.x + canvasBox.width - 80, y: canvasBox.y + 80 };
+
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.move(point.x + 1, point.y + 1);
+  await page.mouse.up({ button: 'right' });
+  await expect(page.locator(selectors.topologyContextMenu)).toBeVisible();
+
+  await page.locator(selectors.topologyContextNewNeuron).click();
+  await expect(page.locator(selectors.topologyContextMenu)).toHaveCount(0);
+  await expect(page.locator(selectors.topologyNodeCount)).toHaveText(String(beforeCount + 1));
+});
+
+test('graph view opens selection context menu and aggregates selected nodes', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
+  await expect(page.locator(selectors.nodeNeuronTwo)).toBeVisible();
+
+  await page.locator(selectors.nodeNeuronOne).click();
+  await page.locator(selectors.nodeNeuronTwo).click({ modifiers: ['Shift'] });
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('2');
+
+  const nodeTwoCenter = await getLocatorCenter(page, selectors.nodeNeuronTwo);
+  await page.mouse.move(nodeTwoCenter.x, nodeTwoCenter.y);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.up({ button: 'right' });
+  await expect(page.locator(selectors.topologyContextMenu)).toBeVisible();
+
+  await page.locator(selectors.topologyContextAggregate).click();
+  await expect(page.locator(selectors.topologyContextMenu)).toHaveCount(0);
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
+  await expect(page.locator('[data-testid^="topology-node-group-"]')).toHaveCount(1);
+});
+
+test('graph view keeps multi-selection when dragging an already selected node', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
+  await expect(page.locator(selectors.nodeNeuronTwo)).toBeVisible();
+
+  await page.locator(selectors.nodeNeuronOne).click();
+  await page.locator(selectors.nodeNeuronTwo).click({ modifiers: ['Shift'] });
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('2');
+
+  const beforeOne = await getLocatorCenter(page, selectors.nodeNeuronOne);
+  const beforeTwo = await getLocatorCenter(page, selectors.nodeNeuronTwo);
+
+  await dragOnCanvas(
+    page,
+    beforeTwo,
+    { x: beforeTwo.x + 56, y: beforeTwo.y + 28 }
+  );
+
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('2');
+
+  const afterOne = await getLocatorCenter(page, selectors.nodeNeuronOne);
+  const afterTwo = await getLocatorCenter(page, selectors.nodeNeuronTwo);
+
+  expect(Math.abs(afterOne.x - beforeOne.x)).toBeGreaterThan(10);
+  expect(Math.abs(afterOne.y - beforeOne.y)).toBeGreaterThan(5);
+  expect(Math.abs(afterTwo.x - beforeTwo.x)).toBeGreaterThan(10);
+  expect(Math.abs(afterTwo.y - beforeTwo.y)).toBeGreaterThan(5);
+});
+
+test('graph view geometry hit-test prefers the visually topmost overlapping node', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
+  await expect(page.locator(selectors.nodeNeuronTwo)).toBeVisible();
+
+  const nodeOneCenter = await getLocatorCenter(page, selectors.nodeNeuronOne);
+  const nodeTwoCenter = await getLocatorCenter(page, selectors.nodeNeuronTwo);
+
+  await dragOnCanvas(page, nodeOneCenter, nodeTwoCenter);
+
+  const overlappedNodeOneCenter = await getLocatorCenter(page, selectors.nodeNeuronOne);
+  const overlappedNodeTwoCenter = await getLocatorCenter(page, selectors.nodeNeuronTwo);
+  expect(Math.abs(overlappedNodeOneCenter.x - overlappedNodeTwoCenter.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(overlappedNodeOneCenter.y - overlappedNodeTwoCenter.y)).toBeLessThanOrEqual(1);
+
+  await dispatchCanvasMouseSequence(page, [
+    { type: 'mousedown', x: overlappedNodeTwoCenter.x, y: overlappedNodeTwoCenter.y },
+    { type: 'mouseup', x: overlappedNodeTwoCenter.x, y: overlappedNodeTwoCenter.y },
+  ]);
+
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
+  await expect(page.locator('[data-testid="topology-selected-node"]')).toHaveText('neuron-2');
+});
+
+test('graph view supports multi-select right-drag batch linking', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
+  await expect(page.locator(selectors.nodeNeuronTwo)).toBeVisible();
+
+  const canvasBox = await getCanvasBox(page);
+  const createPoint = { x: canvasBox.x + 300, y: canvasBox.y + 220 };
+  await page.mouse.move(createPoint.x, createPoint.y);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.up({ button: 'right' });
+  await expect(page.locator(selectors.topologyContextMenu)).toBeVisible();
+  await page.locator(selectors.topologyContextNewNeuron).click();
+
+  const newNeuronSelector = '[data-testid="topology-node-neuron-3"]';
+  await expect(page.locator(newNeuronSelector)).toBeVisible();
+
+  await page.locator(selectors.nodeNeuronOne).click();
+  await page.locator(selectors.nodeNeuronTwo).click({ modifiers: ['Shift'] });
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('2');
+
+  const targetBeforeOne = await page.locator('[data-testid^="topology-link-link-neuron-1-neuron-3-"]').count();
+  const targetBeforeTwo = await page.locator('[data-testid^="topology-link-link-neuron-2-neuron-3-"]').count();
+  await rightDragBetweenNodes(page, selectors.nodeNeuronTwo, newNeuronSelector);
+
+  await expect
+    .poll(async () => ({
+      one: await page.locator('[data-testid^="topology-link-link-neuron-1-neuron-3-"]').count(),
+      two: await page.locator('[data-testid^="topology-link-link-neuron-2-neuron-3-"]').count(),
+    }))
+    .toEqual({
+      one: targetBeforeOne + 1,
+      two: targetBeforeTwo + 1,
+    });
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
+  await expect(page.locator(selectors.topologySelectedLink)).not.toHaveText('none');
+});
+
+test('graph view keeps additive drag selection in sync when shift-dragging an already selected node', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
+  await expect(page.locator(selectors.nodeNeuronTwo)).toBeVisible();
+
+  await page.locator(selectors.nodeNeuronOne).click();
+  await page.locator(selectors.nodeNeuronTwo).click({ modifiers: ['Shift'] });
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('2');
+
+  const beforeOne = await getLocatorCenter(page, selectors.nodeNeuronOne);
+  const beforeTwo = await getLocatorCenter(page, selectors.nodeNeuronTwo);
+
+  await page.keyboard.down('Shift');
+  await dragOnCanvas(
+    page,
+    beforeTwo,
+    { x: beforeTwo.x + 56, y: beforeTwo.y + 28 }
+  );
+  await page.keyboard.up('Shift');
+
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
+
+  const afterOne = await getLocatorCenter(page, selectors.nodeNeuronOne);
+  const afterTwo = await getLocatorCenter(page, selectors.nodeNeuronTwo);
+
+  expect(Math.abs(afterOne.x - beforeOne.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(afterOne.y - beforeOne.y)).toBeLessThanOrEqual(1);
+  expect(Math.abs(afterTwo.x - beforeTwo.x)).toBeGreaterThan(10);
+});
+
 test('graph view supports wheel zoom, stable right-drag pan, clears marquee, and ends node drag on mouseup', async ({ page }, testInfo) => {
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
@@ -899,8 +1271,6 @@ test('graph view supports wheel zoom, stable right-drag pan, clears marquee, and
   await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
 
   const canvas = page.locator(selectors.topologyCanvas);
-  const neuronOne = page.locator(selectors.nodeNeuronOne);
-  const neuronTwo = page.locator(selectors.nodeNeuronTwo);
   const initialNeuronOneCenter = await getLocatorCenter(page, selectors.nodeNeuronOne);
   const initialNeuronTwoCenter = await getLocatorCenter(page, selectors.nodeNeuronTwo);
 
@@ -919,14 +1289,27 @@ test('graph view supports wheel zoom, stable right-drag pan, clears marquee, and
   await page.mouse.up();
   await expect(page.locator('.topology-marquee')).toHaveCount(0);
 
-  await canvas.hover();
+  const canvasBox = await getCanvasBox(page);
+  await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
   await page.mouse.wheel(0, -120);
   await expect(page.locator('[data-testid="topology-canvas-scale"]')).toHaveText('1.20');
   await page.mouse.wheel(0, 120);
   await expect(page.locator('[data-testid="topology-canvas-scale"]')).toHaveText('1.00');
 
+  const beforeDrag = await getNodeCenterFromSummary(page, 'neuron-1');
+  await dragOnCanvas(page, initialNeuronOneCenter, {
+    x: initialNeuronOneCenter.x + 80,
+    y: initialNeuronOneCenter.y + 50,
+  });
+  await expect.poll(() => getNodeCenterFromSummary(page, 'neuron-1')).toMatchObject({
+    x: expect.any(Number),
+    y: expect.any(Number),
+  });
+  const afterDrag = await getNodeCenterFromSummary(page, 'neuron-1');
+  expect(afterDrag.x).toBeGreaterThan(beforeDrag.x + 30);
+  expect(afterDrag.y).toBeGreaterThan(beforeDrag.y + 10);
+
   const beforePan = parsePointPair(await page.locator('[data-testid="topology-canvas-offset"]').innerText());
-  const canvasBox = await getCanvasBox(page);
   await page.mouse.move(canvasBox.x + 80, canvasBox.y + 80);
   await page.mouse.down({ button: 'right' });
   await page.mouse.move(canvasBox.x + 180, canvasBox.y + 140, { steps: 16 });
@@ -935,17 +1318,34 @@ test('graph view supports wheel zoom, stable right-drag pan, clears marquee, and
   expect(afterPan.x - beforePan.x).toBeCloseTo(100, 0);
   expect(afterPan.y - beforePan.y).toBeCloseTo(60, 0);
 
-  const neuronOneCenter = await getLocatorCenter(page, selectors.nodeNeuronOne);
-  const beforeDrag = await getLocatorBox(page, selectors.nodeNeuronOne);
-  await neuronOne.hover();
-  await page.mouse.down();
-  await page.mouse.move(beforeDrag.x + 80, beforeDrag.y + 50, { steps: 10 });
-  await page.mouse.up();
-
-  const afterDrag = await getLocatorBox(page, selectors.nodeNeuronOne);
-  expect(afterDrag.x).toBeGreaterThan(beforeDrag.x + 30);
-  expect(afterDrag.y).toBeGreaterThan(beforeDrag.y + 10);
-
   await canvas.click();
   await expect(page.locator(selectors.topologySelectedCount)).toHaveText('0');
+});
+
+test('graph view keeps context menu visible and actionable near the canvas edge', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+
+  const beforeCount = Number.parseInt(await page.locator(selectors.topologyNodeCount).innerText(), 10);
+  const canvasBox = await getCanvasBox(page);
+  const point = { x: canvasBox.x + canvasBox.width - 4, y: canvasBox.y + canvasBox.height - 4 };
+
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.up({ button: 'right' });
+
+  const menuBox = await page.locator(selectors.topologyContextMenu).boundingBox();
+  if (!menuBox) {
+    throw new Error('Topology context menu bounding box not available');
+  }
+
+  expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(canvasBox.x + canvasBox.width);
+  expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(canvasBox.y + canvasBox.height);
+
+  await page.locator(selectors.topologyContextNewNeuron).click();
+  await expect(page.locator(selectors.topologyNodeCount)).toHaveText(String(beforeCount + 1));
 });
