@@ -42,6 +42,8 @@ export interface GraphViewNode {
   connectableTarget: boolean;
   expanded: boolean;
   expansionParentId: string | null;
+  expansionOffsetX: number;
+  expansionOffsetY: number;
 }
 
 export interface GraphViewLink {
@@ -166,37 +168,48 @@ const getDefaultExpandedChildPosition = (node: TopologyNode, index: number): Pos
   };
 };
 
-const getExpandedGroupSize = (group: NeuronGroupNode) => {
+const getExpandedChildOffset = (group: NeuronGroupNode, draftNodePositions?: NodePositionDraftMap): Position => {
   if (group.children.length === 0) {
-    return EXPANDED_GROUP_MIN_SIZE;
+    return { x: 0, y: 0 };
   }
 
   const minX = Math.min(
     ...group.children.map((child, index) => {
-      const position = child.position ?? getDefaultExpandedChildPosition(child, index);
+      const position = draftNodePositions?.[child.id] ?? child.position ?? getDefaultExpandedChildPosition(child, index);
       return position.x;
     })
   );
   const minY = Math.min(
     ...group.children.map((child, index) => {
-      const position = child.position ?? getDefaultExpandedChildPosition(child, index);
+      const position = draftNodePositions?.[child.id] ?? child.position ?? getDefaultExpandedChildPosition(child, index);
       return position.y;
     })
   );
-  const offsetX = minX < EXPANDED_GROUP_PADDING ? EXPANDED_GROUP_PADDING - minX : 0;
-  const offsetY = minY < EXPANDED_GROUP_PADDING ? EXPANDED_GROUP_PADDING - minY : 0;
+
+  return {
+    x: minX < EXPANDED_GROUP_PADDING ? EXPANDED_GROUP_PADDING - minX : 0,
+    y: minY < EXPANDED_GROUP_PADDING ? EXPANDED_GROUP_PADDING - minY : 0,
+  };
+};
+
+const getExpandedGroupSize = (group: NeuronGroupNode) => {
+  if (group.children.length === 0) {
+    return EXPANDED_GROUP_MIN_SIZE;
+  }
+
+  const offset = getExpandedChildOffset(group);
   const maxRight = Math.max(
     ...group.children.map((child, index) => {
       const position = child.position ?? getDefaultExpandedChildPosition(child, index);
       const size = getStoredNodeSize(child);
-      return position.x + offsetX + size.width;
+      return position.x + offset.x + size.width;
     })
   );
   const maxBottom = Math.max(
     ...group.children.map((child, index) => {
       const position = child.position ?? getDefaultExpandedChildPosition(child, index);
       const size = getStoredNodeSize(child);
-      return position.y + offsetY + size.height;
+      return position.y + offset.y + size.height;
     })
   );
 
@@ -212,18 +225,12 @@ const getExpandedChildDisplayPosition = (
   childIndex: number,
   draftNodePositions: NodePositionDraftMap
 ): Position => {
-  const childPositions = group.children.map((candidate, index) =>
-    draftNodePositions[candidate.id] ?? candidate.position ?? getDefaultExpandedChildPosition(candidate, index)
-  );
-  const minX = Math.min(...childPositions.map((position) => position.x));
-  const minY = Math.min(...childPositions.map((position) => position.y));
-  const offsetX = minX < EXPANDED_GROUP_PADDING ? EXPANDED_GROUP_PADDING - minX : 0;
-  const offsetY = minY < EXPANDED_GROUP_PADDING ? EXPANDED_GROUP_PADDING - minY : 0;
+  const offset = getExpandedChildOffset(group, draftNodePositions);
   const childPosition = draftNodePositions[child.id] ?? child.position ?? getDefaultExpandedChildPosition(child, childIndex);
 
   return {
-    x: childPosition.x + offsetX,
-    y: childPosition.y + offsetY,
+    x: childPosition.x + offset.x,
+    y: childPosition.y + offset.y,
   };
 };
 
@@ -498,6 +505,8 @@ export const buildGraphViewModel = ({
         connectableTarget: linkCapabilities.canTarget,
         expanded,
         expansionParentId: null,
+        expansionOffsetX: 0,
+        expansionOffsetY: 0,
       };
 
       if (!expanded) {
@@ -508,6 +517,7 @@ export const buildGraphViewModel = ({
         viewNode,
         ...node.children.map((child, childIndex) => {
           const childStoredPosition = getExpandedChildDisplayPosition(node, child, childIndex, draftNodePositions);
+          const childDisplayOffset = getExpandedChildOffset(node, draftNodePositions);
           const childSize = getStoredNodeSize(child);
           const childDirection = getNodeDirection(child);
           const childLeaf = isLeafNode(child);
@@ -545,6 +555,8 @@ export const buildGraphViewModel = ({
             connectableTarget: childCapabilities.canTarget,
             expanded: false,
             expansionParentId: node.id,
+            expansionOffsetX: childDisplayOffset.x,
+            expansionOffsetY: childDisplayOffset.y,
           };
         }),
       ];
@@ -556,8 +568,9 @@ export const buildGraphViewModel = ({
   const links: GraphViewLink[] = aggregateLinks
     .filter((link) => nodeIdsInView.has(link.fromNodeId) && nodeIdsInView.has(link.toNodeId))
     .map((link) => {
-      const isDirectLeafLink =
-        link.count === 1 && localLeafIds.has(link.fromNodeId) && localLeafIds.has(link.toNodeId);
+      const fromViewNode = viewNodeById.get(link.fromNodeId);
+      const toViewNode = viewNodeById.get(link.toNodeId);
+      const isDirectLeafLink = link.count === 1 && Boolean(fromViewNode?.leaf && toViewNode?.leaf);
       const leafLinkId = link.leafLinkIds[0] ?? `aggregate:${link.fromNodeId}:${link.toNodeId}`;
       const leafLink = isDirectLeafLink ? containerLinks.find((candidate) => candidate.id === leafLinkId) : null;
 

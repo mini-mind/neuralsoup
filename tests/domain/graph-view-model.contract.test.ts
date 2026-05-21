@@ -190,3 +190,116 @@ test('graph view child scope aggregates internal descendant links onto direct ch
     },
   ]);
 });
+
+test('graph view expanded group projects child leaf links as editable direct links', () => {
+  const document: GraphIRDocument = {
+    version: 1,
+    models: TEST_MODELS,
+    root: {
+      id: 'root',
+      children: [
+        {
+          kind: 'neuron-group',
+          id: 'parent-group',
+          label: 'Parent',
+          children: [
+            {
+              kind: 'neuron-group',
+              id: 'expanded-group',
+              label: 'Expanded',
+              collapsed: false,
+              position: { x: 100, y: 120 },
+              children: [
+                { kind: 'neuron', id: 'neuron-1', label: 'Neuron 1', modelId: 'test-neuron', position: { x: 0, y: 0 } },
+                { kind: 'neuron', id: 'neuron-2', label: 'Neuron 2', modelId: 'test-neuron', position: { x: 80, y: 0 } },
+              ],
+            },
+          ],
+        },
+      ],
+      links: [
+        {
+          id: 'link-neuron-1-neuron-2',
+          from: { nodeId: 'neuron-1', portId: 'axon' },
+          to: { nodeId: 'neuron-2', portId: 'dendrite' },
+          weight: 0.5,
+        },
+      ],
+    },
+  };
+
+  const viewModel = buildGraphViewModel({
+    document,
+    navigationPath: ['parent-group'],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+  });
+
+  assert.deepEqual(viewModel.nodes.map((node) => node.id), ['expanded-group', 'neuron-1', 'neuron-2']);
+  assert.equal(viewModel.viewNodeById.get('neuron-1')?.x, 390);
+  assert.equal(viewModel.viewNodeById.get('neuron-1')?.expansionOffsetX, 30);
+  assert.deepEqual(viewModel.links, [
+    {
+      id: 'link-neuron-1-neuron-2',
+      fromNodeId: 'neuron-1',
+      toNodeId: 'neuron-2',
+      weight: 0.5,
+      count: 1,
+      aggregate: false,
+      leafLinkIds: ['link-neuron-1-neuron-2'],
+      editable: true,
+    },
+  ]);
+});
+
+test('graph view expanded group draft move carries children without mutating relative child offsets', () => {
+  const document: GraphIRDocument = {
+    version: 1,
+    models: TEST_MODELS,
+    root: {
+      id: 'root',
+      children: [
+        {
+          kind: 'neuron-group',
+          id: 'parent-group',
+          label: 'Parent',
+          children: [
+            {
+              kind: 'neuron-group',
+              id: 'expanded-group',
+              label: 'Expanded',
+              collapsed: false,
+              position: { x: 100, y: 120 },
+              children: [
+                { kind: 'neuron', id: 'neuron-1', label: 'Neuron 1', modelId: 'test-neuron', position: { x: 0, y: 0 } },
+              ],
+            },
+          ],
+        },
+      ],
+      links: [],
+    },
+  };
+
+  const before = buildGraphViewModel({
+    document,
+    navigationPath: ['parent-group'],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+  });
+  const after = buildGraphViewModel({
+    document,
+    navigationPath: ['parent-group'],
+    draftNodePositions: {
+      'expanded-group': { x: 172, y: 158 },
+    },
+    runtimeActiveNodeIds: [],
+  });
+
+  assert.equal(after.viewNodeById.get('expanded-group')!.x - before.viewNodeById.get('expanded-group')!.x, 72);
+  assert.equal(after.viewNodeById.get('expanded-group')!.y - before.viewNodeById.get('expanded-group')!.y, 38);
+  assert.equal(after.viewNodeById.get('neuron-1')!.x - before.viewNodeById.get('neuron-1')!.x, 72);
+  assert.equal(after.viewNodeById.get('neuron-1')!.y - before.viewNodeById.get('neuron-1')!.y, 38);
+  assert.equal(after.viewNodeById.get('neuron-1')!.expansionOffsetX, 30);
+  assert.equal(after.viewNodeById.get('neuron-1')!.expansionOffsetY, 30);
+});

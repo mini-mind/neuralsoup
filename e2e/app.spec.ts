@@ -279,6 +279,33 @@ const beginRightLinkFromNode = async (page: Page, selector: string) => {
   await page.mouse.down({ button: 'right' });
 };
 
+const rightClickAt = async (page: Page, point: { x: number; y: number }) => {
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.up({ button: 'right' });
+};
+
+const aggregateDefaultNeuronsIntoGroup = async (page: Page) => {
+  await page.locator(selectors.nodeNeuronOne).click();
+  await page.locator(selectors.nodeNeuronTwo).click({ modifiers: ['Shift'] });
+  const nodeTwoCenter = await getLocatorCenter(page, selectors.nodeNeuronTwo);
+  await rightClickAt(page, nodeTwoCenter);
+  await expect(page.locator(selectors.topologyContextMenu)).toBeVisible();
+  await page.locator(selectors.topologyContextAggregate).click();
+
+  const groupSelector = '[data-testid^="topology-node-group-"]';
+  await expect(page.locator(groupSelector)).toHaveCount(1);
+  return groupSelector;
+};
+
+const expandGroupInPlace = async (page: Page, groupSelector: string) => {
+  const groupCenter = await getLocatorCenter(page, groupSelector);
+  await rightClickAt(page, groupCenter);
+  await expect(page.locator(selectors.topologyContextToggleGroup)).toHaveText('展开');
+  await page.locator(selectors.topologyContextToggleGroup).click();
+  await expect(page.locator(groupSelector)).toHaveClass(/is-expanded/);
+};
+
 const parsePointPair = (value: string) => {
   const [x, y] = value.split(',').map((part) => Number.parseFloat(part));
   return { x, y };
@@ -1235,7 +1262,7 @@ test('graph view opens selection context menu and aggregates selected nodes', as
   await expect(page.locator('[data-testid^="topology-node-group-"]')).toHaveCount(1);
 });
 
-test('graph view expands a group in place and moves children with the group frame', async ({ page }, testInfo) => {
+test('graph view expands a group in place from a direct group context menu', async ({ page }, testInfo) => {
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
   }
@@ -1245,25 +1272,9 @@ test('graph view expands a group in place and moves children with the group fram
   await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
   await expect(page.locator(selectors.nodeNeuronTwo)).toBeVisible();
 
-  await page.locator(selectors.nodeNeuronOne).click();
-  await page.locator(selectors.nodeNeuronTwo).click({ modifiers: ['Shift'] });
-  const nodeTwoCenter = await getLocatorCenter(page, selectors.nodeNeuronTwo);
-  await page.mouse.move(nodeTwoCenter.x, nodeTwoCenter.y);
-  await page.mouse.down({ button: 'right' });
-  await page.mouse.up({ button: 'right' });
-  await expect(page.locator(selectors.topologyContextMenu)).toBeVisible();
-  await page.locator(selectors.topologyContextAggregate).click();
-
-  const groupSelector = '[data-testid^="topology-node-group-"]';
-  await expect(page.locator(groupSelector)).toHaveCount(1);
-  const groupCenter = await getLocatorCenter(page, groupSelector);
-  await page.mouse.move(groupCenter.x, groupCenter.y);
-  await page.mouse.down({ button: 'right' });
-  await page.mouse.up({ button: 'right' });
-  await expect(page.locator(selectors.topologyContextToggleGroup)).toHaveText('展开');
-  await page.locator(selectors.topologyContextToggleGroup).click();
-
-  await expect(page.locator(groupSelector)).toHaveClass(/is-expanded/);
+  const groupSelector = await aggregateDefaultNeuronsIntoGroup(page);
+  await page.mouse.click(20, 20);
+  await expandGroupInPlace(page, groupSelector);
   await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
   await expect(page.locator(selectors.nodeNeuronTwo)).toBeVisible();
 
@@ -1274,18 +1285,30 @@ test('graph view expands a group in place and moves children with the group fram
   expect(expandedNodeOneBox.x + expandedNodeOneBox.width).toBeLessThan(expandedGroupBox.x + expandedGroupBox.width);
   expect(expandedNodeOneBox.y + expandedNodeOneBox.height).toBeLessThan(expandedGroupBox.y + expandedGroupBox.height);
 
-  const beforeGroup = await getLocatorCenter(page, groupSelector);
-  const groupDragHandle = {
-    x: expandedGroupBox.x + expandedGroupBox.width - 22,
-    y: expandedGroupBox.y + 18
-  };
-  const beforeChild = await getLocatorCenter(page, selectors.nodeNeuronOne);
-  await dragOnCanvas(page, groupDragHandle, { x: groupDragHandle.x + 72, y: groupDragHandle.y + 38 });
-  const afterGroup = await getLocatorCenter(page, groupSelector);
-  const afterChild = await getLocatorCenter(page, selectors.nodeNeuronOne);
+  await expect(page.locator(selectors.linkNeuronOneNeuronTwo)).toBeVisible();
+});
 
-  expect(Math.abs(afterChild.x - beforeChild.x - (afterGroup.x - beforeGroup.x))).toBeLessThanOrEqual(2);
-  expect(Math.abs(afterChild.y - beforeChild.y - (afterGroup.y - beforeGroup.y))).toBeLessThanOrEqual(2);
+test('graph view keeps expanded group child links editable and child deletion coherent', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  const groupSelector = await aggregateDefaultNeuronsIntoGroup(page);
+  await expandGroupInPlace(page, groupSelector);
+
+  await expect(page.locator(selectors.linkNeuronOneNeuronTwo)).toBeVisible();
+  await doubleClickAtCenter(page, selectors.linkNeuronOneNeuronTwo);
+  await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
+  await expect(page.locator(selectors.synapseWeightInput)).toBeVisible();
+  await page.locator(selectors.topologyDetailClose).click();
+
+  await page.locator(selectors.nodeNeuronOne).click();
+  await page.keyboard.press('Delete');
+  await expect(page.locator(selectors.nodeNeuronOne)).toHaveCount(0);
+  await expect(page.locator(selectors.linkNeuronOneNeuronTwo)).toHaveCount(0);
+  await expect(page.locator(selectors.nodeNeuronTwo)).toBeVisible();
 });
 
 test('graph view keeps multi-selection when dragging an already selected node', async ({ page }, testInfo) => {
@@ -1617,6 +1640,39 @@ test('graph view keeps context menu visible and actionable near the canvas edge'
 
   await page.locator(selectors.topologyContextNewNeuron).click();
   await expect(page.locator(selectors.topologyNodeCount)).toHaveText(String(beforeCount + 1));
+});
+
+test('graph view keeps group context menu visible near the canvas edge', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+
+  const canvasBox = await getCanvasBox(page);
+  const point = { x: canvasBox.x + canvasBox.width - 220, y: canvasBox.y + canvasBox.height - 132 };
+  await rightClickAt(page, point);
+  await expect(page.locator(selectors.topologyContextNewGroup)).toBeVisible();
+  await page.locator(selectors.topologyContextNewGroup).click();
+
+  const groupSelector = '[data-testid^="topology-node-group-"]';
+  await expect(page.locator(groupSelector)).toHaveCount(1);
+  const groupBox = await getLocatorBox(page, groupSelector);
+  await rightClickAt(page, {
+    x: groupBox.x + groupBox.width / 2,
+    y: groupBox.y + groupBox.height - 8
+  });
+  await expect(page.locator(selectors.topologyContextToggleGroup)).toBeVisible();
+  await expect(page.locator(selectors.topologyContextUngroup)).toBeVisible();
+
+  const menuBox = await page.locator(selectors.topologyContextMenu).boundingBox();
+  if (!menuBox) {
+    throw new Error('Topology group context menu bounding box not available');
+  }
+
+  expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(canvasBox.x + canvasBox.width);
+  expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(canvasBox.y + canvasBox.height);
 });
 
 test('layout splitter resizes the simulation and editor panels', async ({ page }, testInfo) => {

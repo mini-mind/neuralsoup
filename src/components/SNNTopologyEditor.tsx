@@ -92,7 +92,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
 
   const canCreateNeuronHere = currentContainerKind === 'neuron-group';
   const canAggregateSelection = currentContainerKind === 'neuron-group' && selectedNodeIds.length > 1;
-  const canUngroupSelection = currentContainerKind === 'neuron-group' && selectedNodeIds.length === 1;
+  const canUngroupNodesHere = currentContainerKind === 'neuron-group';
 
   const {
     surfaceRef,
@@ -117,7 +117,6 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
     selectedNodeIds,
     canCreateNeuronHere,
     canAggregateSelection,
-    canUngroupSelection,
     canvasViewport,
     setCanvasOffset: setCanvasOffsetState,
     canvasScale,
@@ -192,7 +191,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
         activeViewNodeIds={activeViewNodeIds}
         canCreateNeuronHere={canCreateNeuronHere}
         canAggregateSelection={canAggregateSelection}
-        canUngroupSelection={canUngroupSelection}
+        canUngroupNodesHere={canUngroupNodesHere}
         onCanvasContextMenu={handleCanvasContextMenu}
         onCanvasMouseDown={handleCanvasMouseDown}
         onSelectLink={selectLink}

@@ -41,7 +41,7 @@ interface GraphTopologyCanvasProps {
   activeViewNodeIds: Set<string>;
   canCreateNeuronHere: boolean;
   canAggregateSelection: boolean;
-  canUngroupSelection: boolean;
+  canUngroupNodesHere: boolean;
   onCanvasContextMenu: (event: React.MouseEvent<HTMLDivElement>) => void;
   onCanvasMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
   onSelectLink: (linkId: string) => void;
@@ -78,7 +78,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
   activeViewNodeIds,
   canCreateNeuronHere,
   canAggregateSelection,
-  canUngroupSelection,
+  canUngroupNodesHere,
   onCanvasContextMenu,
   onCanvasMouseDown,
   onSelectLink,
@@ -170,7 +170,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
               聚合
             </button>
           )}
-          {contextMenu.kind === 'group' && canUngroupSelection && contextMenu.nodeIds.length === 1 && (
+          {contextMenu.kind === 'group' && canUngroupNodesHere && contextMenu.nodeIds.length === 1 && (
             <>
               <button
                 type="button"

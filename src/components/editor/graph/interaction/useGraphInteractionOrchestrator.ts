@@ -45,7 +45,6 @@ interface GraphInteractionDependencies {
   selectedNodeIds: string[];
   canCreateNeuronHere: boolean;
   canAggregateSelection: boolean;
-  canUngroupSelection: boolean;
   beginSelectionRect: (point: GraphPoint) => void;
   updateSelectionRect: (point: GraphPoint, intersectedNodeIds: string[]) => void;
   cancelSelectionRect: () => void;
@@ -92,7 +91,6 @@ export const useGraphInteractionOrchestrator = ({
   selectedNodeIds,
   canCreateNeuronHere,
   canAggregateSelection,
-  canUngroupSelection,
   beginSelectionRect,
   updateSelectionRect,
   cancelSelectionRect,
@@ -220,11 +218,7 @@ export const useGraphInteractionOrchestrator = ({
       focusSurface();
       const sourceNodeIds = getNodeContextSourceNodeIds(node);
       const selectionGesture = selectedNodeIds.length > 1 && selectedNodeIds.includes(node.id);
-      const singleGroupGesture =
-        !selectionGesture &&
-        selectedNodeIds.length === 1 &&
-        selectedNodeIds[0] === node.id &&
-        node.ungroupable;
+      const singleGroupGesture = !selectionGesture && node.ungroupable;
 
       if (!selectionGesture && !singleGroupGesture && sourceNodeIds.length > 0) {
         const sourceScenePoint = getSourceScenePoint(sourceNodeIds);
@@ -366,11 +360,13 @@ export const useGraphInteractionOrchestrator = ({
             scene: currentInteraction.startScene,
             nodeIds: [],
           });
-        } else if (
-          currentInteraction.contextTarget === 'selection' &&
-          currentInteraction.contextNodeIds.length === 1 &&
-          canUngroupSelection
-        ) {
+        } else if (currentInteraction.contextTarget === 'selection' && currentInteraction.contextNodeIds.length === 1) {
+          const contextNode = getNodeById(currentInteraction.contextNodeIds[0]);
+          if (!contextNode?.ungroupable) {
+            setInteractionState(null);
+            return;
+          }
+
           setContextMenu({
             kind: 'group',
             client: currentInteraction.startClient,
@@ -407,10 +403,10 @@ export const useGraphInteractionOrchestrator = ({
     [
       canAggregateSelection,
       canCreateNeuronHere,
-      canUngroupSelection,
       cancelSelectionRect,
       clearSelection,
       discardNodeDraftPositions,
+      getNodeById,
       persistNodePositions,
       selectNode,
       selectNodes,
@@ -467,21 +463,6 @@ export const useGraphInteractionOrchestrator = ({
                 !candidate.proxy
             )
           : [pressedNode];
-        const movingNodeIds = new Set(movingNodes.map((candidate) => candidate.id));
-        if (pressedNode.expanded) {
-          for (const candidate of nodesRef.current) {
-            if (
-              candidate.expansionParentId === pressedNode.id &&
-              candidate.movable &&
-              candidate.local &&
-              !candidate.proxy &&
-              !movingNodeIds.has(candidate.id)
-            ) {
-              movingNodes.push(candidate);
-              movingNodeIds.add(candidate.id);
-            }
-          }
-        }
         const basePositions = Object.fromEntries(
           movingNodes.map((candidate) => [
             candidate.id,

@@ -104,8 +104,8 @@ const toStoredPositionForViewNode = (
     if (parentNode) {
       const clampedPosition = clampPositionInsideExpandedParent(position, viewNode, parentNode);
       return toRoundedPosition({
-        x: clampedPosition.x - parentNode.x,
-        y: clampedPosition.y - parentNode.y,
+        x: clampedPosition.x - parentNode.x - viewNode.expansionOffsetX,
+        y: clampedPosition.y - parentNode.y - viewNode.expansionOffsetY,
       });
     }
   }
@@ -197,6 +197,36 @@ const updateNodePositions = (root: RootGraph, positions: NodePositionDraftMap): 
 
   return nextRoot;
 };
+
+const collectLeafNodeIds = (nodes: TopologyNode[]): Set<string> => {
+  const leafNodeIds = new Set<string>();
+
+  const visit = (node: TopologyNode) => {
+    if (isLeafNode(node)) {
+      leafNodeIds.add(node.id);
+      return;
+    }
+
+    if (isContainerNode(node)) {
+      node.children.forEach(visit);
+    }
+  };
+
+  nodes.forEach(visit);
+  return leafNodeIds;
+};
+
+const removeNodesById = (nodes: TopologyNode[], removableNodeIds: Set<string>): TopologyNode[] =>
+  nodes
+    .filter((node) => !removableNodeIds.has(node.id))
+    .map((node) =>
+      isContainerNode(node)
+        ? {
+            ...node,
+            children: removeNodesById(node.children, removableNodeIds),
+          }
+        : node
+    );
 
 const cloneTopologyNodeWithPosition = (node: TopologyNode, position: Position): TopologyNode => ({
   ...node,
@@ -442,15 +472,20 @@ export const useGraphEditorCommands = ({
     }
 
     const removableNodeIds = new Set(selectedViewNodes.map((node) => node.refNodeId));
+    const removableLeafNodeIds = collectLeafNodeIds(
+      selectedViewNodes
+        .map((node) => indexes.nodeById.get(node.refNodeId))
+        .filter((node): node is TopologyNode => node != null)
+    );
     const nextRoot = updateChildrenAtPath(documentRef.current.root, navigationPath, (children) =>
-      children.filter((child) => !removableNodeIds.has(child.id))
+      removeNodesById(children, removableNodeIds)
     );
     setDocument((current) => ({
       ...current,
       root: {
         ...nextRoot,
         links: current.root.links.filter(
-          (link) => !removableNodeIds.has(link.from.nodeId) && !removableNodeIds.has(link.to.nodeId)
+          (link) => !removableLeafNodeIds.has(link.from.nodeId) && !removableLeafNodeIds.has(link.to.nodeId)
         ),
       },
     }));
@@ -460,6 +495,7 @@ export const useGraphEditorCommands = ({
     clearSelection,
     dismissDetailModalIf,
     documentRef,
+    indexes.nodeById,
     navigationPath,
     selectionState,
     setDocument,
@@ -547,6 +583,8 @@ export const useGraphEditorCommands = ({
         connectableTarget: true,
         expanded: false,
         expansionParentId: null,
+        expansionOffsetX: 0,
+        expansionOffsetY: 0,
       };
 
       const uniqueSourceNodeIds = uniqueIds(sourceNodeIds);

@@ -28,7 +28,6 @@ interface GraphViewSessionControllerOptions {
   selectedNodeIds: string[];
   canCreateNeuronHere: boolean;
   canAggregateSelection: boolean;
-  canUngroupSelection: boolean;
   beginSelectionRect: (point: GraphPoint) => void;
   updateSelectionRect: (point: GraphPoint, intersectedNodeIds: string[]) => void;
   cancelSelectionRect: () => void;
@@ -51,7 +50,8 @@ interface CancelGraphViewSessionOptions {
 
 const CONTEXT_MENU_MARGIN = 8;
 const CONTEXT_MENU_WIDTH = 136;
-const CONTEXT_MENU_HEIGHT = 44;
+const CONTEXT_MENU_ITEM_HEIGHT = 26;
+const CONTEXT_MENU_VERTICAL_PADDING = 4;
 
 export const useGraphViewSessionController = ({
   isActive,
@@ -68,7 +68,6 @@ export const useGraphViewSessionController = ({
   selectedNodeIds,
   canCreateNeuronHere,
   canAggregateSelection,
-  canUngroupSelection,
   beginSelectionRect,
   updateSelectionRect,
   cancelSelectionRect,
@@ -98,7 +97,6 @@ export const useGraphViewSessionController = ({
     selectedNodeIds,
     canCreateNeuronHere,
     canAggregateSelection,
-    canUngroupSelection,
     beginSelectionRect,
     updateSelectionRect,
     cancelSelectionRect,
@@ -220,6 +218,9 @@ export const useGraphViewSessionController = ({
       return null;
     }
 
+    const menuItemCount = contextMenu.kind === 'group' ? 2 : contextMenu.kind === 'selection' ? 1 : 2;
+    const menuHeight = menuItemCount * CONTEXT_MENU_ITEM_HEIGHT + CONTEXT_MENU_VERTICAL_PADDING;
+
     return {
       x: Math.max(
         CONTEXT_MENU_MARGIN,
@@ -227,7 +228,7 @@ export const useGraphViewSessionController = ({
       ),
       y: Math.max(
         CONTEXT_MENU_MARGIN,
-        Math.min(contextMenu.client.y - rect.top, rect.height - CONTEXT_MENU_HEIGHT - CONTEXT_MENU_MARGIN)
+        Math.min(contextMenu.client.y - rect.top, rect.height - menuHeight - CONTEXT_MENU_MARGIN)
       ),
     };
   }, [contextMenu, surfaceRef]);
