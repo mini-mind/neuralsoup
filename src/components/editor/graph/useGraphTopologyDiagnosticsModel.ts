@@ -18,6 +18,7 @@ interface UseGraphTopologyDiagnosticsModelOptions {
   selectedNodeId: string | null;
   selectedLinkId: string | null;
   nodeCentersSummary: string;
+  nodeViewPositionsSummary: string;
   currentScope: 'root' | 'child';
   canvasViewport: GraphCanvasViewport;
   canvasScale: number;
@@ -34,6 +35,7 @@ export const useGraphTopologyDiagnosticsModel = ({
   selectedNodeId,
   selectedLinkId,
   nodeCentersSummary,
+  nodeViewPositionsSummary,
   currentScope,
   canvasViewport,
   canvasScale,
@@ -53,6 +55,7 @@ export const useGraphTopologyDiagnosticsModel = ({
     selectedNodeId,
     selectedLinkId,
     nodeCentersSummary,
+    nodeViewPositionsSummary,
     currentScope,
     canvasViewport,
     canvasScale,

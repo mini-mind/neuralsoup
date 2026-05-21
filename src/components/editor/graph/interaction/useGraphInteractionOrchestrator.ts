@@ -15,7 +15,6 @@ import {
   hasMovedPastThreshold,
   normalizeRect,
   type GraphPoint,
-  type GraphSize,
   type GraphViewport,
   type SceneNodeGeometry,
   ZOOM_STEP,
@@ -35,7 +34,6 @@ interface GraphInteractionDependencies {
   surfaceRef: RefObject<HTMLDivElement>;
   sceneRef: RefObject<HTMLDivElement>;
   nodes: OrchestratorNode[];
-  sceneSize: GraphSize;
   sceneOrigin: GraphPoint;
   viewport: GraphViewport;
   setViewport: (nextViewport: GraphViewport) => void;
@@ -81,7 +79,6 @@ export const useGraphInteractionOrchestrator = ({
   surfaceRef,
   sceneRef,
   nodes,
-  sceneSize,
   sceneOrigin,
   viewport,
   setViewport,
@@ -314,11 +311,11 @@ export const useGraphInteractionOrchestrator = ({
             ];
           }
 
-          return [nodeId, clampNodePlacement(nextPoint, currentNode, sceneSize)];
+          return [nodeId, clampNodePlacement(nextPoint)];
         })
       );
     },
-    [sceneSize]
+    []
   );
 
   const endInteraction = useCallback(

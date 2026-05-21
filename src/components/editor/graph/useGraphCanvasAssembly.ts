@@ -280,13 +280,20 @@ export const useGraphCanvasAssembly = ({
     [scene.list]
   );
 
+  const nodeViewPositionsSummary = useMemo(
+    () =>
+      scene.list
+        .map((node) => `${node.id}:${Math.round(node.x)},${Math.round(node.y)}`)
+        .join('|'),
+    [scene.list]
+  );
+
   const session = useGraphViewSessionController({
     isActive,
     scopeKey,
     surfaceRef,
     sceneRef,
     nodes: orchestratorNodes,
-    sceneSize: scene.size,
     sceneOrigin: scene.origin,
     viewport: canvasViewport,
     setViewport: setCanvasOffset,
@@ -316,6 +323,7 @@ export const useGraphCanvasAssembly = ({
     sceneRef,
     scene,
     nodeCentersSummary,
+    nodeViewPositionsSummary,
     ...session,
   };
 };

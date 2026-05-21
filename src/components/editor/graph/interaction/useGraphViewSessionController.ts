@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, type RefObject } from 'react';
 import type { GraphInteractionOrchestratorResult } from './useGraphInteractionOrchestrator';
 import { useGraphInteractionOrchestrator } from './useGraphInteractionOrchestrator';
-import type { GraphPoint, GraphSize, GraphViewport, SceneNodeGeometry } from '../tools/canvasGeometry';
+import type { GraphPoint, GraphViewport, SceneNodeGeometry } from '../tools/canvasGeometry';
 
 interface GraphViewSessionControllerNode extends SceneNodeGeometry {
   proxy: boolean;
@@ -17,7 +17,6 @@ interface GraphViewSessionControllerOptions {
   sceneRef: RefObject<HTMLDivElement>;
   hasOpenDetailModal: boolean;
   nodes: GraphViewSessionControllerNode[];
-  sceneSize: GraphSize;
   sceneOrigin: GraphPoint;
   viewport: GraphViewport;
   setViewport: (nextViewport: GraphViewport) => void;
@@ -56,7 +55,6 @@ export const useGraphViewSessionController = ({
   sceneRef,
   hasOpenDetailModal,
   nodes,
-  sceneSize,
   sceneOrigin,
   viewport,
   setViewport,
@@ -85,7 +83,6 @@ export const useGraphViewSessionController = ({
     surfaceRef,
     sceneRef,
     nodes,
-    sceneSize,
     sceneOrigin,
     viewport,
     setViewport,

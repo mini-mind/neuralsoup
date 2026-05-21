@@ -307,6 +307,22 @@ const getNodeCenterFromSummary = async (page: Page, nodeId: string) => {
   return { x, y };
 };
 
+const getNodeViewPositionFromSummary = async (page: Page, nodeId: string) => {
+  const summary = await page.locator('[data-testid="topology-node-view-positions"]').innerText();
+  const entry = summary
+    .split('|')
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(`${nodeId}:`));
+
+  if (!entry) {
+    throw new Error(`Node view position summary missing node ${nodeId}`);
+  }
+
+  const [, coordinates] = entry.split(':');
+  const [x, y] = coordinates.split(',').map((value) => Number.parseInt(value, 10));
+  return { x, y };
+};
+
 const injectInvalidGraphDraft = async (page: Page) => {
   await page.evaluate(() => {
     window.__NEURALSOUP_TEST_API__?.injectInvalidGraphDraft();
@@ -1262,6 +1278,8 @@ test('graph view keeps additive drag selection in sync when shift-dragging an al
 });
 
 test('graph view supports wheel zoom, stable right-drag pan, clears marquee, and ends node drag on mouseup', async ({ page }, testInfo) => {
+  test.slow();
+
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
   }
@@ -1320,6 +1338,66 @@ test('graph view supports wheel zoom, stable right-drag pan, clears marquee, and
 
   await canvas.click();
   await expect(page.locator(selectors.topologySelectedCount)).toHaveText('0');
+});
+
+test('graph view allows dragging a node beyond the current canvas bounds', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
+
+  const beforeCenter = await getNodeCenterFromSummary(page, 'neuron-1');
+  const canvasBox = await getCanvasBox(page);
+  const dragTarget = {
+    x: canvasBox.x + canvasBox.width + 180,
+    y: canvasBox.y + canvasBox.height + 160,
+  };
+
+  await dragOnCanvas(page, await getLocatorCenter(page, selectors.nodeNeuronOne), dragTarget);
+
+  await expect
+    .poll(() => getNodeCenterFromSummary(page, 'neuron-1'))
+    .toMatchObject({
+      x: expect.any(Number),
+      y: expect.any(Number),
+    });
+
+  const afterCenter = await getNodeCenterFromSummary(page, 'neuron-1');
+  expect(afterCenter.x).toBeGreaterThan(beforeCenter.x + 180);
+  expect(afterCenter.y).toBeGreaterThan(beforeCenter.y + 140);
+});
+
+test('graph view allows dragging a node beyond the current canvas bounds toward the top-left', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
+
+  const beforePosition = await getNodeViewPositionFromSummary(page, 'neuron-1');
+  const canvasBox = await getCanvasBox(page);
+  const dragTarget = {
+    x: canvasBox.x - 220,
+    y: canvasBox.y - 180,
+  };
+
+  await dragOnCanvas(page, await getLocatorCenter(page, selectors.nodeNeuronOne), dragTarget);
+
+  await expect
+    .poll(() => getNodeViewPositionFromSummary(page, 'neuron-1'))
+    .toMatchObject({
+      x: expect.any(Number),
+      y: expect.any(Number),
+    });
+
+  const settledPosition = await getNodeViewPositionFromSummary(page, 'neuron-1');
+  expect(settledPosition.x).toBeLessThan(beforePosition.x - 180);
+  expect(settledPosition.y).toBeLessThan(beforePosition.y - 140);
 });
 
 test('graph view keeps context menu visible and actionable near the canvas edge', async ({ page }, testInfo) => {

@@ -19,6 +19,7 @@ interface GraphTopologyDiagnosticsProps {
   selectedNodeId: string | null;
   selectedLinkId: string | null;
   nodeCentersSummary: string;
+  nodeViewPositionsSummary: string;
   currentScope: 'root' | 'child';
   canvasViewport: GraphCanvasViewport;
   canvasScale: number;
@@ -36,6 +37,7 @@ const GraphTopologyDiagnostics: React.FC<GraphTopologyDiagnosticsProps> = ({
   selectedNodeId,
   selectedLinkId,
   nodeCentersSummary,
+  nodeViewPositionsSummary,
   currentScope,
   canvasViewport,
   canvasScale,
@@ -76,6 +78,7 @@ const GraphTopologyDiagnostics: React.FC<GraphTopologyDiagnosticsProps> = ({
         <span data-testid="topology-output-count">{draftSummary.outputSignalCount}</span>
         <span data-testid="topology-validation-count">{draftValidationCount}</span>
         <span data-testid="topology-node-centers">{nodeCentersSummary}</span>
+        <span data-testid="topology-node-view-positions">{nodeViewPositionsSummary}</span>
         <span data-testid="topology-scope">{currentScope}</span>
         <span data-testid="topology-canvas-offset">{`${Math.round(canvasViewport.x)},${Math.round(canvasViewport.y)}`}</span>
         <span data-testid="topology-canvas-scale">{canvasScale.toFixed(2)}</span>

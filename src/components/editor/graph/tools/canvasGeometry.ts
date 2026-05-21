@@ -59,18 +59,10 @@ export const isPointInsideRect = (point: GraphPoint, rect: GraphRect) =>
   point.y <= rect.y + rect.height;
 
 export const clampNodePlacement = (
-  point: GraphPoint,
-  node: GraphSize,
-  scene: GraphSize
+  point: GraphPoint
 ): GraphPoint => ({
-  x: Math.min(
-    Math.max(NODE_PLACEMENT_MARGIN, Math.round(point.x)),
-    Math.max(NODE_PLACEMENT_MARGIN, Math.round(scene.width - node.width - NODE_PLACEMENT_MARGIN))
-  ),
-  y: Math.min(
-    Math.max(NODE_PLACEMENT_MARGIN, Math.round(point.y)),
-    Math.max(NODE_PLACEMENT_MARGIN, Math.round(scene.height - node.height - NODE_PLACEMENT_MARGIN))
-  ),
+  x: Math.round(point.x),
+  y: Math.round(point.y),
 });
 
 export const getScenePointFromClient = (

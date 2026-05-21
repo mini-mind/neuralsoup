@@ -14,7 +14,6 @@ import {
   CHILD_SCOPE_OFFSET,
   isContainerNode,
   isLeafNode,
-  MIN_NODE_POSITION,
   type GraphViewNode,
 } from '../editor/graph/graphViewModel';
 import { canGraphNodesConnect } from '../editor/graph/graphLinkPolicy';
@@ -53,9 +52,9 @@ const getNextNumericId = (ids: Iterable<string>, prefix: string) => {
   return maxId + 1;
 };
 
-const clampNodePosition = ({ x, y }: GraphPoint): Position => ({
-  x: Math.max(MIN_NODE_POSITION, Math.round(x)),
-  y: Math.max(MIN_NODE_POSITION, Math.round(y)),
+const toRoundedPosition = ({ x, y }: GraphPoint): Position => ({
+  x: Math.round(x),
+  y: Math.round(y),
 });
 
 const getLeafPortId = (node: NeuronNode | SignalNode, direction: 'input' | 'output') => {
@@ -68,13 +67,13 @@ const getLeafPortId = (node: NeuronNode | SignalNode, direction: 'input' | 'outp
 
 const toStoredPosition = (position: GraphPoint, scope: 'root' | 'child'): Position => {
   if (scope === 'child') {
-    return clampNodePosition({
+    return toRoundedPosition({
       x: position.x - CHILD_SCOPE_OFFSET.x,
       y: position.y - CHILD_SCOPE_OFFSET.y,
     });
   }
 
-  return clampNodePosition(position);
+  return toRoundedPosition(position);
 };
 
 const updateChildrenAtPath = (
@@ -489,8 +488,8 @@ export const useGraphEditorCommands = ({
         }
 
         return cloneTopologyNodeWithPosition(child, {
-          x: Math.max(MIN_NODE_POSITION, Math.round(viewNode.x - minX)),
-          y: Math.max(MIN_NODE_POSITION, Math.round(viewNode.y - minY)),
+          x: Math.round(viewNode.x - minX),
+          y: Math.round(viewNode.y - minY),
         });
       }),
     };
