@@ -9,6 +9,8 @@ interface GraphViewSessionControllerNode extends SceneNodeGeometry {
   local: boolean;
   connectableSource: boolean;
   ungroupable: boolean;
+  expanded: boolean;
+  expansionParentId: string | null;
 }
 
 interface GraphViewSessionControllerOptions {

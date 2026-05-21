@@ -28,6 +28,8 @@ interface OrchestratorNode extends SceneNodeGeometry {
   local: boolean;
   connectableSource: boolean;
   ungroupable: boolean;
+  expanded: boolean;
+  expansionParentId: string | null;
 }
 
 interface GraphInteractionDependencies {
@@ -465,6 +467,21 @@ export const useGraphInteractionOrchestrator = ({
                 !candidate.proxy
             )
           : [pressedNode];
+        const movingNodeIds = new Set(movingNodes.map((candidate) => candidate.id));
+        if (pressedNode.expanded) {
+          for (const candidate of nodesRef.current) {
+            if (
+              candidate.expansionParentId === pressedNode.id &&
+              candidate.movable &&
+              candidate.local &&
+              !candidate.proxy &&
+              !movingNodeIds.has(candidate.id)
+            ) {
+              movingNodes.push(candidate);
+              movingNodeIds.add(candidate.id);
+            }
+          }
+        }
         const basePositions = Object.fromEntries(
           movingNodes.map((candidate) => [
             candidate.id,

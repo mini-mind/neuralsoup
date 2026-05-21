@@ -54,6 +54,7 @@ interface GraphTopologyCanvasProps {
   onAddNeuronGroupAt: (x: number, y: number) => void;
   onAggregateSelectedNodes: () => void;
   onUngroupNode: (nodeId: string) => void;
+  onToggleGroupExpanded: (nodeId: string) => void;
 }
 
 const formatWeight = (weight: number) => (Number.isInteger(weight) ? `${weight}` : weight.toFixed(2));
@@ -90,6 +91,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
   onAddNeuronGroupAt,
   onAggregateSelectedNodes,
   onUngroupNode,
+  onToggleGroupExpanded,
 }) => {
   const normalizedSelectionRect = selectionRect ? normalizeRect(selectionRect) : null;
   const pendingNodeIds = interaction?.type === 'linking' ? interaction.sourceNodeIds : [];
@@ -169,17 +171,30 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
             </button>
           )}
           {contextMenu.kind === 'group' && canUngroupSelection && contextMenu.nodeIds.length === 1 && (
-            <button
-              type="button"
-              className="topology-context-menu-item"
-              data-testid="topology-context-ungroup"
-              onClick={() => {
-                onUngroupNode(contextMenu.nodeIds[0]);
-                onCloseContextMenu();
-              }}
-            >
-              拆开组
-            </button>
+            <>
+              <button
+                type="button"
+                className="topology-context-menu-item"
+                data-testid="topology-context-toggle-group"
+                onClick={() => {
+                  onToggleGroupExpanded(contextMenu.nodeIds[0]);
+                  onCloseContextMenu();
+                }}
+              >
+                {scene.map.get(contextMenu.nodeIds[0])?.expanded ? '收起' : '展开'}
+              </button>
+              <button
+                type="button"
+                className="topology-context-menu-item"
+                data-testid="topology-context-ungroup"
+                onClick={() => {
+                  onUngroupNode(contextMenu.nodeIds[0]);
+                  onCloseContextMenu();
+                }}
+              >
+                拆开组
+              </button>
+            </>
           )}
         </div>
       )}
@@ -274,6 +289,8 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
             'topology-node',
             node.leaf ? 'is-leaf' : 'is-group',
             `is-${node.kind}`,
+            node.expanded ? 'is-expanded' : '',
+            node.expansionParentId ? 'is-expanded-child' : '',
             selected ? 'is-selected' : '',
             active ? 'is-active' : '',
             pending ? 'is-pending' : '',

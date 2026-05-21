@@ -43,6 +43,7 @@ const selectors = {
   topologyContextNewNeuron: '[data-testid="topology-context-new-neuron"]',
   topologyContextNewGroup: '[data-testid="topology-context-new-group"]',
   topologyContextAggregate: '[data-testid="topology-context-aggregate"]',
+  topologyContextToggleGroup: '[data-testid="topology-context-toggle-group"]',
   topologyContextUngroup: '[data-testid="topology-context-ungroup"]',
   topologyDetailModal: '[data-testid="topology-detail-modal"]',
   topologyDetailModalOverlay: '[data-testid="topology-detail-modal-overlay"]',
@@ -1232,6 +1233,59 @@ test('graph view opens selection context menu and aggregates selected nodes', as
   await expect(page.locator(selectors.topologyContextMenu)).toHaveCount(0);
   await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
   await expect(page.locator('[data-testid^="topology-node-group-"]')).toHaveCount(1);
+});
+
+test('graph view expands a group in place and moves children with the group frame', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
+  await expect(page.locator(selectors.nodeNeuronTwo)).toBeVisible();
+
+  await page.locator(selectors.nodeNeuronOne).click();
+  await page.locator(selectors.nodeNeuronTwo).click({ modifiers: ['Shift'] });
+  const nodeTwoCenter = await getLocatorCenter(page, selectors.nodeNeuronTwo);
+  await page.mouse.move(nodeTwoCenter.x, nodeTwoCenter.y);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.up({ button: 'right' });
+  await expect(page.locator(selectors.topologyContextMenu)).toBeVisible();
+  await page.locator(selectors.topologyContextAggregate).click();
+
+  const groupSelector = '[data-testid^="topology-node-group-"]';
+  await expect(page.locator(groupSelector)).toHaveCount(1);
+  const groupCenter = await getLocatorCenter(page, groupSelector);
+  await page.mouse.move(groupCenter.x, groupCenter.y);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.up({ button: 'right' });
+  await expect(page.locator(selectors.topologyContextToggleGroup)).toHaveText('展开');
+  await page.locator(selectors.topologyContextToggleGroup).click();
+
+  await expect(page.locator(groupSelector)).toHaveClass(/is-expanded/);
+  await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
+  await expect(page.locator(selectors.nodeNeuronTwo)).toBeVisible();
+
+  const expandedGroupBox = await getLocatorBox(page, groupSelector);
+  const expandedNodeOneBox = await getLocatorBox(page, selectors.nodeNeuronOne);
+  expect(expandedNodeOneBox.x).toBeGreaterThan(expandedGroupBox.x);
+  expect(expandedNodeOneBox.y).toBeGreaterThan(expandedGroupBox.y);
+  expect(expandedNodeOneBox.x + expandedNodeOneBox.width).toBeLessThan(expandedGroupBox.x + expandedGroupBox.width);
+  expect(expandedNodeOneBox.y + expandedNodeOneBox.height).toBeLessThan(expandedGroupBox.y + expandedGroupBox.height);
+
+  const beforeGroup = await getLocatorCenter(page, groupSelector);
+  const groupDragHandle = {
+    x: expandedGroupBox.x + expandedGroupBox.width - 22,
+    y: expandedGroupBox.y + 18
+  };
+  const beforeChild = await getLocatorCenter(page, selectors.nodeNeuronOne);
+  await dragOnCanvas(page, groupDragHandle, { x: groupDragHandle.x + 72, y: groupDragHandle.y + 38 });
+  const afterGroup = await getLocatorCenter(page, groupSelector);
+  const afterChild = await getLocatorCenter(page, selectors.nodeNeuronOne);
+
+  expect(Math.abs(afterChild.x - beforeChild.x - (afterGroup.x - beforeGroup.x))).toBeLessThanOrEqual(2);
+  expect(Math.abs(afterChild.y - beforeChild.y - (afterGroup.y - beforeGroup.y))).toBeLessThanOrEqual(2);
 });
 
 test('graph view keeps multi-selection when dragging an already selected node', async ({ page }, testInfo) => {

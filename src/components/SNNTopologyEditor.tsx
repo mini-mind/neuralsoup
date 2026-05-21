@@ -79,6 +79,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
     createNeuronAndConnectAt,
     aggregateSelectedNodes,
     ungroupNode,
+    toggleGroupExpanded,
     setCanvasOffset: setCanvasOffsetState,
     setCanvasScale: setCanvasScaleState,
     canvasViewport,
@@ -204,6 +205,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
         onAddNeuronGroupAt={addNeuronGroupAt}
         onAggregateSelectedNodes={aggregateSelectedNodes}
         onUngroupNode={ungroupNode}
+        onToggleGroupExpanded={toggleGroupExpanded}
       />
 
       <GraphDetailModal

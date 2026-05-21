@@ -527,6 +527,7 @@ export const useSNNTopologyState = ({
     createNeuronAndConnectAt,
     aggregateSelectedNodes,
     ungroupNode,
+    toggleGroupExpanded,
     updateNodeLabelAndParams,
     updateLinkWeight,
   } = useGraphEditorCommands({
@@ -610,6 +611,7 @@ export const useSNNTopologyState = ({
     createNeuronAndConnectAt,
     aggregateSelectedNodes,
     ungroupNode,
+    toggleGroupExpanded,
     clearDraftNodePositions,
     setCanvasOffset,
     setCanvasScale: setCanvasScaleState,

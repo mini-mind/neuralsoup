@@ -12,6 +12,7 @@ import type {
 } from '../../domain/brain';
 import {
   CHILD_SCOPE_OFFSET,
+  EXPANDED_GROUP_PADDING,
   LEAF_NODE_SIZE,
   isContainerNode,
   isLeafNode,
@@ -75,6 +76,41 @@ const toStoredPosition = (position: GraphPoint, scope: 'root' | 'child'): Positi
   }
 
   return toRoundedPosition(position);
+};
+
+const clampPositionInsideExpandedParent = (position: GraphPoint, viewNode: GraphViewNode, parentNode: GraphViewNode): GraphPoint => ({
+  x: Math.round(
+    Math.min(
+      Math.max(position.x, parentNode.x + EXPANDED_GROUP_PADDING),
+      parentNode.x + parentNode.width - EXPANDED_GROUP_PADDING - viewNode.width
+    )
+  ),
+  y: Math.round(
+    Math.min(
+      Math.max(position.y, parentNode.y + EXPANDED_GROUP_PADDING),
+      parentNode.y + parentNode.height - EXPANDED_GROUP_PADDING - viewNode.height
+    )
+  ),
+});
+
+const toStoredPositionForViewNode = (
+  position: GraphPoint,
+  viewNode: GraphViewNode,
+  viewNodeById: Map<string, GraphViewNode>,
+  scope: 'root' | 'child'
+): Position => {
+  if (viewNode.expansionParentId) {
+    const parentNode = viewNodeById.get(viewNode.expansionParentId);
+    if (parentNode) {
+      const clampedPosition = clampPositionInsideExpandedParent(position, viewNode, parentNode);
+      return toRoundedPosition({
+        x: clampedPosition.x - parentNode.x,
+        y: clampedPosition.y - parentNode.y,
+      });
+    }
+  }
+
+  return toStoredPosition(position, scope);
 };
 
 const updateChildrenAtPath = (
@@ -322,7 +358,7 @@ export const useGraphEditorCommands = ({
             continue;
           }
 
-          nextDrafts[viewNode.refNodeId] = toStoredPosition(update, currentScope);
+          nextDrafts[viewNode.refNodeId] = toStoredPositionForViewNode(update, viewNode, viewNodeById, currentScope);
         }
         return nextDrafts;
       });
@@ -366,7 +402,7 @@ export const useGraphEditorCommands = ({
           continue;
         }
 
-        positions[viewNode.refNodeId] = toStoredPosition(update, currentScope);
+        positions[viewNode.refNodeId] = toStoredPositionForViewNode(update, viewNode, viewNodeById, currentScope);
       }
 
       if (Object.keys(positions).length === 0) {
@@ -509,6 +545,8 @@ export const useGraphEditorCommands = ({
         direction: 'internal',
         connectableSource: true,
         connectableTarget: true,
+        expanded: false,
+        expansionParentId: null,
       };
 
       const uniqueSourceNodeIds = uniqueIds(sourceNodeIds);
@@ -720,6 +758,30 @@ export const useGraphEditorCommands = ({
     ]
   );
 
+  const toggleGroupExpanded = useCallback(
+    (nodeId: string) => {
+      setDocument(
+        (current) => ({
+          ...current,
+          root: updateNodeById(current.root, nodeId, (node) => {
+            if (node.kind !== 'neuron-group') {
+              return node;
+            }
+
+            return {
+              ...node,
+              collapsed: node.collapsed === false ? true : false,
+            };
+          }),
+        }),
+        { installToRuntime: false }
+      );
+      clearSelectionRect();
+      clearDraftNodePositions();
+    },
+    [clearDraftNodePositions, clearSelectionRect, setDocument]
+  );
+
   const updateNodeLabelAndParams = useCallback(
     (nodeId: string, payload: { label: string; parameterOverrides?: Record<string, LiteralValue> }) => {
       setDocument((current) => ({
@@ -771,6 +833,7 @@ export const useGraphEditorCommands = ({
     createNeuronAndConnectAt,
     aggregateSelectedNodes,
     ungroupNode,
+    toggleGroupExpanded,
     updateNodeLabelAndParams,
     updateLinkWeight,
   };
