@@ -112,11 +112,19 @@ export const stepBrainProgram = (
     nextSpikes.set(neuron.id, 0);
   }
 
-  for (const signalNode of program.signalNodes.filter((node) => node.direction === 'output')) {
-    const totalSignal = signalNode.inputConnections.reduce((sum, connection) => (
-      sum + resolveConnectionSignal(connection.sourceNodeId) * connection.weight
-    ), 0);
+  for (const signalNode of program.signalNodes) {
+    if (program.inputBindings.some((binding) => binding.nodeId === signalNode.id)) {
+      continue;
+    }
+
+    const totalSignal = signalNode.inputConnections.reduce(
+      (sum, connection) => sum + resolveConnectionSignal(connection.sourceNodeId) * connection.weight,
+      0
+    );
     nextSignals.set(signalNode.id, totalSignal);
+    if (Math.abs(totalSignal) > ACTIVE_SIGNAL_EPSILON) {
+      activeLeafNodeIds.add(signalNode.id);
+    }
   }
 
   const outputs = program.outputBindings.reduce<Record<BrainOutputChannel, number>>(

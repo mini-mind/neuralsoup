@@ -371,6 +371,90 @@ const createDefaultGraphIROutputSignals = (): SignalNode[] =>
     },
   }));
 
+const createDefaultCoreInputSignals = (): SignalNode[] => [
+  {
+    kind: 'signal',
+    id: 'core-input-R',
+    label: 'R输入',
+    modelId: GRAPH_IR_SIGNAL_MODEL_ID,
+    direction: 'input',
+    signal: {
+      id: 'vision-r',
+      valueType: 'number',
+      doc: VISION_SIGNAL_DOC,
+    },
+    position: { x: -110, y: 120 },
+  },
+  {
+    kind: 'signal',
+    id: 'core-input-G',
+    label: 'G输入',
+    modelId: GRAPH_IR_SIGNAL_MODEL_ID,
+    direction: 'input',
+    signal: {
+      id: 'vision-g',
+      valueType: 'number',
+      doc: VISION_SIGNAL_DOC,
+    },
+    position: { x: -110, y: 190 },
+  },
+  {
+    kind: 'signal',
+    id: 'core-input-B',
+    label: 'B输入',
+    modelId: GRAPH_IR_SIGNAL_MODEL_ID,
+    direction: 'input',
+    signal: {
+      id: 'vision-b',
+      valueType: 'number',
+      doc: VISION_SIGNAL_DOC,
+    },
+    position: { x: -110, y: 260 },
+  },
+];
+
+const createDefaultCoreOutputSignals = (): SignalNode[] => [
+  {
+    kind: 'signal',
+    id: 'core-output-turn-left',
+    label: '左转输出',
+    modelId: GRAPH_IR_SIGNAL_MODEL_ID,
+    direction: 'output',
+    signal: {
+      id: 'turn-left',
+      valueType: 'number',
+      doc: MOTOR_SIGNAL_DOC,
+    },
+    position: { x: 270, y: 120 },
+  },
+  {
+    kind: 'signal',
+    id: 'core-output-move-forward',
+    label: '前进输出',
+    modelId: GRAPH_IR_SIGNAL_MODEL_ID,
+    direction: 'output',
+    signal: {
+      id: 'move-forward',
+      valueType: 'number',
+      doc: MOTOR_SIGNAL_DOC,
+    },
+    position: { x: 270, y: 190 },
+  },
+  {
+    kind: 'signal',
+    id: 'core-output-turn-right',
+    label: '右转输出',
+    modelId: GRAPH_IR_SIGNAL_MODEL_ID,
+    direction: 'output',
+    signal: {
+      id: 'turn-right',
+      valueType: 'number',
+      doc: MOTOR_SIGNAL_DOC,
+    },
+    position: { x: 270, y: 260 },
+  },
+];
+
 const createDefaultGraphIRLinks = (visionCells: number): LeafLink[] => {
   const links: LeafLink[] = [];
 
@@ -383,8 +467,8 @@ const createDefaultGraphIRLinks = (visionCells: number): LeafLink[] => {
           portId: 'out',
         },
         to: {
-          nodeId: 'neuron-1',
-          portId: 'dendrite',
+          nodeId: 'core-input-R',
+          portId: 'in',
         },
         weight: 1,
       },
@@ -395,8 +479,8 @@ const createDefaultGraphIRLinks = (visionCells: number): LeafLink[] => {
           portId: 'out',
         },
         to: {
-          nodeId: 'neuron-1',
-          portId: 'dendrite',
+          nodeId: 'core-input-G',
+          portId: 'in',
         },
         weight: 0.75,
       },
@@ -407,8 +491,8 @@ const createDefaultGraphIRLinks = (visionCells: number): LeafLink[] => {
           portId: 'out',
         },
         to: {
-          nodeId: 'neuron-2',
-          portId: 'dendrite',
+          nodeId: 'core-input-B',
+          portId: 'in',
         },
         weight: 0.75,
       }
@@ -416,6 +500,42 @@ const createDefaultGraphIRLinks = (visionCells: number): LeafLink[] => {
   }
 
   links.push(
+    {
+      id: 'link-core-input-R-neuron-1',
+      from: {
+        nodeId: 'core-input-R',
+        portId: 'out',
+      },
+      to: {
+        nodeId: 'neuron-1',
+        portId: 'dendrite',
+      },
+      weight: 1,
+    },
+    {
+      id: 'link-core-input-G-neuron-1',
+      from: {
+        nodeId: 'core-input-G',
+        portId: 'out',
+      },
+      to: {
+        nodeId: 'neuron-1',
+        portId: 'dendrite',
+      },
+      weight: 0.75,
+    },
+    {
+      id: 'link-core-input-B-neuron-2',
+      from: {
+        nodeId: 'core-input-B',
+        portId: 'out',
+      },
+      to: {
+        nodeId: 'neuron-2',
+        portId: 'dendrite',
+      },
+      weight: 0.75,
+    },
     {
       id: 'link-neuron-1-neuron-2',
       from: {
@@ -435,6 +555,18 @@ const createDefaultGraphIRLinks = (visionCells: number): LeafLink[] => {
         portId: 'axon',
       },
       to: {
+        nodeId: 'core-output-move-forward',
+        portId: 'in',
+      },
+      weight: 1,
+    },
+    {
+      id: 'link-core-output-move-forward-output-move-forward',
+      from: {
+        nodeId: 'core-output-move-forward',
+        portId: 'out',
+      },
+      to: {
         nodeId: 'output-move-forward',
         portId: 'in',
       },
@@ -445,6 +577,18 @@ const createDefaultGraphIRLinks = (visionCells: number): LeafLink[] => {
       from: {
         nodeId: 'neuron-2',
         portId: 'axon',
+      },
+      to: {
+        nodeId: 'core-output-turn-left',
+        portId: 'in',
+      },
+      weight: 1,
+    },
+    {
+      id: 'link-core-output-turn-left-output-turn-left',
+      from: {
+        nodeId: 'core-output-turn-left',
+        portId: 'out',
       },
       to: {
         nodeId: 'output-turn-left',
@@ -459,6 +603,18 @@ const createDefaultGraphIRLinks = (visionCells: number): LeafLink[] => {
         portId: 'axon',
       },
       to: {
+        nodeId: 'core-output-turn-right',
+        portId: 'in',
+      },
+      weight: 1,
+    },
+    {
+      id: 'link-core-output-turn-right-output-turn-right',
+      from: {
+        nodeId: 'core-output-turn-right',
+        portId: 'out',
+      },
+      to: {
         nodeId: 'output-turn-right',
         portId: 'in',
       },
@@ -470,6 +626,8 @@ const createDefaultGraphIRLinks = (visionCells: number): LeafLink[] => {
 };
 
 export const createDefaultGraphIRDocument = (visionCells: number = 36): GraphIRDocument => {
+  const rootInputSignals = createDefaultGraphIRInputSignals(visionCells);
+  const rootOutputSignals = createDefaultGraphIROutputSignals();
   const document: GraphIRDocument = {
     version: 1,
     models: createDefaultGraphIRModels(),
@@ -482,14 +640,32 @@ export const createDefaultGraphIRDocument = (visionCells: number = 36): GraphIRD
           label: '视觉输入',
           adapterType: 'input',
           position: { x: -260, y: 180 },
-          children: createDefaultGraphIRInputSignals(visionCells),
+          children: rootInputSignals,
         },
         {
           kind: 'neuron-group',
           id: 'core-neuron-group',
           label: '默认神经元组',
           position: { x: 50, y: 200 },
-          children: createDefaultGraphIRNeurons(),
+          children: [
+            {
+              kind: 'adapter',
+              id: 'core-input-adapter',
+              label: '组输入',
+              adapterType: 'input',
+              position: { x: -120, y: 170 },
+              children: createDefaultCoreInputSignals(),
+            },
+            ...createDefaultGraphIRNeurons(),
+            {
+              kind: 'adapter',
+              id: 'core-output-adapter',
+              label: '组输出',
+              adapterType: 'output',
+              position: { x: 260, y: 180 },
+              children: createDefaultCoreOutputSignals(),
+            },
+          ],
         },
         {
           kind: 'adapter',
@@ -497,7 +673,7 @@ export const createDefaultGraphIRDocument = (visionCells: number = 36): GraphIRD
           label: '运动输出',
           adapterType: 'output',
           position: { x: 320, y: 200 },
-          children: createDefaultGraphIROutputSignals(),
+          children: rootOutputSignals,
         },
       ],
       links: createDefaultGraphIRLinks(visionCells),
@@ -519,10 +695,19 @@ export const reconcileGraphIRDocumentVisionCells = (
   const nextDefault = createDefaultGraphIRDocument(visionCells);
   const nextInputAdapter = nextDefault.root.children.find((node) => node.id === 'input-adapter');
   const nextOutputAdapter = nextDefault.root.children.find((node) => node.id === 'output-adapter');
+  const nextCoreGroup = nextDefault.root.children.find((node) => node.id === 'core-neuron-group');
   const currentInputAdapter = document.root.children.find((node) => node.id === 'input-adapter');
   const currentOutputAdapter = document.root.children.find((node) => node.id === 'output-adapter');
+  const currentCoreGroup = document.root.children.find((node) => node.id === 'core-neuron-group');
 
-  if (!nextInputAdapter || nextInputAdapter.kind !== 'adapter' || !nextOutputAdapter || nextOutputAdapter.kind !== 'adapter') {
+  if (
+    !nextInputAdapter ||
+    nextInputAdapter.kind !== 'adapter' ||
+    !nextOutputAdapter ||
+    nextOutputAdapter.kind !== 'adapter' ||
+    !nextCoreGroup ||
+    nextCoreGroup.kind !== 'neuron-group'
+  ) {
     return document;
   }
 
@@ -545,6 +730,31 @@ export const reconcileGraphIRDocumentVisionCells = (
     });
   };
 
+  const currentCoreChildrenById =
+    currentCoreGroup && currentCoreGroup.kind === 'neuron-group'
+      ? new Map(currentCoreGroup.children.map((child) => [child.id, child]))
+      : new Map<string, TopologyNode>();
+
+  const nextCoreChildren = nextCoreGroup.children.map((child) => {
+    const currentChild = currentCoreChildrenById.get(child.id);
+
+    if (child.kind === 'adapter') {
+      return {
+        ...child,
+        ...(currentChild?.kind === 'adapter' ? currentChild : {}),
+        children: mergeAdapterChildren(currentChild?.kind === 'adapter' ? currentChild : undefined, child),
+      };
+    }
+
+    return currentChild?.kind === child.kind ? currentChild : child;
+  });
+  const nextCoreChildIds = new Set(nextCoreChildren.map((child) => child.id));
+  const preservedCustomCoreChildren =
+    currentCoreGroup && currentCoreGroup.kind === 'neuron-group'
+      ? currentCoreGroup.children.filter((child) => !nextCoreChildIds.has(child.id))
+      : [];
+  const mergedCoreChildren = [...nextCoreChildren, ...preservedCustomCoreChildren];
+
   const nextRootChildren = document.root.children.map((node) => {
     if (node.id === 'input-adapter' && node.kind === 'adapter') {
       return {
@@ -560,19 +770,15 @@ export const reconcileGraphIRDocumentVisionCells = (
       };
     }
 
+    if (node.id === 'core-neuron-group' && node.kind === 'neuron-group') {
+      return {
+        ...node,
+        children: mergedCoreChildren,
+      };
+    }
+
     return node;
   });
-
-  if (!currentInputAdapter || currentInputAdapter.kind !== 'adapter') {
-    return {
-      ...document,
-      root: {
-        ...document.root,
-        children: nextRootChildren,
-        links: document.root.links,
-      },
-    };
-  }
 
   const validNodeIds = new Set<string>([
     ...collectSignalNodes(nextRootChildren, 'input').map((node) => node.id),

@@ -221,7 +221,6 @@ export type GraphIRValidationIssueCode =
   | 'duplicate-leaf-link-endpoints'
   | 'missing-node-model'
   | 'invalid-node-model-kind'
-  | 'adapter-not-root-child'
   | 'adapter-child-not-signal'
   | 'missing-link-node'
   | 'missing-link-port'
@@ -305,7 +304,6 @@ const compareSignalDefinitions = (left: SignalDefinition, right: SignalDefinitio
 
 const walkTopology = (
   nodes: TopologyNode[],
-  parentKind: 'root' | 'neuron-group' | 'adapter',
   nodeIndex: Map<string, IndexedTopologyNode>,
   issues: GraphIRValidationIssue[]
 ): void => {
@@ -322,15 +320,8 @@ const walkTopology = (
       });
     }
 
-    if (node.kind === 'adapter' && parentKind !== 'root') {
-      issues.push({
-        code: 'adapter-not-root-child',
-        message: `Adapter node "${node.id}" must be a direct child of root.`,
-      });
-    }
-
     if (node.kind === 'neuron-group') {
-      walkTopology(node.children, 'neuron-group', nodeIndex, issues);
+      walkTopology(node.children, nodeIndex, issues);
       continue;
     }
 
@@ -344,7 +335,7 @@ const walkTopology = (
         }
       }
 
-      walkTopology(node.children, 'adapter', nodeIndex, issues);
+      walkTopology(node.children, nodeIndex, issues);
     }
   }
 };
@@ -429,7 +420,7 @@ export const validateGraphIRDocument = (document: GraphIRDocument): GraphIRValid
   }
 
   const nodeIndex = new Map<string, IndexedTopologyNode>();
-  walkTopology(document.root.children, 'root', nodeIndex, issues);
+  walkTopology(document.root.children, nodeIndex, issues);
   issues.push(...collectTopologyModelIssues(nodeIndex.values(), modelsById));
 
   const duplicateLinkIds = collectDuplicateValues(document.root.links.map((link) => link.id));

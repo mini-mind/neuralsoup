@@ -130,7 +130,7 @@ export interface AdapterNode {
 }
 ```
 
-Adapter 只允许出现在顶层 root children 中。每个 adapter 是非叶子节点，内部叶子节点是 `SignalNode`。
+Adapter 可出现在 root 或任意 `neuron-group` 内。每个 adapter 都是非叶子节点，内部叶子节点只能是 `SignalNode`。只有 root 直系 adapter 承担 world input/output 边界绑定；嵌套 adapter 用于组内对外连接中转。
 
 ### 叶子连接
 
@@ -208,13 +208,13 @@ export interface AggregateLinkView {
 
 - 新增 `src/domain/brain/ir.ts` 或 `src/domain/brain/ir/`。
 - 定义 `GraphIRDocument`、`ModelDefinition`、`TopologyNode`、`LeafLink`。
-- 新增校验器，覆盖模型 ID、端口、树结构、叶子连接和 adapter 位置。
+- 新增校验器，覆盖模型 ID、端口、树结构、叶子连接和 adapter 子节点约束。
 - 新增 `tests/domain/graph-ir.contract.test.ts`。
 
 验收：
 
 - `npm run type-check` 通过。
-- `npm run test:domain` 覆盖合法 IR、非法端口、非叶子连接、adapter 非顶层、重复 ID。
+- `npm run test:domain` 覆盖合法 IR、非法端口、非叶子连接、adapter 非 signal 子节点、重复 ID。
 
 ### Phase 2：默认 graph 改为新 IR
 
@@ -278,5 +278,5 @@ export interface AggregateLinkView {
 - 连接真源只允许存在于叶子节点端口之间。
 - 非叶子连接是派生统计视图，不写入 IR，不参与 runtime 编译。
 - `synapse` 不作为实例节点或模型定义出现。
-- adapter 是顶层非叶子节点，内部只包含 `SignalNode`。
+- adapter 可嵌套在任意容器下，内部只包含 `SignalNode`；只有顶层 adapter 参与 world 边界绑定。
 - GraphView、runtime compiler 和 domain tests 使用同一套新 IR。

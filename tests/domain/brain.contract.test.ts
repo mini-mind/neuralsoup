@@ -17,7 +17,7 @@ test('default GraphIR document compiles into a runtime program with vision-align
   assert.equal(program.inputPorts.length, 72);
   assert.equal(program.outputPorts.length, 3);
   assert.equal(program.neuronNodes.length, 2);
-  assert.equal(program.signalNodes.length, 75);
+  assert.equal(program.signalNodes.length, 81);
   assert.deepEqual(
     program.outputPorts.map((output) => output.channel),
     ['turn-left', 'move-forward', 'turn-right']
@@ -32,13 +32,13 @@ test('default GraphIR summary reflects leaf topology counts', () => {
   const document = createDefaultGraphIRDocument(4);
 
   assert.deepEqual(summarizeGraphIRDocument(document), {
-    inputSignalCount: 12,
-    outputSignalCount: 3,
+    inputSignalCount: 15,
+    outputSignalCount: 6,
     neuronCount: 2,
-    leafLinkCount: 16,
+    leafLinkCount: 22,
   });
-  assert.equal(collectSignalNodes(document.root.children, 'input').length, 12);
-  assert.equal(collectSignalNodes(document.root.children, 'output').length, 3);
+  assert.equal(collectSignalNodes(document.root.children, 'input').length, 15);
+  assert.equal(collectSignalNodes(document.root.children, 'output').length, 6);
   assert.equal(collectNeuronNodes(document.root.children).length, 2);
 });
 

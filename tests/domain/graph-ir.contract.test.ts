@@ -6,6 +6,7 @@ import {
   createBrainProgramRuntimeState,
   createDefaultGraphIRDocument,
   GraphIRValidationError,
+  reconcileGraphIRDocumentVisionCells,
   stepBrainProgram,
   type GraphIRDocument,
   validateGraphIRDocument,
@@ -306,7 +307,7 @@ test('validation rejects duplicate topology node ids', () => {
   assert.equal(issues.some((issue) => issue.code === 'duplicate-topology-node-id'), true);
 });
 
-test('validation rejects adapter outside root', () => {
+test('validation allows adapter nested inside neuron-group for local boundary routing', () => {
   const document = createValidGraphIRDocument();
   const group = document.root.children[1];
   assert.ok(group && group.kind === 'neuron-group');
@@ -320,7 +321,8 @@ test('validation rejects adapter outside root', () => {
 
   const issues = validateGraphIRDocument(document);
 
-  assert.equal(issues.some((issue) => issue.code === 'adapter-not-root-child'), true);
+  assert.equal(issues.some((issue) => issue.code === 'adapter-child-not-signal'), false);
+  assert.deepEqual(issues, []);
 });
 
 test('validation rejects non-signal adapter children', () => {
@@ -644,10 +646,10 @@ test('default Graph IR document keeps default neuron-group semantics', () => {
   const neuronModel = document.models.find((model) => model.id === 'izhikevich-neuron');
 
   assert.ok(neuronGroup && neuronGroup.kind === 'neuron-group');
-  assert.equal(neuronGroup.children.length, 2);
+  assert.equal(neuronGroup.children.length, 4);
   assert.deepEqual(
     neuronGroup.children.map((node) => node.id),
-    ['neuron-1', 'neuron-2']
+    ['core-input-adapter', 'neuron-1', 'neuron-2', 'core-output-adapter']
   );
   assert.ok(neuronModel);
   assert.deepEqual(
@@ -680,18 +682,36 @@ test('default Graph IR document keeps default seed connectivity explicit', () =>
       {
         id: 'link-vision-R-0-neuron-1',
         from: 'vision-R-0',
-        to: 'neuron-1',
+        to: 'core-input-R',
         weight: 1,
       },
       {
         id: 'link-vision-G-0-neuron-1',
         from: 'vision-G-0',
-        to: 'neuron-1',
+        to: 'core-input-G',
         weight: 0.75,
       },
       {
         id: 'link-vision-B-0-neuron-2',
         from: 'vision-B-0',
+        to: 'core-input-B',
+        weight: 0.75,
+      },
+      {
+        id: 'link-core-input-R-neuron-1',
+        from: 'core-input-R',
+        to: 'neuron-1',
+        weight: 1,
+      },
+      {
+        id: 'link-core-input-G-neuron-1',
+        from: 'core-input-G',
+        to: 'neuron-1',
+        weight: 0.75,
+      },
+      {
+        id: 'link-core-input-B-neuron-2',
+        from: 'core-input-B',
         to: 'neuron-2',
         weight: 0.75,
       },
@@ -704,18 +724,36 @@ test('default Graph IR document keeps default seed connectivity explicit', () =>
       {
         id: 'link-neuron-1-output-move-forward',
         from: 'neuron-1',
+        to: 'core-output-move-forward',
+        weight: 1,
+      },
+      {
+        id: 'link-core-output-move-forward-output-move-forward',
+        from: 'core-output-move-forward',
         to: 'output-move-forward',
         weight: 1,
       },
       {
         id: 'link-neuron-2-output-turn-left',
         from: 'neuron-2',
+        to: 'core-output-turn-left',
+        weight: 1,
+      },
+      {
+        id: 'link-core-output-turn-left-output-turn-left',
+        from: 'core-output-turn-left',
         to: 'output-turn-left',
         weight: 1,
       },
       {
         id: 'link-neuron-2-output-turn-right',
         from: 'neuron-2',
+        to: 'core-output-turn-right',
+        weight: 1,
+      },
+      {
+        id: 'link-core-output-turn-right-output-turn-right',
+        from: 'core-output-turn-right',
         to: 'output-turn-right',
         weight: 1,
       },
@@ -759,6 +797,49 @@ test('compileGraphIRDocument binds input SignalNodes using model output ports', 
     program.inputBindings.map((binding) => binding.portId),
     ['out', 'out', 'out']
   );
+});
+
+test('compileGraphIRDocument excludes nested adapter signals from world input and output bindings', () => {
+  const document = createDefaultGraphIRDocument(1);
+  const coreGroup = document.root.children.find((node) => node.id === 'core-neuron-group');
+  assert.ok(coreGroup && coreGroup.kind === 'neuron-group');
+  coreGroup.children.push({
+    kind: 'adapter',
+    id: 'nested-adapter',
+    label: 'Nested Adapter',
+    adapterType: 'io',
+    children: [
+      {
+        kind: 'signal',
+        id: 'nested-in',
+        label: 'Nested In',
+        modelId: 'world-signal-bridge',
+        direction: 'input',
+        signal: {
+          id: 'vision-r',
+          valueType: 'number'
+        },
+      },
+      {
+        kind: 'signal',
+        id: 'nested-out',
+        label: 'Nested Out',
+        modelId: 'world-signal-bridge',
+        direction: 'output',
+        signal: {
+          id: 'turn-left',
+          valueType: 'number'
+        },
+      },
+    ],
+  });
+
+  const program = compileGraphIRDocument(document);
+
+  assert.equal(program.signalNodes.some((node) => node.id === 'nested-in'), true);
+  assert.equal(program.signalNodes.some((node) => node.id === 'nested-out'), true);
+  assert.equal(program.inputBindings.some((binding) => binding.nodeId === 'nested-in'), false);
+  assert.equal(program.outputBindings.some((binding) => binding.nodeId === 'nested-out'), false);
 });
 
 test('compileGraphIRDocument maps vision input bindings to visualInput channel order instead of leaf order', () => {
@@ -863,7 +944,15 @@ test('GraphIR runtime step exposes active leaf node ids for input, neuron, and o
 
   assert.deepEqual(
     new Set(result.runtimeState.activeLeafNodeIds),
-    new Set(['vision-R-0', 'vision-G-0', 'neuron-1', 'output-move-forward'])
+    new Set([
+      'vision-R-0',
+      'vision-G-0',
+      'core-input-R',
+      'core-input-G',
+      'neuron-1',
+      'core-output-move-forward',
+      'output-move-forward',
+    ])
   );
 });
 
@@ -879,4 +968,37 @@ test('compileGraphIRDocument rejects unsupported world action signal bindings', 
     () => compileGraphIRDocument(document),
     /unsupported world action signal/
   );
+});
+
+test('reconcileGraphIRDocumentVisionCells preserves custom neuron-group children and local links', () => {
+  const document = createDefaultGraphIRDocument(2);
+  const coreGroup = document.root.children.find((node) => node.id === 'core-neuron-group');
+  assert.ok(coreGroup && coreGroup.kind === 'neuron-group');
+
+  coreGroup.children.push({
+    kind: 'neuron',
+    id: 'neuron-3',
+    label: '神经元3',
+    modelId: 'izhikevich-neuron',
+    position: { x: 360, y: 220 },
+  });
+  document.root.links.push({
+    id: 'link-neuron-1-neuron-3',
+    from: {
+      nodeId: 'neuron-1',
+      portId: 'axon',
+    },
+    to: {
+      nodeId: 'neuron-3',
+      portId: 'dendrite',
+    },
+    weight: 0.8,
+  });
+
+  const reconciled = reconcileGraphIRDocumentVisionCells(document, 3);
+  const reconciledCoreGroup = reconciled.root.children.find((node) => node.id === 'core-neuron-group');
+  assert.ok(reconciledCoreGroup && reconciledCoreGroup.kind === 'neuron-group');
+
+  assert.equal(reconciledCoreGroup.children.some((child) => child.id === 'neuron-3'), true);
+  assert.equal(reconciled.root.links.some((link) => link.id === 'link-neuron-1-neuron-3'), true);
 });

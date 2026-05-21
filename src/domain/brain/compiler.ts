@@ -3,7 +3,15 @@ import {
   GraphIRValidationError,
   validateGraphIRDocument,
 } from './ir';
-import type { GraphIRDocument, LeafLink, LiteralValue, ModelDefinition, NeuronNode, SignalNode } from './ir';
+import type {
+  GraphIRDocument,
+  LeafLink,
+  LiteralValue,
+  ModelDefinition,
+  NeuronNode,
+  SignalNode,
+  TopologyNode,
+} from './ir';
 import type {
   BrainProgram,
   BrainProgramConnection,
@@ -175,6 +183,32 @@ const resolveInputSignalIndex = (node: SignalNode): number => {
   return cellIndex * 3 + INPUT_CHANNEL_OFFSET[channel];
 };
 
+const collectWorldBoundarySignals = (nodes: TopologyNode[]): { inputSignals: SignalNode[]; outputSignals: SignalNode[] } => {
+  const inputSignals: SignalNode[] = [];
+  const outputSignals: SignalNode[] = [];
+
+  for (const node of nodes) {
+    if (node.kind !== 'adapter') {
+      continue;
+    }
+
+    for (const child of node.children) {
+      if (child.kind !== 'signal') {
+        continue;
+      }
+
+      if (child.direction === 'input') {
+        inputSignals.push(child);
+        continue;
+      }
+
+      outputSignals.push(child);
+    }
+  }
+
+  return { inputSignals, outputSignals };
+};
+
 export const compileGraphIRDocument = (document: GraphIRDocument): BrainProgram => {
   const issues = validateGraphIRDocument(document);
   if (issues.length > 0) {
@@ -183,12 +217,9 @@ export const compileGraphIRDocument = (document: GraphIRDocument): BrainProgram 
 
   const modelsById = new Map<string, ModelDefinition>(document.models.map((model) => [model.id, model]));
   const leafNodes = collectLeafNodes(document.root.children);
-  const inputSignalNodes = leafNodes.filter(
-    (node): node is SignalNode => node.kind === 'signal' && node.direction === 'input'
-  );
-  const outputSignalNodes = leafNodes.filter(
-    (node): node is SignalNode => node.kind === 'signal' && node.direction === 'output'
-  );
+  const allSignalNodes = leafNodes.filter((node): node is SignalNode => node.kind === 'signal');
+  const { inputSignals: inputSignalNodes, outputSignals: outputSignalNodes } =
+    collectWorldBoundarySignals(document.root.children);
   const neuronLeafNodes = leafNodes.filter((node): node is NeuronNode => node.kind === 'neuron');
   const orderedInputSignals = inputSignalNodes
     .map((node) => ({
@@ -211,10 +242,7 @@ export const compileGraphIRDocument = (document: GraphIRDocument): BrainProgram 
   const inputPorts = orderedInputSignals.map(({ node, index }) => createInputPortFromSignalNode(node, index));
   const outputPorts = outputSignalNodes.map(createOutputPortFromSignalNode);
   const neuronNodes = neuronLeafNodes.map((node) => createNeuronRuntimeNode(node, modelsById));
-  const signalNodes = [
-    ...inputSignalNodes.map(createSignalRuntimeNode),
-    ...outputSignalNodes.map(createSignalRuntimeNode),
-  ];
+  const signalNodes = allSignalNodes.map(createSignalRuntimeNode);
   const inputBindings = orderedInputSignals.map<BrainProgramInputBinding>(({ node, index }) => {
     const model = modelsById.get(node.modelId);
     if (!model) {

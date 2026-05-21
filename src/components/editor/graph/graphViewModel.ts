@@ -260,6 +260,26 @@ const collectAggregateLinks = (
   return Array.from(aggregateMap.values());
 };
 
+const collectLeafIds = (children: TopologyNode[]): Set<string> => {
+  const leafIds = new Set<string>();
+
+  const visit = (nodes: TopologyNode[]) => {
+    for (const node of nodes) {
+      if (isLeafNode(node)) {
+        leafIds.add(node.id);
+        continue;
+      }
+
+      if (isContainerNode(node)) {
+        visit(node.children);
+      }
+    }
+  };
+
+  visit(children);
+  return leafIds;
+};
+
 const createNodeDetail = (node: TopologyNode): string => {
   if (node.kind === 'adapter') {
     return `${node.children.length} signals`;
@@ -307,6 +327,7 @@ export const buildGraphViewModel = ({
   const currentContainerKind = 'kind' in currentContainer ? currentContainer.kind : 'root';
   const scopeKey = navigationPath.length === 0 ? 'root' : navigationPath.join('/');
   const localLeafIds = new Set(currentChildren.filter(isLeafNode).map((node) => node.id));
+  const containerLeafIds = collectLeafIds(currentChildren);
   const breadcrumbs: GraphBreadcrumbItem[] = [{ id: 'root', label: 'root' }];
 
   for (const nodeId of navigationPath) {
@@ -322,74 +343,10 @@ export const buildGraphViewModel = ({
   }
 
   const modelById = getModelById(document.models);
-  const aggregateLinks = collectAggregateLinks(document.root.links, indexes.pathById, navigationPath);
-  const scopedLeafLinks =
-    navigationPath.length === 0
-      ? []
-      : document.root.links.filter(
-          (link) => localLeafIds.has(link.from.nodeId) || localLeafIds.has(link.to.nodeId)
-        );
-
-  const boundaryProxyNodes: GraphViewNode[] = [];
-  const proxyNodeMap = new Map<string, GraphViewNode>();
-
-  if (navigationPath.length > 0) {
-    for (const link of scopedLeafLinks) {
-      const localSource = localLeafIds.has(link.from.nodeId);
-      const localTarget = localLeafIds.has(link.to.nodeId);
-      if (localSource === localTarget) {
-        continue;
-      }
-
-      const externalNodeId = localSource ? link.to.nodeId : link.from.nodeId;
-      if (proxyNodeMap.has(externalNodeId)) {
-        continue;
-      }
-
-      const externalNode = indexes.nodeById.get(externalNodeId);
-      if (!externalNode || !isLeafNode(externalNode)) {
-        continue;
-      }
-
-      const direction = localTarget ? 'input' : 'output';
-      const offsetIndex = proxyNodeMap.size;
-      const linkCapabilities = getGraphLinkCapabilities(
-        {
-          refNodeId: externalNodeId,
-          kind: externalNode.kind,
-          leaf: true,
-          proxy: true,
-          local: false,
-          direction,
-        },
-        currentScope
-      );
-
-      proxyNodeMap.set(externalNodeId, {
-        id: `proxy:${externalNodeId}`,
-        refNodeId: externalNodeId,
-        label: externalNode.label,
-        kind: externalNode.kind,
-        x: direction === 'input' ? 20 : 820,
-        y: 80 + offsetIndex * 96,
-        width: LEAF_NODE_SIZE,
-        height: LEAF_NODE_SIZE,
-        parentId: navigationPath.at(-1) ?? null,
-        detail: `${direction === 'input' ? 'upstream' : 'downstream'} boundary`,
-        editable: false,
-        navigable: false,
-        leaf: true,
-        proxy: true,
-        movable: false,
-        local: false,
-        direction,
-        connectableSource: linkCapabilities.canSource,
-        connectableTarget: linkCapabilities.canTarget,
-      });
-    }
-  }
-
-  boundaryProxyNodes.push(...proxyNodeMap.values());
+  const containerLinks = document.root.links.filter(
+    (link) => containerLeafIds.has(link.from.nodeId) && containerLeafIds.has(link.to.nodeId)
+  );
+  const aggregateLinks = collectAggregateLinks(containerLinks, indexes.pathById, navigationPath);
 
   const nodes: GraphViewNode[] = [
     ...currentChildren.map((node, index) => {
@@ -434,37 +391,42 @@ export const buildGraphViewModel = ({
         connectableTarget: linkCapabilities.canTarget,
       };
     }),
-    ...boundaryProxyNodes,
   ];
 
   const viewNodeById = new Map(nodes.map((node) => [node.id, node]));
   const nodeIdsInView = new Set(nodes.map((node) => node.id));
-  const links: GraphViewLink[] =
-    navigationPath.length === 0
-      ? aggregateLinks
-          .filter((link) => nodeIdsInView.has(link.fromNodeId) && nodeIdsInView.has(link.toNodeId))
-          .map((link) => ({
-            id: `aggregate:${link.fromNodeId}:${link.toNodeId}`,
-            fromNodeId: link.fromNodeId,
-            toNodeId: link.toNodeId,
-            weight: link.totalWeight,
-            count: link.count,
-            aggregate: true,
-            leafLinkIds: [...link.leafLinkIds],
-            editable: false,
-          }))
-      : scopedLeafLinks
-          .map((link) => ({
-            id: link.id,
-            fromNodeId: localLeafIds.has(link.from.nodeId) ? link.from.nodeId : `proxy:${link.from.nodeId}`,
-            toNodeId: localLeafIds.has(link.to.nodeId) ? link.to.nodeId : `proxy:${link.to.nodeId}`,
-            weight: link.weight,
-            count: 1,
-            aggregate: false,
-            leafLinkIds: [link.id],
-            editable: true,
-          }))
-          .filter((link) => nodeIdsInView.has(link.fromNodeId) && nodeIdsInView.has(link.toNodeId));
+  const links: GraphViewLink[] = aggregateLinks
+    .filter((link) => nodeIdsInView.has(link.fromNodeId) && nodeIdsInView.has(link.toNodeId))
+    .map((link) => {
+      const isDirectLeafLink =
+        link.count === 1 && localLeafIds.has(link.fromNodeId) && localLeafIds.has(link.toNodeId);
+      const leafLinkId = link.leafLinkIds[0] ?? `aggregate:${link.fromNodeId}:${link.toNodeId}`;
+      const leafLink = isDirectLeafLink ? containerLinks.find((candidate) => candidate.id === leafLinkId) : null;
+
+      if (isDirectLeafLink && leafLink) {
+        return {
+          id: leafLink.id,
+          fromNodeId: leafLink.from.nodeId,
+          toNodeId: leafLink.to.nodeId,
+          weight: leafLink.weight,
+          count: 1,
+          aggregate: false,
+          leafLinkIds: [leafLink.id],
+          editable: true,
+        };
+      }
+
+      return {
+        id: `aggregate:${link.fromNodeId}:${link.toNodeId}`,
+        fromNodeId: link.fromNodeId,
+        toNodeId: link.toNodeId,
+        weight: link.totalWeight,
+        count: link.count,
+        aggregate: true,
+        leafLinkIds: [...link.leafLinkIds],
+        editable: false,
+      };
+    });
 
   const activeLeafNodeIds = new Set(runtimeActiveNodeIds);
   const activeViewNodeIds = new Set<string>();

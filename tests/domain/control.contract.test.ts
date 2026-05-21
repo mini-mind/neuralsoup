@@ -133,23 +133,23 @@ test('simulation session keeps main-agent program aligned across mode switches a
   assert.equal(session.isMainAgentBrainProgramConfigured(), true);
   assert.equal(
     summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount,
-    mainAgent.visionCells.length * 3
+    mainAgent.visionCells.length * 3 + 3
   );
 
   session.setControlMode('keyboard');
   session.updateAgentParameters({ visionCells: 24 });
   assert.equal(mainAgent.visionCells.length, 24);
   assert.deepEqual(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()), {
-    inputSignalCount: 72,
-    outputSignalCount: 3,
+    inputSignalCount: 75,
+    outputSignalCount: 6,
     neuronCount: 2,
-    leafLinkCount: 76,
+    leafLinkCount: 82,
   });
 
   session.setControlMode('snn');
   session.updateAgentParameters({ visionCells: 18 });
   assert.equal(mainAgent.visionCells.length, 18);
-  assert.equal(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount, 54);
+  assert.equal(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount, 57);
 
   const agent = createAgent({
     id: mainAgent.id,
@@ -205,7 +205,7 @@ test('simulation session preserves custom GraphIR leaf links across reset and re
   );
 
   session.updateAgentParameters({ visionCells: 1 });
-  assert.equal(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount, 3);
+  assert.equal(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount, 6);
   assert.deepEqual(
     session.getCurrentGraphIRDocument().root.links.map((link) => link.id),
     ['forward-on-green']
@@ -213,7 +213,7 @@ test('simulation session preserves custom GraphIR leaf links across reset and re
 
   session.reset();
   assert.equal(session.getMainAgentControlMode(), 'keyboard');
-  assert.equal(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount, 3);
+  assert.equal(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount, 6);
   assert.deepEqual(
     session.getCurrentGraphIRDocument().root.links.map((link) => link.id),
     ['forward-on-green']
@@ -400,7 +400,7 @@ test('simulation session keeps applied GraphIR coherent when vision-cell reconci
 
   session.updateAgentParameters({ visionCells: 1 });
 
-  assert.equal(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount, 3);
+  assert.equal(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount, 6);
   assert.deepEqual(
     session.getCurrentGraphIRDocument().root.links.map((link) => link.id),
     ['keep-link']
@@ -483,7 +483,15 @@ test('simulation session exposes the main-agent active GraphIR leaf node ids', (
 
   assert.deepEqual(
     new Set(session.getGraphIRRuntimeActivitySnapshot().activeNodeIds),
-    new Set(['vision-R-0', 'vision-G-0', 'neuron-1', 'output-move-forward'])
+    new Set([
+      'vision-R-0',
+      'vision-G-0',
+      'core-input-R',
+      'core-input-G',
+      'neuron-1',
+      'core-output-move-forward',
+      'output-move-forward',
+    ])
   );
 });
 
