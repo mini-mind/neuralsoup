@@ -41,6 +41,7 @@ interface GraphTopologyCanvasProps {
   activeViewNodeIds: Set<string>;
   canCreateNeuronHere: boolean;
   canAggregateSelection: boolean;
+  canUngroupSelection: boolean;
   onCanvasContextMenu: (event: React.MouseEvent<HTMLDivElement>) => void;
   onCanvasMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
   onSelectLink: (linkId: string) => void;
@@ -50,7 +51,9 @@ interface GraphTopologyCanvasProps {
   getNodeDoubleClickAction: (nodeId: string) => 'navigate' | 'edit' | null;
   onCloseContextMenu: () => void;
   onAddNeuronAt: (x: number, y: number) => void;
+  onAddNeuronGroupAt: (x: number, y: number) => void;
   onAggregateSelectedNodes: () => void;
+  onUngroupNode: (nodeId: string) => void;
 }
 
 const formatWeight = (weight: number) => (Number.isInteger(weight) ? `${weight}` : weight.toFixed(2));
@@ -74,6 +77,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
   activeViewNodeIds,
   canCreateNeuronHere,
   canAggregateSelection,
+  canUngroupSelection,
   onCanvasContextMenu,
   onCanvasMouseDown,
   onSelectLink,
@@ -83,7 +87,9 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
   getNodeDoubleClickAction,
   onCloseContextMenu,
   onAddNeuronAt,
+  onAddNeuronGroupAt,
   onAggregateSelectedNodes,
+  onUngroupNode,
 }) => {
   const normalizedSelectionRect = selectionRect ? normalizeRect(selectionRect) : null;
   const pendingNodeIds = interaction?.type === 'linking' ? interaction.sourceNodeIds : [];
@@ -124,17 +130,30 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
           onClick={(event) => event.stopPropagation()}
         >
           {contextMenu.kind === 'canvas' && canCreateNeuronHere && (
-            <button
-              type="button"
-              className="topology-context-menu-item"
-              data-testid="topology-context-new-neuron"
-              onClick={() => {
-                onAddNeuronAt(contextMenu.scene.x + scene.origin.x, contextMenu.scene.y + scene.origin.y);
-                onCloseContextMenu();
-              }}
-            >
-              新建神经元
-            </button>
+            <>
+              <button
+                type="button"
+                className="topology-context-menu-item"
+                data-testid="topology-context-new-neuron"
+                onClick={() => {
+                  onAddNeuronAt(contextMenu.scene.x + scene.origin.x, contextMenu.scene.y + scene.origin.y);
+                  onCloseContextMenu();
+                }}
+              >
+                新建神经元
+              </button>
+              <button
+                type="button"
+                className="topology-context-menu-item"
+                data-testid="topology-context-new-group"
+                onClick={() => {
+                  onAddNeuronGroupAt(contextMenu.scene.x + scene.origin.x, contextMenu.scene.y + scene.origin.y);
+                  onCloseContextMenu();
+                }}
+              >
+                新建分组
+              </button>
+            </>
           )}
           {contextMenu.kind === 'selection' && canAggregateSelection && (
             <button
@@ -147,6 +166,19 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
               }}
             >
               聚合
+            </button>
+          )}
+          {contextMenu.kind === 'group' && canUngroupSelection && contextMenu.nodeIds.length === 1 && (
+            <button
+              type="button"
+              className="topology-context-menu-item"
+              data-testid="topology-context-ungroup"
+              onClick={() => {
+                onUngroupNode(contextMenu.nodeIds[0]);
+                onCloseContextMenu();
+              }}
+            >
+              拆开组
             </button>
           )}
         </div>

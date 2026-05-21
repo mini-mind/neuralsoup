@@ -8,6 +8,7 @@ interface GraphViewSessionControllerNode extends SceneNodeGeometry {
   movable: boolean;
   local: boolean;
   connectableSource: boolean;
+  ungroupable: boolean;
 }
 
 interface GraphViewSessionControllerOptions {
@@ -25,6 +26,7 @@ interface GraphViewSessionControllerOptions {
   selectedNodeIds: string[];
   canCreateNeuronHere: boolean;
   canAggregateSelection: boolean;
+  canUngroupSelection: boolean;
   beginSelectionRect: (point: GraphPoint) => void;
   updateSelectionRect: (point: GraphPoint, intersectedNodeIds: string[]) => void;
   cancelSelectionRect: () => void;
@@ -63,6 +65,7 @@ export const useGraphViewSessionController = ({
   selectedNodeIds,
   canCreateNeuronHere,
   canAggregateSelection,
+  canUngroupSelection,
   beginSelectionRect,
   updateSelectionRect,
   cancelSelectionRect,
@@ -91,6 +94,7 @@ export const useGraphViewSessionController = ({
     selectedNodeIds,
     canCreateNeuronHere,
     canAggregateSelection,
+    canUngroupSelection,
     beginSelectionRect,
     updateSelectionRect,
     cancelSelectionRect,

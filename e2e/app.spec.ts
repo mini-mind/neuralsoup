@@ -41,7 +41,9 @@ const selectors = {
   topologyCanvasScale: '[data-testid="topology-canvas-scale"]',
   topologyContextMenu: '[data-testid="topology-context-menu"]',
   topologyContextNewNeuron: '[data-testid="topology-context-new-neuron"]',
+  topologyContextNewGroup: '[data-testid="topology-context-new-group"]',
   topologyContextAggregate: '[data-testid="topology-context-aggregate"]',
+  topologyContextUngroup: '[data-testid="topology-context-ungroup"]',
   topologyDetailModal: '[data-testid="topology-detail-modal"]',
   topologyDetailModalOverlay: '[data-testid="topology-detail-modal-overlay"]',
   topologyDetailClose: '[data-testid="topology-detail-close"]',
@@ -1143,6 +1145,67 @@ test('graph view opens canvas context menu and creates a neuron from it', async 
   await page.locator(selectors.topologyContextNewNeuron).click();
   await expect(page.locator(selectors.topologyContextMenu)).toHaveCount(0);
   await expect(page.locator(selectors.topologyNodeCount)).toHaveText(String(beforeCount + 1));
+});
+
+test('graph view opens canvas context menu and creates an empty group from it', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+
+  const beforeCount = Number.parseInt(await page.locator(selectors.topologyNodeCount).innerText(), 10);
+  const canvasBox = await getCanvasBox(page);
+  const point = { x: canvasBox.x + canvasBox.width - 96, y: canvasBox.y + 132 };
+
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.move(point.x + 1, point.y + 1);
+  await page.mouse.up({ button: 'right' });
+  await expect(page.locator(selectors.topologyContextMenu)).toBeVisible();
+  await expect(page.locator(selectors.topologyContextNewGroup)).toBeVisible();
+
+  await page.locator(selectors.topologyContextNewGroup).click();
+  await expect(page.locator(selectors.topologyContextMenu)).toHaveCount(0);
+  await expect(page.locator(selectors.topologyNodeCount)).toHaveText(String(beforeCount + 1));
+  await expect(page.locator('[data-testid^="topology-node-group-"]')).toHaveCount(1);
+});
+
+test('graph view opens a group context menu and ungroups it into the current level', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+
+  const canvasBox = await getCanvasBox(page);
+  const point = { x: canvasBox.x + canvasBox.width - 96, y: canvasBox.y + 144 };
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.move(point.x + 1, point.y + 1);
+  await page.mouse.up({ button: 'right' });
+  await expect(page.locator(selectors.topologyContextMenu)).toBeVisible();
+  await page.locator(selectors.topologyContextNewGroup).click();
+
+  const groupSelector = '[data-testid^="topology-node-group-"]';
+  await expect(page.locator(groupSelector)).toHaveCount(1);
+  const beforeCount = Number.parseInt(await page.locator(selectors.topologyNodeCount).innerText(), 10);
+
+  await page.locator(groupSelector).click();
+  const groupCenter = await getLocatorCenter(page, groupSelector);
+  await page.mouse.move(groupCenter.x, groupCenter.y);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.up({ button: 'right' });
+
+  await expect(page.locator(selectors.topologyContextMenu)).toBeVisible();
+  await expect(page.locator(selectors.topologyContextUngroup)).toBeVisible();
+  await page.locator(selectors.topologyContextUngroup).click();
+
+  await expect(page.locator(selectors.topologyContextMenu)).toHaveCount(0);
+  await expect(page.locator(groupSelector)).toHaveCount(0);
+  await expect(page.locator(selectors.topologyNodeCount)).toHaveText(String(beforeCount - 1));
 });
 
 test('graph view opens selection context menu and aggregates selected nodes', async ({ page }, testInfo) => {

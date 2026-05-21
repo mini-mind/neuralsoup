@@ -20,6 +20,7 @@ export type GraphInteractionState =
       startClient: GraphPoint;
       startScene: GraphPoint;
       startOffset: GraphPoint;
+      contextNodeIds: string[];
       sourceNodeIds: string[];
       sourceScenePoint: GraphPoint | null;
       moved: boolean;
@@ -56,7 +57,7 @@ export type GraphInteractionState =
     };
 
 export interface GraphContextMenuState {
-  kind: 'canvas' | 'selection';
+  kind: 'canvas' | 'selection' | 'group';
   client: GraphPoint;
   scene: GraphPoint;
   nodeIds: string[];

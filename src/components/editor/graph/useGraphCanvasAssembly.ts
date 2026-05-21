@@ -16,6 +16,7 @@ interface GraphCanvasAssemblyOptions {
   selectedNodeIds: string[];
   canCreateNeuronHere: boolean;
   canAggregateSelection: boolean;
+  canUngroupSelection: boolean;
   canvasViewport: GraphCanvasViewport;
   setCanvasOffset: (offset: GraphCanvasViewport) => void;
   canvasScale: number;
@@ -45,6 +46,7 @@ export const useGraphCanvasAssembly = ({
   selectedNodeIds,
   canCreateNeuronHere,
   canAggregateSelection,
+  canUngroupSelection,
   canvasViewport,
   setCanvasOffset,
   canvasScale,
@@ -257,10 +259,11 @@ export const useGraphCanvasAssembly = ({
         width: node.width,
         height: node.height,
         proxy: node.proxy,
-        movable: node.movable,
-        local: node.local,
-        connectableSource: node.connectableSource,
-      })),
+      movable: node.movable,
+      local: node.local,
+      connectableSource: node.connectableSource,
+      ungroupable: node.kind === 'neuron-group' && node.local && !node.proxy,
+    })),
     [scene.list]
   );
 
@@ -302,6 +305,7 @@ export const useGraphCanvasAssembly = ({
     selectedNodeIds,
     canCreateNeuronHere,
     canAggregateSelection,
+    canUngroupSelection,
     beginSelectionRect,
     updateSelectionRect,
     cancelSelectionRect,

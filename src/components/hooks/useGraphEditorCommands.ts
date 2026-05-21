@@ -454,6 +454,31 @@ export const useGraphEditorCommands = ({
     [currentChildren, currentContainerKind, currentScope, indexes.nodeById, navigationPath, scheduleFocusNode, setDocument]
   );
 
+  const addNeuronGroupAt = useCallback(
+    (x: number, y: number) => {
+      if (navigationPath.length === 0 || currentContainerKind !== 'neuron-group') {
+        return;
+      }
+
+      const groupIndex = currentChildren.filter((child) => child.kind === 'neuron-group').length + 1;
+      const nextGroupId = `group-${getNextNumericId(indexes.nodeById.keys(), 'group-')}`;
+      const nextGroup: NeuronGroupNode = {
+        kind: 'neuron-group',
+        id: nextGroupId,
+        label: `神经元组${groupIndex}`,
+        position: toStoredPosition({ x, y }, currentScope),
+        children: [],
+      };
+
+      setDocument((current) => ({
+        ...current,
+        root: updateChildrenAtPath(current.root, navigationPath, (children) => [...children, nextGroup]),
+      }));
+      scheduleFocusNode(nextGroup.id);
+    },
+    [currentChildren, currentContainerKind, currentScope, indexes.nodeById, navigationPath, scheduleFocusNode, setDocument]
+  );
+
   const aggregateSelectedNodes = useCallback(() => {
     if (currentContainerKind !== 'neuron-group' || selectionState.nodeIds.length < 2) {
       return;
@@ -534,6 +559,59 @@ export const useGraphEditorCommands = ({
     viewNodeById,
   ]);
 
+  const ungroupNode = useCallback(
+    (nodeId: string) => {
+      if (currentContainerKind !== 'neuron-group') {
+        return;
+      }
+
+      const targetGroup = currentChildren.find((child) => child.id === nodeId);
+      if (!targetGroup || targetGroup.kind !== 'neuron-group') {
+        return;
+      }
+
+      const groupPosition = targetGroup.position ?? { x: 0, y: 0 };
+      const ungroupedChildren = targetGroup.children.map((child) => ({
+        ...child,
+        position: {
+          x: (child.position?.x ?? 0) + groupPosition.x,
+          y: (child.position?.y ?? 0) + groupPosition.y,
+        },
+      }));
+
+      setDocument((current) => ({
+        ...current,
+        root: updateChildrenAtPath(current.root, navigationPath, (children) => {
+          const nextChildren: TopologyNode[] = [];
+          for (const child of children) {
+            if (child.id === nodeId && child.kind === 'neuron-group') {
+              nextChildren.push(...ungroupedChildren);
+              continue;
+            }
+
+            nextChildren.push(child);
+          }
+
+          return nextChildren;
+        }),
+      }));
+      clearSelection();
+      closeDetailModal();
+      clearSelectionRect();
+      clearDraftNodePositions();
+    },
+    [
+      clearDraftNodePositions,
+      clearSelection,
+      clearSelectionRect,
+      closeDetailModal,
+      currentChildren,
+      currentContainerKind,
+      navigationPath,
+      setDocument,
+    ]
+  );
+
   const updateNodeLabelAndParams = useCallback(
     (nodeId: string, payload: { label: string; parameterOverrides?: Record<string, LiteralValue> }) => {
       setDocument((current) => ({
@@ -581,7 +659,9 @@ export const useGraphEditorCommands = ({
     persistNodePositions,
     removeSelected,
     addNeuronAt,
+    addNeuronGroupAt,
     aggregateSelectedNodes,
+    ungroupNode,
     updateNodeLabelAndParams,
     updateLinkWeight,
   };

@@ -27,6 +27,7 @@ interface OrchestratorNode extends SceneNodeGeometry {
   movable: boolean;
   local: boolean;
   connectableSource: boolean;
+  ungroupable: boolean;
 }
 
 interface GraphInteractionDependencies {
@@ -42,6 +43,7 @@ interface GraphInteractionDependencies {
   selectedNodeIds: string[];
   canCreateNeuronHere: boolean;
   canAggregateSelection: boolean;
+  canUngroupSelection: boolean;
   beginSelectionRect: (point: GraphPoint) => void;
   updateSelectionRect: (point: GraphPoint, intersectedNodeIds: string[]) => void;
   cancelSelectionRect: () => void;
@@ -87,6 +89,7 @@ export const useGraphInteractionOrchestrator = ({
   selectedNodeIds,
   canCreateNeuronHere,
   canAggregateSelection,
+  canUngroupSelection,
   beginSelectionRect,
   updateSelectionRect,
   cancelSelectionRect,
@@ -198,6 +201,7 @@ export const useGraphInteractionOrchestrator = ({
         startClient,
         startScene: getScenePoint(startClient),
         startOffset: viewportRef.current,
+        contextNodeIds: [],
         sourceNodeIds: [],
         sourceScenePoint: null,
         moved: false,
@@ -212,8 +216,13 @@ export const useGraphInteractionOrchestrator = ({
       focusSurface();
       const sourceNodeIds = getNodeContextSourceNodeIds(node);
       const selectionGesture = selectedNodeIds.length > 1 && selectedNodeIds.includes(node.id);
+      const singleGroupGesture =
+        !selectionGesture &&
+        selectedNodeIds.length === 1 &&
+        selectedNodeIds[0] === node.id &&
+        node.ungroupable;
 
-      if (!selectionGesture && sourceNodeIds.length > 0) {
+      if (!selectionGesture && !singleGroupGesture && sourceNodeIds.length > 0) {
         const sourceScenePoint = getSourceScenePoint(sourceNodeIds);
         if (sourceScenePoint) {
           setInteractionState({
@@ -234,6 +243,8 @@ export const useGraphInteractionOrchestrator = ({
         startClient: { x: event.clientX, y: event.clientY },
         startScene: getScenePoint({ x: event.clientX, y: event.clientY }),
         startOffset: viewportRef.current,
+        contextNodeIds:
+          selectedNodeIds.length > 0 && selectedNodeIds.includes(node.id) ? [...selectedNodeIds] : [node.id],
         sourceNodeIds,
         sourceScenePoint: getSourceScenePoint(sourceNodeIds),
         moved: false,
@@ -351,6 +362,17 @@ export const useGraphInteractionOrchestrator = ({
             scene: currentInteraction.startScene,
             nodeIds: [],
           });
+        } else if (
+          currentInteraction.contextTarget === 'selection' &&
+          currentInteraction.contextNodeIds.length === 1 &&
+          canUngroupSelection
+        ) {
+          setContextMenu({
+            kind: 'group',
+            client: currentInteraction.startClient,
+            scene: currentInteraction.startScene,
+            nodeIds: currentInteraction.contextNodeIds,
+          });
         } else if (currentInteraction.contextTarget === 'selection' && canAggregateSelection) {
           setContextMenu({
             kind: 'selection',
@@ -381,6 +403,7 @@ export const useGraphInteractionOrchestrator = ({
     [
       canAggregateSelection,
       canCreateNeuronHere,
+      canUngroupSelection,
       cancelSelectionRect,
       clearSelection,
       discardNodeDraftPositions,
