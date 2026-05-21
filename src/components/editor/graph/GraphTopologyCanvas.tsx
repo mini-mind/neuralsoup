@@ -234,7 +234,8 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
                   }
                 }}
               >
-                <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} />
+                <line className="topology-link-stroke" x1={from.x} y1={from.y} x2={to.x} y2={to.y} />
+                <line className="topology-link-flow" x1={from.x} y1={from.y} x2={to.x} y2={to.y} />
                 <text x={(from.x + to.x) / 2} y={(from.y + to.y) / 2 - 8}>
                   {link.aggregate ? `${link.count}` : formatWeight(link.weight)}
                 </text>

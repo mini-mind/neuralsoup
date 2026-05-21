@@ -102,9 +102,17 @@
   cursor: pointer;
 }
 
-.topology-link line {
+.topology-link-stroke {
   stroke: rgba(183, 203, 219, 0.46);
   stroke-width: 2;
+}
+
+.topology-link-flow {
+  stroke: rgba(240, 246, 251, 0.9);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 2 10;
+  animation: topology-link-flow 1.15s linear infinite;
 }
 
 .topology-link text {
@@ -117,13 +125,23 @@
   pointer-events: none;
 }
 
-.topology-link.is-selected line {
+.topology-link.is-selected .topology-link-stroke {
   stroke: #f0f6fb;
   stroke-width: 2.4;
 }
 
-.topology-link.is-aggregate line {
+.topology-link.is-selected .topology-link-flow {
+  stroke: #ffffff;
+  stroke-width: 2.4;
+}
+
+.topology-link.is-aggregate .topology-link-stroke {
   stroke-dasharray: 10 6;
+}
+
+.topology-link.is-aggregate .topology-link-flow {
+  stroke-dasharray: 3 13;
+  animation-duration: 1.4s;
 }
 
 .topology-link-preview {
@@ -239,6 +257,16 @@
   background: rgba(117, 186, 237, 0.14);
   box-shadow: inset 0 0 0 1px rgba(172, 221, 255, 0.18);
   pointer-events: none;
+}
+
+@keyframes topology-link-flow {
+  from {
+    stroke-dashoffset: 0;
+  }
+
+  to {
+    stroke-dashoffset: -24;
+  }
 }
 
 .topology-meta-hidden {
