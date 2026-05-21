@@ -1339,6 +1339,46 @@ test('graph view supports multi-select right-drag batch linking', async ({ page 
   await expect(page.locator(selectors.topologySelectedLink)).not.toHaveText('none');
 });
 
+test('graph view right-drag batch linking into empty canvas creates a new neuron target and connects to it', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
+  await expect(page.locator(selectors.nodeNeuronTwo)).toBeVisible();
+
+  await page.locator(selectors.nodeNeuronOne).click();
+  await page.locator(selectors.nodeNeuronTwo).click({ modifiers: ['Shift'] });
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('2');
+
+  const beforeCount = Number.parseInt(await page.locator(selectors.topologyNodeCount).innerText(), 10);
+  const targetBeforeOne = await page.locator('[data-testid^="topology-link-link-neuron-1-neuron-3-"]').count();
+  const targetBeforeTwo = await page.locator('[data-testid^="topology-link-link-neuron-2-neuron-3-"]').count();
+  const nodeTwoCenter = await getLocatorCenter(page, selectors.nodeNeuronTwo);
+  const canvasBox = await getCanvasBox(page);
+  const backgroundTarget = {
+    x: canvasBox.x + canvasBox.width - 84,
+    y: canvasBox.y + canvasBox.height - 92,
+  };
+
+  await dragOnCanvas(page, nodeTwoCenter, backgroundTarget, { button: 'right' });
+
+  const newNeuronSelector = '[data-testid="topology-node-neuron-3"]';
+  await expect(page.locator(newNeuronSelector)).toBeVisible();
+  await expect(page.locator(selectors.topologyNodeCount)).toHaveText(String(beforeCount + 1));
+  await expect
+    .poll(async () => ({
+      one: await page.locator('[data-testid^="topology-link-link-neuron-1-neuron-3-"]').count(),
+      two: await page.locator('[data-testid^="topology-link-link-neuron-2-neuron-3-"]').count(),
+    }))
+    .toEqual({
+      one: targetBeforeOne + 1,
+      two: targetBeforeTwo + 1,
+    });
+});
+
 test('graph view keeps additive drag selection in sync when shift-dragging an already selected node', async ({ page }, testInfo) => {
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;

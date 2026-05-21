@@ -32,6 +32,7 @@ interface GraphViewSessionControllerOptions {
   cancelSelectionRect: () => void;
   clearSelection: () => void;
   connectSourceNodesToTarget: (sourceNodeIds: string[], targetNodeId: string) => void;
+  createNeuronAndConnectAt: (sourceNodeIds: string[], x: number, y: number) => void;
   updateNodePositionsInDraft: (updates: Array<{ nodeId: string; x: number; y: number }>) => void;
   discardNodeDraftPositions: () => void;
   persistNodePositions: (updates: Array<{ nodeId: string; x: number; y: number }>) => void;
@@ -71,6 +72,7 @@ export const useGraphViewSessionController = ({
   cancelSelectionRect,
   clearSelection,
   connectSourceNodesToTarget,
+  createNeuronAndConnectAt,
   updateNodePositionsInDraft,
   discardNodeDraftPositions,
   persistNodePositions,
@@ -100,6 +102,7 @@ export const useGraphViewSessionController = ({
     cancelSelectionRect,
     clearSelection,
     connectSourceNodesToTarget,
+    createNeuronAndConnectAt,
     updateNodePositionsInDraft,
     discardNodeDraftPositions,
     persistNodePositions,

@@ -49,6 +49,7 @@ interface GraphInteractionDependencies {
   cancelSelectionRect: () => void;
   clearSelection: () => void;
   connectSourceNodesToTarget: (sourceNodeIds: string[], targetNodeId: string) => void;
+  createNeuronAndConnectAt: (sourceNodeIds: string[], x: number, y: number) => void;
   updateNodePositionsInDraft: (updates: Array<{ nodeId: string; x: number; y: number }>) => void;
   discardNodeDraftPositions: () => void;
   persistNodePositions: (updates: Array<{ nodeId: string; x: number; y: number }>) => void;
@@ -95,6 +96,7 @@ export const useGraphInteractionOrchestrator = ({
   cancelSelectionRect,
   clearSelection,
   connectSourceNodesToTarget,
+  createNeuronAndConnectAt,
   updateNodePositionsInDraft,
   discardNodeDraftPositions,
   persistNodePositions,
@@ -645,6 +647,13 @@ export const useGraphInteractionOrchestrator = ({
           setInteractionState(null);
           return;
         }
+
+        if (currentInteraction.mode === 'multi' && canCreateNeuronHere) {
+          const scenePoint = getScenePoint({ x: event.clientX, y: event.clientY });
+          createNeuronAndConnectAt(currentInteraction.sourceNodeIds, scenePoint.x + sceneOriginRef.current.x, scenePoint.y + sceneOriginRef.current.y);
+          setInteractionState(null);
+          return;
+        }
       }
 
       endInteraction(currentInteraction);
@@ -668,6 +677,7 @@ export const useGraphInteractionOrchestrator = ({
     cancelSelectionRect,
     clearSelection,
     connectSourceNodesToTarget,
+    createNeuronAndConnectAt,
     discardNodeDraftPositions,
     endInteraction,
     getNodeById,

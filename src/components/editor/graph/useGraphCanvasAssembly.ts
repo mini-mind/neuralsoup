@@ -26,6 +26,7 @@ interface GraphCanvasAssemblyOptions {
   cancelSelectionRect: () => void;
   clearSelection: () => void;
   connectSourceNodesToTarget: (sourceNodeIds: string[], targetNodeId: string) => void;
+  createNeuronAndConnectAt: (sourceNodeIds: string[], x: number, y: number) => void;
   updateNodePositionsInDraft: (updates: Array<{ nodeId: string; x: number; y: number }>) => void;
   discardNodeDraftPositions: () => void;
   persistNodePositions: (updates: Array<{ nodeId: string; x: number; y: number }>) => void;
@@ -56,6 +57,7 @@ export const useGraphCanvasAssembly = ({
   cancelSelectionRect,
   clearSelection,
   connectSourceNodesToTarget,
+  createNeuronAndConnectAt,
   updateNodePositionsInDraft,
   discardNodeDraftPositions,
   persistNodePositions,
@@ -259,11 +261,11 @@ export const useGraphCanvasAssembly = ({
         width: node.width,
         height: node.height,
         proxy: node.proxy,
-      movable: node.movable,
-      local: node.local,
-      connectableSource: node.connectableSource,
-      ungroupable: node.kind === 'neuron-group' && node.local && !node.proxy,
-    })),
+        movable: node.movable,
+        local: node.local,
+        connectableSource: node.connectableSource,
+        ungroupable: node.kind === 'neuron-group' && node.local && !node.proxy,
+      })),
     [scene.list]
   );
 
@@ -311,6 +313,7 @@ export const useGraphCanvasAssembly = ({
     cancelSelectionRect,
     clearSelection,
     connectSourceNodesToTarget,
+    createNeuronAndConnectAt,
     updateNodePositionsInDraft: updateNodePositionsFromSceneDraft,
     discardNodeDraftPositions,
     persistNodePositions: persistNodePositionsFromScene,

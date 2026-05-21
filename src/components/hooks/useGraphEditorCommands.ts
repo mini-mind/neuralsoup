@@ -12,6 +12,7 @@ import type {
 } from '../../domain/brain';
 import {
   CHILD_SCOPE_OFFSET,
+  LEAF_NODE_SIZE,
   isContainerNode,
   isLeafNode,
   type GraphViewNode,
@@ -432,7 +433,7 @@ export const useGraphEditorCommands = ({
   const addNeuronAt = useCallback(
     (x: number, y: number) => {
       if (navigationPath.length === 0 || currentContainerKind !== 'neuron-group') {
-        return;
+        return null;
       }
 
       const siblingIndex = currentChildren.filter((child) => child.kind === 'neuron').length + 1;
@@ -450,6 +451,7 @@ export const useGraphEditorCommands = ({
         root: updateChildrenAtPath(current.root, navigationPath, (children) => [...children, nextNode]),
       }));
       scheduleFocusNode(nextNode.id);
+      return nextNode.id;
     },
     [currentChildren, currentContainerKind, currentScope, indexes.nodeById, navigationPath, scheduleFocusNode, setDocument]
   );
@@ -457,7 +459,7 @@ export const useGraphEditorCommands = ({
   const addNeuronGroupAt = useCallback(
     (x: number, y: number) => {
       if (navigationPath.length === 0 || currentContainerKind !== 'neuron-group') {
-        return;
+        return null;
       }
 
       const groupIndex = currentChildren.filter((child) => child.kind === 'neuron-group').length + 1;
@@ -475,8 +477,114 @@ export const useGraphEditorCommands = ({
         root: updateChildrenAtPath(current.root, navigationPath, (children) => [...children, nextGroup]),
       }));
       scheduleFocusNode(nextGroup.id);
+      return nextGroup.id;
     },
     [currentChildren, currentContainerKind, currentScope, indexes.nodeById, navigationPath, scheduleFocusNode, setDocument]
+  );
+
+  const createNeuronAndConnectAt = useCallback(
+    (sourceNodeIds: string[], x: number, y: number) => {
+      const nextNeuronId = addNeuronAt(x, y);
+      if (!nextNeuronId) {
+        return;
+      }
+
+      const nextTargetNode: GraphViewNode = {
+        id: nextNeuronId,
+        refNodeId: nextNeuronId,
+        label: nextNeuronId,
+        kind: 'neuron',
+        x,
+        y,
+        width: LEAF_NODE_SIZE,
+        height: LEAF_NODE_SIZE,
+        parentId: navigationPath.at(-1) ?? null,
+        detail: '',
+        editable: true,
+        navigable: false,
+        leaf: true,
+        proxy: false,
+        movable: true,
+        local: true,
+        direction: 'internal',
+        connectableSource: true,
+        connectableTarget: true,
+      };
+
+      const uniqueSourceNodeIds = uniqueIds(sourceNodeIds);
+      const nextLinks: LeafLink[] = [];
+      const resolvedLinkIds: string[] = [];
+      const attemptedEndpoints = new Set<string>();
+      const timestamp = Date.now();
+
+      for (const sourceNodeId of uniqueSourceNodeIds) {
+        const sourceViewNode = viewNodeById.get(sourceNodeId);
+        if (!sourceViewNode) {
+          continue;
+        }
+
+        const sourceNode = indexes.nodeById.get(sourceViewNode.refNodeId);
+        if (!sourceNode || !isLeafNode(sourceNode)) {
+          continue;
+        }
+
+        if (
+          !canGraphNodesConnect({
+            sourceNode: sourceViewNode,
+            targetNode: nextTargetNode,
+            currentScope,
+            localLeafIds,
+          })
+        ) {
+          continue;
+        }
+
+        const fromPortId = getLeafPortId(sourceNode, 'output');
+        const toPortId = NEURON_INPUT_PORT_ID;
+        const endpointKey = `${sourceNode.id}:${fromPortId}->${nextNeuronId}:${toPortId}`;
+        if (attemptedEndpoints.has(endpointKey)) {
+          continue;
+        }
+
+        attemptedEndpoints.add(endpointKey);
+        nextLinks.push({
+          id: `link-${sourceNode.id}-${nextNeuronId}-${timestamp}-${nextLinks.length}`,
+          from: {
+            nodeId: sourceNode.id,
+            portId: fromPortId,
+          },
+          to: {
+            nodeId: nextNeuronId,
+            portId: toPortId,
+          },
+          weight: 0.8,
+        });
+      }
+
+      if (nextLinks.length === 0) {
+        return;
+      }
+
+      resolvedLinkIds.push(nextLinks.at(-1)?.id ?? '');
+      setDocument((current) => ({
+        ...current,
+        root: {
+          ...current.root,
+          links: [...current.root.links, ...nextLinks],
+        },
+      }));
+      scheduleFocusLink(resolvedLinkIds.at(-1) ?? null);
+    },
+    [
+      addNeuronAt,
+      currentScope,
+      indexes.nodeById,
+      localLeafIds,
+      navigationPath,
+      scheduleFocusLink,
+      setDocument,
+      viewNodeById,
+    ]
   );
 
   const aggregateSelectedNodes = useCallback(() => {
@@ -660,6 +768,7 @@ export const useGraphEditorCommands = ({
     removeSelected,
     addNeuronAt,
     addNeuronGroupAt,
+    createNeuronAndConnectAt,
     aggregateSelectedNodes,
     ungroupNode,
     updateNodeLabelAndParams,
