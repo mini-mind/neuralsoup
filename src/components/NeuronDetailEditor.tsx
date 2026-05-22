@@ -59,7 +59,7 @@ const NeuronDetailEditor: React.FC<NeuronDetailEditorProps> = ({ neuron, onUpdat
       </div>
 
       <div className="topology-detail-copy">
-        {neuron.description ?? '当前 inspector 直接回写 GraphIRDocument 中的参数覆盖，不再维护任何 legacy graph 真源。'}
+        {neuron.description ?? '当前 inspector 修改的是 Brain leaf node 的参数覆盖。'}
       </div>
 
       {!neuron.readonly && (

@@ -75,7 +75,6 @@ export class CollisionDetector {
         
         reward += food.nutritionValue;
         
-        console.log(`Agent ${agent.id} ate food ${food.id}, reward: ${food.nutritionValue}`);
       }
     }
 
@@ -118,7 +117,6 @@ export class CollisionDetector {
         
         collisions++;
         
-        console.log(`Agent ${agent.id} collided with obstacle ${obstacle.id}`);
       }
     }
 
@@ -158,7 +156,6 @@ export class CollisionDetector {
         
         collisions++;
         
-        console.log(`Agent ${agent.id} collided with agent ${otherAgent.id}`);
       }
     }
 
@@ -166,67 +163,9 @@ export class CollisionDetector {
   }
 
   /**
-   * 检查单个智能体与食物的碰撞（用于实时检测）
-   */
-  public checkSingleAgentFoodCollision(agent: Agent, food: Food): boolean {
-    const dx = agent.x - food.x;
-    const dy = agent.y - food.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    
-    return distance < CollisionDetector.AGENT_RADIUS + food.radius;
-  }
-
-  /**
-   * 检查单个智能体与障碍物的碰撞（用于路径规划）
-   */
-  public checkSingleAgentObstacleCollision(agent: Agent, obstacle: Obstacle): boolean {
-    const nearestX = Math.max(obstacle.x - obstacle.radius, Math.min(agent.x, obstacle.x + obstacle.radius));
-    const nearestY = Math.max(obstacle.y - obstacle.radius, Math.min(agent.y, obstacle.y + obstacle.radius));
-    const dx = agent.x - nearestX;
-    const dy = agent.y - nearestY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    
-    return distance < CollisionDetector.AGENT_RADIUS;
-  }
-
-  /**
    * 移除被吃掉的食物
    */
   public removeFoods(foods: Food[], foodsToRemove: Food[]): Food[] {
     return foods.filter(food => !foodsToRemove.some(removeFood => removeFood.id === food.id));
-  }
-
-  /**
-   * 获取智能体周围的危险程度（用于AI决策）
-   */
-  public getDangerLevel(agent: Agent, obstacles: Obstacle[], otherAgents: Agent[]): number {
-    let dangerLevel = 0;
-    const dangerRadius = 50; // 危险感知半径
-
-    // 检查障碍物威胁
-    for (const obstacle of obstacles) {
-      const dx = agent.x - obstacle.x;
-      const dy = agent.y - obstacle.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      if (distance < dangerRadius) {
-        dangerLevel += (dangerRadius - distance) / dangerRadius;
-      }
-    }
-
-    // 检查其他智能体威胁
-    for (const otherAgent of otherAgents) {
-      if (agent.id === otherAgent.id) continue;
-      
-      const dx = agent.x - otherAgent.x;
-      const dy = agent.y - otherAgent.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      if (distance < dangerRadius) {
-        dangerLevel += 0.5 * (dangerRadius - distance) / dangerRadius;
-      }
-    }
-
-    return Math.min(1, dangerLevel); // 限制在0-1范围内
   }
 } 

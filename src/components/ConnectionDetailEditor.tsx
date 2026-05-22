@@ -1,28 +1,28 @@
 import React, { useEffect, useState } from 'react';
 
-interface InspectorSynapse {
+interface InspectorConnection {
   id: string;
   from: string;
   to: string;
   weight: number;
 }
 
-interface SynapseDetailEditorProps {
-  synapse: InspectorSynapse;
-  onUpdate: (updatedSynapse: InspectorSynapse) => void;
+interface ConnectionDetailEditorProps {
+  connection: InspectorConnection;
+  onUpdate: (updatedConnection: InspectorConnection) => void;
 }
 
-const SynapseDetailEditor: React.FC<SynapseDetailEditorProps> = ({ synapse, onUpdate }) => {
-  const [weight, setWeight] = useState(synapse.weight);
+const ConnectionDetailEditor: React.FC<ConnectionDetailEditorProps> = ({ connection, onUpdate }) => {
+  const [weight, setWeight] = useState(connection.weight);
 
   useEffect(() => {
-    setWeight(synapse.weight);
-  }, [synapse.id, synapse.weight]);
+    setWeight(connection.weight);
+  }, [connection.id, connection.weight]);
 
   const handleWeightChange = (nextWeight: number) => {
     setWeight(nextWeight);
     onUpdate({
-      ...synapse,
+      ...connection,
       weight: nextWeight,
     });
   };
@@ -30,23 +30,23 @@ const SynapseDetailEditor: React.FC<SynapseDetailEditorProps> = ({ synapse, onUp
   return (
     <div className="topology-detail-editor">
       <div className="topology-detail-copy">
-        当前 inspector 修改的是 GraphIRDocument `LeafLink.weight`。
+        当前 inspector 修改的是 Brain leaf connection 的权重。
       </div>
 
       <div className="topology-detail-section">
         <div className="topology-detail-label">连接</div>
         <div className="topology-detail-copy">
-          {synapse.from} -&gt; {synapse.to}
+          {connection.from} -&gt; {connection.to}
         </div>
       </div>
 
       <div className="topology-detail-section">
-        <label className="topology-detail-label" htmlFor="synapse-weight-input">
+        <label className="topology-detail-label" htmlFor="connection-weight-input">
           权重
         </label>
         <input
-          id="synapse-weight-input"
-          data-testid="synapse-weight-input"
+          id="connection-weight-input"
+          data-testid="connection-weight-input"
           className="topology-detail-input"
           type="number"
           step="0.01"
@@ -58,4 +58,4 @@ const SynapseDetailEditor: React.FC<SynapseDetailEditorProps> = ({ synapse, onUp
   );
 };
 
-export default SynapseDetailEditor;
+export default ConnectionDetailEditor;

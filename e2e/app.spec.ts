@@ -63,19 +63,19 @@ const selectors = {
   topologyDraftInputCount: '[data-testid="topology-draft-input-count"]',
   topologyDraftOutputCount: '[data-testid="topology-draft-output-count"]',
   topologyDraftNeuronCount: '[data-testid="topology-draft-neuron-count"]',
-  topologyDraftSynapseCount: '[data-testid="topology-draft-synapse-count"]',
+  topologyDraftConnectionCount: '[data-testid="topology-draft-connection-count"]',
   topologyDraftValidationCount: '[data-testid="topology-draft-validation-count"]',
   topologyRuntimeState: '[data-testid="topology-runtime-state"]',
   topologyRuntimeValidationCount: '[data-testid="topology-runtime-validation-count"]',
   topologyRuntimeInputCount: '[data-testid="topology-runtime-input-count"]',
   topologyRuntimeOutputCount: '[data-testid="topology-runtime-output-count"]',
   topologyRuntimeNeuronCount: '[data-testid="topology-runtime-neuron-count"]',
-  topologyRuntimeSynapseCount: '[data-testid="topology-runtime-synapse-count"]',
+  topologyRuntimeConnectionCount: '[data-testid="topology-runtime-connection-count"]',
   topologyInputCount: '[data-testid="topology-input-count"]',
   topologyOutputCount: '[data-testid="topology-output-count"]',
   topologyValidationCount: '[data-testid="topology-validation-count"]',
   neuronLabelInput: '[data-testid="neuron-label-input"]',
-  synapseWeightInput: '[data-testid="synapse-weight-input"]',
+  connectionWeightInput: '[data-testid="connection-weight-input"]',
   inputAdapterNode: '[data-testid="topology-node-input-adapter"]',
   coreGroupNode: '[data-testid="topology-node-core-neuron-group"]',
   outputAdapterNode: '[data-testid="topology-node-output-adapter"]',
@@ -1025,7 +1025,7 @@ test('graph view edits leaf params and leaf link weights through Graph IR inspec
 
   await page.locator(selectors.editorTabGraph).click();
   await doubleClickNode(page, selectors.coreGroupNode);
-  await expect(page.locator(selectors.topologyRuntimeSynapseCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
 
   await doubleClickNode(page, selectors.nodeNeuronOne);
   await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
@@ -1040,10 +1040,10 @@ test('graph view edits leaf params and leaf link weights through Graph IR inspec
 
   await doubleClickAtCenter(page, selectors.linkNeuronOneNeuronTwo);
   await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
-  await page.locator(selectors.synapseWeightInput).fill('1.25');
+  await page.locator(selectors.connectionWeightInput).fill('1.25');
   await page.locator(selectors.topologyDetailClose).click();
   await expect(page.locator(selectors.linkNeuronOneNeuronTwo)).toContainText('1.25');
-  await expect(page.locator(selectors.topologyRuntimeSynapseCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
 });
 
 test('graph view diagnostics keep draft and installed runtime summaries aligned after valid edits', async ({ page }, testInfo) => {
@@ -1063,15 +1063,15 @@ test('graph view diagnostics keep draft and installed runtime summaries aligned 
   await expect(page.locator(selectors.topologyOutputCount)).toHaveText(initialDraftOutputCount);
   await expect(page.locator(selectors.topologyRuntimeOutputCount)).toHaveText(initialDraftOutputCount);
   await expect(page.locator(selectors.topologyRuntimeNeuronCount)).toHaveText(initialDraftNeuronCount);
-  await expect(page.locator(selectors.topologyDraftSynapseCount)).toHaveText('118');
-  await expect(page.locator(selectors.topologyRuntimeSynapseCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
 
-  await expect(page.locator(selectors.topologyDraftSynapseCount)).toHaveText('118');
-  await expect(page.locator(selectors.topologyRuntimeSynapseCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
   await expect(page.locator(selectors.topologyRuntimeInputCount)).toHaveText(initialDraftInputCount);
   await expect(page.locator(selectors.topologyRuntimeOutputCount)).toHaveText(initialDraftOutputCount);
   await expect(page.locator(selectors.topologyRuntimeNeuronCount)).toHaveText(initialDraftNeuronCount);
@@ -1091,16 +1091,16 @@ test('graph view diagnostics keep valid draft counts distinct from installed run
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
-  await expect(page.locator(selectors.topologyDraftSynapseCount)).toHaveText('118');
-  await expect(page.locator(selectors.topologyRuntimeSynapseCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
 
   await injectValidDraftOnly(page);
 
-  await expect(page.locator(selectors.topologyDraftSynapseCount)).toHaveText('119');
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('119');
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
   await expect(page.locator(selectors.topologyRuntimeValidationCount)).toHaveText('0');
-  await expect(page.locator(selectors.topologyRuntimeSynapseCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
   await expect.poll(() => getRuntimeDiagnostics(page)).toEqual({
     state: 'applied',
     validationCount: '0'
@@ -1114,7 +1114,7 @@ test('graph view supports creating a leaf link and keeps state across tab switch
 
   await page.locator(selectors.editorTabGraph).click();
   await doubleClickNode(page, selectors.coreGroupNode);
-  await expect(page.locator(selectors.topologyRuntimeSynapseCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
   const canvasBox = await getCanvasBox(page);
   const createPoint = { x: canvasBox.x + 300, y: canvasBox.y + 220 };
   await page.mouse.move(createPoint.x, createPoint.y);
@@ -1128,7 +1128,7 @@ test('graph view supports creating a leaf link and keeps state across tab switch
   await rightDragBetweenNodes(page, selectors.nodeNeuronOne, newNeuronSelector);
   await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
   await expect(page.locator(selectors.topologySelectedLink)).toHaveText(/link-neuron-1-neuron-3-/);
-  await expect(page.locator(selectors.topologyRuntimeSynapseCount)).toHaveText('119');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('119');
 
   await page.locator(selectors.editorTabSettings).click();
   await page.locator(selectors.settingsNavKeyboardInputs).click();
@@ -1140,7 +1140,7 @@ test('graph view supports creating a leaf link and keeps state across tab switch
   await expect(page.locator('[data-testid^="topology-link-link-neuron-1-neuron-3-"]')).toHaveCount(1);
   await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
   await expect(page.locator(selectors.topologySelectedLink)).toHaveText(/link-neuron-1-neuron-3-/);
-  await expect(page.locator(selectors.topologyRuntimeSynapseCount)).toHaveText('119');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('119');
 });
 
 test('graph view routes link-covered left-drag through canvas gestures without losing link selection or detail', async ({ page }, testInfo) => {
@@ -1191,7 +1191,7 @@ test('graph view routes link-covered left-drag through canvas gestures without l
 
   await doubleClickAtCenter(page, linkSelector);
   await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
-  await expect(page.locator(selectors.synapseWeightInput)).toBeVisible();
+  await expect(page.locator(selectors.connectionWeightInput)).toBeVisible();
   await page.locator(selectors.topologyDetailClose).click();
   await expect(page.locator(selectors.topologyDetailModal)).toHaveCount(0);
 });
@@ -1203,7 +1203,7 @@ test('graph view blocks duplicate local links and keeps external nodes out of th
 
   await page.locator(selectors.editorTabGraph).click();
   await doubleClickNode(page, selectors.coreGroupNode);
-  await expect(page.locator(selectors.topologyRuntimeSynapseCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
 
   const canvasBox = await getCanvasBox(page);
   const createPoint = { x: canvasBox.x + 300, y: canvasBox.y + 220 };
@@ -1218,13 +1218,13 @@ test('graph view blocks duplicate local links and keeps external nodes out of th
 
   await rightDragBetweenNodes(page, selectors.nodeNeuronOne, newNeuronSelector);
   await expect(page.locator('[data-testid^="topology-link-link-neuron-1-neuron-3-"]')).toHaveCount(1);
-  await expect(page.locator(selectors.topologyRuntimeSynapseCount)).toHaveText('119');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('119');
 
   await rightDragBetweenNodes(page, selectors.nodeNeuronOne, newNeuronSelector);
   await expect(page.locator('[data-testid^="topology-link-link-neuron-1-neuron-3-"]')).toHaveCount(1);
   await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
   await expect(page.locator(selectors.topologySelectedLink)).toHaveText(/link-neuron-1-neuron-3-/);
-  await expect(page.locator(selectors.topologyRuntimeSynapseCount)).toHaveText('119');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('119');
 
   await expect(page.locator('[data-testid^="topology-node-proxy:"]')).toHaveCount(0);
   await expect(page.locator('[data-testid^="topology-link-link-vision-R-0-output-move-forward-"]')).toHaveCount(0);
@@ -1286,15 +1286,15 @@ test('graph view diagnostics expose invalid draft divergence from installed runt
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
-  await expect(page.locator(selectors.topologyDraftSynapseCount)).toHaveText('118');
-  await expect(page.locator(selectors.topologyRuntimeSynapseCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
 
   await injectInvalidGraphDraft(page);
 
-  await expect(page.locator(selectors.topologyDraftSynapseCount)).toHaveText('119');
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('119');
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('1');
   await expect(page.locator(selectors.topologyValidationCount)).toHaveText('1');
-  await expect(page.locator(selectors.topologyRuntimeSynapseCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
   await expect
     .poll(() => getRuntimeDiagnostics(page))
     .toEqual({
@@ -1592,7 +1592,7 @@ test('graph view keeps expanded group child links editable and child deletion co
   await expect(page.locator(selectors.linkNeuronOneNeuronTwo)).toBeVisible();
   await doubleClickAtCenter(page, selectors.linkNeuronOneNeuronTwo);
   await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
-  await expect(page.locator(selectors.synapseWeightInput)).toBeVisible();
+  await expect(page.locator(selectors.connectionWeightInput)).toBeVisible();
   await page.locator(selectors.topologyDetailClose).click();
 
   await page.locator(selectors.nodeNeuronOne).click();

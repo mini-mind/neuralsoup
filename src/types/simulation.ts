@@ -51,10 +51,6 @@ export interface Agent {
   // 统计数据
   totalReward: number;
   collisionCount: number;
-  
-  // 渲染对象
-  sprite?: any;
-  visionSprites?: any[]; // 视野格子的渲染对象
 }
 
 export interface Food {
@@ -70,8 +66,6 @@ export interface Obstacle {
   x: number;
   y: number;
   radius: number;
-  isMoving: boolean;
-  velocity?: { x: number; y: number };
 }
 
 export interface World {

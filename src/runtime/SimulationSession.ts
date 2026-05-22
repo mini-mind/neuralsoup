@@ -118,8 +118,6 @@ export class SimulationSession {
       this.worldManager.handleBoundaryCollision(agent);
     }
 
-    this.worldManager.updateMovingObstacles(this.state.obstacles, deltaTime);
-
     const collisionResult = this.collisionDetector.handleCollisions(
       this.state.agents,
       this.state.foods,

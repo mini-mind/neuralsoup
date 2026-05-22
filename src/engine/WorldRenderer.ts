@@ -141,18 +141,6 @@ export class WorldRenderer {
     this.worldContainer.x = screenWidth / 2;
     this.worldContainer.y = screenHeight / 2;
 
-    // 调试日志
-    if (this.app.ticker.count % 60 === 0) { // 大约每秒一次
-      console.log('Camera Update Debug:', {
-        targetAgentPos: { x: this.cameraTarget.x, y: this.cameraTarget.y },
-        worldContainerPivot: { x: this.worldContainer.pivot.x, y: this.worldContainer.pivot.y },
-        worldContainerPos: { x: this.worldContainer.x, y: this.worldContainer.y },
-        worldContainerRotation: this.worldContainer.rotation,
-        targetRotation: targetRotation,
-        screenWidth: screenWidth,
-        screenHeight: screenHeight
-      });
-    }
   }
 
   private renderAgents(agents: Agent[], visionAngle: number, focusedAgentId: number | null): void {
@@ -285,11 +273,6 @@ export class WorldRenderer {
     // 智能体本身的朝向由其内部的指示器绘制，而不是通过旋转整个精灵来表示
     graphics.rotation = -this.worldContainer.rotation; // 将精灵自身旋转设置为抵消世界容器的旋转
 
-    // 调试日志：仅对主智能体打印其全局位置
-    if (isFocusedAgent && this.app.ticker.count % 60 === 0) {
-      const globalPos = graphics.getGlobalPosition();
-      console.log('Main Agent Global Position:', { id: agent.id, x: globalPos.x, y: globalPos.y });
-    }
   }
 
   private renderFoods(foods: Food[]): void {
@@ -363,16 +346,6 @@ export class WorldRenderer {
     graphics.drawRect(-obstacle.radius, -obstacle.radius, obstacle.radius * 2, obstacle.radius * 2);
     graphics.endFill();
     
-    // 移除移动障碍物相关的渲染（例如运动指示）
-    // if (obstacle.isMoving && obstacle.velocity) {
-    //   graphics.lineStyle(2, 0x666666);
-    //   const speed = Math.sqrt(obstacle.velocity.x ** 2 + obstacle.velocity.y ** 2);
-    //   if (speed > 0) {
-    //     graphics.moveTo(0, 0);
-    //     graphics.lineTo(obstacle.velocity.x * 50, obstacle.velocity.y * 50);
-    //   }
-    // }
-    
     graphics.position.set(obstacle.x, obstacle.y);
   }
 
@@ -435,7 +408,6 @@ export class WorldRenderer {
     }
     
     this.noiseGenerated = true;
-    console.log('海洋背景噪声生成完成');
   }
 
   /**
@@ -447,10 +419,4 @@ export class WorldRenderer {
     this.noiseGenerated = false; // 标记需要重新生成噪声
   }
 
-  /**
-   * 强制重新生成背景噪声
-   */
-  public regenerateNoise(): void {
-    this.noiseGenerated = false;
-  }
 } 

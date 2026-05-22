@@ -59,9 +59,6 @@ export class WorldManager {
       agents.push(agent);
     }
     
-    console.log('Total agents created:', agents.length);
-    console.log('Wall inner bounds:', bounds);
-    
     return agents;
   }
 
@@ -85,9 +82,6 @@ export class WorldManager {
         nutritionValue: 10
       });
     }
-    
-    console.log('Generated foods:', foods.length);
-    console.log('Food spawn area:', bounds);
     
     return foods;
   }
@@ -114,16 +108,14 @@ export class WorldManager {
         id: idCounter++,
         x: WALL_MARGIN + i * obstacleSize + obstacleSize / 2,
         y: WALL_MARGIN + obstacleSize / 2,
-        radius: obstacleSize / 2,
-        isMoving: false,
+        radius: obstacleSize / 2
       });
       // 底部墙
       obstacles.push({
         id: idCounter++,
         x: WALL_MARGIN + i * obstacleSize + obstacleSize / 2,
         y: WALL_MARGIN + innerHeight - obstacleSize / 2,
-        radius: obstacleSize / 2,
-        isMoving: false,
+        radius: obstacleSize / 2
       });
     }
 
@@ -134,21 +126,17 @@ export class WorldManager {
         id: idCounter++,
         x: WALL_MARGIN + obstacleSize / 2,
         y: WALL_MARGIN + i * obstacleSize + obstacleSize / 2,
-        radius: obstacleSize / 2,
-        isMoving: false,
+        radius: obstacleSize / 2
       });
       // 右侧墙
       obstacles.push({
         id: idCounter++,
         x: WALL_MARGIN + innerWidth - obstacleSize / 2,
         y: WALL_MARGIN + i * obstacleSize + obstacleSize / 2,
-        radius: obstacleSize / 2,
-        isMoving: false,
+        radius: obstacleSize / 2
       });
     }
 
-    console.log('Generated obstacles (walls):', obstacles.length);
-    
     return obstacles;
   }
 
@@ -168,26 +156,6 @@ export class WorldManager {
     if (clampedY !== agent.y) {
       agent.y = clampedY;
       agent.velocity.y = 0;
-    }
-  }
-
-  /**
-   * 更新移动障碍物
-   */
-  public updateMovingObstacles(obstacles: Obstacle[], deltaTime: number): void {
-    for (const obstacle of obstacles) {
-      if (obstacle.isMoving && obstacle.velocity) {
-        obstacle.x += obstacle.velocity.x * deltaTime;
-        obstacle.y += obstacle.velocity.y * deltaTime;
-        
-        // 简单的边界反弹
-        if (obstacle.x < 0 || obstacle.x > this.worldWidth) {
-          obstacle.velocity.x = -obstacle.velocity.x;
-        }
-        if (obstacle.y < 0 || obstacle.y > this.worldHeight) {
-          obstacle.velocity.y = -obstacle.velocity.y;
-        }
-      }
     }
   }
 

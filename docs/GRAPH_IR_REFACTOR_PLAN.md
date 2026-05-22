@@ -143,11 +143,10 @@ GraphView 当前仍直接编辑 `GraphIRDocument`。长期目标是：
 3. 将 `LeafLink` 正式重命名或替换为 `ConnectionEdge`。
 4. 移除 `SignalNode.signal` 的 world-facing 用途；如果保留，只作为模型信号类型描述。
 5. 为 body schema 增加更严格的重复绑定、fan-in/fan-out 策略和容量边界校验。
-6. 为 Brain Library 补齐 rename、delete、duplicate、dirty prompt 和 import error 细节。
 
 ## 验收边界
 
 - `rg "compileGraphIRDocument|StoredBrain|createStoredBrain|upsertStoredBrainDocument" src tests e2e docs` 不命中新运行路径。
 - `npm run type-check` 通过。
 - `npm run test:domain` 通过。
-- Brain Library e2e 覆盖保存完整 package、LocalStorage 持久化、reload 后选择 Brain，并同步 body 对应的视觉格数量。
+- Brain Library e2e 覆盖保存完整 package、LocalStorage 持久化、reload 后选择 Brain、导入导出、重命名、删除、复制、脏状态提示，并同步 body 对应的视觉格数量。

@@ -1,7 +1,7 @@
 import React from 'react';
 import type { LiteralValue, TopologyNode } from '../../../domain/brain';
 import NeuronDetailEditor from '../../NeuronDetailEditor';
-import SynapseDetailEditor from '../../SynapseDetailEditor';
+import ConnectionDetailEditor from '../../ConnectionDetailEditor';
 import type { DetailModalData } from '../../hooks/useSNNTopologyState';
 
 interface GraphLeafLink {
@@ -112,15 +112,15 @@ const GraphDetailModal: React.FC<GraphDetailModalProps> = ({
           />
         )}
         {detailModal.type === 'link' && activeLink && (
-          <SynapseDetailEditor
-            synapse={{
+          <ConnectionDetailEditor
+            connection={{
               id: activeLink.id,
               from: activeLink.from.nodeId,
               to: activeLink.to.nodeId,
               weight: activeLink.weight,
             }}
-            onUpdate={(updatedSynapse) => {
-              onUpdateLink(activeLink.id, updatedSynapse.weight);
+            onUpdate={(updatedConnection) => {
+              onUpdateLink(activeLink.id, updatedConnection.weight);
             }}
           />
         )}

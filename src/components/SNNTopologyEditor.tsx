@@ -143,7 +143,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
     runtimeStatus,
     runtimeActivity,
     nodeCount: nodes.length,
-    synapseCount: links.filter((link) => !link.aggregate).length,
+    connectionCount: links.filter((link) => !link.aggregate).length,
     selectedCount,
     selectedNodeId,
     selectedLinkId,

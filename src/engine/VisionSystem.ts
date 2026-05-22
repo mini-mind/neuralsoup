@@ -185,14 +185,10 @@ export class VisionSystem {
         const relativeAngle = this.normalizeAngle(angleToObstacle - agent.angle);
         
         if (Math.abs(relativeAngle) <= this.visionAngle / 2) {
-          const color = obstacle.isMoving ? 
-            { r: 0.5, g: 0.5, b: 0.5 } : 
-            { r: 0.3, g: 0.3, b: 0.3 };
-          
           visibleElements.push({
             x: obstacle.x,
             y: obstacle.y,
-            color: color,
+            color: { r: 0.3, g: 0.3, b: 0.3 },
             type: 'obstacle',
             id: obstacle.id,
             radius: obstacle.radius
@@ -324,4 +320,4 @@ export class VisionSystem {
   public getVisionCells(): number {
     return this.visionCells;
   }
-} 
+}

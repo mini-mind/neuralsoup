@@ -117,8 +117,6 @@ export class SimulationEngine {
     this.onGraphIRActivityChange?.(this.getGraphIRRuntimeActivitySnapshot());
     // 立即重新渲染世界，确保即使在暂停状态下也能看到变化
     this.renderWorld();
-    
-    console.log('智能体参数已更新:', params);
   }
 
   /**
@@ -148,8 +146,6 @@ export class SimulationEngine {
    * 初始化仿真系统
    */
   initialize(): void {
-    console.log('初始化仿真系统...');
-    
     // 设置渲染器的世界尺寸
     this.renderer.setWorldDimensions(this.worldManager.width, this.worldManager.height);
     this.session.initialize();
@@ -164,14 +160,12 @@ export class SimulationEngine {
     
     this.renderWorld();
     this.emitLifecycleChange();
-    console.log(`仿真系统初始化完成: ${this.session.getState().agents.length}个智能体`);
   }
 
   /**
    * 启动仿真
    */
   start(): void {
-    console.log('启动仿真...');
     this.isRunning = true;
     this.isPaused = false;
     this.lastTime = performance.now();
@@ -186,7 +180,6 @@ export class SimulationEngine {
    * 暂停仿真
    */
   pause(): void {
-    console.log('暂停仿真...');
     this.isPaused = true;
     this.emitLifecycleChange();
   }
@@ -195,7 +188,6 @@ export class SimulationEngine {
    * 恢复仿真
    */
   resume(): void {
-    console.log('恢复仿真...');
     this.isPaused = false;
     this.lastTime = performance.now();
     this.emitLifecycleChange();
@@ -205,7 +197,6 @@ export class SimulationEngine {
    * 停止仿真
    */
   stop(): void {
-    console.log('停止仿真...');
     this.isRunning = false;
     this.isPaused = false;
     this.gameLoopRunning = false;
@@ -304,7 +295,6 @@ export class SimulationEngine {
     this.session.setControlMode(newMode);
     this.onGraphIRStatusChange?.(this.getGraphIRRuntimeStatus());
     this.onGraphIRActivityChange?.(this.getGraphIRRuntimeActivitySnapshot());
-    console.log(`Control mode changed to: ${newMode}`);
   }
 
   public getLifecycleState(): SimulationLifecycleState {

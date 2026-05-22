@@ -14,7 +14,7 @@ interface GraphTopologyDiagnosticsProps {
   runtimeStatus: GraphIRRuntimeStatus;
   runtimeActivity: GraphIRRuntimeActivitySnapshot;
   nodeCount: number;
-  synapseCount: number;
+  connectionCount: number;
   selectedCount: number;
   selectedNodeId: string | null;
   selectedLinkId: string | null;
@@ -32,7 +32,7 @@ const GraphTopologyDiagnostics: React.FC<GraphTopologyDiagnosticsProps> = ({
   runtimeStatus,
   runtimeActivity,
   nodeCount,
-  synapseCount,
+  connectionCount,
   selectedCount,
   selectedNodeId,
   selectedLinkId,
@@ -52,7 +52,7 @@ const GraphTopologyDiagnostics: React.FC<GraphTopologyDiagnosticsProps> = ({
         <span data-testid="topology-draft-input-count">{draftSummary.inputSignalCount}</span>
         <span data-testid="topology-draft-output-count">{draftSummary.outputSignalCount}</span>
         <span data-testid="topology-draft-neuron-count">{draftSummary.neuronCount}</span>
-        <span data-testid="topology-draft-synapse-count">{draftSummary.leafLinkCount}</span>
+        <span data-testid="topology-draft-connection-count">{draftSummary.leafLinkCount}</span>
         <span data-testid="topology-draft-validation-count">{draftValidationCount}</span>
         <span data-testid="topology-runtime-state">{runtimeStatus.state}</span>
         <span data-testid="topology-runtime-status-label">{runtimeStatusLabel}</span>
@@ -60,7 +60,7 @@ const GraphTopologyDiagnostics: React.FC<GraphTopologyDiagnosticsProps> = ({
         <span data-testid="topology-runtime-input-count">{runtimeStatus.appliedSummary.inputSignalCount}</span>
         <span data-testid="topology-runtime-output-count">{runtimeStatus.appliedSummary.outputSignalCount}</span>
         <span data-testid="topology-runtime-neuron-count">{runtimeStatus.appliedSummary.neuronCount}</span>
-        <span data-testid="topology-runtime-synapse-count">{runtimeStatus.appliedSummary.leafLinkCount}</span>
+        <span data-testid="topology-runtime-connection-count">{runtimeStatus.appliedSummary.leafLinkCount}</span>
         <span data-testid="topology-runtime-message">{runtimeMessage}</span>
         <span data-testid="topology-runtime-active-node-count">{runtimeActivity.activeNodeIds.length}</span>
         <span data-testid="topology-runtime-active-node-ids">{runtimeActivity.activeNodeIds.join('|')}</span>
@@ -68,11 +68,10 @@ const GraphTopologyDiagnostics: React.FC<GraphTopologyDiagnosticsProps> = ({
 
       <div className="topology-meta-hidden" data-testid="topology-state-summary" aria-hidden="true">
         <span data-testid="topology-node-count">{nodeCount}</span>
-        <span data-testid="topology-synapse-count">{synapseCount}</span>
+        <span data-testid="topology-connection-count">{connectionCount}</span>
         <span data-testid="topology-selected-count">{selectedCount}</span>
         <span data-testid="topology-selected-node">{selectedNodeId ?? 'none'}</span>
         <span data-testid="topology-selected-link">{selectedLinkId ?? 'none'}</span>
-        <span data-testid="topology-selected-synapse">{selectedLinkId ?? 'none'}</span>
         <span data-testid="topology-vision-cells">{visionCells}</span>
         <span data-testid="topology-input-count">{draftSummary.inputSignalCount}</span>
         <span data-testid="topology-output-count">{draftSummary.outputSignalCount}</span>

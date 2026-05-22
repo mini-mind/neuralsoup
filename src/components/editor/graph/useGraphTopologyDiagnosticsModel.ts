@@ -13,7 +13,7 @@ interface UseGraphTopologyDiagnosticsModelOptions {
   runtimeStatus: GraphIRRuntimeStatus;
   runtimeActivity: GraphIRRuntimeActivitySnapshot;
   nodeCount: number;
-  synapseCount: number;
+  connectionCount: number;
   selectedCount: number;
   selectedNodeId: string | null;
   selectedLinkId: string | null;
@@ -30,7 +30,7 @@ export const useGraphTopologyDiagnosticsModel = ({
   runtimeStatus,
   runtimeActivity,
   nodeCount,
-  synapseCount,
+  connectionCount,
   selectedCount,
   selectedNodeId,
   selectedLinkId,
@@ -50,7 +50,7 @@ export const useGraphTopologyDiagnosticsModel = ({
     runtimeStatus,
     runtimeActivity,
     nodeCount,
-    synapseCount,
+    connectionCount,
     selectedCount,
     selectedNodeId,
     selectedLinkId,

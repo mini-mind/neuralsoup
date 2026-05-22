@@ -10,8 +10,7 @@ function cloneAgent(agent: Agent): Agent {
       ...cell,
       color: { ...cell.color }
     })),
-    visualInput: [...agent.visualInput],
-    visionSprites: agent.visionSprites ? [...agent.visionSprites] : undefined
+    visualInput: [...agent.visualInput]
   };
 }
 
@@ -20,10 +19,7 @@ function cloneFood(food: Food): Food {
 }
 
 function cloneObstacle(obstacle: Obstacle): Obstacle {
-  return {
-    ...obstacle,
-    velocity: obstacle.velocity ? { ...obstacle.velocity } : undefined
-  };
+  return { ...obstacle };
 }
 
 export function createWorldSnapshot(
