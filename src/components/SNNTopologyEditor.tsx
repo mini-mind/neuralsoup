@@ -14,11 +14,12 @@ interface SNNTopologyEditorProps {
   width: number;
   height: number;
   agent: AgentIR;
+  graphSessionKey: number;
   document: GraphIRDocument;
   visionCells?: number;
   onAgentChange?: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
-  onGraphPathChange?: (graphPath: GraphPathItem[], sourceAgentId: string) => void;
-  onGraphPathNavigateRegister?: (navigate: (pathId: string) => void, sourceAgentId: string) => void;
+  onGraphPathChange?: (graphPath: GraphPathItem[], sourceSessionKey: number) => void;
+  onGraphPathNavigateRegister?: (navigate: (pathId: string) => void, sourceSessionKey: number) => void;
   runtimeStatus: GraphIRRuntimeStatus;
   draftStatus: GraphIRDraftStatus;
   runtimeActivity: GraphIRRuntimeActivitySnapshot;
@@ -29,6 +30,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   width,
   height,
   agent,
+  graphSessionKey,
   document,
   visionCells = 36,
   onAgentChange,
@@ -41,6 +43,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
 }) => {
   const state = useSNNTopologyState({
     agent,
+    graphSessionKey,
     runtimeActiveNodeIds: runtimeActivity.activeNodeIds,
     onAgentChange,
   });
@@ -165,17 +168,17 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   useEffect(() => {
     onGraphPathChange?.(
       breadcrumbs.map((item) => ({ id: item.id, label: item.label })),
-      agent.metadata.id
+      graphSessionKey
     );
-  }, [agent.metadata.id, breadcrumbs, onGraphPathChange]);
+  }, [breadcrumbs, graphSessionKey, onGraphPathChange]);
 
   useEffect(() => {
     if (!onGraphPathNavigateRegister) {
       return;
     }
 
-    onGraphPathNavigateRegister(navigateToBreadcrumb, agent.metadata.id);
-  }, [agent.metadata.id, navigateToBreadcrumb, onGraphPathNavigateRegister]);
+    onGraphPathNavigateRegister(navigateToBreadcrumb, graphSessionKey);
+  }, [graphSessionKey, navigateToBreadcrumb, onGraphPathNavigateRegister]);
 
   return (
     <div className="snn-topology-editor" data-testid="topology-editor">

@@ -129,7 +129,7 @@
   paint-order: stroke;
   stroke: rgba(32, 32, 32, 0.9);
   stroke-width: 4px;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .topology-link.is-selected .topology-link-stroke {

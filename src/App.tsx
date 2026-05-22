@@ -1,4 +1,4 @@
-import React, { startTransition, useState, useCallback, useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import SimulationCanvas from './components/SimulationCanvas';
 import {
   createAgentIRFromLegacyGraph,
@@ -7,10 +7,10 @@ import {
   createDefaultBodyDefinition,
   createDefaultGraphIRDocument,
   getBodyVisionCellCount,
+  reconcileAgentIRVisionCells,
   type AgentIR,
   type AgentPackage,
   type BodyDefinition,
-  reconcileGraphIRDocumentVisionCells,
   summarizeGraphIRDocument,
   validateGraphIRDocument,
   type GraphIRDocument,
@@ -99,9 +99,6 @@ const createGraphIRDraftStatus = (draftDocument: GraphIRDocument): GraphIRDraftS
   };
 };
 
-const areGraphDocumentsEquivalent = (left: GraphIRDocument, right: GraphIRDocument): boolean =>
-  JSON.stringify(left) === JSON.stringify(right);
-
 const areAgentParametersEqual = (left: AgentParameters, right: AgentParameters): boolean => {
   return (
     left.visionCells === right.visionCells &&
@@ -113,6 +110,17 @@ const areAgentParametersEqual = (left: AgentParameters, right: AgentParameters):
 const areGraphPathsEqual = (left: GraphPathItem[], right: GraphPathItem[]): boolean =>
   left.length === right.length &&
   left.every((item, index) => item.id === right[index]?.id && item.label === right[index]?.label);
+
+const normalizeAgentForCompare = (agent: AgentIR): AgentIR => ({
+  ...agent,
+  metadata: {
+    ...agent.metadata,
+    updatedAt: '',
+  },
+});
+
+const areAgentsEquivalent = (left: AgentIR, right: AgentIR): boolean =>
+  JSON.stringify(normalizeAgentForCompare(left)) === JSON.stringify(normalizeAgentForCompare(right));
 
 const ROOT_GRAPH_PATH: GraphPathItem[] = [{ id: 'root', label: 'root' }];
 
@@ -161,6 +169,7 @@ const App: React.FC = () => {
   const [editorTab, setEditorTab] = useState<EditorTab>('graph');
   const [graphPath, setGraphPath] = useState<GraphPathItem[]>(ROOT_GRAPH_PATH);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('agent-parameters');
+  const [graphEditorSessionKey, setGraphEditorSessionKey] = useState(0);
   const requestedLifecycleStateRef = useRef<SimulationLifecycleState>('idle');
   const draftAgentDocumentRef = useRef(draftAgentDocument);
   const draftAgentBridge = useMemo(
@@ -175,15 +184,11 @@ const App: React.FC = () => {
   const graphDocumentRef = useRef(graphDocument);
   const activeAgentDocumentRef = useRef(activeAgentDocument);
   const graphPathNavigateRef = useRef<(pathId: string) => void>(() => {});
-  const graphPathAgentIdRef = useRef(draftAgentDocument.metadata.id);
+  const graphPathSessionKeyRef = useRef(0);
   const appRef = useRef<HTMLDivElement | null>(null);
   const simulationPanelRef = useRef<HTMLDivElement | null>(null);
   const installedGraphSummary = graphIRRuntimeStatus.appliedSummary;
-  const installedGraphDocument = useMemo(
-    () => createLegacyGraphBridgeFromAgent(activeAgentDocument).document,
-    [activeAgentDocument]
-  );
-  const hasUnsavedDraftChanges = !areGraphDocumentsEquivalent(installedGraphDocument, graphDocument);
+  const hasUnsavedDraftChanges = !areAgentsEquivalent(activeAgentDocument, draftAgentDocument);
 
   useEffect(() => {
     try {
@@ -360,13 +365,6 @@ const App: React.FC = () => {
     };
   }, [handleStartPause]);
 
-  const handleAgentParametersApply = useCallback((params: AgentParameters) => {
-    const nextBodyDefinition = createDefaultBodyDefinition(params.visionCells);
-    const nextDocument = reconcileGraphIRDocumentVisionCells(graphDocumentRef.current, params.visionCells);
-    setAgentParameters((current) => (areAgentParametersEqual(current, params) ? current : params));
-    updateGraphDocument(nextDocument, true, true, nextBodyDefinition);
-  }, [updateGraphDocument]);
-
   const handleAgentParametersChange = useCallback((params: AgentParameters) => {
     setAgentParameters((current) => (areAgentParametersEqual(current, params) ? current : params));
   }, []);
@@ -381,7 +379,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     draftAgentDocumentRef.current = draftAgentDocument;
-    graphPathAgentIdRef.current = draftAgentDocument.metadata.id;
   }, [draftAgentDocument]);
 
   useEffect(() => {
@@ -415,6 +412,14 @@ const App: React.FC = () => {
     commitEditedAgentDocument(nextAgentDocument, shouldInstallToRuntime, shouldInstallToRuntime);
   }, [commitEditedAgentDocument]);
 
+  const handleAgentParametersApply = useCallback((params: AgentParameters) => {
+    setAgentParameters((current) => (areAgentParametersEqual(current, params) ? current : params));
+    handleAgentChange(
+      (currentAgent) => reconcileAgentIRVisionCells(currentAgent, params.visionCells),
+      { installToRuntime: true }
+    );
+  }, [handleAgentChange]);
+
   const handleGraphIRRuntimeStatusChange = useCallback((nextStatus: GraphIRRuntimeStatus) => {
     setGraphIRRuntimeStatus(nextStatus);
   }, []);
@@ -442,21 +447,24 @@ const App: React.FC = () => {
     graphPathNavigateRef.current(pathId);
   }, []);
 
-  const resetGraphEditorToRoot = useCallback(() => {
+  const resetGraphEditorSession = useCallback(() => {
+    const nextSessionKey = graphPathSessionKeyRef.current + 1;
+    graphPathSessionKeyRef.current = nextSessionKey;
+    setGraphEditorSessionKey(nextSessionKey);
     graphPathNavigateRef.current = () => {};
     setGraphPath(ROOT_GRAPH_PATH);
   }, []);
 
-  const handleGraphPathChange = useCallback((nextGraphPath: GraphPathItem[], sourceAgentId: string) => {
-    if (sourceAgentId !== graphPathAgentIdRef.current) {
+  const handleGraphPathChange = useCallback((nextGraphPath: GraphPathItem[], sourceSessionKey: number) => {
+    if (sourceSessionKey !== graphPathSessionKeyRef.current) {
       return;
     }
 
     setGraphPath((currentGraphPath) => (areGraphPathsEqual(currentGraphPath, nextGraphPath) ? currentGraphPath : nextGraphPath));
   }, []);
 
-  const handleGraphPathNavigateRegister = useCallback((navigate: (pathId: string) => void, sourceAgentId: string) => {
-    if (sourceAgentId !== graphPathAgentIdRef.current) {
+  const handleGraphPathNavigateRegister = useCallback((navigate: (pathId: string) => void, sourceSessionKey: number) => {
+    if (sourceSessionKey !== graphPathSessionKeyRef.current) {
       return;
     }
 
@@ -489,21 +497,18 @@ const App: React.FC = () => {
 
     const bridge = createLegacyGraphBridgeFromAgent(selectedBrain.agent);
     const bodyVisionCells = getBodyVisionCellCount(bridge.body);
-    startTransition(() => {
-      graphPathAgentIdRef.current = selectedBrain.agent.metadata.id;
-      resetRuntimeForBrainSwitch();
-      setIsBrainLibraryOpen(true);
-      setActiveBrainId(selectedBrain.metadata.id);
-      setActiveAgentDocument(selectedBrain.agent);
-      setDraftAgentDocument(selectedBrain.agent);
-      setDraftGraphOverride(null);
-      setAgentParameters((current) =>
-        current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells }
-      );
-      setEditorTab('graph');
-      resetGraphEditorToRoot();
-    });
-  }, [brainLibrary, confirmUnsavedBrainReplacement, resetGraphEditorToRoot, resetRuntimeForBrainSwitch]);
+    resetGraphEditorSession();
+    resetRuntimeForBrainSwitch();
+    setIsBrainLibraryOpen(true);
+    setActiveBrainId(selectedBrain.metadata.id);
+    setActiveAgentDocument(selectedBrain.agent);
+    setDraftAgentDocument(selectedBrain.agent);
+    setDraftGraphOverride(null);
+    setAgentParameters((current) =>
+      current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells }
+    );
+    setEditorTab((currentTab) => (currentTab === 'graph' ? 'graph' : currentTab));
+  }, [brainLibrary, confirmUnsavedBrainReplacement, resetGraphEditorSession, resetRuntimeForBrainSwitch]);
 
   const handleImportBrain = useCallback((_name: string, payload: AgentPackage) => {
     if (!isAgentPackage(payload)) {
@@ -515,23 +520,20 @@ const App: React.FC = () => {
     }
 
     const bridge = createLegacyGraphBridgeFromAgent(nextBrain.agent);
-    startTransition(() => {
-      graphPathAgentIdRef.current = nextBrain.agent.metadata.id;
-      resetRuntimeForBrainSwitch();
-      setIsBrainLibraryOpen(true);
-      setBrainLibrary((currentLibrary) => [...currentLibrary, nextBrain]);
-      setActiveBrainId(nextBrain.metadata.id);
-      setActiveAgentDocument(nextBrain.agent);
-      setDraftAgentDocument(nextBrain.agent);
-      setDraftGraphOverride(null);
-      setAgentParameters((current) => {
-        const bodyVisionCells = getBodyVisionCellCount(bridge.body);
-        return current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells };
-      });
-      setEditorTab('graph');
-      resetGraphEditorToRoot();
+    resetGraphEditorSession();
+    resetRuntimeForBrainSwitch();
+    setIsBrainLibraryOpen(true);
+    setBrainLibrary((currentLibrary) => [...currentLibrary, nextBrain]);
+    setActiveBrainId(nextBrain.metadata.id);
+    setActiveAgentDocument(nextBrain.agent);
+    setDraftAgentDocument(nextBrain.agent);
+    setDraftGraphOverride(null);
+    setAgentParameters((current) => {
+      const bodyVisionCells = getBodyVisionCellCount(bridge.body);
+      return current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells };
     });
-  }, [confirmUnsavedBrainReplacement, resetGraphEditorToRoot, resetRuntimeForBrainSwitch]);
+    setEditorTab((currentTab) => (currentTab === 'graph' ? 'graph' : currentTab));
+  }, [confirmUnsavedBrainReplacement, resetGraphEditorSession, resetRuntimeForBrainSwitch]);
 
   const handleExportBrain = useCallback((brainId: string) => {
     const selectedBrain = brainLibrary.find((brain) => brain.metadata.id === brainId);
@@ -552,7 +554,28 @@ const App: React.FC = () => {
 
   const handleRenameBrain = useCallback((brainId: string, name: string) => {
     setBrainLibrary((currentLibrary) => renameBrainLibraryItem(currentLibrary, brainId, name));
-  }, []);
+    if (brainId !== activeBrainId) {
+      return;
+    }
+
+    const nextUpdatedAt = new Date().toISOString();
+    setActiveAgentDocument((currentAgent) => ({
+      ...currentAgent,
+      metadata: {
+        ...currentAgent.metadata,
+        name,
+        updatedAt: nextUpdatedAt,
+      },
+    }));
+    setDraftAgentDocument((currentAgent) => ({
+      ...currentAgent,
+      metadata: {
+        ...currentAgent.metadata,
+        name,
+        updatedAt: nextUpdatedAt,
+      },
+    }));
+  }, [activeBrainId]);
 
   const handleDeleteBrain = useCallback((brainId: string) => {
     setBrainLibrary((currentLibrary) => deleteBrainLibraryItem(currentLibrary, brainId));
@@ -813,6 +836,7 @@ const App: React.FC = () => {
           <GraphEditorPanel
             isActive={editorTab === 'graph'}
             agent={draftAgentDocument}
+            graphSessionKey={graphEditorSessionKey}
             document={graphDocument}
             visionCells={agentParameters.visionCells}
             runtimeStatus={graphIRRuntimeStatus}

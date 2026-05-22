@@ -7,19 +7,21 @@ import type { GraphPathItem } from './types';
 interface GraphEditorPanelProps {
   isActive: boolean;
   agent: AgentIR;
+  graphSessionKey: number;
   document: GraphIRDocument;
   visionCells: number;
   runtimeStatus: GraphIRRuntimeStatus;
   draftStatus: GraphIRDraftStatus;
   runtimeActivity: GraphIRRuntimeActivitySnapshot;
   onAgentChange: (updater: (current: AgentIR) => AgentIR) => void;
-  onGraphPathChange: (graphPath: GraphPathItem[], sourceAgentId: string) => void;
-  onGraphPathNavigateRegister: (navigate: (pathId: string) => void, sourceAgentId: string) => void;
+  onGraphPathChange: (graphPath: GraphPathItem[], sourceSessionKey: number) => void;
+  onGraphPathNavigateRegister: (navigate: (pathId: string) => void, sourceSessionKey: number) => void;
 }
 
 const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
   isActive,
   agent,
+  graphSessionKey,
   document,
   visionCells,
   runtimeStatus,
@@ -71,10 +73,10 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
       aria-hidden={!isActive}
     >
       <SNNTopologyEditor
-        key={agent.metadata.id}
         width={Math.max(viewport.width, 1)}
         height={Math.max(viewport.height, 1)}
         agent={agent}
+        graphSessionKey={graphSessionKey}
         document={document}
         visionCells={visionCells}
         onAgentChange={onAgentChange}

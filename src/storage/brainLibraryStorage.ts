@@ -428,7 +428,18 @@ export const renameBrainLibraryItem = (
 ): AgentPackage[] =>
   brains.map((brain) =>
     brain.metadata.id === brainId
-      ? { ...brain, metadata: { ...brain.metadata, name, updatedAt: new Date().toISOString() } }
+      ? {
+          ...brain,
+          metadata: { ...brain.metadata, name, updatedAt: new Date().toISOString() },
+          agent: {
+            ...brain.agent,
+            metadata: {
+              ...brain.agent.metadata,
+              name,
+              updatedAt: new Date().toISOString(),
+            },
+          },
+        }
       : brain
   );
 

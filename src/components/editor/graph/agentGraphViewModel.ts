@@ -779,8 +779,8 @@ export const buildAgentGraphViewModel = ({
       if (isDirectLeafLink && connection) {
         return {
           id: connection.id,
-          fromNodeId: connection.from.nodeId,
-          toNodeId: connection.to.nodeId,
+          fromNodeId: fromViewNode?.viewId ?? link.fromNodeId,
+          toNodeId: toViewNode?.viewId ?? link.toNodeId,
           weight: connection.weight,
           count: 1,
           aggregate: false,

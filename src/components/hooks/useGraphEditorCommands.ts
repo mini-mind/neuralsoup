@@ -884,10 +884,11 @@ export const useGraphEditorCommands = ({
           })),
         { installToRuntime: false }
       );
+      clearSelection();
       clearSelectionRect();
       clearDraftNodePositions();
     },
-    [clearDraftNodePositions, clearSelectionRect, setAgent, viewNodeById]
+    [clearDraftNodePositions, clearSelection, clearSelectionRect, setAgent, viewNodeById]
   );
 
   const updateNodeLabelAndParams = useCallback(
