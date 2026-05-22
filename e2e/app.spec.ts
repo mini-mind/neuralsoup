@@ -65,6 +65,8 @@ const selectors = {
   topologyDraftNeuronCount: '[data-testid="topology-draft-neuron-count"]',
   topologyDraftConnectionCount: '[data-testid="topology-draft-connection-count"]',
   topologyDraftValidationCount: '[data-testid="topology-draft-validation-count"]',
+  topologyDraftState: '[data-testid="topology-draft-state"]',
+  topologyDraftMessage: '[data-testid="topology-draft-message"]',
   topologyRuntimeState: '[data-testid="topology-runtime-state"]',
   topologyRuntimeValidationCount: '[data-testid="topology-runtime-validation-count"]',
   topologyRuntimeInputCount: '[data-testid="topology-runtime-input-count"]',
@@ -87,6 +89,7 @@ const selectors = {
 } as const;
 
 type E2EStoredBrain = {
+  packageVersion?: number;
   metadata?: { id?: string; name?: string };
   agent?: {
     version?: number;
@@ -482,6 +485,46 @@ const getRuntimeDiagnostics = async (page: Page) => ({
   state: await page.locator(selectors.topologyRuntimeState).innerText(),
   validationCount: await page.locator(selectors.topologyRuntimeValidationCount).innerText()
 });
+
+const getDraftDiagnostics = async (page: Page) => ({
+  state: await page.locator(selectors.topologyDraftState).innerText(),
+  validationCount: await page.locator(selectors.topologyDraftValidationCount).innerText(),
+  message: await page.locator(selectors.topologyDraftMessage).innerText()
+});
+
+const getStoredBrains = async (page: Page): Promise<E2EStoredBrain[]> =>
+  page.evaluate((storageKey) => {
+    const rawValue = window.localStorage.getItem(storageKey);
+    if (!rawValue) {
+      return [];
+    }
+
+    return ((JSON.parse(rawValue) as { brains?: E2EStoredBrain[] }).brains ?? []);
+  }, BRAIN_LIBRARY_STORAGE_KEY);
+
+const getStoredBrainByName = async (page: Page, name: string): Promise<E2EStoredBrain | null> => {
+  const storedBrains = await getStoredBrains(page);
+  return storedBrains.find((brain) => brain.metadata?.name === name) ?? null;
+};
+
+const saveCurrentBrainToLibrary = async (page: Page, name: string) => {
+  await page.locator(selectors.brainLibrarySaveName).fill(name);
+  const saveButton = page.locator(selectors.brainLibrarySaveCurrent);
+  await expect(saveButton).toBeVisible();
+  await expect(saveButton).toBeEnabled();
+  await saveButton.click({ force: true });
+  await expect(page.locator(selectors.brainLibraryList)).toContainText(name);
+};
+
+const ensureGraphEditorVisible = async (page: Page) => {
+  const topologyEditor = page.locator(selectors.topologyEditor);
+  if (await topologyEditor.isVisible().catch(() => false)) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).evaluate((tab: HTMLElement) => tab.click());
+  await expect(topologyEditor).toBeVisible();
+};
 
 test.beforeEach(async ({ page }, testInfo) => {
   installStartupDiagnostics(page);
@@ -922,6 +965,162 @@ test('brain switch resets lifecycle stats and runtime activity before installing
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
 });
 
+test('brain library preserves draft-only expanded group state across later saved edits', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await rightClickAt(page, await getLocatorCenter(page, selectors.coreGroupNode));
+  await expect(page.locator(selectors.topologyContextToggleGroup)).toHaveText('展开');
+  await page.locator(selectors.topologyContextToggleGroup).click();
+  await expect(page.locator(selectors.coreGroupNode)).toHaveClass(/is-expanded/);
+  await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  await saveCurrentBrainToLibrary(page, 'Draft Layout Brain');
+  await page.locator(selectors.brainLibraryClose).evaluate((button: HTMLButtonElement) => button.click());
+  await expect(page.locator(selectors.brainLibraryModal)).toHaveCount(0);
+
+  await page.locator(selectors.editorTabSettings).click();
+  await page.locator(selectors.visionRangeInput).fill('320');
+  await page.locator(selectors.paramsApply).click();
+  await expect(page.locator(selectors.visionRangeValue)).toHaveText('320');
+
+  await page.reload();
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.locator(selectors.brainLibraryList).getByText('Draft Layout Brain').click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  await page.locator(selectors.brainLibraryClose).evaluate((button: HTMLButtonElement) => button.click());
+  await expect(page.locator(selectors.brainLibraryModal)).toHaveCount(0);
+
+  await page.locator(selectors.editorTabGraph).click();
+  await expect(page.locator(selectors.coreGroupNode)).toHaveClass(/is-expanded/);
+  await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
+});
+
+test('brain library confirms before replacing a saved brain with draft-only changes on switch or import', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await saveCurrentBrainToLibrary(page, 'Saved Brain');
+  await saveCurrentBrainToLibrary(page, 'Other Brain');
+  await page.locator(selectors.brainLibraryClose).click();
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('118');
+  await injectValidDraftOnly(page);
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('119');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('未安装的草稿改动');
+    await dialog.dismiss();
+  });
+  await page.locator(selectors.brainLibraryList).getByText('Other Brain').click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('119');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+
+  const savedBrain = await getStoredBrainByName(page, 'Saved Brain');
+  expect(savedBrain).toBeTruthy();
+
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('未安装的草稿改动');
+    await dialog.dismiss();
+  });
+  await page.setInputFiles(selectors.brainLibraryImportFile, {
+    name: 'saved-brain.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(savedBrain)),
+  });
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('119');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('未安装的草稿改动');
+    await dialog.accept();
+  });
+  await page.locator(selectors.brainLibraryList).getByText('Other Brain').click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+});
+
+test('applying agent parameters persists the current brain library layout instead of reverting to an older snapshot', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  const initialPosition = await getNodeViewPositionFromSummary(page, 'core-neuron-group');
+  const nodeCenter = await getLocatorCenter(page, selectors.coreGroupNode);
+  await dragOnCanvas(page, nodeCenter, {
+    x: nodeCenter.x + 92,
+    y: nodeCenter.y + 44,
+  });
+
+  await expect
+    .poll(() => getNodeViewPositionFromSummary(page, 'core-neuron-group'))
+    .toMatchObject({
+      x: expect.any(Number),
+      y: expect.any(Number),
+    });
+
+  const movedPosition = await getNodeViewPositionFromSummary(page, 'core-neuron-group');
+  expect(movedPosition.x !== initialPosition.x || movedPosition.y !== initialPosition.y).toBe(true);
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  await saveCurrentBrainToLibrary(page, 'Applied Params Brain');
+  await page.locator(selectors.brainLibraryClose).click();
+
+  await page.locator(selectors.editorTabSettings).click();
+  await page.locator(selectors.visionCellsInput).fill('24');
+  await page.locator(selectors.paramsApply).click();
+  await expect(page.locator(selectors.visionCellsValue)).toHaveText('24');
+
+  await page.reload();
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.locator(selectors.brainLibraryList).getByText('Applied Params Brain').click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  await page.locator(selectors.brainLibraryClose).evaluate((button: HTMLButtonElement) => button.click());
+  await expect(page.locator(selectors.brainLibraryModal)).toHaveCount(0);
+
+  await ensureGraphEditorVisible(page);
+  await expect(page.locator(selectors.topologyNodeCount)).toHaveText('3');
+  await expect(page.locator(selectors.topologyBreadcrumbRoot)).toBeVisible();
+  await expect(page.locator(selectors.coreGroupNode)).toBeVisible();
+  const restoredPosition = await getNodeViewPositionFromSummary(page, 'core-neuron-group');
+  expect(restoredPosition.x).toBe(movedPosition.x);
+  expect(restoredPosition.y).toBe(movedPosition.y);
+
+  await page.locator(selectors.editorTabSettings).click();
+  await expect(page.locator(selectors.editorTabValue)).toHaveText('settings');
+  await expect(page.locator(selectors.agentParamsPanel)).toBeVisible();
+  await expect(page.locator(selectors.visionCellsInput)).toHaveValue('24');
+});
+
 test('settings and graph tabs preserve sidebar and graph state across switches', async ({ page }, testInfo) => {
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
@@ -1298,6 +1497,7 @@ test('graph view diagnostics expose invalid draft divergence from installed runt
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
+  await expect(page.locator(selectors.topologyDraftState)).toHaveText('structurally-valid');
   await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('118');
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
 
@@ -1307,11 +1507,16 @@ test('graph view diagnostics expose invalid draft divergence from installed runt
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('1');
   await expect(page.locator(selectors.topologyValidationCount)).toHaveText('1');
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+  await expect.poll(() => getDraftDiagnostics(page).then((value) => value.state)).toBe('invalid');
+  await expect.poll(() => getDraftDiagnostics(page).then((value) => value.validationCount)).toBe('1');
+  await expect
+    .poll(() => getDraftDiagnostics(page).then((value) => value.message))
+    .toContain('duplicated');
   await expect
     .poll(() => getRuntimeDiagnostics(page))
     .toEqual({
-      state: 'invalid',
-      validationCount: '1'
+      state: 'applied',
+      validationCount: '0'
     });
 });
 

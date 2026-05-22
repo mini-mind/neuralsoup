@@ -1,19 +1,17 @@
 import { useMemo } from 'react';
 import {
-  summarizeGraphIRDocument,
-  createLegacyGraphBridgeFromAgent,
-  validateGraphIRDocument,
   type AgentIR,
   type GraphIRDocument,
 } from '../../../domain/brain';
-import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../../../types/graphIRRuntime';
+import type { GraphIRDraftStatus, GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../../../types/graphIRRuntime';
 import type { GraphCanvasViewport } from '../../hooks/useSNNTopologyState';
 
 interface UseGraphTopologyDiagnosticsModelOptions {
   agent: AgentIR;
-  draftDocument?: GraphIRDocument;
+  document: GraphIRDocument;
   visionCells: number;
   runtimeStatus: GraphIRRuntimeStatus;
+  draftStatus: GraphIRDraftStatus;
   runtimeActivity: GraphIRRuntimeActivitySnapshot;
   nodeCount: number;
   connectionCount: number;
@@ -29,9 +27,10 @@ interface UseGraphTopologyDiagnosticsModelOptions {
 
 export const useGraphTopologyDiagnosticsModel = ({
   agent,
-  draftDocument,
+  document,
   visionCells,
   runtimeStatus,
+  draftStatus,
   runtimeActivity,
   nodeCount,
   connectionCount,
@@ -44,23 +43,16 @@ export const useGraphTopologyDiagnosticsModel = ({
   canvasViewport,
   canvasScale,
 }: UseGraphTopologyDiagnosticsModelOptions) => {
-  const document = useMemo(
-    () => draftDocument ?? createLegacyGraphBridgeFromAgent(agent).document,
-    [agent, draftDocument]
-  );
-  const draftSummary = useMemo(
-    () => runtimeStatus.draftSummary ?? summarizeGraphIRDocument(document),
-    [document, runtimeStatus.draftSummary]
-  );
-  const draftValidationCount = useMemo(
-    () => runtimeStatus.draftValidationCount ?? validateGraphIRDocument(document).length,
-    [document, runtimeStatus.draftValidationCount]
-  );
+  void agent;
+  const draftSummary = useMemo(() => draftStatus.summary, [draftStatus.summary]);
+  const draftValidationCount = useMemo(() => draftStatus.issues.length, [draftStatus.issues.length]);
 
   return {
     visionCells,
+    document,
     draftSummary,
     draftValidationCount,
+    draftStatus,
     runtimeStatus,
     runtimeActivity,
     nodeCount,

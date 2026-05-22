@@ -253,7 +253,7 @@ export const useGraphCanvasAssembly = ({
   const orchestratorNodes = useMemo(
     () =>
       scene.list.map((node) => ({
-        id: node.id,
+        id: node.viewId,
         x: node.sceneX,
         y: node.sceneY,
         width: node.width,
@@ -279,7 +279,7 @@ export const useGraphCanvasAssembly = ({
             width: node.width,
             height: node.height,
           });
-          return `${node.id}:${Math.round(center.x)},${Math.round(center.y)}`;
+          return `${node.refNodeId}:${Math.round(center.x)},${Math.round(center.y)}`;
         })
         .join('|'),
     [scene.list]
@@ -288,7 +288,7 @@ export const useGraphCanvasAssembly = ({
   const nodeViewPositionsSummary = useMemo(
     () =>
       scene.list
-        .map((node) => `${node.id}:${Math.round(node.x)},${Math.round(node.y)}`)
+        .map((node) => `${node.refNodeId}:${Math.round(node.x)},${Math.round(node.y)}`)
         .join('|'),
     [scene.list]
   );

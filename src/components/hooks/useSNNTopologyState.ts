@@ -172,7 +172,7 @@ export const useSNNTopologyState = ({
   } = legacyViewModel;
 
   const localSelectableNodeIds = useMemo(
-    () => new Set(nodes.filter((node) => !node.proxy).map((node) => node.id)),
+    () => new Set(nodes.filter((node) => !node.proxy).map((node) => node.viewId)),
     [nodes]
   );
 
@@ -458,10 +458,15 @@ export const useSNNTopologyState = ({
 
   const openNodeDetail = useCallback(
     (nodeId: string) => {
-      setShowDetailModal({ type: 'node', id: nodeId });
+      const node = viewNodeById.get(nodeId);
+      if (!node) {
+        return;
+      }
+
+      setShowDetailModal({ type: 'node', id: node.refNodeId });
       selectNode(nodeId);
     },
-    [selectNode]
+    [selectNode, viewNodeById]
   );
 
   const openLinkDetail = useCallback(

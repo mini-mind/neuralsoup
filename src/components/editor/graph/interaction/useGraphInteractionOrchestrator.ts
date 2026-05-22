@@ -176,7 +176,7 @@ export const useGraphInteractionOrchestrator = ({
   const resolveNodeHit = useCallback(
     (target: EventTarget | null, clientPoint: GraphPoint) => {
       const targetElement = target instanceof Element ? target : null;
-      const domNodeId = targetElement?.closest<HTMLElement>('[data-topology-node-id]')?.dataset.topologyNodeId;
+      const domNodeId = targetElement?.closest<HTMLElement>('[data-topology-view-node-id]')?.dataset.topologyViewNodeId;
       if (domNodeId) {
         return getNodeById(domNodeId);
       }

@@ -563,6 +563,7 @@ export const useGraphEditorCommands = ({
 
       const nextTargetNode: GraphViewNode = {
         id: nextNeuronId,
+        viewId: nextNeuronId,
         refNodeId: nextNeuronId,
         label: nextNeuronId,
         kind: 'neuron',

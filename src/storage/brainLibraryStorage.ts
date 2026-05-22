@@ -1,5 +1,6 @@
 import {
   createAgentPackage,
+  createBrainLayoutFromDefinition,
   createLegacyGraphBridgeFromAgent,
   type AgentPackage,
   type BrainDefinition,
@@ -263,18 +264,19 @@ export const upsertBrainLibraryItemDefinition = (
   brains: AgentPackage[],
   brainId: string,
   definition: BrainDefinition,
-  body: BodyDefinition
+  body: BodyDefinition,
+  updatedAt?: string
 ): AgentPackage[] =>
   brains.map((brain) =>
     brain.metadata.id === brainId
       ? createAgentPackage(brain.metadata.name, definition, {
           id: brain.metadata.id,
           createdAt: brain.metadata.createdAt,
-          updatedAt: new Date().toISOString(),
+          updatedAt: updatedAt ?? new Date().toISOString(),
           description: brain.metadata.description,
           tags: brain.metadata.tags,
           body,
-          layout: createLegacyGraphBridgeFromAgent(brain.agent).layout,
+          layout: createBrainLayoutFromDefinition(definition),
         })
       : brain
   );

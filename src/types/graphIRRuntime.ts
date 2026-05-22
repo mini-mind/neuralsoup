@@ -4,6 +4,13 @@ export interface GraphIRRuntimeActivitySnapshot {
   activeNodeIds: string[];
 }
 
+export interface GraphIRDraftStatus {
+  state: 'structurally-valid' | 'invalid';
+  summary: GraphIRDocumentSummary;
+  issues: GraphIRValidationIssue[];
+  message: string | null;
+}
+
 export type GraphIRRuntimeStatus =
   | {
       state: 'applied';
@@ -11,8 +18,6 @@ export type GraphIRRuntimeStatus =
       appliedSummary: GraphIRDocumentSummary;
       issues: [];
       message: null;
-      draftSummary?: GraphIRDocumentSummary;
-      draftValidationCount?: number;
     }
   | {
       state: 'invalid';
@@ -20,6 +25,4 @@ export type GraphIRRuntimeStatus =
       appliedSummary: GraphIRDocumentSummary;
       issues: GraphIRValidationIssue[];
       message: string;
-      draftSummary?: GraphIRDocumentSummary;
-      draftValidationCount?: number;
     };

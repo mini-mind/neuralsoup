@@ -52,10 +52,17 @@ export const projectGraphScene = (
     sceneX: node.x - origin.x,
     sceneY: node.y - origin.y,
   }));
+  const map = new Map<string, GraphSceneNode>();
+  for (const node of list) {
+    map.set(node.viewId, node);
+    if (!map.has(node.id)) {
+      map.set(node.id, node);
+    }
+  }
 
   return {
     list,
-    map: new Map(list.map((node) => [node.id, node])),
+    map,
     origin,
     size,
   };

@@ -7,6 +7,7 @@ export interface GraphBreadcrumbItem {
 
 export interface GraphViewNode {
   id: string;
+  viewId: string;
   refNodeId: string;
   label: string;
   kind: 'adapter' | 'neuron-group' | 'neuron' | 'signal';
@@ -64,4 +65,3 @@ export interface GraphViewModel<Node, Container> {
 }
 
 export type NodePositionDraftMap = Record<string, Position>;
-

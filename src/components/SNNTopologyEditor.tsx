@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
-import { createLegacyGraphBridgeFromAgent, type AgentIR, type GraphIRDocument } from '../domain/brain';
-import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../types/graphIRRuntime';
+import type { AgentIR, GraphIRDocument } from '../domain/brain';
+import type { GraphIRDraftStatus, GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../types/graphIRRuntime';
 import GraphDetailModal from './editor/graph/GraphDetailModal';
 import GraphTopologyCanvas from './editor/graph/GraphTopologyCanvas';
 import GraphTopologyDiagnostics from './editor/graph/GraphTopologyDiagnostics';
@@ -14,12 +14,13 @@ interface SNNTopologyEditorProps {
   width: number;
   height: number;
   agent: AgentIR;
-  draftDocument?: GraphIRDocument;
+  document: GraphIRDocument;
   visionCells?: number;
   onDocumentChange?: (document: GraphIRDocument, options?: GraphDocumentChangeOptions) => void;
   onGraphPathChange?: (graphPath: GraphPathItem[]) => void;
   onGraphPathNavigateRegister?: (navigate: (pathId: string) => void) => void;
   runtimeStatus: GraphIRRuntimeStatus;
+  draftStatus: GraphIRDraftStatus;
   runtimeActivity: GraphIRRuntimeActivitySnapshot;
   isActive?: boolean;
 }
@@ -28,17 +29,18 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   width,
   height,
   agent,
-  draftDocument,
+  document,
   visionCells = 36,
   onDocumentChange,
   onGraphPathChange,
   onGraphPathNavigateRegister,
   runtimeStatus,
+  draftStatus,
   runtimeActivity,
   isActive = true,
 }) => {
   const state = useSNNTopologyState({
-    document: draftDocument ?? createLegacyGraphBridgeFromAgent(agent).document,
+    document,
     runtimeActiveNodeIds: runtimeActivity.activeNodeIds,
     onDocumentChange,
   });
@@ -143,9 +145,10 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
 
   const diagnostics = useGraphTopologyDiagnosticsModel({
     agent,
-    draftDocument,
+    document,
     visionCells,
     runtimeStatus,
+    draftStatus,
     runtimeActivity,
     nodeCount: nodes.length,
     connectionCount: links.filter((link) => !link.aggregate).length,

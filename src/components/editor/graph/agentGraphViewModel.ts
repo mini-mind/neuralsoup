@@ -581,6 +581,7 @@ export const buildAgentGraphViewModel = ({
 
     nodes.push({
       id: node.id,
+      viewId: node.id,
       refNodeId: node.refNodeId,
       label: node.label,
       kind: node.kind,
@@ -636,6 +637,7 @@ export const buildAgentGraphViewModel = ({
 
       nodes.push({
         id: child.id,
+        viewId: `${node.id}::${child.id}`,
         refNodeId: child.refNodeId,
         label: child.label,
         kind: child.kind,

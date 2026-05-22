@@ -289,9 +289,9 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
         )}
 
         {scene.list.map((node) => {
-          const selected = selectedNodeIds.includes(node.id);
-          const active = activeViewNodeIds.has(node.id);
-          const pending = pendingNodeIds.includes(node.id);
+          const selected = selectedNodeIds.includes(node.viewId);
+          const active = activeViewNodeIds.has(node.viewId);
+          const pending = pendingNodeIds.includes(node.viewId);
           const nodeClassName = [
             'topology-node',
             node.leaf ? 'is-leaf' : 'is-group',
@@ -306,21 +306,21 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
 
           return (
             <div
-              key={node.id}
+              key={node.viewId}
               className={nodeClassName}
               data-testid={`topology-node-${node.id}`}
-              data-topology-node-id={node.id}
+              data-topology-view-node-id={node.viewId}
               style={{
                 left: node.sceneX,
                 top: node.sceneY,
                 width: node.width,
                 height: node.height,
               }}
-              onMouseDown={(event) => onNodeMouseDown(event, node.id)}
+              onMouseDown={(event) => onNodeMouseDown(event, node.viewId)}
               onContextMenu={onNodeContextMenu}
               onDoubleClick={(event) => {
                 event.stopPropagation();
-                const action = getNodeDoubleClickAction(node.id);
+                const action = getNodeDoubleClickAction(node.viewId);
                 if (action === 'navigate') {
                   onNavigateToNode(node.refNodeId);
                   return;

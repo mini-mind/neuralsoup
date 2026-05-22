@@ -1,9 +1,10 @@
 import React from 'react';
-import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../../../types/graphIRRuntime';
+import type { GraphIRDraftStatus, GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../../../types/graphIRRuntime';
 import type { GraphCanvasViewport } from '../../hooks/useSNNTopologyState';
 
 interface GraphTopologyDiagnosticsProps {
   visionCells: number;
+  draftStatus: GraphIRDraftStatus;
   draftSummary: {
     inputSignalCount: number;
     outputSignalCount: number;
@@ -27,6 +28,7 @@ interface GraphTopologyDiagnosticsProps {
 
 const GraphTopologyDiagnostics: React.FC<GraphTopologyDiagnosticsProps> = ({
   visionCells,
+  draftStatus,
   draftSummary,
   draftValidationCount,
   runtimeStatus,
@@ -44,16 +46,21 @@ const GraphTopologyDiagnostics: React.FC<GraphTopologyDiagnosticsProps> = ({
 }) => {
   const runtimeStatusLabel = runtimeStatus.state === 'applied' ? '已安装' : '安装失败';
   const runtimeMessage = runtimeStatus.message ?? '';
+  const draftStatusLabel = draftStatus.state === 'structurally-valid' ? '结构有效' : '草稿非法';
+  const draftMessage = draftStatus.message ?? '';
 
   return (
     <>
       <div className="topology-meta-hidden" data-testid="topology-runtime-summary" aria-hidden="true">
         <span data-testid="topology-draft-vision-cells">{visionCells}</span>
+        <span data-testid="topology-draft-state">{draftStatus.state}</span>
+        <span data-testid="topology-draft-status-label">{draftStatusLabel}</span>
         <span data-testid="topology-draft-input-count">{draftSummary.inputSignalCount}</span>
         <span data-testid="topology-draft-output-count">{draftSummary.outputSignalCount}</span>
         <span data-testid="topology-draft-neuron-count">{draftSummary.neuronCount}</span>
         <span data-testid="topology-draft-connection-count">{draftSummary.leafLinkCount}</span>
         <span data-testid="topology-draft-validation-count">{draftValidationCount}</span>
+        <span data-testid="topology-draft-message">{draftMessage}</span>
         <span data-testid="topology-runtime-state">{runtimeStatus.state}</span>
         <span data-testid="topology-runtime-status-label">{runtimeStatusLabel}</span>
         <span data-testid="topology-runtime-validation-count">{runtimeStatus.issues.length}</span>

@@ -1,16 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import SNNTopologyEditor from '../SNNTopologyEditor';
 import type { AgentIR, GraphIRDocument } from '../../domain/brain';
-import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../../types/graphIRRuntime';
+import type { GraphIRDraftStatus, GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../../types/graphIRRuntime';
 import type { GraphPathItem } from './types';
 import type { GraphDocumentChangeOptions } from '../hooks/useSNNTopologyState';
 
 interface GraphEditorPanelProps {
   isActive: boolean;
   agent: AgentIR;
-  draftDocument?: GraphIRDocument;
+  document: GraphIRDocument;
   visionCells: number;
   runtimeStatus: GraphIRRuntimeStatus;
+  draftStatus: GraphIRDraftStatus;
   runtimeActivity: GraphIRRuntimeActivitySnapshot;
   onDocumentChange: (document: GraphIRDocument, options?: GraphDocumentChangeOptions) => void;
   onGraphPathChange: (graphPath: GraphPathItem[]) => void;
@@ -20,9 +21,10 @@ interface GraphEditorPanelProps {
 const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
   isActive,
   agent,
-  draftDocument,
+  document,
   visionCells,
   runtimeStatus,
+  draftStatus,
   runtimeActivity,
   onDocumentChange,
   onGraphPathChange,
@@ -73,12 +75,13 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
         width={Math.max(viewport.width, 1)}
         height={Math.max(viewport.height, 1)}
         agent={agent}
-        draftDocument={draftDocument}
+        document={document}
         visionCells={visionCells}
         onDocumentChange={onDocumentChange}
         onGraphPathChange={onGraphPathChange}
         onGraphPathNavigateRegister={onGraphPathNavigateRegister}
         runtimeStatus={runtimeStatus}
+        draftStatus={draftStatus}
         runtimeActivity={runtimeActivity}
         isActive={isActive}
       />

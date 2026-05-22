@@ -375,6 +375,8 @@ export const buildGraphViewModel = ({
   draftNodePositions: NodePositionDraftMap;
   runtimeActiveNodeIds: string[];
 }): GraphViewModel<TopologyNode, RootGraph | AdapterNode | NeuronGroupNode> => {
+  const getViewNodeId = (nodeId: string, parentViewId?: string | null) =>
+    parentViewId ? `${parentViewId}::${nodeId}` : nodeId;
   const indexes = collectNodePathById(document.root);
   const currentContainer = getNodeByPath(document.root, navigationPath, indexes.nodeById);
   const currentChildren = currentContainer.children;
@@ -428,6 +430,7 @@ export const buildGraphViewModel = ({
 
       const viewNode: GraphViewNode = {
         id: node.id,
+        viewId: getViewNodeId(node.id),
         refNodeId: node.id,
         label: node.label,
         kind: node.kind,
@@ -478,6 +481,7 @@ export const buildGraphViewModel = ({
 
           return {
             id: child.id,
+            viewId: getViewNodeId(child.id, node.id),
             refNodeId: child.id,
             label: child.label,
             kind: child.kind,
@@ -506,13 +510,27 @@ export const buildGraphViewModel = ({
     }),
   ];
 
-  const viewNodeById = new Map(nodes.map((node) => [node.id, node]));
-  const nodeIdsInView = new Set(nodes.map((node) => node.id));
+  const viewNodeById = new Map<string, GraphViewNode>();
+  for (const node of nodes) {
+    if (!viewNodeById.has(node.id)) {
+      viewNodeById.set(node.id, node);
+    }
+    viewNodeById.set(node.viewId, node);
+  }
+  const viewNodeByRefId = new Map<string, GraphViewNode>();
+  for (const node of nodes) {
+    if (node.expansionParentId && viewNodeByRefId.has(node.refNodeId)) {
+      continue;
+    }
+    viewNodeByRefId.set(node.refNodeId, node);
+  }
   const links: GraphViewLink[] = aggregateLinks
-    .filter((link) => nodeIdsInView.has(link.fromNodeId) && nodeIdsInView.has(link.toNodeId))
     .map((link) => {
-      const fromViewNode = viewNodeById.get(link.fromNodeId);
-      const toViewNode = viewNodeById.get(link.toNodeId);
+      const fromViewNode = viewNodeByRefId.get(link.fromNodeId);
+      const toViewNode = viewNodeByRefId.get(link.toNodeId);
+      if (!fromViewNode || !toViewNode) {
+        return null;
+      }
       const isDirectLeafLink = link.count === 1 && Boolean(fromViewNode?.leaf && toViewNode?.leaf);
       const leafLinkId = link.leafLinkIds[0] ?? `aggregate:${link.fromNodeId}:${link.toNodeId}`;
       const leafLink = isDirectLeafLink ? containerLinks.find((candidate) => candidate.id === leafLinkId) : null;
@@ -520,8 +538,8 @@ export const buildGraphViewModel = ({
       if (isDirectLeafLink && leafLink) {
         return {
           id: leafLink.id,
-          fromNodeId: leafLink.from.nodeId,
-          toNodeId: leafLink.to.nodeId,
+          fromNodeId: fromViewNode.id,
+          toNodeId: toViewNode.id,
           weight: leafLink.weight,
           count: 1,
           aggregate: false,
@@ -532,15 +550,16 @@ export const buildGraphViewModel = ({
 
       return {
         id: `aggregate:${link.fromNodeId}:${link.toNodeId}`,
-        fromNodeId: link.fromNodeId,
-        toNodeId: link.toNodeId,
+        fromNodeId: fromViewNode.id,
+        toNodeId: toViewNode.id,
         weight: link.totalWeight,
         count: link.count,
         aggregate: true,
         leafLinkIds: [...link.leafLinkIds],
         editable: false,
       };
-    });
+    })
+    .filter((link): link is GraphViewLink => link !== null);
 
   const activeLeafNodeIds = new Set(runtimeActiveNodeIds);
   const activeViewNodeIds = new Set<string>();
@@ -548,14 +567,14 @@ export const buildGraphViewModel = ({
   for (const node of nodes) {
     if (node.proxy || node.leaf) {
       if (activeLeafNodeIds.has(node.refNodeId)) {
-        activeViewNodeIds.add(node.id);
+        activeViewNodeIds.add(node.viewId);
       }
       continue;
     }
 
     for (const activeLeafNodeId of activeLeafNodeIds) {
       if (getScopeNodeIdForLeaf(activeLeafNodeId, indexes.pathById, navigationPath, expandedContainerIds) === node.refNodeId) {
-        activeViewNodeIds.add(node.id);
+        activeViewNodeIds.add(node.viewId);
         break;
       }
     }
