@@ -1,14 +1,12 @@
 import { useMemo } from 'react';
 import {
   type AgentIR,
-  type GraphIRDocument,
 } from '../../../domain/brain';
 import type { GraphIRDraftStatus, GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../../../types/graphIRRuntime';
 import type { GraphCanvasViewport } from '../../hooks/useSNNTopologyState';
 
 interface UseGraphTopologyDiagnosticsModelOptions {
   agent: AgentIR;
-  document: GraphIRDocument;
   visionCells: number;
   runtimeStatus: GraphIRRuntimeStatus;
   draftStatus: GraphIRDraftStatus;
@@ -27,7 +25,6 @@ interface UseGraphTopologyDiagnosticsModelOptions {
 
 export const useGraphTopologyDiagnosticsModel = ({
   agent,
-  document,
   visionCells,
   runtimeStatus,
   draftStatus,
@@ -49,7 +46,6 @@ export const useGraphTopologyDiagnosticsModel = ({
 
   return {
     visionCells,
-    document,
     draftSummary,
     draftValidationCount,
     draftStatus,

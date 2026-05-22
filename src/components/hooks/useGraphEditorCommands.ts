@@ -6,10 +6,11 @@ import type {
   Position,
 } from '../../domain/brain';
 import {
-  CHILD_SCOPE_OFFSET,
-  EXPANDED_GROUP_PADDING,
-  LEAF_NODE_SIZE,
-} from '../editor/graph/graphViewModel';
+  AGENT_GRAPH_CHILD_SCOPE_OFFSET,
+  AGENT_GRAPH_EXPANDED_GROUP_PADDING,
+  AGENT_GRAPH_LEAF_NODE_SIZE,
+  AGENT_GRAPH_ROOT_BRAIN_GROUP_ID,
+} from '../editor/graph/agentGraphViewConstants';
 import {
   aggregateAgentNodesIntoGroup,
   createNeuronAndConnectInContainer,
@@ -32,7 +33,6 @@ const INPUT_PORT_ID = 'in';
 const OUTPUT_PORT_ID = 'out';
 const NEURON_INPUT_PORT_ID = 'dendrite';
 const NEURON_OUTPUT_PORT_ID = 'axon';
-const LEGACY_ROOT_GROUP_ID = 'core-neuron-group';
 
 const uniqueIds = (ids: string[]) => Array.from(new Set(ids));
 
@@ -75,8 +75,8 @@ const getLeafPortId = (node: AgentLeafNodeRecord, direction: 'input' | 'output')
 const toStoredPosition = (position: GraphPoint, scope: 'root' | 'child'): Position => {
   if (scope === 'child') {
     return toRoundedPosition({
-      x: position.x - CHILD_SCOPE_OFFSET.x,
-      y: position.y - CHILD_SCOPE_OFFSET.y,
+      x: position.x - AGENT_GRAPH_CHILD_SCOPE_OFFSET.x,
+      y: position.y - AGENT_GRAPH_CHILD_SCOPE_OFFSET.y,
     });
   }
 
@@ -86,14 +86,14 @@ const toStoredPosition = (position: GraphPoint, scope: 'root' | 'child'): Positi
 const clampPositionInsideExpandedParent = (position: GraphPoint, viewNode: GraphViewNode, parentNode: GraphViewNode): GraphPoint => ({
   x: Math.round(
     Math.min(
-      Math.max(position.x, parentNode.x + EXPANDED_GROUP_PADDING),
-      parentNode.x + parentNode.width - EXPANDED_GROUP_PADDING - viewNode.width
+      Math.max(position.x, parentNode.x + AGENT_GRAPH_EXPANDED_GROUP_PADDING),
+      parentNode.x + parentNode.width - AGENT_GRAPH_EXPANDED_GROUP_PADDING - viewNode.width
     )
   ),
   y: Math.round(
     Math.min(
-      Math.max(position.y, parentNode.y + EXPANDED_GROUP_PADDING),
-      parentNode.y + parentNode.height - EXPANDED_GROUP_PADDING - viewNode.height
+      Math.max(position.y, parentNode.y + AGENT_GRAPH_EXPANDED_GROUP_PADDING),
+      parentNode.y + parentNode.height - AGENT_GRAPH_EXPANDED_GROUP_PADDING - viewNode.height
     )
   ),
 });
@@ -147,7 +147,7 @@ const resolveCurrentBrainContainerId = (agent: AgentIR, navigationPath: string[]
   }
 
   const currentNodeId = navigationPath[navigationPath.length - 1]!;
-  if (currentNodeId === LEGACY_ROOT_GROUP_ID) {
+  if (currentNodeId === AGENT_GRAPH_ROOT_BRAIN_GROUP_ID) {
     return agent.brain.rootContainerId;
   }
 
@@ -663,8 +663,8 @@ export const useGraphEditorCommands = ({
         kind: 'neuron',
         x,
         y,
-        width: LEAF_NODE_SIZE,
-        height: LEAF_NODE_SIZE,
+        width: AGENT_GRAPH_LEAF_NODE_SIZE,
+        height: AGENT_GRAPH_LEAF_NODE_SIZE,
         parentId: navigationPath.at(-1) ?? null,
         detail: '',
         editable: true,

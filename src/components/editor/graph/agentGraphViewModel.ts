@@ -16,6 +16,14 @@ import type {
   GraphViewNode,
   NodePositionDraftMap,
 } from './graphViewTypes';
+import {
+  AGENT_GRAPH_CHILD_SCOPE_OFFSET,
+  AGENT_GRAPH_EXPANDED_GROUP_MIN_SIZE,
+  AGENT_GRAPH_EXPANDED_GROUP_PADDING,
+  AGENT_GRAPH_GROUP_NODE_SIZE,
+  AGENT_GRAPH_LEAF_NODE_SIZE,
+  AGENT_GRAPH_ROOT_BRAIN_GROUP_ID,
+} from './agentGraphViewConstants';
 
 export interface AgentGraphViewNodeRecord {
   id: string;
@@ -45,27 +53,11 @@ const ROOT_FALLBACK_LAYOUT: Record<string, Position> = {
   'output-adapter': { x: 644, y: 200 },
 };
 
-const CHILD_SCOPE_OFFSET = {
-  x: 260,
-  y: 40,
-} as const;
-
-const LEAF_NODE_SIZE = 14;
-const GROUP_NODE_SIZE = {
-  width: 188,
-  height: 96,
-} as const;
-const EXPANDED_GROUP_MIN_SIZE = {
-  width: 300,
-  height: 210,
-} as const;
-const EXPANDED_GROUP_PADDING = 30;
-
 const DEFAULT_MODELS: ModelDefinition[] = [];
 
 const BODY_INPUTS_GROUP_ID = 'input-adapter';
 const BODY_OUTPUTS_GROUP_ID = 'output-adapter';
-const ROOT_BRAIN_GROUP_ID = 'core-neuron-group';
+const ROOT_BRAIN_GROUP_ID = AGENT_GRAPH_ROOT_BRAIN_GROUP_ID;
 const CHILD_INPUT_ADAPTER_ID = 'core-input-adapter';
 const CHILD_OUTPUT_ADAPTER_ID = 'core-output-adapter';
 
@@ -81,15 +73,15 @@ type AggregateLinkView = {
 const toViewPosition = (position: Position, scope: 'root' | 'child'): Position =>
   scope === 'child'
     ? {
-        x: position.x + CHILD_SCOPE_OFFSET.x,
-        y: position.y + CHILD_SCOPE_OFFSET.y,
+        x: position.x + AGENT_GRAPH_CHILD_SCOPE_OFFSET.x,
+        y: position.y + AGENT_GRAPH_CHILD_SCOPE_OFFSET.y,
       }
     : position;
 
 const getNodeSize = (node: AgentGraphViewNodeRecord) =>
   node.kind === 'neuron' || node.kind === 'signal'
-    ? { width: LEAF_NODE_SIZE, height: LEAF_NODE_SIZE }
-    : { width: GROUP_NODE_SIZE.width, height: GROUP_NODE_SIZE.height };
+    ? { width: AGENT_GRAPH_LEAF_NODE_SIZE, height: AGENT_GRAPH_LEAF_NODE_SIZE }
+    : { width: AGENT_GRAPH_GROUP_NODE_SIZE.width, height: AGENT_GRAPH_GROUP_NODE_SIZE.height };
 
 const getStoredNodeSize = getNodeSize;
 
@@ -160,16 +152,16 @@ const getDefaultExpandedChildPosition = (node: AgentGraphViewNodeRecord, index: 
     const column = index % 5;
     const row = Math.floor(index / 5);
     return {
-      x: EXPANDED_GROUP_PADDING + column * 48,
-      y: EXPANDED_GROUP_PADDING + row * 44,
+      x: AGENT_GRAPH_EXPANDED_GROUP_PADDING + column * 48,
+      y: AGENT_GRAPH_EXPANDED_GROUP_PADDING + row * 44,
     };
   }
 
   const column = index % 2;
   const row = Math.floor(index / 2);
   return {
-    x: EXPANDED_GROUP_PADDING + column * 132,
-    y: EXPANDED_GROUP_PADDING + row * 112,
+    x: AGENT_GRAPH_EXPANDED_GROUP_PADDING + column * 132,
+    y: AGENT_GRAPH_EXPANDED_GROUP_PADDING + row * 112,
   };
 };
 
@@ -204,8 +196,8 @@ const getExpandedChildOffset = (
   );
 
   return {
-    x: minX < EXPANDED_GROUP_PADDING ? EXPANDED_GROUP_PADDING - minX : 0,
-    y: minY < EXPANDED_GROUP_PADDING ? EXPANDED_GROUP_PADDING - minY : 0,
+    x: minX < AGENT_GRAPH_EXPANDED_GROUP_PADDING ? AGENT_GRAPH_EXPANDED_GROUP_PADDING - minX : 0,
+    y: minY < AGENT_GRAPH_EXPANDED_GROUP_PADDING ? AGENT_GRAPH_EXPANDED_GROUP_PADDING - minY : 0,
   };
 };
 
@@ -215,7 +207,7 @@ const getExpandedGroupSize = (
   draftNodePositions: NodePositionDraftMap
 ) => {
   if (groupChildren.length === 0) {
-    return EXPANDED_GROUP_MIN_SIZE;
+    return AGENT_GRAPH_EXPANDED_GROUP_MIN_SIZE;
   }
 
   const offset = getExpandedChildOffset(groupChildren, agent, draftNodePositions);
@@ -243,8 +235,14 @@ const getExpandedGroupSize = (
   );
 
   return {
-    width: Math.max(EXPANDED_GROUP_MIN_SIZE.width, maxRight + EXPANDED_GROUP_PADDING),
-    height: Math.max(EXPANDED_GROUP_MIN_SIZE.height, maxBottom + EXPANDED_GROUP_PADDING),
+    width: Math.max(
+      AGENT_GRAPH_EXPANDED_GROUP_MIN_SIZE.width,
+      maxRight + AGENT_GRAPH_EXPANDED_GROUP_PADDING
+    ),
+    height: Math.max(
+      AGENT_GRAPH_EXPANDED_GROUP_MIN_SIZE.height,
+      maxBottom + AGENT_GRAPH_EXPANDED_GROUP_PADDING
+    ),
   };
 };
 
@@ -752,8 +750,8 @@ export const buildAgentGraphViewModel = ({
         connectableTarget: capabilities.canTarget,
         expanded: false,
         expansionParentId: node.id,
-        expansionOffsetX: EXPANDED_GROUP_PADDING,
-        expansionOffsetY: EXPANDED_GROUP_PADDING,
+        expansionOffsetX: AGENT_GRAPH_EXPANDED_GROUP_PADDING,
+        expansionOffsetY: AGENT_GRAPH_EXPANDED_GROUP_PADDING,
       });
     }
   }

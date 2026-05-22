@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import type { AgentIR, GraphIRDocument } from '../domain/brain';
+import type { AgentIR } from '../domain/brain';
 import type { GraphIRDraftStatus, GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../types/graphIRRuntime';
 import GraphDetailModal from './editor/graph/GraphDetailModal';
 import GraphTopologyCanvas from './editor/graph/GraphTopologyCanvas';
@@ -15,7 +15,6 @@ interface SNNTopologyEditorProps {
   height: number;
   agent: AgentIR;
   graphSessionKey: number;
-  document: GraphIRDocument;
   visionCells?: number;
   onAgentChange?: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
   onGraphPathChange?: (graphPath: GraphPathItem[], sourceSessionKey: number) => void;
@@ -31,7 +30,6 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   height,
   agent,
   graphSessionKey,
-  document,
   visionCells = 36,
   onAgentChange,
   onGraphPathChange,
@@ -148,7 +146,6 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
 
   const diagnostics = useGraphTopologyDiagnosticsModel({
     agent,
-    document,
     visionCells,
     runtimeStatus,
     draftStatus,

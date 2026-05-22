@@ -129,3 +129,32 @@ test('Brain Library storage reports LocalStorage capacity write failures', () =>
     /Brain Library 保存失败：quota exceeded/
   );
 });
+
+test('Brain Library storage migrates legacy AgentPackage payloads missing body visionCellCount', () => {
+  const storage = installMemoryLocalStorage();
+  const brain = createAgentPackage('Legacy Agent', createDefaultGraphIRDocument(2));
+  const legacyBrain = structuredClone(brain) as typeof brain & {
+    agent: typeof brain.agent & { body: Omit<typeof brain.agent.body, 'visionCellCount'> };
+  };
+  delete (legacyBrain.agent.body as { visionCellCount?: number }).visionCellCount;
+
+  storage.setItem(
+    BRAIN_LIBRARY_STORAGE_KEY,
+    JSON.stringify({
+      storageVersion: 1,
+      savedAt: new Date().toISOString(),
+      brains: [legacyBrain],
+    })
+  );
+
+  const loaded = loadBrainLibraryWithStatus();
+
+  assert.equal(loaded.status.state, 'ok');
+  assert.equal(loaded.brains.length, 1);
+  assert.equal(loaded.brains[0].agent.body.visionCellCount, 2);
+
+  const persisted = JSON.parse(storage.getItem(BRAIN_LIBRARY_STORAGE_KEY) ?? 'null') as {
+    brains: Array<{ agent: { body: { visionCellCount: number } } }>;
+  };
+  assert.equal(persisted.brains[0].agent.body.visionCellCount, 2);
+});

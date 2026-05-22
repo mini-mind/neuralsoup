@@ -20,6 +20,7 @@ import type {
 import {
   createBrainLayoutFromDefinition,
   createDefaultBodyDefinition,
+  getBodyVisionCellCount,
   type BodyDefinition,
   type BrainLayoutDocument,
 } from './package';
@@ -124,6 +125,12 @@ const buildBodyIRFromLegacy = (document: GraphIRDocument): BodyIR => {
 
   return {
     version: 1,
+    visionCellCount: Math.max(
+      0,
+      ...signals
+        .filter((signal) => INPUT_CHANNEL_PATTERN.test(signal.id))
+        .map((signal) => Number.parseInt(signal.id.match(INPUT_CHANNEL_PATTERN)?.[2] ?? '-1', 10) + 1)
+    ),
     inputRules: hasVisionSignals
       ? [
           {
@@ -387,7 +394,10 @@ export const createAgentIRFromLegacyGraph = (
 ): AgentIR => {
   const resolvedBody = body ?? createDefaultBodyDefinition(1);
   const metadata = createAgentMetadata(name, metadataOverrides);
-  const agentBody = buildBodyIRFromLegacy(document);
+  const agentBody = {
+    ...buildBodyIRFromLegacy(document),
+    visionCellCount: Math.max(0, getBodyVisionCellCount(resolvedBody)),
+  };
   const { containers, rootContainerId } = buildContainersFromLegacy(document);
   const brain: BrainIR = {
     version: 1,
@@ -478,7 +488,7 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
     visionCellIds.add(Number.parseInt(match[2], 10));
   }
 
-  const visionCells = visionCellIds.size > 0 ? Math.max(...visionCellIds) + 1 : 1;
+  const visionCells = Math.max(agent.body.visionCellCount, visionCellIds.size > 0 ? Math.max(...visionCellIds) + 1 : 0, 1);
   const nextDocument = createDefaultGraphIRDocument(visionCells);
   const nextBody = createDefaultBodyDefinition(visionCells);
   const defaultRootGroup = nextDocument.root.children.find(

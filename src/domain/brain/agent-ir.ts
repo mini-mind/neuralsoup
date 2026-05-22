@@ -25,6 +25,7 @@ export interface BodyOutputRule {
 
 export interface BodyIR {
   version: 1;
+  visionCellCount: number;
   inputRules: BodyInputRule[];
   outputRules: BodyOutputRule[];
 }

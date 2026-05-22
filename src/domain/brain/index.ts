@@ -6,6 +6,7 @@ export * from './agent-program';
 export * from './program';
 export * from './agent-compiler';
 export * from './agent-reconcile';
+export * from './agent-summary';
 export * from './compiler';
 export * from './legacy-graph-bridge';
 export * from './defaults';

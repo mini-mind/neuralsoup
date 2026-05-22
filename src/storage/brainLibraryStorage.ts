@@ -42,6 +42,22 @@ export interface BrainLibraryLoadResult {
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const inferVisionCellCountFromAgent = (agent: AgentIR): number =>
+  agent.connections.reduce((maxCount, connection) => {
+    const endpoints = [connection.from, connection.to];
+    for (const endpoint of endpoints) {
+      if (endpoint.scope !== 'bodyInput') {
+        continue;
+      }
+      const match = endpoint.nodeId.match(/^vision-[RGB]-(\d+)$/);
+      if (!match) {
+        continue;
+      }
+      maxCount = Math.max(maxCount, Number.parseInt(match[1], 10) + 1);
+    }
+    return maxCount;
+  }, 0);
+
 const isBrainDefinition = (value: unknown): value is BrainDefinition => {
   if (!isObject(value)) {
     return false;
@@ -132,6 +148,10 @@ export const isAgentPackage = (value: unknown): value is AgentPackage =>
   typeof value.agent.metadata.updatedAt === 'string' &&
   isObject(value.agent.body) &&
   value.agent.body.version === 1 &&
+  (value.agent.body.visionCellCount === undefined ||
+    (typeof value.agent.body.visionCellCount === 'number' &&
+      Number.isFinite(value.agent.body.visionCellCount) &&
+      value.agent.body.visionCellCount >= 0)) &&
   Array.isArray(value.agent.body.inputRules) &&
   value.agent.body.inputRules.every(
     (rule) =>
@@ -236,7 +256,29 @@ const isBrainLibraryStorageEnvelope = (value: unknown): value is BrainLibrarySto
   Array.isArray(value.brains) &&
   value.brains.every(isAgentPackage);
 
-const normalizeAgentPackage = (candidate: unknown): AgentPackage | null => (isAgentPackage(candidate) ? candidate : null);
+const normalizeAgentPackage = (candidate: unknown): AgentPackage | null => {
+  if (!isAgentPackage(candidate)) {
+    return null;
+  }
+
+  const visionCellCount =
+    typeof candidate.agent.body.visionCellCount === 'number'
+      ? candidate.agent.body.visionCellCount
+      : inferVisionCellCountFromAgent(candidate.agent as AgentIR);
+
+  const normalizedVisionCellCount = Math.max(visionCellCount, 0);
+
+  return {
+    ...candidate,
+    agent: {
+      ...candidate.agent,
+      body: {
+        ...candidate.agent.body,
+        visionCellCount: normalizedVisionCellCount,
+      },
+    },
+  };
+};
 
 export const createBrainLibraryItem = (name: string, definition: BrainDefinition): AgentPackage =>
   createAgentPackage(name, definition);
@@ -340,8 +382,19 @@ export const loadBrainLibraryWithStatus = (): BrainLibraryLoadResult => {
       };
     }
 
+    const normalizedBrains = parsed.brains
+      .map(normalizeAgentPackage)
+      .filter((brain): brain is AgentPackage => brain !== null);
+
+    const shouldRewriteStorage = normalizedBrains.some(
+      (brain, index) => brain.agent.body.visionCellCount !== parsed.brains[index]?.agent?.body?.visionCellCount
+    );
+    if (shouldRewriteStorage) {
+      saveBrainLibrary(normalizedBrains);
+    }
+
     return {
-      brains: parsed.brains.map(normalizeAgentPackage).filter((brain): brain is AgentPackage => brain !== null),
+      brains: normalizedBrains,
       status: { state: 'ok', message: null },
     };
   } catch {

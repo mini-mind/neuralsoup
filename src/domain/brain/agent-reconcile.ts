@@ -68,6 +68,7 @@ export const reconcileAgentIRVisionCells = (
     ...agent,
     body: {
       ...agent.body,
+      visionCellCount: visionCells,
       inputRules: nextInputRules,
       outputRules: nextOutputRules,
     },

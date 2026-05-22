@@ -2,16 +2,14 @@ import React, { useState, useCallback, useEffect, useMemo, useRef, type CSSPrope
 import SimulationCanvas from './components/SimulationCanvas';
 import {
   createAgentIRFromLegacyGraph,
-  createBrainLayoutFromDefinition,
   createLegacyGraphBridgeFromAgent,
   createDefaultBodyDefinition,
   createDefaultGraphIRDocument,
-  getBodyVisionCellCount,
   reconcileAgentIRVisionCells,
+  summarizeAgentIR,
+  summarizeGraphIRDocument,
   type AgentIR,
   type AgentPackage,
-  type BodyDefinition,
-  summarizeGraphIRDocument,
   validateGraphIRDocument,
   type GraphIRDocument,
 } from './domain/brain';
@@ -71,9 +69,9 @@ const clampSplitRatio = (containerSize: number, ratio: number): number => {
   return clamp(ratio, minRatio, maxRatio);
 };
 
-const createInitialGraphIRRuntimeStatus = (document: GraphIRDocument): GraphIRRuntimeStatus => ({
+const createInitialGraphIRRuntimeStatus = (agent: AgentIR): GraphIRRuntimeStatus => ({
   state: 'applied',
-  appliedSummary: summarizeGraphIRDocument(document),
+  appliedSummary: summarizeAgentIR(agent),
   issues: [],
   message: null,
 });
@@ -136,9 +134,9 @@ const App: React.FC = () => {
   const [stats, setStats] = useState<SimulationState['stats']>(INITIAL_STATS);
   const [activeAgentDocument, setActiveAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
   const [draftAgentDocument, setDraftAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
-  const [draftGraphOverride, setDraftGraphOverride] = useState<GraphIRDocument | null>(null);
+  const [draftGraphStatusOverride, setDraftGraphStatusOverride] = useState<GraphIRDraftStatus | null>(null);
   const [graphIRRuntimeStatus, setGraphIRRuntimeStatus] = useState<GraphIRRuntimeStatus>(() =>
-    createInitialGraphIRRuntimeStatus(initialGraphDocument)
+    createInitialGraphIRRuntimeStatus(initialAgentDocument)
   );
   const [graphIRRuntimeActivity, setGraphIRRuntimeActivity] = useState<GraphIRRuntimeActivitySnapshot>({
     activeNodeIds: []
@@ -176,10 +174,10 @@ const App: React.FC = () => {
     () => createLegacyGraphBridgeFromAgent(draftAgentDocument),
     [draftAgentDocument]
   );
-  const graphDocument = draftGraphOverride ?? draftAgentBridge.document;
+  const graphDocument = draftAgentBridge.document;
   const graphIRDraftStatus = useMemo<GraphIRDraftStatus>(
-    () => createGraphIRDraftStatus(graphDocument),
-    [graphDocument]
+    () => draftGraphStatusOverride ?? createGraphIRDraftStatus(graphDocument),
+    [draftGraphStatusOverride, graphDocument]
   );
   const graphDocumentRef = useRef(graphDocument);
   const activeAgentDocumentRef = useRef(activeAgentDocument);
@@ -295,7 +293,7 @@ const App: React.FC = () => {
       };
       const bridgedDocument = createLegacyGraphBridgeFromAgent(normalizedAgentDocument).document;
       graphDocumentRef.current = bridgedDocument;
-      setDraftGraphOverride(null);
+      setDraftGraphStatusOverride(null);
       setDraftAgentDocument(normalizedAgentDocument);
       if (installToRuntime) {
         setActiveAgentDocument(normalizedAgentDocument);
@@ -312,33 +310,6 @@ const App: React.FC = () => {
       );
     },
     [activeBrainId]
-  );
-
-  const updateGraphDocument = useCallback(
-    (
-      nextDocument: GraphIRDocument,
-      installToRuntime: boolean = true,
-      persistActiveBrain: boolean = true,
-      bodyDefinition?: BodyDefinition
-    ) => {
-      const currentDraftAgent = draftAgentDocumentRef.current;
-      const draftBridge = createLegacyGraphBridgeFromAgent(currentDraftAgent);
-      const resolvedBodyDefinition = bodyDefinition ?? draftBridge.body;
-      const nextUpdatedAt = new Date().toISOString();
-      const nextAgentDocument = createAgentIRFromLegacyGraph(
-        currentDraftAgent.metadata.name,
-        nextDocument,
-        resolvedBodyDefinition,
-        createBrainLayoutFromDefinition(nextDocument),
-        {
-          ...currentDraftAgent.metadata,
-          updatedAt: nextUpdatedAt,
-        }
-      );
-      graphDocumentRef.current = nextDocument;
-      commitEditedAgentDocument(nextAgentDocument, installToRuntime, persistActiveBrain);
-    },
-    [commitEditedAgentDocument]
   );
 
   useEffect(() => {
@@ -384,19 +355,6 @@ const App: React.FC = () => {
   useEffect(() => {
     activeAgentDocumentRef.current = activeAgentDocument;
   }, [activeAgentDocument]);
-
-  const handleAgentDocumentChange = useCallback((
-    nextDocument: GraphIRDocument,
-    options?: GraphDocumentChangeOptions
-  ) => {
-    const shouldInstallToRuntime = options?.installToRuntime !== false;
-    updateGraphDocument(nextDocument, shouldInstallToRuntime, shouldInstallToRuntime);
-  }, [updateGraphDocument]);
-
-  const handleGraphDraftOnlyChange = useCallback((nextDocument: GraphIRDocument) => {
-    graphDocumentRef.current = nextDocument;
-    setDraftGraphOverride(nextDocument);
-  }, []);
 
   const handleAgentChange = useCallback((
     updater: (current: AgentIR) => AgentIR,
@@ -495,15 +453,14 @@ const App: React.FC = () => {
       return;
     }
 
-    const bridge = createLegacyGraphBridgeFromAgent(selectedBrain.agent);
-    const bodyVisionCells = getBodyVisionCellCount(bridge.body);
+    const bodyVisionCells = selectedBrain.agent.body.visionCellCount;
     resetGraphEditorSession();
     resetRuntimeForBrainSwitch();
     setIsBrainLibraryOpen(true);
     setActiveBrainId(selectedBrain.metadata.id);
     setActiveAgentDocument(selectedBrain.agent);
     setDraftAgentDocument(selectedBrain.agent);
-    setDraftGraphOverride(null);
+    setDraftGraphStatusOverride(null);
     setAgentParameters((current) =>
       current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells }
     );
@@ -519,7 +476,6 @@ const App: React.FC = () => {
       return;
     }
 
-    const bridge = createLegacyGraphBridgeFromAgent(nextBrain.agent);
     resetGraphEditorSession();
     resetRuntimeForBrainSwitch();
     setIsBrainLibraryOpen(true);
@@ -527,9 +483,9 @@ const App: React.FC = () => {
     setActiveBrainId(nextBrain.metadata.id);
     setActiveAgentDocument(nextBrain.agent);
     setDraftAgentDocument(nextBrain.agent);
-    setDraftGraphOverride(null);
+    setDraftGraphStatusOverride(null);
     setAgentParameters((current) => {
-      const bodyVisionCells = getBodyVisionCellCount(bridge.body);
+      const bodyVisionCells = nextBrain.agent.body.visionCellCount;
       return current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells };
     });
     setEditorTab((currentTab) => (currentTab === 'graph' ? 'graph' : currentTab));
@@ -698,33 +654,31 @@ const App: React.FC = () => {
 
     window.__NEURALSOUP_TEST_API__ = {
       injectValidDraftOnly: () => {
-        const current = graphDocumentRef.current;
-        if (current.root.links.some((link) => link.id === 'test-valid-draft-link-vision-R-0-neuron-2')) {
+        const currentAgent = draftAgentDocumentRef.current;
+        if (currentAgent.connections.some((connection) => connection.id === 'test-valid-draft-link-vision-R-0-neuron-2')) {
           return;
         }
-
-        handleAgentDocumentChange(
-          {
+        handleAgentChange(
+          (current) => ({
             ...current,
-            root: {
-              ...current.root,
-              links: [
-                ...current.root.links,
-                {
-                  id: 'test-valid-draft-link-vision-R-0-neuron-2',
-                  from: {
-                    nodeId: 'vision-R-0',
-                    portId: 'out'
-                  },
-                  to: {
-                    nodeId: 'neuron-2',
-                    portId: 'dendrite'
-                  },
-                  weight: 1
-                }
-              ]
-            }
-          },
+            connections: [
+              ...current.connections,
+              {
+                id: 'test-valid-draft-link-vision-R-0-neuron-2',
+                from: {
+                  scope: 'bodyInput',
+                  nodeId: 'vision-R-0',
+                  portId: 'out',
+                },
+                to: {
+                  scope: 'brain',
+                  nodeId: 'neuron-2',
+                  portId: 'dendrite',
+                },
+                weight: 1,
+              },
+            ],
+          }),
           { installToRuntime: false }
         );
       },
@@ -742,7 +696,7 @@ const App: React.FC = () => {
             links: [firstLink, { ...firstLink, id: `${firstLink.id}-duplicate` }, ...remainingLinks]
           }
         };
-        handleGraphDraftOnlyChange(invalidDocument);
+        setDraftGraphStatusOverride(createGraphIRDraftStatus(invalidDocument));
       },
       getRuntimeActiveNodeIds: () => [...graphIRRuntimeActivity.activeNodeIds],
       getGraphPathIds: () => graphPath.map((item) => item.id),
@@ -751,7 +705,7 @@ const App: React.FC = () => {
     return () => {
       delete window.__NEURALSOUP_TEST_API__;
     };
-  }, [graphIRRuntimeActivity.activeNodeIds, graphPath, handleAgentDocumentChange, handleGraphDraftOnlyChange, isE2ETestMode]);
+  }, [graphIRRuntimeActivity.activeNodeIds, graphPath, handleAgentChange, isE2ETestMode]);
 
   return (
     <div
@@ -837,7 +791,6 @@ const App: React.FC = () => {
             isActive={editorTab === 'graph'}
             agent={draftAgentDocument}
             graphSessionKey={graphEditorSessionKey}
-            document={graphDocument}
             visionCells={agentParameters.visionCells}
             runtimeStatus={graphIRRuntimeStatus}
             draftStatus={graphIRDraftStatus}
