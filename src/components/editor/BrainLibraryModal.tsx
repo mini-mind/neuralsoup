@@ -1,5 +1,5 @@
 import React, { useId, useRef, useState } from 'react';
-import type { AgentPackage, BrainPackage } from '../../domain/brain';
+import type { AgentPackage } from '../../domain/brain';
 
 interface BrainLibraryModalProps {
   activeBrainId: string | null;
@@ -13,12 +13,12 @@ interface BrainLibraryModalProps {
   onDeleteBrain: (brainId: string) => void;
   onDuplicateBrain: (brainId: string) => void;
   onExportBrain: (brainId: string) => void;
-  onImportBrain: (name: string, payload: BrainPackage | AgentPackage) => void;
+  onImportBrain: (name: string, payload: AgentPackage) => void;
 }
 
-const parseImportedBrainPackage = (rawValue: string): BrainPackage | AgentPackage => {
+const parseImportedBrainPackage = (rawValue: string): AgentPackage => {
   try {
-    return JSON.parse(rawValue) as BrainPackage;
+    return JSON.parse(rawValue) as AgentPackage;
   } catch (error) {
     throw new Error(`JSON 解析失败：${error instanceof Error ? error.message : '未知错误'}`);
   }
@@ -113,7 +113,7 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
         <div className="brain-library-header">
           <div>
             <h3 id={importInputId}>Brain 切换</h3>
-            <p>使用 LocalStorage 保存完整 BrainPackage，包含 Brain、Body 和布局。</p>
+            <p>使用 LocalStorage 保存完整 AgentPackage。</p>
           </div>
           <button type="button" className="brain-library-close" data-testid="brain-library-close" onClick={onClose}>
             ×

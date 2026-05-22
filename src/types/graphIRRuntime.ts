@@ -1,4 +1,4 @@
-import type { GraphIRDocument, GraphIRDocumentSummary, GraphIRValidationIssue } from '../domain/brain';
+import type { GraphIRDocumentSummary, GraphIRValidationIssue } from '../domain/brain';
 
 export interface GraphIRRuntimeActivitySnapshot {
   activeNodeIds: string[];
@@ -14,14 +14,12 @@ export interface GraphIRDraftStatus {
 export type GraphIRRuntimeStatus =
   | {
       state: 'applied';
-      appliedDocument: GraphIRDocument;
       appliedSummary: GraphIRDocumentSummary;
       issues: [];
       message: null;
     }
   | {
       state: 'invalid';
-      appliedDocument: GraphIRDocument;
       appliedSummary: GraphIRDocumentSummary;
       issues: GraphIRValidationIssue[];
       message: string;

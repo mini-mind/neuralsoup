@@ -6,6 +6,7 @@ import {
   compileAgentIR,
   compileBrainDefinition,
   createAgentIRFromLegacyGraph,
+  reconcileAgentIRVisionCells,
   createLegacyGraphBridgeFromAgent,
   createDefaultBodyDefinition,
   createDefaultGraphIRDocument,
@@ -321,21 +322,11 @@ export class SimulationSession {
       return;
     }
 
-    const graphIR = this.reconcileGraphIR(mainAgent.visionCells.length);
-    const body = this.reconcileBodyDefinition(mainAgent.visionCells.length);
-    this.applyAgentIR(
-      createAgentIRFromLegacyGraph(
-        this.currentAgentIR.metadata.name,
-        graphIR,
-        body,
-        undefined,
-        this.currentAgentIR.metadata
-      ),
-      graphIR,
-      body,
-      mainAgent
-    );
-    this.setAppliedGraphIRRuntimeStatus(graphIR);
+    const nextAgent = reconcileAgentIRVisionCells(this.currentAgentIR, mainAgent.visionCells.length);
+    const reconciledDocument = this.reconcileGraphIR(mainAgent.visionCells.length, this.currentGraphIRDocument);
+    const reconciledBody = this.reconcileBodyDefinition(mainAgent.visionCells.length, this.currentBodyDefinition);
+    this.applyAgentIR(nextAgent, reconciledDocument, reconciledBody, mainAgent);
+    this.setAppliedGraphIRRuntimeStatus(reconciledDocument);
   }
 
   private reconcileGraphIR(
@@ -373,7 +364,6 @@ export class SimulationSession {
   private createAppliedGraphIRRuntimeStatus(document: GraphIRDocument): GraphIRRuntimeStatus {
     return {
       state: 'applied',
-      appliedDocument: document,
       appliedSummary: summarizeGraphIRDocument(document),
       issues: [],
       message: null,
@@ -388,7 +378,6 @@ export class SimulationSession {
   private setInvalidGraphIRRuntimeStatus(issues: GraphIRValidationIssue[]): GraphIRRuntimeStatus {
     this.graphIRRuntimeStatus = {
       state: 'invalid',
-      appliedDocument: this.currentGraphIRDocument,
       appliedSummary: summarizeGraphIRDocument(this.currentGraphIRDocument),
       issues,
       message: issues.map((issue) => issue.message).join(' | '),

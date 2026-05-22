@@ -279,10 +279,7 @@ test('simulation session rejects invalid GraphIR drafts without dropping the las
   const invalidStatus = session.setGraphIRDocument(invalidDocument);
   assert.equal(invalidStatus.state, 'invalid');
   assert.ok(invalidStatus.message.includes('not an output port'));
-  assert.deepEqual(
-    invalidStatus.appliedDocument.root.links.map((link) => link.id),
-    ['vision-to-neuron']
-  );
+  assert.deepEqual(invalidStatus.appliedSummary.leafLinkCount, 1);
   assert.deepEqual(
     session.getCurrentGraphIRDocument().root.links.map((link) => link.id),
     ['vision-to-neuron']
@@ -329,10 +326,7 @@ test('simulation session keeps the last applied document and program when GraphI
   const invalidStatus = session.setGraphIRDocument(validDocument, invalidBody);
   assert.equal(invalidStatus.state, 'invalid');
   assert.ok(invalidStatus.message.includes('non-root or non-output brain signal'));
-  assert.deepEqual(
-    invalidStatus.appliedDocument.root.links.map((link) => link.id),
-    ['vision-b1-to-forward']
-  );
+  assert.deepEqual(invalidStatus.appliedSummary.leafLinkCount, 1);
   assert.deepEqual(invalidStatus.appliedSummary, appliedSummary);
   assert.deepEqual(
     session.getCurrentGraphIRDocument().root.links.map((link) => link.id),

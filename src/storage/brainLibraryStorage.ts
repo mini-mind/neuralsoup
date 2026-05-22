@@ -1,7 +1,7 @@
 import {
   createAgentPackage,
   createBrainLayoutFromDefinition,
-  createLegacyGraphBridgeFromAgent,
+  type AgentIR,
   type AgentPackage,
   type BrainDefinition,
   type BodyDefinition,
@@ -132,25 +132,34 @@ const isBrainLibraryStorageEnvelope = (value: unknown): value is BrainLibrarySto
   Array.isArray(value.brains) &&
   value.brains.every(isAgentPackage);
 
-const normalizeAgentPackage = (candidate: unknown): AgentPackage | null => {
-  if (!isAgentPackage(candidate)) {
-    return null;
-  }
-
-  const bridge = createLegacyGraphBridgeFromAgent(candidate.agent);
-  return createAgentPackage(candidate.metadata.name, bridge.document, {
-    id: candidate.metadata.id,
-    createdAt: candidate.metadata.createdAt,
-    updatedAt: candidate.metadata.updatedAt,
-    description: candidate.metadata.description,
-    tags: candidate.metadata.tags,
-    body: bridge.body,
-    layout: bridge.layout,
-  });
-};
+const normalizeAgentPackage = (candidate: unknown): AgentPackage | null => (isAgentPackage(candidate) ? candidate : null);
 
 export const createBrainLibraryItem = (name: string, definition: BrainDefinition): AgentPackage =>
   createAgentPackage(name, definition);
+
+export const createBrainLibraryItemFromAgent = (name: string, agent: AgentIR): AgentPackage => {
+  const timestamp = new Date().toISOString();
+  return {
+    packageVersion: 1,
+    metadata: {
+      ...agent.metadata,
+      id: `agent-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name: name.trim() || '未命名 Brain',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+    agent: {
+      ...agent,
+      metadata: {
+        ...agent.metadata,
+        id: `agent-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        name: name.trim() || '未命名 Brain',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+    },
+  };
+};
 
 const createStorageEnvelope = (brains: AgentPackage[]): BrainLibraryStorageEnvelope => ({
   storageVersion: 1,
@@ -281,6 +290,33 @@ export const upsertBrainLibraryItemDefinition = (
       : brain
   );
 
+export const upsertBrainLibraryItemAgent = (
+  brains: AgentPackage[],
+  brainId: string,
+  agent: AgentIR,
+  updatedAt?: string
+): AgentPackage[] => {
+  const nextUpdatedAt = updatedAt ?? new Date().toISOString();
+  return brains.map((brain) =>
+    brain.metadata.id === brainId
+      ? {
+          ...brain,
+          metadata: {
+            ...brain.metadata,
+            updatedAt: nextUpdatedAt,
+          },
+          agent: {
+            ...agent,
+            metadata: {
+              ...brain.metadata,
+              updatedAt: nextUpdatedAt,
+            },
+          },
+        }
+      : brain
+  );
+};
+
 export const renameBrainLibraryItem = (
   brains: AgentPackage[],
   brainId: string,
@@ -300,16 +336,30 @@ export const duplicateBrainLibraryItem = (brains: AgentPackage[], brainId: strin
   if (!sourceBrain) {
     return brains;
   }
-
-  const bridge = createLegacyGraphBridgeFromAgent(sourceBrain.agent);
+  const timestamp = new Date().toISOString();
+  const duplicateId = `agent-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
   return [
     ...brains,
-    createAgentPackage(`${sourceBrain.metadata.name} 副本`, bridge.document, {
-      description: sourceBrain.metadata.description,
-      tags: sourceBrain.metadata.tags,
-      body: bridge.body,
-      layout: bridge.layout,
-    }),
+    {
+      packageVersion: 1,
+      metadata: {
+        ...sourceBrain.metadata,
+        id: duplicateId,
+        name: `${sourceBrain.metadata.name} 副本`,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+      agent: {
+        ...sourceBrain.agent,
+        metadata: {
+          ...sourceBrain.agent.metadata,
+          id: duplicateId,
+          name: `${sourceBrain.metadata.name} 副本`,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      },
+    },
   ];
 };
