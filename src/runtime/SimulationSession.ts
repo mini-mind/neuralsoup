@@ -3,13 +3,16 @@ import { CollisionDetector } from '../engine/CollisionDetector';
 import { VisionSystem } from '../engine/VisionSystem';
 import { WorldManager } from '../engine/WorldManager';
 import {
+  compileAgentIR,
   compileBrainDefinition,
+  createAgentIRFromLegacyGraph,
   createDefaultBodyDefinition,
   createDefaultGraphIRDocument,
   GraphIRValidationError,
   reconcileGraphIRDocumentVisionCells,
   summarizeGraphIRDocument,
   validateGraphIRDocument,
+  type AgentIR,
   type BodyDefinition,
   type GraphIRDocument,
   type GraphIRValidationIssue,
@@ -53,6 +56,7 @@ export class SimulationSession {
   private readonly config: WorldConfig;
 
   private currentControlMode: SimulationControlMode;
+  private currentAgentIR: AgentIR;
   private currentGraphIRDocument: GraphIRDocument;
   private currentBodyDefinition: BodyDefinition;
   private graphIRRuntimeStatus: GraphIRRuntimeStatus;
@@ -79,6 +83,11 @@ export class SimulationSession {
     this.currentControlMode = options.initialControlMode ?? 'keyboard';
     this.currentGraphIRDocument = createDefaultGraphIRDocument(this.visionSystem.getVisionCells());
     this.currentBodyDefinition = createDefaultBodyDefinition(this.visionSystem.getVisionCells());
+    this.currentAgentIR = createAgentIRFromLegacyGraph(
+      '默认 Agent',
+      this.currentGraphIRDocument,
+      this.currentBodyDefinition
+    );
     this.graphIRRuntimeStatus = this.createAppliedGraphIRRuntimeStatus(this.currentGraphIRDocument);
     this.state = createEmptyWorldState(this.config, this.worldManager.getWorldBounds());
   }
@@ -186,7 +195,18 @@ export class SimulationSession {
     }
 
     try {
-      this.applyGraphIRDocument(reconciledDocument, reconciledBody, mainAgent);
+      this.applyAgentIR(
+        createAgentIRFromLegacyGraph(
+          this.currentAgentIR.metadata.name,
+          reconciledDocument,
+          reconciledBody,
+          undefined,
+          this.currentAgentIR.metadata
+        ),
+        reconciledDocument,
+        reconciledBody,
+        mainAgent
+      );
     } catch (error) {
       if (error instanceof GraphIRValidationError) {
         return this.setInvalidGraphIRRuntimeStatus(error.issues);
@@ -203,6 +223,27 @@ export class SimulationSession {
     return this.setAppliedGraphIRRuntimeStatus(reconciledDocument);
   }
 
+  public setAgentIR(agent: AgentIR): GraphIRRuntimeStatus {
+    const mainAgent = this.getMainAgent();
+
+    try {
+      this.applyAgentIR(agent, this.currentGraphIRDocument, this.currentBodyDefinition, mainAgent);
+    } catch (error) {
+      if (error instanceof GraphIRValidationError) {
+        return this.setInvalidGraphIRRuntimeStatus(error.issues);
+      }
+
+      return this.setInvalidGraphIRRuntimeStatus([
+        {
+          code: 'runtime-binding-error',
+          message: error instanceof Error ? error.message : 'Unknown AgentIR runtime binding failure.',
+        },
+      ]);
+    }
+
+    return this.setAppliedGraphIRRuntimeStatus(this.currentGraphIRDocument);
+  }
+
   public getMainAgentControlMode(): SimulationControlMode {
     return this.currentControlMode;
   }
@@ -214,6 +255,10 @@ export class SimulationSession {
 
   public getCurrentGraphIRDocument(): GraphIRDocument {
     return this.currentGraphIRDocument;
+  }
+
+  public getCurrentAgentIR(): AgentIR {
+    return this.currentAgentIR;
   }
 
   public getGraphIRRuntimeStatus(): GraphIRRuntimeStatus {
@@ -280,7 +325,18 @@ export class SimulationSession {
 
     const graphIR = this.reconcileGraphIR(mainAgent.visionCells.length);
     const body = this.reconcileBodyDefinition(mainAgent.visionCells.length);
-    this.applyGraphIRDocument(graphIR, body, mainAgent);
+    this.applyAgentIR(
+      createAgentIRFromLegacyGraph(
+        this.currentAgentIR.metadata.name,
+        graphIR,
+        body,
+        undefined,
+        this.currentAgentIR.metadata
+      ),
+      graphIR,
+      body,
+      mainAgent
+    );
     this.setAppliedGraphIRRuntimeStatus(graphIR);
   }
 
@@ -299,13 +355,20 @@ export class SimulationSession {
     return body.inputSignals.length === defaultBody.inputSignals.length ? body : defaultBody;
   }
 
-  private applyGraphIRDocument(document: GraphIRDocument, body: BodyDefinition, mainAgent: Agent | null): void {
+  private applyAgentIR(
+    agent: AgentIR,
+    document: GraphIRDocument,
+    body: BodyDefinition,
+    mainAgent: Agent | null
+  ): void {
     const compiledProgram = compileBrainDefinition(document, body);
+    compileAgentIR(agent);
 
     if (mainAgent) {
       this.agentController.installBrainProgram(mainAgent.id, compiledProgram);
     }
 
+    this.currentAgentIR = agent;
     this.currentGraphIRDocument = document;
     this.currentBodyDefinition = body;
   }

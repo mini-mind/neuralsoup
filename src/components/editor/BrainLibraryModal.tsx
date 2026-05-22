@@ -1,9 +1,9 @@
 import React, { useId, useRef, useState } from 'react';
-import type { BrainPackage } from '../../domain/brain';
+import type { AgentPackage, BrainPackage } from '../../domain/brain';
 
 interface BrainLibraryModalProps {
   activeBrainId: string | null;
-  brains: BrainPackage[];
+  brains: AgentPackage[];
   isOpen: boolean;
   statusMessage: string | null;
   onClose: () => void;
@@ -13,10 +13,10 @@ interface BrainLibraryModalProps {
   onDeleteBrain: (brainId: string) => void;
   onDuplicateBrain: (brainId: string) => void;
   onExportBrain: (brainId: string) => void;
-  onImportBrain: (name: string, payload: BrainPackage) => void;
+  onImportBrain: (name: string, payload: BrainPackage | AgentPackage) => void;
 }
 
-const parseImportedBrainPackage = (rawValue: string): BrainPackage => {
+const parseImportedBrainPackage = (rawValue: string): BrainPackage | AgentPackage => {
   try {
     return JSON.parse(rawValue) as BrainPackage;
   } catch (error) {
@@ -66,7 +66,7 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
     }
   };
 
-  const startRenamingBrain = (brain: BrainPackage) => {
+  const startRenamingBrain = (brain: AgentPackage) => {
     setRenamingBrainId(brain.metadata.id);
     setRenamingBrainName(brain.metadata.name);
   };
@@ -88,7 +88,7 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
     setErrorMessage(null);
   };
 
-  const deleteBrain = (brain: BrainPackage) => {
+  const deleteBrain = (brain: AgentPackage) => {
     if (!window.confirm(`删除 Brain "${brain.metadata.name}"？此操作不能撤销。`)) {
       return;
     }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createBrainPackage, createDefaultGraphIRDocument } from '../../src/domain/brain';
+import { createAgentPackage, createDefaultGraphIRDocument } from '../../src/domain/brain';
 import {
   BRAIN_LIBRARY_CORRUPT_STORAGE_KEY,
   BRAIN_LIBRARY_STATUS_STORAGE_KEY,
@@ -43,7 +43,7 @@ const installMemoryLocalStorage = () => {
 
 test('Brain Library storage saves and loads v1 envelope payloads', () => {
   const storage = installMemoryLocalStorage();
-  const brain = createBrainPackage('Stored Brain', createDefaultGraphIRDocument(1));
+  const brain = createAgentPackage('Stored Brain', createDefaultGraphIRDocument(1));
 
   saveBrainLibrary([brain]);
   const rawValue = storage.getItem(BRAIN_LIBRARY_STORAGE_KEY);
@@ -76,7 +76,7 @@ test('Brain Library storage quarantines corrupted JSON payloads', () => {
 
 test('Brain Library storage rejects old array payloads instead of migrating implicitly', () => {
   const storage = installMemoryLocalStorage();
-  const brain = createBrainPackage('Old Array Brain', createDefaultGraphIRDocument(1));
+  const brain = createAgentPackage('Old Array Brain', createDefaultGraphIRDocument(1));
   storage.setItem(BRAIN_LIBRARY_STORAGE_KEY, JSON.stringify([brain]));
 
   const loaded = loadBrainLibraryWithStatus();
@@ -92,7 +92,7 @@ test('Brain Library storage reports LocalStorage capacity write failures', () =>
   storage.failWrites = true;
 
   assert.throws(
-    () => saveBrainLibrary([createBrainPackage('Too Large', createDefaultGraphIRDocument(1))]),
+    () => saveBrainLibrary([createAgentPackage('Too Large', createDefaultGraphIRDocument(1))]),
     /Brain Library 保存失败：quota exceeded/
   );
 });

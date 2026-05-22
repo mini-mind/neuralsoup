@@ -3,6 +3,8 @@ import {
   GraphIRValidationError,
   validateGraphIRDocument,
 } from './ir';
+import { compileAgentIR } from './agent-compiler';
+import { createAgentIRFromLegacyGraph } from './legacy-graph-bridge';
 import type {
   LeafLink,
   LiteralValue,
@@ -219,6 +221,9 @@ const assertBodyBindingsTargetRootAdapterSignals = (
 };
 
 export const compileBrainDefinition = (document: BrainDefinition, body: BodyDefinition): BrainProgram => {
+  const agentProgram = compileAgentIR(
+    createAgentIRFromLegacyGraph('legacy-graph-bridge', document, body)
+  );
   const issues = validateGraphIRDocument(document);
   if (issues.length > 0) {
     throw new GraphIRValidationError(issues);
@@ -315,6 +320,7 @@ export const compileBrainDefinition = (document: BrainDefinition, body: BodyDefi
 
   return {
     graphIR: document,
+    agentProgram,
     inputPorts,
     neuronNodes,
     outputPorts,

@@ -103,6 +103,7 @@ export class AgentController {
         brainProgram,
         agent.visualInput,
         runtimeState,
+        deltaTime,
         Date.now()
       );
       this.brainRuntimeStates.set(agent.id, result.runtimeState);

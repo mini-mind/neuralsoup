@@ -1,13 +1,16 @@
 import React, { useState, useCallback, useEffect, useRef, type CSSProperties } from 'react';
 import SimulationCanvas from './components/SimulationCanvas';
 import {
-  createBrainPackage,
+  createAgentIRFromLegacyGraph,
+  createLegacyGraphBridgeFromAgent,
+  createAgentPackage,
   createDefaultBodyDefinition,
   createDefaultGraphIRDocument,
   getBodyVisionCellCount,
-  type BrainDefinition,
-  type BodyDefinition,
+  type AgentIR,
+  type AgentPackage,
   type BrainPackage,
+  type BodyDefinition,
   reconcileGraphIRDocumentVisionCells,
   summarizeGraphIRDocument,
   validateGraphIRDocument,
@@ -29,6 +32,7 @@ import {
   deleteBrainLibraryItem,
   duplicateBrainLibraryItem,
   isBrainPackage,
+  isAgentPackage,
   loadBrainLibraryWithStatus,
   renameBrainLibraryItem,
   saveBrainLibrary,
@@ -86,25 +90,29 @@ const areAgentParametersEqual = (left: AgentParameters, right: AgentParameters):
 
 const App: React.FC = () => {
   const initialBrainLibraryLoad = useRef(loadBrainLibraryWithStatus()).current;
+  const initialGraphDocument = createDefaultGraphIRDocument(36);
+  const initialBodyDefinition = createDefaultBodyDefinition(36);
+  const initialAgentDocument = createAgentIRFromLegacyGraph('当前 Agent', initialGraphDocument, initialBodyDefinition);
   const isE2ETestMode = import.meta.env.MODE === 'test' || import.meta.env.VITE_E2E === 'true';
   const [runState, setRunState] = useState<SimulationLifecycleState>('idle');
   const [requestedLifecycleState, setRequestedLifecycleState] = useState<SimulationLifecycleState>('idle');
   const [resetToken, setResetToken] = useState(0);
   const [stats, setStats] = useState<SimulationState['stats']>(INITIAL_STATS);
-  const [graphDocument, setGraphDocument] = useState<GraphIRDocument>(() => createDefaultGraphIRDocument(36));
+  const [activeAgentDocument, setActiveAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
+  const [graphDocument, setGraphDocument] = useState<GraphIRDocument>(() => initialGraphDocument);
   const [runtimeGraphDocument, setRuntimeGraphDocument] = useState<GraphIRDocument>(() =>
-    createDefaultGraphIRDocument(36)
+    initialGraphDocument
   );
   const [runtimeBodyDefinition, setRuntimeBodyDefinition] = useState<BodyDefinition>(() =>
-    createDefaultBodyDefinition(36)
+    initialBodyDefinition
   );
   const [graphIRRuntimeStatus, setGraphIRRuntimeStatus] = useState<GraphIRRuntimeStatus>(() =>
-    createInitialGraphIRRuntimeStatus(createDefaultGraphIRDocument(36))
+    createInitialGraphIRRuntimeStatus(initialGraphDocument)
   );
   const [graphIRRuntimeActivity, setGraphIRRuntimeActivity] = useState<GraphIRRuntimeActivitySnapshot>({
     activeNodeIds: []
   });
-  const [brainLibrary, setBrainLibrary] = useState<BrainPackage[]>(() => initialBrainLibraryLoad.brains);
+  const [brainLibrary, setBrainLibrary] = useState<AgentPackage[]>(() => initialBrainLibraryLoad.brains);
   const [activeBrainId, setActiveBrainId] = useState<string | null>(null);
   const [isBrainLibraryOpen, setIsBrainLibraryOpen] = useState(false);
   const [brainLibraryStatusMessage, setBrainLibraryStatusMessage] = useState<string | null>(
@@ -233,7 +241,15 @@ const App: React.FC = () => {
       installToRuntime: boolean = true,
       persistActiveBrain: boolean = true
     ) => {
+      const nextAgentDocument = createAgentIRFromLegacyGraph(
+        activeAgentDocument.metadata.name,
+        nextDocument,
+        runtimeBodyDefinition,
+        undefined,
+        activeAgentDocument.metadata
+      );
       graphDocumentRef.current = nextDocument;
+      setActiveAgentDocument(nextAgentDocument);
       setGraphDocument(nextDocument);
       setBrainLibrary((currentLibrary) =>
         persistActiveBrain && activeBrainId
@@ -244,7 +260,7 @@ const App: React.FC = () => {
         setRuntimeGraphDocument(nextDocument);
       }
     },
-    [activeBrainId, runtimeBodyDefinition]
+    [activeAgentDocument, activeBrainId, runtimeBodyDefinition]
   );
 
   useEffect(() => {
@@ -277,6 +293,9 @@ const App: React.FC = () => {
     setAgentParameters((current) => (areAgentParametersEqual(current, params) ? current : params));
     updateGraphDocument(nextDocument, true, false);
     setRuntimeBodyDefinition(nextBodyDefinition);
+    setActiveAgentDocument((current) =>
+      createAgentIRFromLegacyGraph(current.metadata.name, nextDocument, nextBodyDefinition, undefined, current.metadata)
+    );
     setBrainLibrary((currentLibrary) =>
       activeBrainId
         ? upsertBrainLibraryItemDefinition(
@@ -359,11 +378,13 @@ const App: React.FC = () => {
       return;
     }
 
-    const bodyVisionCells = getBodyVisionCellCount(selectedBrain.body);
+    const bridge = createLegacyGraphBridgeFromAgent(selectedBrain.agent);
+    const bodyVisionCells = getBodyVisionCellCount(bridge.body);
     resetRuntimeForBrainSwitch();
     setActiveBrainId(selectedBrain.metadata.id);
-    updateGraphDocument(selectedBrain.definition, true, false);
-    setRuntimeBodyDefinition(selectedBrain.body);
+    setActiveAgentDocument(selectedBrain.agent);
+    updateGraphDocument(bridge.document, true, false);
+    setRuntimeBodyDefinition(bridge.body);
     setAgentParameters((current) =>
       current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells }
     );
@@ -371,30 +392,36 @@ const App: React.FC = () => {
     graphPathNavigateRef.current('root');
   }, [brainLibrary, confirmUnsavedBrainReplacement, resetRuntimeForBrainSwitch, updateGraphDocument]);
 
-  const handleImportBrain = useCallback((name: string, payload: BrainPackage) => {
-    if (!isBrainPackage(payload)) {
-      throw new Error('导入内容不是有效的 BrainPackage。');
+  const handleImportBrain = useCallback((name: string, payload: BrainPackage | AgentPackage) => {
+    const nextBrain = isAgentPackage(payload)
+      ? payload
+      : isBrainPackage(payload)
+        ? createAgentPackage(payload.metadata.name || name, payload.definition, {
+            id: payload.metadata.id,
+            createdAt: payload.metadata.createdAt,
+            updatedAt: payload.metadata.updatedAt,
+            description: payload.metadata.description,
+            tags: payload.metadata.tags,
+            body: payload.body,
+            layout: payload.layout,
+          })
+        : null;
+    if (!nextBrain) {
+      throw new Error('导入内容不是有效的 AgentPackage 或 BrainPackage。');
     }
     if (!confirmUnsavedBrainReplacement()) {
       return;
     }
 
-    const nextBrain = createBrainPackage(payload.metadata.name || name, payload.definition as BrainDefinition, {
-      id: payload.metadata.id,
-      createdAt: payload.metadata.createdAt,
-      updatedAt: payload.metadata.updatedAt,
-      description: payload.metadata.description,
-      tags: payload.metadata.tags,
-      body: payload.body,
-      layout: payload.layout,
-    });
+    const bridge = createLegacyGraphBridgeFromAgent(nextBrain.agent);
     resetRuntimeForBrainSwitch();
     setBrainLibrary((currentLibrary) => [...currentLibrary, nextBrain]);
     setActiveBrainId(nextBrain.metadata.id);
-    updateGraphDocument(nextBrain.definition, true, false);
-    setRuntimeBodyDefinition(nextBrain.body);
+    setActiveAgentDocument(nextBrain.agent);
+    updateGraphDocument(bridge.document, true, false);
+    setRuntimeBodyDefinition(bridge.body);
     setAgentParameters((current) => {
-      const bodyVisionCells = getBodyVisionCellCount(nextBrain.body);
+      const bodyVisionCells = getBodyVisionCellCount(bridge.body);
       return current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells };
     });
     setEditorTab('graph');

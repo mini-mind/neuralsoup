@@ -1,9 +1,11 @@
 import type { BrainOutputChannel, IzhikevichNeuronRuntimeState } from './shared';
 import type { BrainProgram } from './program';
+import { createAgentProgramRuntimeState, stepAgentProgram, type AgentProgramRuntimeState } from './agent-step';
 
 export interface BrainProgramRuntimeState {
   neurons: Map<string, IzhikevichNeuronRuntimeState>;
   signals: Map<string, number>;
+  agentRuntimeState?: AgentProgramRuntimeState;
   activeLeafNodeIds: string[];
 }
 
@@ -34,6 +36,7 @@ export const createBrainProgramRuntimeState = (
     program.neuronNodes.map((neuron) => [neuron.id, DEFAULT_RUNTIME_STATE()])
   ),
   signals: new Map(program.signalNodes.map((signalNode) => [signalNode.id, 0])),
+  agentRuntimeState: program.agentProgram ? createAgentProgramRuntimeState(program.agentProgram) : undefined,
   activeLeafNodeIds: [],
 });
 
@@ -45,8 +48,29 @@ export const stepBrainProgram = (
   program: BrainProgram,
   sensoryInputs: number[],
   previousState: BrainProgramRuntimeState,
-  timestamp: number
+  deltaTimeSeconds: number,
+  timestamp: number = Date.now()
 ): BrainProgramStepResult => {
+  if (program.agentProgram) {
+    const agentResult = stepAgentProgram(
+      program.agentProgram,
+      sensoryInputs,
+      previousState.agentRuntimeState ?? createAgentProgramRuntimeState(program.agentProgram),
+      deltaTimeSeconds,
+      timestamp
+    );
+
+    return {
+      runtimeState: {
+        neurons: agentResult.runtimeState.neurons,
+        signals: previousState.signals,
+        agentRuntimeState: agentResult.runtimeState,
+        activeLeafNodeIds: agentResult.runtimeState.activeLeafNodeIds,
+      },
+      outputs: agentResult.outputs,
+    };
+  }
+
   const previousNeurons = previousState.neurons;
   const nextNeurons = new Map<string, IzhikevichNeuronRuntimeState>();
   const nextSignals = new Map<string, number>();
