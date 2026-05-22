@@ -17,6 +17,7 @@ interface SNNTopologyEditorProps {
   document: GraphIRDocument;
   visionCells?: number;
   onDocumentChange?: (document: GraphIRDocument, options?: GraphDocumentChangeOptions) => void;
+  onAgentChange?: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
   onGraphPathChange?: (graphPath: GraphPathItem[]) => void;
   onGraphPathNavigateRegister?: (navigate: (pathId: string) => void) => void;
   runtimeStatus: GraphIRRuntimeStatus;
@@ -32,6 +33,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   document,
   visionCells = 36,
   onDocumentChange,
+  onAgentChange,
   onGraphPathChange,
   onGraphPathNavigateRegister,
   runtimeStatus,
@@ -40,9 +42,11 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   isActive = true,
 }) => {
   const state = useSNNTopologyState({
+    agent,
     document,
     runtimeActiveNodeIds: runtimeActivity.activeNodeIds,
     onDocumentChange,
+    onAgentChange,
   });
   const {
     breadcrumbs,

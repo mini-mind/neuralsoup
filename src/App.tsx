@@ -266,6 +266,39 @@ const App: React.FC = () => {
     setRunState(nextState);
   }, []);
 
+  const commitEditedAgentDocument = useCallback(
+    (
+      nextAgentDocument: AgentIR,
+      installToRuntime: boolean = true,
+      persistActiveBrain: boolean = true
+    ) => {
+      const nextUpdatedAt = new Date().toISOString();
+      const normalizedAgentDocument: AgentIR = {
+        ...nextAgentDocument,
+        metadata: {
+          ...nextAgentDocument.metadata,
+          updatedAt: nextUpdatedAt,
+        },
+      };
+      graphDocumentRef.current = createLegacyGraphBridgeFromAgent(normalizedAgentDocument).document;
+      setDraftAgentDocument(normalizedAgentDocument);
+      if (installToRuntime) {
+        setActiveAgentDocument(normalizedAgentDocument);
+      }
+      setBrainLibrary((currentLibrary) =>
+        persistActiveBrain && activeBrainId
+          ? upsertBrainLibraryItemAgent(
+              currentLibrary,
+              activeBrainId,
+              normalizedAgentDocument,
+              nextUpdatedAt
+            )
+          : currentLibrary
+      );
+    },
+    [activeBrainId]
+  );
+
   const updateGraphDocument = useCallback(
     (
       nextDocument: GraphIRDocument,
@@ -288,22 +321,9 @@ const App: React.FC = () => {
         }
       );
       graphDocumentRef.current = nextDocument;
-      setDraftAgentDocument(nextAgentDocument);
-      if (installToRuntime) {
-        setActiveAgentDocument(nextAgentDocument);
-      }
-      setBrainLibrary((currentLibrary) =>
-        persistActiveBrain && activeBrainId
-          ? upsertBrainLibraryItemAgent(
-              currentLibrary,
-              activeBrainId,
-              nextAgentDocument,
-              nextUpdatedAt
-            )
-          : currentLibrary
-      );
+      commitEditedAgentDocument(nextAgentDocument, installToRuntime, persistActiveBrain);
     },
-    [activeBrainId]
+    [commitEditedAgentDocument]
   );
 
   useEffect(() => {
@@ -364,6 +384,20 @@ const App: React.FC = () => {
     const shouldInstallToRuntime = options?.installToRuntime !== false;
     updateGraphDocument(nextDocument, shouldInstallToRuntime, shouldInstallToRuntime);
   }, [updateGraphDocument]);
+
+  const handleAgentChange = useCallback((
+    updater: (current: AgentIR) => AgentIR,
+    options?: GraphDocumentChangeOptions
+  ) => {
+    const currentDraftAgent = draftAgentDocumentRef.current;
+    const nextAgentDocument = updater(currentDraftAgent);
+    if (nextAgentDocument === currentDraftAgent) {
+      return;
+    }
+
+    const shouldInstallToRuntime = options?.installToRuntime !== false;
+    commitEditedAgentDocument(nextAgentDocument, shouldInstallToRuntime, shouldInstallToRuntime);
+  }, [commitEditedAgentDocument]);
 
   const handleGraphIRRuntimeStatusChange = useCallback((nextStatus: GraphIRRuntimeStatus) => {
     setGraphIRRuntimeStatus(nextStatus);
@@ -738,6 +772,7 @@ const App: React.FC = () => {
             draftStatus={graphIRDraftStatus}
             runtimeActivity={graphIRRuntimeActivity}
             onDocumentChange={handleAgentDocumentChange}
+            onAgentChange={handleAgentChange}
             onGraphPathChange={setGraphPath}
             onGraphPathNavigateRegister={(navigate) => {
               graphPathNavigateRef.current = navigate;

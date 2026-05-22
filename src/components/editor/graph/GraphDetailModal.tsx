@@ -1,8 +1,9 @@
 import React from 'react';
-import type { LiteralValue, TopologyNode } from '../../../domain/brain';
+import type { LiteralValue } from '../../../domain/brain';
 import NeuronDetailEditor from '../../NeuronDetailEditor';
 import ConnectionDetailEditor from '../../ConnectionDetailEditor';
 import type { DetailModalData } from '../../hooks/useSNNTopologyState';
+import type { AgentGraphViewNodeRecord } from './agentGraphViewModel';
 
 interface GraphLeafLink {
   id: string;
@@ -17,7 +18,7 @@ interface GraphLeafLink {
 
 interface GraphDetailModalProps {
   detailModal: DetailModalData | null;
-  activeNode: TopologyNode | null;
+  activeNode: AgentGraphViewNodeRecord | null;
   activeLink: GraphLeafLink | null;
   activeNeuronParameters: {
     a: number;

@@ -7,6 +7,7 @@ import {
   type BodyDefinition,
   type BrainLayoutDocument,
   type BrainPackage,
+  validateAgentIR,
 } from '../domain/brain';
 
 export const BRAIN_LIBRARY_STORAGE_KEY = 'neuralsoup.brain-library.v1';
@@ -123,7 +124,110 @@ export const isAgentPackage = (value: unknown): value is AgentPackage =>
   typeof value.metadata.createdAt === 'string' &&
   typeof value.metadata.updatedAt === 'string' &&
   isObject(value.agent) &&
-  value.agent.version === 1;
+  value.agent.version === 1 &&
+  isObject(value.agent.metadata) &&
+  typeof value.agent.metadata.id === 'string' &&
+  typeof value.agent.metadata.name === 'string' &&
+  typeof value.agent.metadata.createdAt === 'string' &&
+  typeof value.agent.metadata.updatedAt === 'string' &&
+  isObject(value.agent.body) &&
+  value.agent.body.version === 1 &&
+  Array.isArray(value.agent.body.inputRules) &&
+  value.agent.body.inputRules.every(
+    (rule) =>
+      isObject(rule) &&
+      typeof rule.id === 'string' &&
+      typeof rule.nodeIdPattern === 'string' &&
+      typeof rule.sourceTemplate === 'string' &&
+      typeof rule.scale === 'number' &&
+      Number.isFinite(rule.scale)
+  ) &&
+  Array.isArray(value.agent.body.outputRules) &&
+  value.agent.body.outputRules.every(
+    (rule) =>
+      isObject(rule) &&
+      typeof rule.id === 'string' &&
+      typeof rule.nodeIdPattern === 'string' &&
+      typeof rule.targetTemplate === 'string' &&
+      typeof rule.decayPerSecond === 'number' &&
+      Number.isFinite(rule.decayPerSecond)
+  ) &&
+  isObject(value.agent.brain) &&
+  value.agent.brain.version === 1 &&
+  typeof value.agent.brain.rootContainerId === 'string' &&
+  Array.isArray(value.agent.brain.neurons) &&
+  value.agent.brain.neurons.every(
+    (neuron) =>
+      isObject(neuron) &&
+      typeof neuron.id === 'string' &&
+      typeof neuron.label === 'string' &&
+      neuron.model === 'izhikevich' &&
+      isObject(neuron.params) &&
+      typeof neuron.params.a === 'number' &&
+      Number.isFinite(neuron.params.a) &&
+      typeof neuron.params.b === 'number' &&
+      Number.isFinite(neuron.params.b) &&
+      typeof neuron.params.c === 'number' &&
+      Number.isFinite(neuron.params.c) &&
+      typeof neuron.params.d === 'number' &&
+      Number.isFinite(neuron.params.d) &&
+      typeof neuron.params.threshold === 'number' &&
+      Number.isFinite(neuron.params.threshold) &&
+      isObject(neuron.initialState) &&
+      typeof neuron.initialState.v === 'number' &&
+      Number.isFinite(neuron.initialState.v) &&
+      (neuron.initialState.u === undefined ||
+        (typeof neuron.initialState.u === 'number' && Number.isFinite(neuron.initialState.u)))
+  ) &&
+  Array.isArray(value.agent.brain.containers) &&
+  value.agent.brain.containers.every(
+    (container) =>
+      isObject(container) &&
+      typeof container.id === 'string' &&
+      (container.label === undefined || typeof container.label === 'string') &&
+      Array.isArray(container.children) &&
+      container.children.every(
+        (child) =>
+          isObject(child) &&
+          (child.scope === 'brain' || child.scope === 'container') &&
+          typeof child.nodeId === 'string'
+      )
+  ) &&
+  Array.isArray(value.agent.connections) &&
+  value.agent.connections.every(
+    (connection) =>
+      isObject(connection) &&
+      typeof connection.id === 'string' &&
+      isObject(connection.from) &&
+      ['bodyInput', 'bodyOutput', 'brain'].includes(String(connection.from.scope)) &&
+      typeof connection.from.nodeId === 'string' &&
+      (connection.from.portId === undefined || typeof connection.from.portId === 'string') &&
+      isObject(connection.to) &&
+      ['bodyInput', 'bodyOutput', 'brain'].includes(String(connection.to.scope)) &&
+      typeof connection.to.nodeId === 'string' &&
+      (connection.to.portId === undefined || typeof connection.to.portId === 'string') &&
+      typeof connection.weight === 'number' &&
+      Number.isFinite(connection.weight) &&
+      (connection.delayMs === undefined ||
+        (typeof connection.delayMs === 'number' && Number.isFinite(connection.delayMs)))
+  ) &&
+  (value.agent.layout === undefined ||
+    (isObject(value.agent.layout) &&
+      value.agent.layout.version === 1 &&
+      isObject(value.agent.layout.nodes) &&
+      (value.agent.layout.viewportByContainerId === undefined ||
+        (isObject(value.agent.layout.viewportByContainerId) &&
+          Object.values(value.agent.layout.viewportByContainerId).every(
+            (viewport) =>
+              isObject(viewport) &&
+              typeof viewport.x === 'number' &&
+              Number.isFinite(viewport.x) &&
+              typeof viewport.y === 'number' &&
+              Number.isFinite(viewport.y) &&
+              typeof viewport.scale === 'number' &&
+              Number.isFinite(viewport.scale)
+          ))))) &&
+  validateAgentIR(value.agent as unknown as AgentIR).length === 0;
 
 const isBrainLibraryStorageEnvelope = (value: unknown): value is BrainLibraryStorageEnvelope =>
   isObject(value) &&

@@ -14,6 +14,7 @@ interface GraphEditorPanelProps {
   draftStatus: GraphIRDraftStatus;
   runtimeActivity: GraphIRRuntimeActivitySnapshot;
   onDocumentChange: (document: GraphIRDocument, options?: GraphDocumentChangeOptions) => void;
+  onAgentChange: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
   onGraphPathChange: (graphPath: GraphPathItem[]) => void;
   onGraphPathNavigateRegister: (navigate: (pathId: string) => void) => void;
 }
@@ -27,6 +28,7 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
   draftStatus,
   runtimeActivity,
   onDocumentChange,
+  onAgentChange,
   onGraphPathChange,
   onGraphPathNavigateRegister
 }) => {
@@ -78,6 +80,7 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
         document={document}
         visionCells={visionCells}
         onDocumentChange={onDocumentChange}
+        onAgentChange={onAgentChange}
         onGraphPathChange={onGraphPathChange}
         onGraphPathNavigateRegister={onGraphPathNavigateRegister}
         runtimeStatus={runtimeStatus}

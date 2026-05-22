@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { GraphIRDocument, RootGraph, TopologyNode } from '../../domain/brain';
-import {
-  buildGraphViewModel,
-  isContainerNode as isLegacyContainerNode,
-} from '../editor/graph/graphViewModel';
+import type { AgentIR, GraphIRDocument } from '../../domain/brain';
+import { buildAgentGraphViewModel } from '../editor/graph/agentGraphViewModel';
+import { buildGraphViewModel } from '../editor/graph/graphViewModel';
 import { clampZoom } from '../editor/graph/tools/canvasGeometry';
 import { useGraphEditorCommands } from './useGraphEditorCommands';
 import { createEmptySelectionState, useGraphEditorSessionState } from './useGraphEditorSessionState';
@@ -42,9 +40,11 @@ export interface GraphNodePositionUpdate extends GraphPoint {
 }
 
 interface UseSNNTopologyStateOptions {
+  agent: AgentIR;
   document: GraphIRDocument;
   runtimeActiveNodeIds?: string[];
   onDocumentChange?: (document: GraphIRDocument, options?: GraphDocumentChangeOptions) => void;
+  onAgentChange?: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
 }
 
 export interface GraphDocumentChangeOptions {
@@ -59,53 +59,12 @@ const uniqueIds = (ids: string[]) => Array.from(new Set(ids));
 const areStringArraysEqual = (left: string[], right: string[]) =>
   left.length === right.length && left.every((value, index) => value === right[index]);
 
-const updateChildrenAtPath = (
-  root: RootGraph,
-  path: string[],
-  transform: (children: TopologyNode[]) => TopologyNode[]
-): RootGraph => {
-  if (path.length === 0) {
-    return {
-      ...root,
-      children: transform(root.children),
-    };
-  }
-
-  const [head, ...tail] = path;
-  return {
-    ...root,
-    children: root.children.map((child) => {
-      if (child.id !== head || !isLegacyContainerNode(child)) {
-        return child;
-      }
-
-      if (tail.length === 0) {
-        return {
-          ...child,
-          children: transform(child.children),
-        };
-      }
-
-      return {
-        ...child,
-        children: updateChildrenAtPath(
-          {
-            id: 'root',
-            children: child.children,
-            links: [],
-          },
-          tail,
-          transform
-        ).children,
-      };
-    }),
-  };
-};
-
 export const useSNNTopologyState = ({
+  agent,
   document,
   runtimeActiveNodeIds = [],
   onDocumentChange,
+  onAgentChange,
 }: UseSNNTopologyStateOptions) => {
   const [navigationPath, setNavigationPath] = useState<string[]>([]);
   const {
@@ -148,6 +107,12 @@ export const useSNNTopologyState = ({
     },
     [onDocumentChange]
   );
+  const setAgent = useCallback(
+    (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => {
+      onAgentChange?.(updater, options);
+    },
+    [onAgentChange]
+  );
 
   const legacyViewModel = useMemo(
     () =>
@@ -159,8 +124,17 @@ export const useSNNTopologyState = ({
       }),
     [document, draftNodePositions, navigationPath, runtimeActiveNodeIds]
   );
+  const agentViewModel = useMemo(
+    () =>
+      buildAgentGraphViewModel({
+        agent,
+        navigationPath,
+        draftNodePositions,
+        runtimeActiveNodeIds,
+      }),
+    [agent, draftNodePositions, navigationPath, runtimeActiveNodeIds]
+  );
   const {
-    indexes,
     breadcrumbs,
     currentScope,
     currentContainerKind,
@@ -169,8 +143,7 @@ export const useSNNTopologyState = ({
     viewNodeById,
     links,
     activeViewNodeIds,
-  } = legacyViewModel;
-
+  } = agentViewModel;
   const localSelectableNodeIds = useMemo(
     () => new Set(nodes.filter((node) => !node.proxy).map((node) => node.viewId)),
     [nodes]
@@ -234,8 +207,8 @@ export const useSNNTopologyState = ({
       return null;
     }
 
-    return legacyViewModel.indexes.nodeById.get(showDetailModal.id) ?? null;
-  }, [legacyViewModel.indexes.nodeById, showDetailModal]);
+    return agentViewModel.indexes.nodeById.get(showDetailModal.id) ?? null;
+  }, [agentViewModel.indexes.nodeById, showDetailModal]);
 
   const activeLink = useMemo(() => {
     if (showDetailModal?.type !== 'link') {
@@ -291,12 +264,14 @@ export const useSNNTopologyState = ({
 
   const navigateTo = useCallback(
     (nodeId: string) => {
-      const node = indexes.nodeById.get(nodeId);
-      if (!node || !isLegacyContainerNode(node)) {
+      const viewNode = viewNodeById.get(nodeId);
+      if (!viewNode?.navigable) {
         return;
       }
 
-      const path = indexes.pathById.get(nodeId);
+      const path =
+        agentViewModel.indexes.pathById.get(nodeId) ??
+        agentViewModel.indexes.pathById.get(viewNode.refNodeId);
       if (!path) {
         return;
       }
@@ -304,7 +279,7 @@ export const useSNNTopologyState = ({
       setNavigationPath(path);
       clearTransientState();
     },
-    [clearTransientState, indexes.nodeById, indexes.pathById]
+    [agentViewModel.indexes.pathById, clearTransientState, viewNodeById]
   );
 
   const navigateToBreadcrumb = useCallback(
@@ -312,7 +287,7 @@ export const useSNNTopologyState = ({
       if (breadcrumbId === 'root') {
         setNavigationPath([]);
       } else {
-        const path = indexes.pathById.get(breadcrumbId);
+        const path = agentViewModel.indexes.pathById.get(breadcrumbId);
         if (!path) {
           return;
         }
@@ -322,7 +297,7 @@ export const useSNNTopologyState = ({
 
       clearTransientState();
     },
-    [clearTransientState, indexes.pathById]
+    [agentViewModel.indexes.pathById, clearTransientState]
   );
 
   const selectNode = useCallback(
@@ -532,6 +507,7 @@ export const useSNNTopologyState = ({
   } = useGraphEditorCommands({
     documentRef,
     setDocument,
+    setAgent,
     currentScope: legacyViewModel.currentScope,
     currentContainerKind: legacyViewModel.currentContainerKind,
     currentChildren: legacyViewModel.currentChildren,
@@ -564,13 +540,12 @@ export const useSNNTopologyState = ({
       return null;
     }
 
-    const overrides = activeNode.parameterOverrides ?? {};
     return {
-      a: typeof overrides.a === 'number' ? overrides.a : 0.02,
-      b: typeof overrides.b === 'number' ? overrides.b : 0.2,
-      c: typeof overrides.c === 'number' ? overrides.c : -65,
-      d: typeof overrides.d === 'number' ? overrides.d : 8,
-      threshold: typeof overrides.threshold === 'number' ? overrides.threshold : 30,
+      a: activeNode.neuron?.params.a ?? 0.02,
+      b: activeNode.neuron?.params.b ?? 0.2,
+      c: activeNode.neuron?.params.c ?? -65,
+      d: activeNode.neuron?.params.d ?? 8,
+      threshold: activeNode.neuron?.params.threshold ?? 30,
     };
   }, [activeNode]);
 

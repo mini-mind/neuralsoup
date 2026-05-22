@@ -322,7 +322,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
                 event.stopPropagation();
                 const action = getNodeDoubleClickAction(node.viewId);
                 if (action === 'navigate') {
-                  onNavigateToNode(node.refNodeId);
+                  onNavigateToNode(node.viewId);
                   return;
                 }
 

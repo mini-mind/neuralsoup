@@ -87,6 +87,39 @@ test('Brain Library storage rejects old array payloads instead of migrating impl
   assert.ok(storage.getItem(BRAIN_LIBRARY_CORRUPT_STORAGE_KEY));
 });
 
+test('Brain Library storage quarantines structurally invalid AgentPackage payloads', () => {
+  const storage = installMemoryLocalStorage();
+  storage.setItem(
+    BRAIN_LIBRARY_STORAGE_KEY,
+    JSON.stringify({
+      storageVersion: 1,
+      savedAt: new Date().toISOString(),
+      brains: [
+        {
+          packageVersion: 1,
+          metadata: {
+            id: 'broken-agent',
+            name: 'Broken Agent',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          agent: {
+            version: 1,
+          },
+        },
+      ],
+    })
+  );
+
+  const loaded = loadBrainLibraryWithStatus();
+
+  assert.equal(loaded.status.state, 'recovered');
+  assert.match(loaded.status.message ?? '', /存储格式无效/);
+  assert.equal(loaded.brains.length, 0);
+  assert.equal(storage.getItem(BRAIN_LIBRARY_STORAGE_KEY), null);
+  assert.ok(storage.getItem(BRAIN_LIBRARY_CORRUPT_STORAGE_KEY));
+});
+
 test('Brain Library storage reports LocalStorage capacity write failures', () => {
   const storage = installMemoryLocalStorage();
   storage.failWrites = true;

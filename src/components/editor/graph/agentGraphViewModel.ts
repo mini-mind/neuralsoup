@@ -664,7 +664,11 @@ export const buildAgentGraphViewModel = ({
     }
   }
 
-  const viewNodeById = new Map(nodes.map((node) => [node.id, node]));
+  const viewNodeById = new Map<string, GraphViewNode>();
+  for (const node of nodes) {
+    viewNodeById.set(node.id, node);
+    viewNodeById.set(node.viewId, node);
+  }
   const localLeafIds = new Set(nodes.filter((node) => node.local && node.leaf && !node.proxy).map((node) => node.refNodeId));
   const nodeIdsInView = new Set(nodes.map((node) => node.id));
   const links: GraphViewLink[] = aggregateLinks
@@ -706,7 +710,7 @@ export const buildAgentGraphViewModel = ({
   const activeViewNodeIds = new Set<string>();
   for (const node of nodes) {
     if (node.leaf && runtimeActiveNodeIds.includes(node.refNodeId)) {
-      activeViewNodeIds.add(node.id);
+      activeViewNodeIds.add(node.viewId);
       continue;
     }
 
@@ -716,7 +720,7 @@ export const buildAgentGraphViewModel = ({
         return path.includes(node.id) || path.includes(node.refNodeId);
       });
       if (descendantActive) {
-        activeViewNodeIds.add(node.id);
+        activeViewNodeIds.add(node.viewId);
       }
     }
   }
