@@ -103,13 +103,9 @@ const GraphDetailModal: React.FC<GraphDetailModalProps> = ({
               label: activeNode.label,
               params: DEFAULT_SIGNAL_PARAMS,
               readonly: true,
-              description: 'Signal adapter leaf 仅编辑标签；参数由模型层定义。',
+              description: 'Signal adapter leaf 当前为只读；标签与映射规则后续统一落到 BodyIR 编辑器。',
             }}
-            onUpdate={(updatedNeuron) => {
-              onUpdateNode(activeNode.id, {
-                label: updatedNeuron.label,
-              });
-            }}
+            onUpdate={() => {}}
           />
         )}
         {detailModal.type === 'link' && activeLink && (

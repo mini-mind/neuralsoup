@@ -2,23 +2,21 @@ import { useCallback } from 'react';
 import type {
   BrainContainerNode,
   AgentIR,
-  GraphIRDocument,
   LiteralValue,
-  NeuronGroupNode,
-  NeuronNode,
   Position,
-  RootGraph,
-  SignalNode,
-  TopologyNode,
 } from '../../domain/brain';
 import {
   CHILD_SCOPE_OFFSET,
   EXPANDED_GROUP_PADDING,
   LEAF_NODE_SIZE,
-  isContainerNode,
-  isLeafNode,
 } from '../editor/graph/graphViewModel';
+import {
+  aggregateAgentNodesIntoGroup,
+  createNeuronAndConnectInContainer,
+  ungroupAgentContainer,
+} from '../editor/graph/agentGraphEditing';
 import type { GraphViewNode } from '../editor/graph/graphViewTypes';
+import type { AgentGraphViewIndexes, AgentGraphViewNodeRecord } from '../editor/graph/agentGraphViewModel';
 import { canGraphNodesConnect } from '../editor/graph/graphLinkPolicy';
 import type {
   DetailModalData,
@@ -61,7 +59,12 @@ const toRoundedPosition = ({ x, y }: GraphPoint): Position => ({
   y: Math.round(y),
 });
 
-const getLeafPortId = (node: NeuronNode | SignalNode, direction: 'input' | 'output') => {
+type AgentLeafNodeRecord = AgentGraphViewNodeRecord & { kind: 'neuron' | 'signal' };
+
+const isAgentLeafNodeRecord = (node: AgentGraphViewNodeRecord | null | undefined): node is AgentLeafNodeRecord =>
+  node?.kind === 'neuron' || node?.kind === 'signal';
+
+const getLeafPortId = (node: AgentLeafNodeRecord, direction: 'input' | 'output') => {
   if (node.kind === 'neuron') {
     return direction === 'input' ? NEURON_INPUT_PORT_ID : NEURON_OUTPUT_PORT_ID;
   }
@@ -115,84 +118,6 @@ const toStoredPositionForViewNode = (
   return toStoredPosition(position, scope);
 };
 
-const updateChildrenAtPath = (
-  root: RootGraph,
-  path: string[],
-  transform: (children: TopologyNode[]) => TopologyNode[]
-): RootGraph => {
-  if (path.length === 0) {
-    return {
-      ...root,
-      children: transform(root.children),
-    };
-  }
-
-  const [head, ...tail] = path;
-  return {
-    ...root,
-    children: root.children.map((child) => {
-      if (child.id !== head || !isContainerNode(child)) {
-        return child;
-      }
-
-      if (tail.length === 0) {
-        return {
-          ...child,
-          children: transform(child.children),
-        };
-      }
-
-      return {
-        ...child,
-        children: updateChildrenAtPath(
-          {
-            id: 'root',
-            children: child.children,
-            links: [],
-          },
-          tail,
-          transform
-        ).children,
-      };
-    }),
-  };
-};
-
-const collectLeafNodeIds = (nodes: TopologyNode[]): Set<string> => {
-  const leafNodeIds = new Set<string>();
-
-  const visit = (node: TopologyNode) => {
-    if (isLeafNode(node)) {
-      leafNodeIds.add(node.id);
-      return;
-    }
-
-    if (isContainerNode(node)) {
-      node.children.forEach(visit);
-    }
-  };
-
-  nodes.forEach(visit);
-  return leafNodeIds;
-};
-
-const removeNodesById = (nodes: TopologyNode[], removableNodeIds: Set<string>): TopologyNode[] =>
-  nodes
-    .filter((node) => !removableNodeIds.has(node.id))
-    .map((node) =>
-      isContainerNode(node)
-        ? {
-            ...node,
-            children: removeNodesById(node.children, removableNodeIds),
-          }
-        : node
-    );
-
-const cloneTopologyNodeWithPosition = (node: TopologyNode, position: Position): TopologyNode => ({
-  ...node,
-  position,
-});
-
 const updateAgentLayoutNodeState = (
   agent: AgentIR,
   layoutNodeId: string,
@@ -230,13 +155,46 @@ const resolveCurrentBrainContainerId = (agent: AgentIR, navigationPath: string[]
 };
 
 const toAgentEndpoint = (
-  node: NeuronNode | SignalNode,
+  node: AgentLeafNodeRecord,
   direction: 'input' | 'output'
 ): AgentIR['connections'][number]['from'] => ({
   scope: node.kind === 'signal' ? (direction === 'output' ? 'bodyInput' : 'bodyOutput') : 'brain',
-  nodeId: node.id,
+  nodeId: node.refNodeId,
   portId: getLeafPortId(node, direction),
 });
+
+const collectLeafRecordIds = (
+  nodes: AgentGraphViewNodeRecord[],
+  indexes: AgentGraphViewIndexes
+): Set<string> => {
+  const leafNodeIds = new Set<string>();
+
+  const visit = (node: AgentGraphViewNodeRecord) => {
+    if (isAgentLeafNodeRecord(node)) {
+      leafNodeIds.add(node.refNodeId);
+      return;
+    }
+
+    if (node.kind !== 'neuron-group') {
+      return;
+    }
+
+    const container = node.container ?? indexes.containerById.get(node.refNodeId);
+    if (!container) {
+      return;
+    }
+
+    for (const child of container.children) {
+      const nextNode = indexes.nodeById.get(child.nodeId);
+      if (nextNode) {
+        visit(nextNode);
+      }
+    }
+  };
+
+  nodes.forEach(visit);
+  return leafNodeIds;
+};
 
 const collectRemovableContainerIds = (
   containersById: Map<string, BrainContainerNode>,
@@ -265,6 +223,11 @@ const collectRemovableContainerIds = (
   return removableContainerIds;
 };
 
+const collectSelectedContainerIds = (selectedNodes: AgentGraphViewNodeRecord[]): string[] =>
+  selectedNodes
+    .filter((node) => node.kind === 'neuron-group')
+    .map((node) => node.refNodeId);
+
 const collectNeuronIdsInContainers = (
   containersById: Map<string, BrainContainerNode>,
   containerIds: Set<string>
@@ -286,17 +249,12 @@ const collectNeuronIdsInContainers = (
 };
 
 interface GraphEditorCommandDependencies {
-  documentRef: React.MutableRefObject<GraphIRDocument>;
-  setDocument: (updater: (current: GraphIRDocument) => GraphIRDocument, options?: GraphDocumentChangeOptions) => void;
   setAgent: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
   currentScope: 'root' | 'child';
   currentContainerKind: 'root' | 'adapter' | 'neuron-group';
-  currentChildren: TopologyNode[];
+  currentChildren: AgentGraphViewNodeRecord[];
   navigationPath: string[];
-  indexes: {
-    nodeById: Map<string, TopologyNode>;
-    pathById: Map<string, string[]>;
-  };
+  indexes: AgentGraphViewIndexes;
   localLeafIds: Set<string>;
   viewNodeById: Map<string, GraphViewNode>;
   selectionState: GraphSelectionState;
@@ -312,8 +270,6 @@ interface GraphEditorCommandDependencies {
 }
 
 export const useGraphEditorCommands = ({
-  documentRef,
-  setDocument,
   setAgent,
   currentScope,
   currentContainerKind,
@@ -341,7 +297,7 @@ export const useGraphEditorCommands = ({
       }
 
       const targetNode = indexes.nodeById.get(targetViewNode.refNodeId);
-      if (!targetNode || !isLeafNode(targetNode)) {
+      if (!isAgentLeafNodeRecord(targetNode)) {
         return;
       }
 
@@ -358,7 +314,7 @@ export const useGraphEditorCommands = ({
         }
 
         const sourceNode = indexes.nodeById.get(sourceViewNode.refNodeId);
-        if (!sourceNode || !isLeafNode(sourceNode)) {
+        if (!isAgentLeafNodeRecord(sourceNode)) {
           continue;
         }
 
@@ -381,7 +337,7 @@ export const useGraphEditorCommands = ({
         }
 
         attemptedEndpoints.add(endpointKey);
-        const existingLink = [...documentRef.current.root.links].find(
+        const existingLink = [...indexes.linkById.values()].find(
           (link) =>
             link.from.nodeId === sourceNode.id &&
             link.from.portId === fromPortId &&
@@ -417,7 +373,7 @@ export const useGraphEditorCommands = ({
 
       scheduleFocusLink(resolvedLinkIds.at(-1) ?? null);
     },
-    [documentRef, indexes.nodeById, localLeafIds, scheduleFocusLink, setAgent, viewNodeById]
+    [currentScope, indexes.linkById, indexes.nodeById, localLeafIds, scheduleFocusLink, setAgent, viewNodeById]
   );
 
   const updateNodePositionsInDraft = useCallback(
@@ -518,30 +474,16 @@ export const useGraphEditorCommands = ({
     }
 
     const removableNodeIds = new Set(selectedViewNodes.map((node) => node.refNodeId));
-    const removableLeafNodeIds = collectLeafNodeIds(
-      selectedViewNodes
-        .map((node) => indexes.nodeById.get(node.refNodeId))
-        .filter((node): node is TopologyNode => node != null)
+    const selectedNodeRecords = selectedViewNodes
+      .map((node) => indexes.nodeById.get(node.refNodeId))
+      .filter((node): node is AgentGraphViewNodeRecord => node != null);
+    const removableLeafNodeIds = collectLeafRecordIds(
+      selectedNodeRecords,
+      indexes
     );
     const removableContainerIds = collectRemovableContainerIds(
-      new Map(
-        currentChildren
-          .filter((child): child is NeuronGroupNode => child.kind === 'neuron-group' && removableNodeIds.has(child.id))
-          .map((child) => [
-            child.id,
-            {
-              id: child.id,
-              label: child.label,
-              children: child.children.map((nestedChild) => ({
-                scope: nestedChild.kind === 'neuron-group' ? 'container' : 'brain',
-                nodeId: nestedChild.id,
-              })),
-            } satisfies BrainContainerNode,
-          ] as const)
-      ),
-      currentChildren
-        .filter((child): child is NeuronGroupNode => child.kind === 'neuron-group' && removableNodeIds.has(child.id))
-        .map((child) => child.id)
+      indexes.containerById,
+      collectSelectedContainerIds(selectedNodeRecords)
     );
     setAgent((current) => {
       const containersById = new Map(current.brain.containers.map((container) => [container.id, container]));
@@ -707,11 +649,12 @@ export const useGraphEditorCommands = ({
 
   const createNeuronAndConnectAt = useCallback(
     (sourceNodeIds: string[], x: number, y: number) => {
-      const nextNeuronId = addNeuronAt(x, y);
-      if (!nextNeuronId) {
+      if (navigationPath.length === 0 || currentContainerKind !== 'neuron-group') {
         return;
       }
 
+      const siblingIndex = currentChildren.filter((child) => child.kind === 'neuron').length + 1;
+      const nextNeuronId = `neuron-${getNextNumericId(indexes.nodeById.keys(), 'neuron-')}`;
       const nextTargetNode: GraphViewNode = {
         id: nextNeuronId,
         viewId: nextNeuronId,
@@ -752,7 +695,7 @@ export const useGraphEditorCommands = ({
         }
 
         const sourceNode = indexes.nodeById.get(sourceViewNode.refNodeId);
-        if (!sourceNode || !isLeafNode(sourceNode)) {
+        if (!isAgentLeafNodeRecord(sourceNode)) {
           continue;
         }
 
@@ -793,18 +736,31 @@ export const useGraphEditorCommands = ({
         return;
       }
 
-      setAgent((current) => ({
-        ...current,
-        connections: [...current.connections, ...nextConnections],
-      }));
+      setAgent((current) => {
+        const currentContainerId = resolveCurrentBrainContainerId(current, navigationPath);
+        if (!currentContainerId) {
+          return current;
+        }
+
+        return createNeuronAndConnectInContainer(current, {
+          parentContainerId: currentContainerId,
+          nextNeuronId,
+          nextNeuronLabel: `神经元${siblingIndex}`,
+          nextNeuronPosition: toStoredPosition({ x, y }, currentScope),
+          connections: nextConnections,
+        });
+      });
+      scheduleFocusNode(nextNeuronId);
       scheduleFocusLink(resolvedLinkIds.at(-1) ?? null);
     },
     [
-      addNeuronAt,
+      currentChildren,
+      currentContainerKind,
       currentScope,
       indexes.nodeById,
       localLeafIds,
       navigationPath,
+      scheduleFocusNode,
       scheduleFocusLink,
       setAgent,
       viewNodeById,
@@ -812,18 +768,18 @@ export const useGraphEditorCommands = ({
   );
 
   const aggregateSelectedNodes = useCallback(() => {
-    if (currentContainerKind !== 'neuron-group' || selectionState.nodeIds.length < 2) {
+    if (currentContainerKind !== 'neuron-group' || selectionState.nodeIds.length < 2 || navigationPath.length === 0) {
       return;
     }
 
-    const selectedNodeIdSet = new Set(selectionState.nodeIds);
-    const selectedChildren = currentChildren.filter((child) => selectedNodeIdSet.has(child.id));
+    const selectedNodeIdSet = new Set(selectionState.nodeIds.map((nodeId) => viewNodeById.get(nodeId)?.refNodeId ?? nodeId));
+    const selectedChildren = currentChildren.filter((child) => selectedNodeIdSet.has(child.refNodeId));
     if (selectedChildren.length < 2) {
       return;
     }
 
     const selectedViewNodes = selectedChildren
-      .map((child) => viewNodeById.get(child.id))
+      .map((child) => viewNodeById.get(child.id) ?? viewNodeById.get(child.refNodeId))
       .filter((node): node is GraphViewNode => node != null && !node.proxy);
     if (selectedViewNodes.length !== selectedChildren.length) {
       return;
@@ -833,45 +789,34 @@ export const useGraphEditorCommands = ({
     const minY = Math.min(...selectedViewNodes.map((node) => node.y));
     const groupIndex = currentChildren.filter((child) => child.kind === 'neuron-group').length + 1;
     const nextGroupId = `group-${getNextNumericId(indexes.nodeById.keys(), 'group-')}`;
-    const nextGroup: NeuronGroupNode = {
-      kind: 'neuron-group',
-      id: nextGroupId,
-      label: `神经元组${groupIndex}`,
-      position: toStoredPosition({ x: minX, y: minY }, currentScope),
-      children: selectedChildren.map((child) => {
-        const viewNode = viewNodeById.get(child.id);
-        if (!viewNode) {
-          return child;
-        }
+    setAgent((current) => {
+      const currentContainerId = resolveCurrentBrainContainerId(current, navigationPath);
+      if (!currentContainerId) {
+        return current;
+      }
 
-        return cloneTopologyNodeWithPosition(child, {
-          x: Math.round(viewNode.x - minX),
-          y: Math.round(viewNode.y - minY),
-        });
-      }),
-    };
-
-    setDocument((current) => ({
-      ...current,
-      root: updateChildrenAtPath(current.root, navigationPath, (children) => {
-        const nextChildren: TopologyNode[] = [];
-        let inserted = false;
-
-        for (const child of children) {
-          if (selectedNodeIdSet.has(child.id)) {
-            if (!inserted) {
-              nextChildren.push(nextGroup);
-              inserted = true;
-            }
-            continue;
-          }
-
-          nextChildren.push(child);
-        }
-
-        return nextChildren;
-      }),
-    }));
+      return aggregateAgentNodesIntoGroup(current, {
+        parentContainerId: currentContainerId,
+        selectedNodeIds: selectedChildren.map((child) => child.refNodeId),
+        nextGroupId,
+        nextGroupLabel: `神经元组${groupIndex}`,
+        nextGroupPosition: toStoredPosition({ x: minX, y: minY }, currentScope),
+        childPositionsById: Object.fromEntries(
+          selectedChildren.map((child) => {
+            const viewNode = viewNodeById.get(child.id) ?? viewNodeById.get(child.refNodeId);
+            return [
+              child.refNodeId,
+              viewNode
+                ? {
+                    x: Math.round(viewNode.x - minX),
+                    y: Math.round(viewNode.y - minY),
+                  }
+                : { x: 0, y: 0 },
+            ];
+          })
+        ),
+      });
+    }, { installToRuntime: false });
     scheduleFocusNode(nextGroupId);
     closeDetailModal();
     clearSelectionRect();
@@ -887,46 +832,29 @@ export const useGraphEditorCommands = ({
     navigationPath,
     scheduleFocusNode,
     selectionState.nodeIds,
-    setDocument,
+    setAgent,
     viewNodeById,
   ]);
 
   const ungroupNode = useCallback(
     (nodeId: string) => {
-      if (currentContainerKind !== 'neuron-group') {
+      if (currentContainerKind !== 'neuron-group' || navigationPath.length === 0) {
         return;
       }
 
-      const targetGroup = currentChildren.find((child) => child.id === nodeId);
+      const targetGroup = currentChildren.find((child) => child.id === nodeId || child.refNodeId === nodeId);
       if (!targetGroup || targetGroup.kind !== 'neuron-group') {
         return;
       }
 
-      const groupPosition = targetGroup.position ?? { x: 0, y: 0 };
-      const ungroupedChildren = targetGroup.children.map((child) => ({
-        ...child,
-        position: {
-          x: (child.position?.x ?? 0) + groupPosition.x,
-          y: (child.position?.y ?? 0) + groupPosition.y,
-        },
-      }));
+      setAgent((current) => {
+        const currentContainerId = resolveCurrentBrainContainerId(current, navigationPath);
+        if (!currentContainerId) {
+          return current;
+        }
 
-      setDocument((current) => ({
-        ...current,
-        root: updateChildrenAtPath(current.root, navigationPath, (children) => {
-          const nextChildren: TopologyNode[] = [];
-          for (const child of children) {
-            if (child.id === nodeId && child.kind === 'neuron-group') {
-              nextChildren.push(...ungroupedChildren);
-              continue;
-            }
-
-            nextChildren.push(child);
-          }
-
-          return nextChildren;
-        }),
-      }));
+        return ungroupAgentContainer(current, currentContainerId, targetGroup.refNodeId);
+      }, { installToRuntime: false });
       clearSelection();
       closeDetailModal();
       clearSelectionRect();
@@ -940,7 +868,7 @@ export const useGraphEditorCommands = ({
       currentChildren,
       currentContainerKind,
       navigationPath,
-      setDocument,
+      setAgent,
     ]
   );
 

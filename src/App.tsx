@@ -122,6 +122,7 @@ const App: React.FC = () => {
   const [stats, setStats] = useState<SimulationState['stats']>(INITIAL_STATS);
   const [activeAgentDocument, setActiveAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
   const [draftAgentDocument, setDraftAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
+  const [draftGraphOverride, setDraftGraphOverride] = useState<GraphIRDocument | null>(null);
   const [graphIRRuntimeStatus, setGraphIRRuntimeStatus] = useState<GraphIRRuntimeStatus>(() =>
     createInitialGraphIRRuntimeStatus(initialGraphDocument)
   );
@@ -160,7 +161,7 @@ const App: React.FC = () => {
     () => createLegacyGraphBridgeFromAgent(draftAgentDocument),
     [draftAgentDocument]
   );
-  const graphDocument = draftAgentBridge.document;
+  const graphDocument = draftGraphOverride ?? draftAgentBridge.document;
   const graphIRDraftStatus = useMemo<GraphIRDraftStatus>(
     () => createGraphIRDraftStatus(graphDocument),
     [graphDocument]
@@ -280,7 +281,9 @@ const App: React.FC = () => {
           updatedAt: nextUpdatedAt,
         },
       };
-      graphDocumentRef.current = createLegacyGraphBridgeFromAgent(normalizedAgentDocument).document;
+      const bridgedDocument = createLegacyGraphBridgeFromAgent(normalizedAgentDocument).document;
+      graphDocumentRef.current = bridgedDocument;
+      setDraftGraphOverride(null);
       setDraftAgentDocument(normalizedAgentDocument);
       if (installToRuntime) {
         setActiveAgentDocument(normalizedAgentDocument);
@@ -385,6 +388,11 @@ const App: React.FC = () => {
     updateGraphDocument(nextDocument, shouldInstallToRuntime, shouldInstallToRuntime);
   }, [updateGraphDocument]);
 
+  const handleGraphDraftOnlyChange = useCallback((nextDocument: GraphIRDocument) => {
+    graphDocumentRef.current = nextDocument;
+    setDraftGraphOverride(nextDocument);
+  }, []);
+
   const handleAgentChange = useCallback((
     updater: (current: AgentIR) => AgentIR,
     options?: GraphDocumentChangeOptions
@@ -453,9 +461,11 @@ const App: React.FC = () => {
     const bridge = createLegacyGraphBridgeFromAgent(selectedBrain.agent);
     const bodyVisionCells = getBodyVisionCellCount(bridge.body);
     resetRuntimeForBrainSwitch();
+    setIsBrainLibraryOpen(true);
     setActiveBrainId(selectedBrain.metadata.id);
     setActiveAgentDocument(selectedBrain.agent);
     setDraftAgentDocument(selectedBrain.agent);
+    setDraftGraphOverride(null);
     setAgentParameters((current) =>
       current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells }
     );
@@ -474,10 +484,12 @@ const App: React.FC = () => {
 
     const bridge = createLegacyGraphBridgeFromAgent(nextBrain.agent);
     resetRuntimeForBrainSwitch();
+    setIsBrainLibraryOpen(true);
     setBrainLibrary((currentLibrary) => [...currentLibrary, nextBrain]);
     setActiveBrainId(nextBrain.metadata.id);
     setActiveAgentDocument(nextBrain.agent);
     setDraftAgentDocument(nextBrain.agent);
+    setDraftGraphOverride(null);
     setAgentParameters((current) => {
       const bodyVisionCells = getBodyVisionCellCount(bridge.body);
       return current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells };
@@ -672,7 +684,7 @@ const App: React.FC = () => {
             links: [firstLink, { ...firstLink, id: `${firstLink.id}-duplicate` }, ...remainingLinks]
           }
         };
-        handleAgentDocumentChange(invalidDocument, { installToRuntime: false });
+        handleGraphDraftOnlyChange(invalidDocument);
       },
       getRuntimeActiveNodeIds: () => [...graphIRRuntimeActivity.activeNodeIds],
       getGraphPathIds: () => graphPath.map((item) => item.id),
@@ -681,7 +693,7 @@ const App: React.FC = () => {
     return () => {
       delete window.__NEURALSOUP_TEST_API__;
     };
-  }, [graphIRRuntimeActivity.activeNodeIds, graphPath, handleAgentDocumentChange, isE2ETestMode]);
+  }, [graphIRRuntimeActivity.activeNodeIds, graphPath, handleAgentDocumentChange, handleGraphDraftOnlyChange, isE2ETestMode]);
 
   return (
     <div
@@ -771,7 +783,6 @@ const App: React.FC = () => {
             runtimeStatus={graphIRRuntimeStatus}
             draftStatus={graphIRDraftStatus}
             runtimeActivity={graphIRRuntimeActivity}
-            onDocumentChange={handleAgentDocumentChange}
             onAgentChange={handleAgentChange}
             onGraphPathChange={setGraphPath}
             onGraphPathNavigateRegister={(navigate) => {

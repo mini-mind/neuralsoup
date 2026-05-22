@@ -3,7 +3,6 @@ import SNNTopologyEditor from '../SNNTopologyEditor';
 import type { AgentIR, GraphIRDocument } from '../../domain/brain';
 import type { GraphIRDraftStatus, GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../../types/graphIRRuntime';
 import type { GraphPathItem } from './types';
-import type { GraphDocumentChangeOptions } from '../hooks/useSNNTopologyState';
 
 interface GraphEditorPanelProps {
   isActive: boolean;
@@ -13,8 +12,7 @@ interface GraphEditorPanelProps {
   runtimeStatus: GraphIRRuntimeStatus;
   draftStatus: GraphIRDraftStatus;
   runtimeActivity: GraphIRRuntimeActivitySnapshot;
-  onDocumentChange: (document: GraphIRDocument, options?: GraphDocumentChangeOptions) => void;
-  onAgentChange: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
+  onAgentChange: (updater: (current: AgentIR) => AgentIR) => void;
   onGraphPathChange: (graphPath: GraphPathItem[]) => void;
   onGraphPathNavigateRegister: (navigate: (pathId: string) => void) => void;
 }
@@ -27,7 +25,6 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
   runtimeStatus,
   draftStatus,
   runtimeActivity,
-  onDocumentChange,
   onAgentChange,
   onGraphPathChange,
   onGraphPathNavigateRegister
@@ -74,12 +71,12 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
       aria-hidden={!isActive}
     >
       <SNNTopologyEditor
+        key={agent.metadata.id}
         width={Math.max(viewport.width, 1)}
         height={Math.max(viewport.height, 1)}
         agent={agent}
         document={document}
         visionCells={visionCells}
-        onDocumentChange={onDocumentChange}
         onAgentChange={onAgentChange}
         onGraphPathChange={onGraphPathChange}
         onGraphPathNavigateRegister={onGraphPathNavigateRegister}

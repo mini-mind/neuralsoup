@@ -187,6 +187,14 @@
   z-index: 3;
 }
 
+.topology-node.is-selected {
+  z-index: 6;
+}
+
+.topology-node.is-selected.is-expanded-child {
+  z-index: 7;
+}
+
 .topology-node-shape {
   width: 100%;
   height: 100%;

@@ -155,6 +155,99 @@ const getDefaultStoredPosition = (node: AgentGraphViewNodeRecord, index: number,
   };
 };
 
+const getDefaultExpandedChildPosition = (node: AgentGraphViewNodeRecord, index: number): Position => {
+  if (isLeafNode(node)) {
+    const column = index % 5;
+    const row = Math.floor(index / 5);
+    return {
+      x: EXPANDED_GROUP_PADDING + column * 48,
+      y: EXPANDED_GROUP_PADDING + row * 44,
+    };
+  }
+
+  const column = index % 2;
+  const row = Math.floor(index / 2);
+  return {
+    x: EXPANDED_GROUP_PADDING + column * 132,
+    y: EXPANDED_GROUP_PADDING + row * 112,
+  };
+};
+
+const getExpandedChildOffset = (
+  groupChildren: AgentGraphViewNodeRecord[],
+  agent: AgentIR,
+  draftNodePositions: NodePositionDraftMap
+): Position => {
+  if (groupChildren.length === 0) {
+    return { x: 0, y: 0 };
+  }
+
+  const minX = Math.min(
+    ...groupChildren.map((child, index) => {
+      const position =
+        draftNodePositions[child.refNodeId] ??
+        draftNodePositions[child.id] ??
+        agent.layout?.nodes[getLayoutNodeKey(child)]?.position ??
+        getDefaultExpandedChildPosition(child, index);
+      return position.x;
+    })
+  );
+  const minY = Math.min(
+    ...groupChildren.map((child, index) => {
+      const position =
+        draftNodePositions[child.refNodeId] ??
+        draftNodePositions[child.id] ??
+        agent.layout?.nodes[getLayoutNodeKey(child)]?.position ??
+        getDefaultExpandedChildPosition(child, index);
+      return position.y;
+    })
+  );
+
+  return {
+    x: minX < EXPANDED_GROUP_PADDING ? EXPANDED_GROUP_PADDING - minX : 0,
+    y: minY < EXPANDED_GROUP_PADDING ? EXPANDED_GROUP_PADDING - minY : 0,
+  };
+};
+
+const getExpandedGroupSize = (
+  groupChildren: AgentGraphViewNodeRecord[],
+  agent: AgentIR,
+  draftNodePositions: NodePositionDraftMap
+) => {
+  if (groupChildren.length === 0) {
+    return EXPANDED_GROUP_MIN_SIZE;
+  }
+
+  const offset = getExpandedChildOffset(groupChildren, agent, draftNodePositions);
+  const maxRight = Math.max(
+    ...groupChildren.map((child, index) => {
+      const position =
+        draftNodePositions[child.refNodeId] ??
+        draftNodePositions[child.id] ??
+        agent.layout?.nodes[getLayoutNodeKey(child)]?.position ??
+        getDefaultExpandedChildPosition(child, index);
+      const size = getStoredNodeSize(child);
+      return position.x + offset.x + size.width;
+    })
+  );
+  const maxBottom = Math.max(
+    ...groupChildren.map((child, index) => {
+      const position =
+        draftNodePositions[child.refNodeId] ??
+        draftNodePositions[child.id] ??
+        agent.layout?.nodes[getLayoutNodeKey(child)]?.position ??
+        getDefaultExpandedChildPosition(child, index);
+      const size = getStoredNodeSize(child);
+      return position.y + offset.y + size.height;
+    })
+  );
+
+  return {
+    width: Math.max(EXPANDED_GROUP_MIN_SIZE.width, maxRight + EXPANDED_GROUP_PADDING),
+    height: Math.max(EXPANDED_GROUP_MIN_SIZE.height, maxBottom + EXPANDED_GROUP_PADDING),
+  };
+};
+
 const getLayoutPosition = (
   agent: AgentIR,
   node: AgentGraphViewNodeRecord,
@@ -162,7 +255,7 @@ const getLayoutPosition = (
   scope: 'root' | 'child',
   draftNodePositions: NodePositionDraftMap
 ): Position => {
-  const draftPosition = draftNodePositions[node.id];
+  const draftPosition = draftNodePositions[node.id] ?? draftNodePositions[node.refNodeId];
   if (draftPosition) {
     return toViewPosition(draftPosition, scope);
   }
@@ -560,7 +653,10 @@ export const buildAgentGraphViewModel = ({
   for (const [index, node] of currentChildren.entries()) {
     const position = getLayoutPosition(agent, node, index, currentScope, draftNodePositions);
     const expanded = node.kind === 'neuron-group' && agent.layout?.nodes[getLayoutNodeKey(node)]?.collapsed === false;
-    const size = expanded ? EXPANDED_GROUP_MIN_SIZE : getNodeSize(node);
+    const groupChildren = node.container?.children
+      .map((childRef) => indexes.nodeById.get(childRef.nodeId))
+      .filter((child): child is AgentGraphViewNodeRecord => child != null) ?? [];
+    const size = expanded ? getExpandedGroupSize(groupChildren, agent, draftNodePositions) : getNodeSize(node);
     const childCount =
       node.kind === 'neuron-group'
         ? node.container?.children.length ?? 0
@@ -610,16 +706,14 @@ export const buildAgentGraphViewModel = ({
       continue;
     }
 
-    const groupChildren = node.container?.children
-      .map((childRef) => indexes.nodeById.get(childRef.nodeId))
-      .filter((child): child is AgentGraphViewNodeRecord => child != null) ?? [];
+    const childOffset = getExpandedChildOffset(groupChildren, agent, draftNodePositions);
 
     for (const [childIndex, child] of groupChildren.entries()) {
-      const childLayoutPosition = agent.layout?.nodes[getLayoutNodeKey(child)]?.position;
-      const childPosition = childLayoutPosition ?? {
-        x: EXPANDED_GROUP_PADDING + (childIndex % 5) * 48,
-        y: EXPANDED_GROUP_PADDING + Math.floor(childIndex / 5) * 44,
-      };
+      const childLayoutPosition =
+        draftNodePositions[child.refNodeId] ??
+        draftNodePositions[child.id] ??
+        agent.layout?.nodes[getLayoutNodeKey(child)]?.position;
+      const childPosition = childLayoutPosition ?? getDefaultExpandedChildPosition(child, childIndex);
       const size = getStoredNodeSize(child);
       const direction = getNodeDirection(child);
       const leaf = isLeafNode(child);
@@ -641,8 +735,8 @@ export const buildAgentGraphViewModel = ({
         refNodeId: child.refNodeId,
         label: child.label,
         kind: child.kind,
-        x: position.x + childPosition.x,
-        y: position.y + childPosition.y,
+        x: position.x + childPosition.x + childOffset.x,
+        y: position.y + childPosition.y + childOffset.y,
         width: size.width,
         height: size.height,
         parentId: node.id,

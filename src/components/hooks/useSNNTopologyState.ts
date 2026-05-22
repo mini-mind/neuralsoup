@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { AgentIR, GraphIRDocument } from '../../domain/brain';
+import type { AgentIR } from '../../domain/brain';
 import { buildAgentGraphViewModel } from '../editor/graph/agentGraphViewModel';
-import { buildGraphViewModel } from '../editor/graph/graphViewModel';
 import { clampZoom } from '../editor/graph/tools/canvasGeometry';
 import { useGraphEditorCommands } from './useGraphEditorCommands';
 import { createEmptySelectionState, useGraphEditorSessionState } from './useGraphEditorSessionState';
@@ -41,9 +40,7 @@ export interface GraphNodePositionUpdate extends GraphPoint {
 
 interface UseSNNTopologyStateOptions {
   agent: AgentIR;
-  document: GraphIRDocument;
   runtimeActiveNodeIds?: string[];
-  onDocumentChange?: (document: GraphIRDocument, options?: GraphDocumentChangeOptions) => void;
   onAgentChange?: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
 }
 
@@ -61,9 +58,7 @@ const areStringArraysEqual = (left: string[], right: string[]) =>
 
 export const useSNNTopologyState = ({
   agent,
-  document,
   runtimeActiveNodeIds = [],
-  onDocumentChange,
   onAgentChange,
 }: UseSNNTopologyStateOptions) => {
   const [navigationPath, setNavigationPath] = useState<string[]>([]);
@@ -86,27 +81,6 @@ export const useSNNTopologyState = ({
     setPendingFocusLinkId,
   } = useGraphEditorSessionState();
   const scopeSessionRef = useRef<string | null>(null);
-  const documentRef = useRef(document);
-
-  useEffect(() => {
-    documentRef.current = document;
-  }, [document]);
-
-  const setDocument = useCallback(
-    (
-      updater: (current: GraphIRDocument) => GraphIRDocument,
-      options?: GraphDocumentChangeOptions
-    ) => {
-      const nextDocument = updater(documentRef.current);
-      if (nextDocument === documentRef.current) {
-        return;
-      }
-
-      documentRef.current = nextDocument;
-      onDocumentChange?.(nextDocument, options);
-    },
-    [onDocumentChange]
-  );
   const setAgent = useCallback(
     (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => {
       onAgentChange?.(updater, options);
@@ -114,16 +88,6 @@ export const useSNNTopologyState = ({
     [onAgentChange]
   );
 
-  const legacyViewModel = useMemo(
-    () =>
-      buildGraphViewModel({
-        document,
-        navigationPath,
-        draftNodePositions,
-        runtimeActiveNodeIds,
-      }),
-    [document, draftNodePositions, navigationPath, runtimeActiveNodeIds]
-  );
   const agentViewModel = useMemo(
     () =>
       buildAgentGraphViewModel({
@@ -215,8 +179,8 @@ export const useSNNTopologyState = ({
       return null;
     }
 
-    return document.root.links.find((link) => link.id === showDetailModal.id) ?? null;
-  }, [document.root.links, showDetailModal]);
+    return agent.connections.find((link) => link.id === showDetailModal.id) ?? null;
+  }, [agent.connections, showDetailModal]);
 
   useEffect(() => {
     if (!showDetailModal) {
@@ -505,15 +469,13 @@ export const useSNNTopologyState = ({
     updateNodeLabelAndParams,
     updateLinkWeight,
   } = useGraphEditorCommands({
-    documentRef,
-    setDocument,
     setAgent,
-    currentScope: legacyViewModel.currentScope,
-    currentContainerKind: legacyViewModel.currentContainerKind,
-    currentChildren: legacyViewModel.currentChildren,
+    currentScope,
+    currentContainerKind,
+    currentChildren: agentViewModel.currentChildren,
     navigationPath,
-    indexes: legacyViewModel.indexes,
-    localLeafIds: legacyViewModel.localLeafIds,
+    indexes: agentViewModel.indexes,
+    localLeafIds: agentViewModel.localLeafIds,
     viewNodeById,
     selectionState,
     draftNodePositions,
@@ -552,6 +514,7 @@ export const useSNNTopologyState = ({
   return {
     breadcrumbs,
     scopeKey,
+    canvasScopeKey: `${agent.metadata.id}:${scopeKey}`,
     currentScope,
     currentContainerKind,
     nodes,
