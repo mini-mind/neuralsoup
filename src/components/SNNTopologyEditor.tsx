@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import type { AgentIR } from '../domain/brain';
+import { createLegacyGraphBridgeFromAgent, type AgentIR, type GraphIRDocument } from '../domain/brain';
 import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../types/graphIRRuntime';
 import GraphDetailModal from './editor/graph/GraphDetailModal';
 import GraphTopologyCanvas from './editor/graph/GraphTopologyCanvas';
@@ -14,8 +14,9 @@ interface SNNTopologyEditorProps {
   width: number;
   height: number;
   agent: AgentIR;
+  draftDocument?: GraphIRDocument;
   visionCells?: number;
-  onDocumentChange?: (document: AgentIR, options?: GraphDocumentChangeOptions) => void;
+  onDocumentChange?: (document: GraphIRDocument, options?: GraphDocumentChangeOptions) => void;
   onGraphPathChange?: (graphPath: GraphPathItem[]) => void;
   onGraphPathNavigateRegister?: (navigate: (pathId: string) => void) => void;
   runtimeStatus: GraphIRRuntimeStatus;
@@ -27,6 +28,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   width,
   height,
   agent,
+  draftDocument,
   visionCells = 36,
   onDocumentChange,
   onGraphPathChange,
@@ -36,7 +38,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   isActive = true,
 }) => {
   const state = useSNNTopologyState({
-    agent,
+    document: draftDocument ?? createLegacyGraphBridgeFromAgent(agent).document,
     runtimeActiveNodeIds: runtimeActivity.activeNodeIds,
     onDocumentChange,
   });
@@ -107,6 +109,8 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
     closeContextMenu,
     handleCanvasMouseDown,
     handleCanvasContextMenu,
+    handleNodeMouseDown,
+    handleNodeContextMenu,
   } = useGraphCanvasAssembly({
     width,
     height,
@@ -139,6 +143,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
 
   const diagnostics = useGraphTopologyDiagnosticsModel({
     agent,
+    draftDocument,
     visionCells,
     runtimeStatus,
     runtimeActivity,
@@ -194,6 +199,8 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
         canUngroupNodesHere={canUngroupNodesHere}
         onCanvasContextMenu={handleCanvasContextMenu}
         onCanvasMouseDown={handleCanvasMouseDown}
+        onNodeMouseDown={handleNodeMouseDown}
+        onNodeContextMenu={handleNodeContextMenu}
         onSelectLink={selectLink}
         onOpenLinkDetail={openLinkDetail}
         onNavigateToNode={navigateTo}

@@ -237,7 +237,7 @@ export const useGraphInteractionOrchestrator = ({
 
       setInteractionState({
         type: 'context-gesture',
-        contextTarget: 'selection',
+        contextTarget: singleGroupGesture ? 'group' : 'selection',
         startClient: { x: event.clientX, y: event.clientY },
         startScene: getScenePoint({ x: event.clientX, y: event.clientY }),
         startOffset: viewportRef.current,
@@ -360,7 +360,7 @@ export const useGraphInteractionOrchestrator = ({
             scene: currentInteraction.startScene,
             nodeIds: [],
           });
-        } else if (currentInteraction.contextTarget === 'selection' && currentInteraction.contextNodeIds.length === 1) {
+        } else if (currentInteraction.contextTarget === 'group' && currentInteraction.contextNodeIds.length === 1) {
           const contextNode = getNodeById(currentInteraction.contextNodeIds[0]);
           if (!contextNode?.ungroupable) {
             setInteractionState(null);
@@ -777,6 +777,36 @@ export const useGraphInteractionOrchestrator = ({
     event.stopPropagation();
   }, []);
 
+  const handleNodeMouseDown = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>, nodeId: string) => {
+      if (!isActive) {
+        return;
+      }
+
+      event.stopPropagation();
+      const node = getNodeById(nodeId);
+      if (!node) {
+        return;
+      }
+
+      if (event.button === 2) {
+        event.preventDefault();
+        beginNodeContextGesture(event, node);
+        return;
+      }
+
+      if (event.button === 0) {
+        beginNodePressing(event, node);
+      }
+    },
+    [beginNodeContextGesture, beginNodePressing, getNodeById, isActive]
+  );
+
+  const handleNodeContextMenu = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
+
   return {
     interaction,
     contextMenu,
@@ -786,10 +816,7 @@ export const useGraphInteractionOrchestrator = ({
     handleCanvasWheel,
     handleCanvasMouseDown,
     handleCanvasContextMenu,
-    handleNodeMouseDown: handleCanvasMouseDown as unknown as (
-      event: ReactMouseEvent<HTMLDivElement>,
-      nodeId: string
-    ) => void,
-    handleNodeContextMenu: handleCanvasContextMenu,
+    handleNodeMouseDown,
+    handleNodeContextMenu,
   };
 };

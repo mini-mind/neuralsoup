@@ -1,14 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type {
-  AgentIR,
-  GraphIRDocument,
-  RootGraph,
-  TopologyNode,
-} from '../../domain/brain';
-import {
-  createAgentIRFromLegacyGraph,
-  createLegacyGraphBridgeFromAgent,
-} from '../../domain/brain';
+import type { GraphIRDocument, RootGraph, TopologyNode } from '../../domain/brain';
 import {
   buildGraphViewModel,
   isContainerNode as isLegacyContainerNode,
@@ -51,9 +42,9 @@ export interface GraphNodePositionUpdate extends GraphPoint {
 }
 
 interface UseSNNTopologyStateOptions {
-  agent: AgentIR;
+  document: GraphIRDocument;
   runtimeActiveNodeIds?: string[];
-  onDocumentChange?: (document: AgentIR, options?: GraphDocumentChangeOptions) => void;
+  onDocumentChange?: (document: GraphIRDocument, options?: GraphDocumentChangeOptions) => void;
 }
 
 export interface GraphDocumentChangeOptions {
@@ -112,11 +103,10 @@ const updateChildrenAtPath = (
 };
 
 export const useSNNTopologyState = ({
-  agent,
+  document,
   runtimeActiveNodeIds = [],
   onDocumentChange,
 }: UseSNNTopologyStateOptions) => {
-  const agentRef = useRef(agent);
   const [navigationPath, setNavigationPath] = useState<string[]>([]);
   const {
     selectionState,
@@ -137,13 +127,7 @@ export const useSNNTopologyState = ({
     setPendingFocusLinkId,
   } = useGraphEditorSessionState();
   const scopeSessionRef = useRef<string | null>(null);
-  const legacyBridge = useMemo(() => createLegacyGraphBridgeFromAgent(agent), [agent]);
-  const document = legacyBridge.document;
   const documentRef = useRef(document);
-
-  useEffect(() => {
-    agentRef.current = agent;
-  }, [agent]);
 
   useEffect(() => {
     documentRef.current = document;
@@ -160,23 +144,9 @@ export const useSNNTopologyState = ({
       }
 
       documentRef.current = nextDocument;
-      const currentAgent = agentRef.current;
-      const nextAgent = createAgentIRFromLegacyGraph(
-        currentAgent.metadata.name,
-        nextDocument,
-        legacyBridge.body,
-        legacyBridge.layout,
-        currentAgent.metadata
-      );
-      onDocumentChange?.(
-        {
-          ...nextAgent,
-          body: currentAgent.body,
-        },
-        options
-      );
+      onDocumentChange?.(nextDocument, options);
     },
-    [legacyBridge.body, legacyBridge.layout, onDocumentChange]
+    [onDocumentChange]
   );
 
   const legacyViewModel = useMemo(

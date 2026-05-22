@@ -88,8 +88,17 @@ const selectors = {
 
 type E2EStoredBrain = {
   metadata?: { id?: string; name?: string };
-  body?: { inputSignals?: unknown[] };
-  layout?: { version?: number };
+  agent?: {
+    version?: number;
+    body?: {
+      inputRules?: unknown[];
+      outputRules?: unknown[];
+    };
+    brain?: {
+      rootContainerId?: string;
+    };
+    layout?: { version?: number };
+  };
 };
 
 const BRAIN_LIBRARY_STORAGE_KEY = 'neuralsoup.brain-library.v1';
@@ -724,8 +733,11 @@ test('brain library opens from the editor toolbar and saves the current IR to Lo
 
   const storedBrain = storedBrains.find((brain) => brain.metadata?.name === 'E2E Brain');
   expect(storedBrain).toBeTruthy();
-  expect(storedBrain?.body?.inputSignals).toHaveLength(72);
-  expect(storedBrain?.layout?.version).toBe(1);
+  expect(storedBrain?.agent?.version).toBe(1);
+  expect(storedBrain?.agent?.body?.inputRules).toHaveLength(1);
+  expect(storedBrain?.agent?.body?.outputRules).toHaveLength(1);
+  expect(storedBrain?.agent?.brain?.rootContainerId).toBe('core-neuron-group');
+  expect(storedBrain?.agent?.layout?.version).toBe(1);
 
   await page.locator(selectors.brainLibraryClose).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeHidden();

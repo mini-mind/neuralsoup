@@ -11,6 +11,8 @@ export type GraphIRRuntimeStatus =
       appliedSummary: GraphIRDocumentSummary;
       issues: [];
       message: null;
+      draftSummary?: GraphIRDocumentSummary;
+      draftValidationCount?: number;
     }
   | {
       state: 'invalid';
@@ -18,4 +20,6 @@ export type GraphIRRuntimeStatus =
       appliedSummary: GraphIRDocumentSummary;
       issues: GraphIRValidationIssue[];
       message: string;
+      draftSummary?: GraphIRDocumentSummary;
+      draftValidationCount?: number;
     };

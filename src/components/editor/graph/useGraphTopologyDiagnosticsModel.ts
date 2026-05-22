@@ -1,15 +1,17 @@
 import { useMemo } from 'react';
 import {
-  createLegacyGraphBridgeFromAgent,
   summarizeGraphIRDocument,
+  createLegacyGraphBridgeFromAgent,
   validateGraphIRDocument,
   type AgentIR,
+  type GraphIRDocument,
 } from '../../../domain/brain';
 import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../../../types/graphIRRuntime';
 import type { GraphCanvasViewport } from '../../hooks/useSNNTopologyState';
 
 interface UseGraphTopologyDiagnosticsModelOptions {
   agent: AgentIR;
+  draftDocument?: GraphIRDocument;
   visionCells: number;
   runtimeStatus: GraphIRRuntimeStatus;
   runtimeActivity: GraphIRRuntimeActivitySnapshot;
@@ -27,6 +29,7 @@ interface UseGraphTopologyDiagnosticsModelOptions {
 
 export const useGraphTopologyDiagnosticsModel = ({
   agent,
+  draftDocument,
   visionCells,
   runtimeStatus,
   runtimeActivity,
@@ -41,9 +44,18 @@ export const useGraphTopologyDiagnosticsModel = ({
   canvasViewport,
   canvasScale,
 }: UseGraphTopologyDiagnosticsModelOptions) => {
-  const document = useMemo(() => createLegacyGraphBridgeFromAgent(agent).document, [agent]);
-  const draftSummary = useMemo(() => summarizeGraphIRDocument(document), [document]);
-  const draftValidationCount = useMemo(() => validateGraphIRDocument(document).length, [document]);
+  const document = useMemo(
+    () => draftDocument ?? createLegacyGraphBridgeFromAgent(agent).document,
+    [agent, draftDocument]
+  );
+  const draftSummary = useMemo(
+    () => runtimeStatus.draftSummary ?? summarizeGraphIRDocument(document),
+    [document, runtimeStatus.draftSummary]
+  );
+  const draftValidationCount = useMemo(
+    () => runtimeStatus.draftValidationCount ?? validateGraphIRDocument(document).length,
+    [document, runtimeStatus.draftValidationCount]
+  );
 
   return {
     visionCells,

@@ -16,7 +16,7 @@ export type GraphInteractionState =
     }
   | {
       type: 'context-gesture';
-      contextTarget: 'canvas' | 'selection';
+      contextTarget: 'canvas' | 'selection' | 'group';
       startClient: GraphPoint;
       startScene: GraphPoint;
       startOffset: GraphPoint;

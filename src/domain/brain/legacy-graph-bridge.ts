@@ -178,16 +178,10 @@ const buildContainerChildren = (nodes: TopologyNode[]): BrainContainerNode['chil
   return children;
 };
 
-const buildContainersFromLegacy = (document: GraphIRDocument): BrainContainerNode[] => {
-  const containers: BrainContainerNode[] = [
-    {
-      id: DEFAULT_ROOT_CONTAINER_ID,
-      label: 'root',
-      children: buildContainerChildren(document.root.children),
-    },
-  ];
-
-  const visit = (group: NeuronGroupNode) => {
+const buildContainersFromLegacy = (
+  document: GraphIRDocument
+): { containers: BrainContainerNode[]; rootContainerId: string } => {
+  const visit = (group: NeuronGroupNode, containers: BrainContainerNode[]) => {
     containers.push({
       id: group.id,
       label: group.label,
@@ -196,18 +190,53 @@ const buildContainersFromLegacy = (document: GraphIRDocument): BrainContainerNod
 
     for (const child of group.children) {
       if (child.kind === 'neuron-group') {
-        visit(child);
+        visit(child, containers);
       }
     }
   };
 
+  const legacyRootGroup = document.root.children.find(
+    (node): node is NeuronGroupNode => node.kind === 'neuron-group' && node.id === LEGACY_ROOT_GROUP_ID
+  );
+  if (legacyRootGroup) {
+    const containers: BrainContainerNode[] = [
+      {
+        id: legacyRootGroup.id,
+        label: legacyRootGroup.label,
+        children: buildContainerChildren(legacyRootGroup.children),
+      },
+    ];
+
+    for (const child of legacyRootGroup.children) {
+      if (child.kind === 'neuron-group') {
+        visit(child, containers);
+      }
+    }
+
+    return {
+      containers,
+      rootContainerId: legacyRootGroup.id,
+    };
+  }
+
+  const containers: BrainContainerNode[] = [
+    {
+      id: DEFAULT_ROOT_CONTAINER_ID,
+      label: 'root',
+      children: buildContainerChildren(document.root.children),
+    },
+  ];
+
   for (const child of document.root.children) {
     if (child.kind === 'neuron-group') {
-      visit(child);
+      visit(child, containers);
     }
   }
 
-  return containers;
+  return {
+    containers,
+    rootContainerId: DEFAULT_ROOT_CONTAINER_ID,
+  };
 };
 
 const buildAgentConnectionsFromLegacy = (document: GraphIRDocument): AgentConnection[] => {
@@ -339,6 +368,7 @@ const buildAgentLayoutFromLegacy = (
     nodes[nodeId] = {
       position: clonePosition(state.position),
       collapsed: state.collapsed,
+      expanded: state.collapsed === false ? true : undefined,
     };
   }
 
@@ -358,11 +388,12 @@ export const createAgentIRFromLegacyGraph = (
   const resolvedBody = body ?? createDefaultBodyDefinition(1);
   const metadata = createAgentMetadata(name, metadataOverrides);
   const agentBody = buildBodyIRFromLegacy(document);
+  const { containers, rootContainerId } = buildContainersFromLegacy(document);
   const brain: BrainIR = {
     version: 1,
     neurons: buildBrainNeuronsFromLegacy(document),
-    containers: buildContainersFromLegacy(document),
-    rootContainerId: DEFAULT_ROOT_CONTAINER_ID,
+    containers,
+    rootContainerId,
   };
 
   void resolvedBody;
@@ -421,7 +452,9 @@ const createContainerNodeFromAgent = (
     id: container.id,
     label: container.label ?? container.id,
     position,
-    collapsed: agent.layout?.nodes[container.id]?.collapsed,
+    collapsed:
+      agent.layout?.nodes[container.id]?.collapsed ??
+      (agent.layout?.nodes[container.id]?.expanded === true ? false : undefined),
     children,
   };
 };
@@ -467,6 +500,8 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
 
       return {
         ...node,
+        position: agent.layout?.nodes[node.id]?.position ?? node.position,
+        collapsed: agent.layout?.nodes[node.id]?.collapsed ?? node.collapsed,
         children: [
           ...(defaultCoreInputAdapter ? [{ ...defaultCoreInputAdapter }] : []),
           ...rootContainer.children.flatMap<TopologyNode>((childRef) => {
@@ -492,11 +527,19 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
     return {
       ...node,
       position: agent.layout?.nodes[node.id]?.position ?? node.position,
-      collapsed: 'collapsed' in node ? agent.layout?.nodes[node.id]?.collapsed ?? node.collapsed : undefined,
+      collapsed:
+        'collapsed' in node
+          ? agent.layout?.nodes[node.id]?.collapsed ??
+            (agent.layout?.nodes[node.id]?.expanded === true ? false : node.collapsed)
+          : undefined,
     };
   });
 
   const links: LeafLink[] = [];
+  const rootInputLinkIds = new Set<string>();
+  const coreInputLinkIds = new Set<string>();
+  const rootOutputLinkIds = new Set<string>();
+  const coreOutputLinkIds = new Set<string>();
 
   for (const connection of agent.connections) {
     if (connection.from.scope === 'bodyOutput' || connection.to.scope === 'bodyInput') {
@@ -511,9 +554,11 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
 
       const channel = channelMatch[1];
       const coreInputNodeId = `core-input-${channel}`;
-      links.push(
-        {
-          id: connection.id,
+      const rootLinkId = `bridge-root:${connection.from.nodeId}:${coreInputNodeId}`;
+      if (!rootInputLinkIds.has(rootLinkId)) {
+        rootInputLinkIds.add(rootLinkId);
+        links.push({
+          id: rootLinkId,
           from: {
             nodeId: connection.from.nodeId,
             portId: connection.from.portId ?? SIGNAL_OUTPUT_PORT,
@@ -523,9 +568,14 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
             portId: SIGNAL_INPUT_PORT,
           },
           weight: 1,
-        },
-        {
-          id: `${connection.id}__core`,
+        });
+      }
+
+      const coreLinkId = `bridge-core:${coreInputNodeId}:${connection.to.nodeId}`;
+      if (!coreInputLinkIds.has(coreLinkId)) {
+        coreInputLinkIds.add(coreLinkId);
+        links.push({
+          id: coreLinkId,
           from: {
             nodeId: coreInputNodeId,
             portId: SIGNAL_OUTPUT_PORT,
@@ -536,8 +586,8 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
           },
           weight: connection.weight,
           delayMs: connection.delayMs,
-        }
-      );
+        });
+      }
       continue;
     }
 
@@ -566,9 +616,11 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
 
       const action = outputMatch[1];
       const coreOutputNodeId = `core-output-${action}`;
-      links.push(
-        {
-          id: connection.id,
+      const coreLinkId = `bridge-core:${connection.from.nodeId}:${coreOutputNodeId}`;
+      if (!coreOutputLinkIds.has(coreLinkId)) {
+        coreOutputLinkIds.add(coreLinkId);
+        links.push({
+          id: coreLinkId,
           from: {
             nodeId: connection.from.nodeId,
             portId: connection.from.portId ?? NEURON_OUTPUT_PORT,
@@ -579,9 +631,14 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
           },
           weight: connection.weight,
           delayMs: connection.delayMs,
-        },
-        {
-          id: `${connection.id}__root`,
+        });
+      }
+
+      const rootLinkId = `bridge-root:${coreOutputNodeId}:${connection.to.nodeId}`;
+      if (!rootOutputLinkIds.has(rootLinkId)) {
+        rootOutputLinkIds.add(rootLinkId);
+        links.push({
+          id: rootLinkId,
           from: {
             nodeId: coreOutputNodeId,
             portId: SIGNAL_OUTPUT_PORT,
@@ -591,8 +648,8 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
             portId: connection.to.portId ?? SIGNAL_INPUT_PORT,
           },
           weight: 1,
-        }
-      );
+        });
+      }
     }
   }
 
@@ -604,6 +661,7 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
         {
           position: clonePosition(state.position),
           collapsed: state.collapsed,
+          expanded: state.expanded,
         },
       ])
     ),

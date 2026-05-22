@@ -44,6 +44,8 @@ interface GraphTopologyCanvasProps {
   canUngroupNodesHere: boolean;
   onCanvasContextMenu: (event: React.MouseEvent<HTMLDivElement>) => void;
   onCanvasMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
+  onNodeMouseDown: (event: React.MouseEvent<HTMLDivElement>, nodeId: string) => void;
+  onNodeContextMenu: (event: React.MouseEvent<HTMLDivElement>) => void;
   onSelectLink: (linkId: string) => void;
   onOpenLinkDetail: (linkId: string) => void;
   onNavigateToNode: (nodeRefId: string) => void;
@@ -81,6 +83,8 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
   canUngroupNodesHere,
   onCanvasContextMenu,
   onCanvasMouseDown,
+  onNodeMouseDown,
+  onNodeContextMenu,
   onSelectLink,
   onOpenLinkDetail,
   onNavigateToNode,
@@ -170,7 +174,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
               聚合
             </button>
           )}
-          {contextMenu.kind === 'group' && canUngroupNodesHere && contextMenu.nodeIds.length === 1 && (
+          {contextMenu.kind === 'group' && contextMenu.nodeIds.length === 1 && (
             <>
               <button
                 type="button"
@@ -183,17 +187,19 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
               >
                 {scene.map.get(contextMenu.nodeIds[0])?.expanded ? '收起' : '展开'}
               </button>
-              <button
-                type="button"
-                className="topology-context-menu-item"
-                data-testid="topology-context-ungroup"
-                onClick={() => {
-                  onUngroupNode(contextMenu.nodeIds[0]);
-                  onCloseContextMenu();
-                }}
-              >
-                拆开组
-              </button>
+              {canUngroupNodesHere && (
+                <button
+                  type="button"
+                  className="topology-context-menu-item"
+                  data-testid="topology-context-ungroup"
+                  onClick={() => {
+                    onUngroupNode(contextMenu.nodeIds[0]);
+                    onCloseContextMenu();
+                  }}
+                >
+                  拆开组
+                </button>
+              )}
             </>
           )}
         </div>
@@ -310,6 +316,8 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
                 width: node.width,
                 height: node.height,
               }}
+              onMouseDown={(event) => onNodeMouseDown(event, node.id)}
+              onContextMenu={onNodeContextMenu}
               onDoubleClick={(event) => {
                 event.stopPropagation();
                 const action = getNodeDoubleClickAction(node.id);

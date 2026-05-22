@@ -77,8 +77,36 @@ const createInitialGraphIRRuntimeStatus = (document: GraphIRDocument): GraphIRRu
   appliedDocument: document,
   appliedSummary: summarizeGraphIRDocument(document),
   issues: [],
-  message: null
+  message: null,
+  draftSummary: summarizeGraphIRDocument(document),
+  draftValidationCount: 0,
 });
+
+const createPreviewGraphIRRuntimeStatus = (
+  installedStatus: GraphIRRuntimeStatus,
+  draftDocument: GraphIRDocument
+): GraphIRRuntimeStatus => {
+  const draftSummary = summarizeGraphIRDocument(draftDocument);
+  const validationIssues = validateGraphIRDocument(draftDocument);
+
+  if (validationIssues.length > 0) {
+    return {
+      state: 'invalid',
+      appliedDocument: installedStatus.appliedDocument,
+      appliedSummary: installedStatus.appliedSummary,
+      issues: validationIssues,
+      message: validationIssues.map((issue) => issue.message).join(' | '),
+      draftSummary,
+      draftValidationCount: validationIssues.length,
+    };
+  }
+
+  return {
+    ...installedStatus,
+    draftSummary,
+    draftValidationCount: 0,
+  };
+};
 
 const areAgentParametersEqual = (left: AgentParameters, right: AgentParameters): boolean => {
   return (
@@ -99,6 +127,7 @@ const App: React.FC = () => {
   const [resetToken, setResetToken] = useState(0);
   const [stats, setStats] = useState<SimulationState['stats']>(INITIAL_STATS);
   const [activeAgentDocument, setActiveAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
+  const [draftAgentDocument, setDraftAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
   const [graphDocument, setGraphDocument] = useState<GraphIRDocument>(() => initialGraphDocument);
   const [graphIRRuntimeStatus, setGraphIRRuntimeStatus] = useState<GraphIRRuntimeStatus>(() =>
     createInitialGraphIRRuntimeStatus(initialGraphDocument)
@@ -134,7 +163,10 @@ const App: React.FC = () => {
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('agent-parameters');
   const requestedLifecycleStateRef = useRef<SimulationLifecycleState>('idle');
   const graphIRIssues = validateGraphIRDocument(graphDocument);
+  const graphIRPreviewStatus = createPreviewGraphIRRuntimeStatus(graphIRRuntimeStatus, graphDocument);
   const graphDocumentRef = useRef(graphDocument);
+  const activeAgentDocumentRef = useRef(activeAgentDocument);
+  const draftAgentDocumentRef = useRef(draftAgentDocument);
   const graphPathNavigateRef = useRef<(pathId: string) => void>(() => {});
   const appRef = useRef<HTMLDivElement | null>(null);
   const simulationPanelRef = useRef<HTMLDivElement | null>(null);
@@ -235,25 +267,28 @@ const App: React.FC = () => {
       installToRuntime: boolean = true,
       persistActiveBrain: boolean = true
     ) => {
-      const activeBridge = createLegacyGraphBridgeFromAgent(activeAgentDocument);
+      const currentRuntimeAgent = activeAgentDocumentRef.current;
+      const activeBridge = createLegacyGraphBridgeFromAgent(currentRuntimeAgent);
       const nextAgentDocument = createAgentIRFromLegacyGraph(
-        activeAgentDocument.metadata.name,
+        currentRuntimeAgent.metadata.name,
         nextDocument,
         activeBridge.body,
         undefined,
-        activeAgentDocument.metadata
+        currentRuntimeAgent.metadata
       );
       graphDocumentRef.current = nextDocument;
-      setActiveAgentDocument(nextAgentDocument);
+      setDraftAgentDocument(nextAgentDocument);
+      if (installToRuntime) {
+        setActiveAgentDocument(nextAgentDocument);
+      }
       setGraphDocument(nextDocument);
       setBrainLibrary((currentLibrary) =>
         persistActiveBrain && activeBrainId
           ? upsertBrainLibraryItemDefinition(currentLibrary, activeBrainId, nextDocument, activeBridge.body)
           : currentLibrary
       );
-      void installToRuntime;
     },
-    [activeAgentDocument, activeBrainId]
+    [activeBrainId]
   );
 
   useEffect(() => {
@@ -285,9 +320,15 @@ const App: React.FC = () => {
     const nextDocument = reconcileGraphIRDocumentVisionCells(graphDocumentRef.current, params.visionCells);
     setAgentParameters((current) => (areAgentParametersEqual(current, params) ? current : params));
     updateGraphDocument(nextDocument, true, false);
-    setActiveAgentDocument((current) =>
-      createAgentIRFromLegacyGraph(current.metadata.name, nextDocument, nextBodyDefinition, undefined, current.metadata)
+    const nextInstalledAgent = createAgentIRFromLegacyGraph(
+      activeAgentDocumentRef.current.metadata.name,
+      nextDocument,
+      nextBodyDefinition,
+      undefined,
+      activeAgentDocumentRef.current.metadata
     );
+    setActiveAgentDocument(nextInstalledAgent);
+    setDraftAgentDocument(nextInstalledAgent);
     setBrainLibrary((currentLibrary) =>
       activeBrainId
         ? upsertBrainLibraryItemDefinition(
@@ -312,24 +353,46 @@ const App: React.FC = () => {
     graphDocumentRef.current = graphDocument;
   }, [graphDocument]);
 
+  useEffect(() => {
+    activeAgentDocumentRef.current = activeAgentDocument;
+  }, [activeAgentDocument]);
+
+  useEffect(() => {
+    draftAgentDocumentRef.current = draftAgentDocument;
+  }, [draftAgentDocument]);
+
   const handleAgentDocumentChange = useCallback((
-    nextAgent: AgentIR,
+    nextDocument: GraphIRDocument,
     options?: GraphDocumentChangeOptions
   ) => {
-    const bridge = createLegacyGraphBridgeFromAgent(nextAgent);
-    graphDocumentRef.current = bridge.document;
-    setActiveAgentDocument(nextAgent);
-    setGraphDocument(bridge.document);
+    graphDocumentRef.current = nextDocument;
+    setGraphDocument(nextDocument);
+
+    const shouldInstallToRuntime = options?.installToRuntime !== false;
+    if (!shouldInstallToRuntime) {
+      return;
+    }
+
+    const currentRuntimeAgent = activeAgentDocumentRef.current;
+    const bridge = createLegacyGraphBridgeFromAgent(currentRuntimeAgent);
+    const nextRuntimeAgent = createAgentIRFromLegacyGraph(
+      currentRuntimeAgent.metadata.name,
+      nextDocument,
+      bridge.body,
+      bridge.layout,
+      currentRuntimeAgent.metadata
+    );
+    setActiveAgentDocument(nextRuntimeAgent);
+    setDraftAgentDocument(nextRuntimeAgent);
     setBrainLibrary((currentLibrary) =>
       activeBrainId
         ? currentLibrary.map((brain) =>
             brain.metadata.id === activeBrainId
-              ? { ...brain, metadata: nextAgent.metadata, agent: nextAgent }
+              ? { ...brain, metadata: nextRuntimeAgent.metadata, agent: nextRuntimeAgent }
               : brain
-      )
+        )
         : currentLibrary
     );
-    void options?.installToRuntime;
   }, [activeBrainId]);
 
   const handleGraphIRRuntimeStatusChange = useCallback((nextStatus: GraphIRRuntimeStatus) => {
@@ -388,6 +451,7 @@ const App: React.FC = () => {
     resetRuntimeForBrainSwitch();
     setActiveBrainId(selectedBrain.metadata.id);
     setActiveAgentDocument(selectedBrain.agent);
+    setDraftAgentDocument(selectedBrain.agent);
     graphDocumentRef.current = bridge.document;
     setGraphDocument(bridge.document);
     setAgentParameters((current) =>
@@ -423,6 +487,7 @@ const App: React.FC = () => {
     setBrainLibrary((currentLibrary) => [...currentLibrary, nextBrain]);
     setActiveBrainId(nextBrain.metadata.id);
     setActiveAgentDocument(nextBrain.agent);
+    setDraftAgentDocument(nextBrain.agent);
     graphDocumentRef.current = bridge.document;
     setGraphDocument(bridge.document);
     setAgentParameters((current) => {
@@ -580,7 +645,7 @@ const App: React.FC = () => {
           return;
         }
 
-        updateGraphDocument(
+        handleAgentDocumentChange(
           {
             ...current,
             root: {
@@ -602,7 +667,7 @@ const App: React.FC = () => {
               ]
             }
           },
-          false
+          { installToRuntime: false }
         );
       },
       injectInvalidGraphDraft: () => {
@@ -612,13 +677,14 @@ const App: React.FC = () => {
           return;
         }
 
-        updateGraphDocument({
+        const invalidDocument = {
           ...current,
           root: {
             ...current.root,
             links: [firstLink, { ...firstLink, id: `${firstLink.id}-duplicate` }, ...remainingLinks]
           }
-        });
+        };
+        handleAgentDocumentChange(invalidDocument, { installToRuntime: false });
       },
       getRuntimeActiveNodeIds: () => [...graphIRRuntimeActivity.activeNodeIds],
       getGraphPathIds: () => graphPath.map((item) => item.id),
@@ -627,7 +693,7 @@ const App: React.FC = () => {
     return () => {
       delete window.__NEURALSOUP_TEST_API__;
     };
-  }, [graphIRRuntimeActivity.activeNodeIds, graphPath, isE2ETestMode, updateGraphDocument]);
+  }, [graphIRRuntimeActivity.activeNodeIds, graphPath, handleAgentDocumentChange, isE2ETestMode]);
 
   return (
     <div
@@ -711,9 +777,10 @@ const App: React.FC = () => {
         <div className={`content-area ${editorTab === 'graph' ? 'snn-mode' : 'settings-mode'}`}>
           <GraphEditorPanel
             isActive={editorTab === 'graph'}
-            agent={activeAgentDocument}
+            agent={draftAgentDocument}
+            draftDocument={graphDocument}
             visionCells={agentParameters.visionCells}
-            runtimeStatus={graphIRRuntimeStatus}
+            runtimeStatus={graphIRPreviewStatus}
             runtimeActivity={graphIRRuntimeActivity}
             onDocumentChange={handleAgentDocumentChange}
             onGraphPathChange={setGraphPath}
