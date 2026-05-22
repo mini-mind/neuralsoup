@@ -4,7 +4,6 @@ import {
   validateGraphIRDocument,
 } from './ir';
 import type {
-  GraphIRDocument,
   LeafLink,
   LiteralValue,
   ModelDefinition,
@@ -12,6 +11,7 @@ import type {
   SignalNode,
   TopologyNode,
 } from './ir';
+import type { BodyDefinition, BodyInputSignal, BodyOutputSignal, BrainDefinition } from './package';
 import type {
   BrainProgram,
   BrainProgramConnection,
@@ -22,19 +22,7 @@ import type {
   ProgramInputPort,
   ProgramOutputPort,
 } from './program';
-import type { BrainInputChannel, BrainOutputChannel } from './shared';
-
-const INPUT_CHANNEL_BY_ID = {
-  'vision-r': 'R',
-  'vision-g': 'G',
-  'vision-b': 'B',
-} as const satisfies Record<string, BrainInputChannel>;
-
-const OUTPUT_CHANNEL_BY_SIGNAL = {
-  'turn-left': 'turn-left',
-  'move-forward': 'move-forward',
-  'turn-right': 'turn-right',
-} as const satisfies Record<string, BrainOutputChannel>;
+import type { BrainInputChannel } from './shared';
 
 const INPUT_CHANNEL_OFFSET = {
   R: 0,
@@ -53,26 +41,6 @@ const DEFAULT_IZHIKEVICH_PARAMETERS = {
 const isRecord = (value: LiteralValue | undefined): value is Record<string, LiteralValue> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
-const resolveInputChannel = (node: SignalNode): BrainInputChannel => {
-  if (Object.prototype.hasOwnProperty.call(INPUT_CHANNEL_BY_ID, node.signal.id)) {
-    return INPUT_CHANNEL_BY_ID[node.signal.id as keyof typeof INPUT_CHANNEL_BY_ID];
-  }
-
-  throw new Error(
-    `Input signal node "${node.id}" uses unsupported world observation signal "${node.signal.id}".`
-  );
-};
-
-const resolveOutputChannel = (node: SignalNode): BrainOutputChannel => {
-  if (Object.prototype.hasOwnProperty.call(OUTPUT_CHANNEL_BY_SIGNAL, node.signal.id)) {
-    return OUTPUT_CHANNEL_BY_SIGNAL[node.signal.id as keyof typeof OUTPUT_CHANNEL_BY_SIGNAL];
-  }
-
-  throw new Error(
-    `Output signal node "${node.id}" uses unsupported world action signal "${node.signal.id}".`
-  );
-};
-
 const resolveSignalPortId = (
   model: ModelDefinition,
   direction: 'input' | 'output',
@@ -88,20 +56,28 @@ const resolveSignalPortId = (
   return ports[0].id;
 };
 
-const createInputPortFromSignalNode = (node: SignalNode, index: number): ProgramInputPort => {
+const createInputPortFromBinding = (
+  node: SignalNode,
+  bodySignal: BodyInputSignal,
+  index: number
+): ProgramInputPort => {
   return {
     id: node.id,
     label: node.label,
     modality: 'vision',
-    channel: resolveInputChannel(node),
+    channel: bodySignal.source.channel,
     index,
   };
 };
 
-const createOutputPortFromSignalNode = (node: SignalNode, index: number): ProgramOutputPort => ({
+const createOutputPortFromBinding = (
+  node: SignalNode,
+  bodySignal: BodyOutputSignal,
+  index: number
+): ProgramOutputPort => ({
   id: node.id,
   label: node.label,
-  channel: resolveOutputChannel(node),
+  channel: bodySignal.target.channel,
   index,
 });
 
@@ -166,24 +142,7 @@ const createRuntimeConnection = (link: LeafLink): BrainProgramConnection => ({
   delayMs: link.delayMs ?? 0,
 });
 
-const resolveVisionCellIndex = (node: SignalNode): number => {
-  const match = node.id.match(/(\d+)$/) ?? node.label.match(/(\d+)$/);
-  if (!match) {
-    throw new Error(
-      `Input signal node "${node.id}" must end with a numeric vision cell index for runtime binding.`
-    );
-  }
-
-  return Number.parseInt(match[1], 10);
-};
-
-const resolveInputSignalIndex = (node: SignalNode): number => {
-  const channel = resolveInputChannel(node);
-  const cellIndex = resolveVisionCellIndex(node);
-  return cellIndex * 3 + INPUT_CHANNEL_OFFSET[channel];
-};
-
-const collectWorldBoundarySignals = (nodes: TopologyNode[]): { inputSignals: SignalNode[]; outputSignals: SignalNode[] } => {
+const collectRootAdapterSignals = (nodes: TopologyNode[]): { inputSignals: SignalNode[]; outputSignals: SignalNode[] } => {
   const inputSignals: SignalNode[] = [];
   const outputSignals: SignalNode[] = [];
 
@@ -209,7 +168,57 @@ const collectWorldBoundarySignals = (nodes: TopologyNode[]): { inputSignals: Sig
   return { inputSignals, outputSignals };
 };
 
-export const compileGraphIRDocument = (document: GraphIRDocument): BrainProgram => {
+const resolveInputSignalIndex = (bodySignal: BodyInputSignal): number =>
+  bodySignal.source.cellIndex * 3 + INPUT_CHANNEL_OFFSET[bodySignal.source.channel];
+
+const createBodySignalIndex = <Signal extends { id: string }>(signals: Signal[]): Map<string, Signal> =>
+  new Map(signals.map((signal) => [signal.id, signal]));
+
+const assertNoDuplicateBodySignalIds = (signals: Array<{ id: string }>, scope: string): void => {
+  const seen = new Set<string>();
+  for (const signal of signals) {
+    if (seen.has(signal.id)) {
+      throw new Error(`Duplicate ${scope} body signal "${signal.id}".`);
+    }
+    seen.add(signal.id);
+  }
+};
+
+const assertBodyBindingsTargetRootAdapterSignals = (
+  body: BodyDefinition,
+  inputSignalsByNodeId: Map<string, SignalNode>,
+  outputSignalsByNodeId: Map<string, SignalNode>
+): void => {
+  const bodyInputById = createBodySignalIndex(body.inputSignals);
+  const bodyOutputById = createBodySignalIndex(body.outputSignals);
+
+  assertNoDuplicateBodySignalIds(body.inputSignals, 'input');
+  assertNoDuplicateBodySignalIds(body.outputSignals, 'output');
+
+  for (const binding of body.brainBindings.inputs) {
+    if (!bodyInputById.has(binding.bodySignalId)) {
+      throw new Error(`Body input binding references missing body signal "${binding.bodySignalId}".`);
+    }
+    if (!inputSignalsByNodeId.has(binding.brainSignalNodeId)) {
+      throw new Error(
+        `Body input binding references non-root or non-input brain signal "${binding.brainSignalNodeId}".`
+      );
+    }
+  }
+
+  for (const binding of body.brainBindings.outputs) {
+    if (!bodyOutputById.has(binding.bodySignalId)) {
+      throw new Error(`Body output binding references missing body signal "${binding.bodySignalId}".`);
+    }
+    if (!outputSignalsByNodeId.has(binding.brainSignalNodeId)) {
+      throw new Error(
+        `Body output binding references non-root or non-output brain signal "${binding.brainSignalNodeId}".`
+      );
+    }
+  }
+};
+
+export const compileBrainDefinition = (document: BrainDefinition, body: BodyDefinition): BrainProgram => {
   const issues = validateGraphIRDocument(document);
   if (issues.length > 0) {
     throw new GraphIRValidationError(issues);
@@ -219,31 +228,62 @@ export const compileGraphIRDocument = (document: GraphIRDocument): BrainProgram 
   const leafNodes = collectLeafNodes(document.root.children);
   const allSignalNodes = leafNodes.filter((node): node is SignalNode => node.kind === 'signal');
   const { inputSignals: inputSignalNodes, outputSignals: outputSignalNodes } =
-    collectWorldBoundarySignals(document.root.children);
+    collectRootAdapterSignals(document.root.children);
+  const inputSignalsByNodeId = new Map(inputSignalNodes.map((node) => [node.id, node]));
+  const outputSignalsByNodeId = new Map(outputSignalNodes.map((node) => [node.id, node]));
+  const bodyInputById = createBodySignalIndex(body.inputSignals);
+  const bodyOutputById = createBodySignalIndex(body.outputSignals);
   const neuronLeafNodes = leafNodes.filter((node): node is NeuronNode => node.kind === 'neuron');
-  const orderedInputSignals = inputSignalNodes
-    .map((node) => ({
-      node,
-      index: resolveInputSignalIndex(node),
-    }))
+  assertBodyBindingsTargetRootAdapterSignals(body, inputSignalsByNodeId, outputSignalsByNodeId);
+
+  const orderedInputBindings = body.brainBindings.inputs
+    .map((binding) => {
+      const node = inputSignalsByNodeId.get(binding.brainSignalNodeId);
+      const bodySignal = bodyInputById.get(binding.bodySignalId);
+      if (!node || !bodySignal) {
+        throw new Error(`Body input binding "${binding.bodySignalId}" failed validation.`);
+      }
+      return {
+        node,
+        bodySignal,
+        index: resolveInputSignalIndex(bodySignal),
+      };
+    })
     .sort((left, right) => left.index - right.index || left.node.id.localeCompare(right.node.id));
   const seenInputIndices = new Map<number, string>();
-  for (const binding of orderedInputSignals) {
+  for (const binding of orderedInputBindings) {
     const existingNodeId = seenInputIndices.get(binding.index);
     if (existingNodeId) {
       throw new Error(
-        `Input signal nodes "${existingNodeId}" and "${binding.node.id}" resolve to the same visual input index ${binding.index}.`
+        `Body input bindings for "${existingNodeId}" and "${binding.node.id}" resolve to the same visual input index ${binding.index}.`
       );
     }
 
     seenInputIndices.set(binding.index, binding.node.id);
   }
 
-  const inputPorts = orderedInputSignals.map(({ node, index }) => createInputPortFromSignalNode(node, index));
-  const outputPorts = outputSignalNodes.map(createOutputPortFromSignalNode);
+  const orderedOutputBindings = body.brainBindings.outputs.map((binding, index) => {
+    const node = outputSignalsByNodeId.get(binding.brainSignalNodeId);
+    const bodySignal = bodyOutputById.get(binding.bodySignalId);
+    if (!node || !bodySignal) {
+      throw new Error(`Body output binding "${binding.bodySignalId}" failed validation.`);
+    }
+    return {
+      node,
+      bodySignal,
+      index,
+    };
+  });
+
+  const inputPorts = orderedInputBindings.map(({ node, bodySignal, index }) =>
+    createInputPortFromBinding(node, bodySignal, index)
+  );
+  const outputPorts = orderedOutputBindings.map(({ node, bodySignal, index }) =>
+    createOutputPortFromBinding(node, bodySignal, index)
+  );
   const neuronNodes = neuronLeafNodes.map((node) => createNeuronRuntimeNode(node, modelsById));
   const signalNodes = allSignalNodes.map(createSignalRuntimeNode);
-  const inputBindings = orderedInputSignals.map<BrainProgramInputBinding>(({ node, index }) => {
+  const inputBindings = orderedInputBindings.map<BrainProgramInputBinding>(({ node, index }) => {
     const model = modelsById.get(node.modelId);
     if (!model) {
       throw new Error(`Missing model "${node.modelId}" for input signal node "${node.id}".`);
@@ -281,7 +321,7 @@ export const compileGraphIRDocument = (document: GraphIRDocument): BrainProgram 
     signalNodes,
     links,
     inputBindings,
-    outputBindings: outputSignalNodes.map<BrainProgramOutputBinding>((node) => {
+    outputBindings: orderedOutputBindings.map<BrainProgramOutputBinding>(({ node, bodySignal }) => {
       const model = modelsById.get(node.modelId);
       if (!model) {
         throw new Error(`Missing model "${node.modelId}" for output signal node "${node.id}".`);
@@ -290,7 +330,7 @@ export const compileGraphIRDocument = (document: GraphIRDocument): BrainProgram 
       return {
         nodeId: node.id,
         portId: resolveSignalPortId(model, 'input', node.id),
-        channel: resolveOutputChannel(node),
+        channel: bodySignal.target.channel,
       };
     }),
     modelsById,

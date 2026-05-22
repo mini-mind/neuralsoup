@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as PIXI from '../engine/pixi';
-import type { GraphIRDocument } from '../domain/brain';
+import type { BodyDefinition, GraphIRDocument } from '../domain/brain';
 import { SimulationEngine, type SimulationLifecycleState } from '../engine/SimulationEngine';
 import type { SimulationControlMode } from '../domain/world';
 import type { SimulationState } from '../types/simulation';
@@ -15,6 +15,7 @@ interface SimulationCanvasProps {
   onGraphIRActivityChange: (snapshot: GraphIRRuntimeActivitySnapshot) => void;
   controlMode: Extract<SimulationControlMode, 'keyboard' | 'snn'>;
   graphDocument: GraphIRDocument;
+  bodyDefinition: BodyDefinition;
   agentParameters: AgentParameters;
   requestedLifecycleState: SimulationLifecycleState;
   resetToken: number;
@@ -40,6 +41,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   onGraphIRActivityChange,
   controlMode,
   graphDocument,
+  bodyDefinition,
   agentParameters,
   requestedLifecycleState,
   resetToken,
@@ -230,8 +232,8 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       return;
     }
 
-    engine.setGraphIRDocument(graphDocument);
-  }, [graphDocument]);
+    engine.setGraphIRDocument(graphDocument, bodyDefinition);
+  }, [bodyDefinition, graphDocument]);
 
   useEffect(() => {
     const engine = engineRef.current;
@@ -246,9 +248,9 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     }
 
     engine.updateAgentParameters(agentParameters);
-    engine.setGraphIRDocument(graphDocument);
+    engine.setGraphIRDocument(graphDocument, bodyDefinition);
     onAgentParametersChange(engine.getAgentParameters());
-  }, [agentParameters, graphDocument, onAgentParametersChange]);
+  }, [agentParameters, bodyDefinition, graphDocument, onAgentParametersChange]);
 
   useEffect(() => {
     const engine = engineRef.current;
@@ -287,12 +289,12 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
     lastAppliedResetTokenRef.current = resetToken;
     engine.reset();
-    engine.setGraphIRDocument(graphDocument);
+    engine.setGraphIRDocument(graphDocument, bodyDefinition);
     engine.setControlMode(controlMode);
     engine.updateAgentParameters(agentParameters);
-    engine.setGraphIRDocument(graphDocument);
+    engine.setGraphIRDocument(graphDocument, bodyDefinition);
     onAgentParametersChange(engine.getAgentParameters());
-  }, [agentParameters, graphDocument, controlMode, onAgentParametersChange, resetToken]);
+  }, [agentParameters, bodyDefinition, graphDocument, controlMode, onAgentParametersChange, resetToken]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {

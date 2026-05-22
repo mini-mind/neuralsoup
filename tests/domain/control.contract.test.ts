@@ -6,8 +6,9 @@ import { WorldManager } from '../../src/engine/WorldManager';
 import { CollisionDetector } from '../../src/engine/CollisionDetector';
 import { SimulationSession } from '../../src/runtime/SimulationSession';
 import {
-  compileGraphIRDocument,
+  compileBrainDefinition,
   createBrainProgramRuntimeState,
+  createDefaultBodyDefinition,
   createDefaultGraphIRDocument,
   stepBrainProgram,
   summarizeGraphIRDocument,
@@ -45,6 +46,14 @@ const getOutputAdapter = (document: GraphIRDocument) => {
   assert.ok(adapter && adapter.kind === 'adapter');
   return adapter;
 };
+
+const getRootVisionCells = (document: GraphIRDocument) => {
+  const inputAdapter = document.root.children.find((node) => node.id === 'input-adapter' && node.kind === 'adapter');
+  return inputAdapter?.kind === 'adapter' ? inputAdapter.children.length / 3 : 1;
+};
+
+const compileDefaultBrain = (document: GraphIRDocument) =>
+  compileBrainDefinition(document, createDefaultBodyDefinition(getRootVisionCells(document)));
 
 test('keyboard policy moves forward and cancels opposite turns', () => {
   const controller = new AgentController();
@@ -311,15 +320,15 @@ test('simulation session keeps the last applied document and program when GraphI
   assert.equal(appliedStatus.state, 'applied');
   const appliedSummary = appliedStatus.appliedSummary;
 
-  const compileInvalidDocument = structuredClone(validDocument);
-  const outputAdapter = getOutputAdapter(compileInvalidDocument);
-  const moveForward = outputAdapter.children.find((node) => node.id === 'output-move-forward');
-  assert.ok(moveForward && moveForward.kind === 'signal');
-  moveForward.signal.id = 'unsupported-action';
+  const invalidBody = createDefaultBodyDefinition(2);
+  invalidBody.brainBindings.outputs[1] = {
+    brainSignalNodeId: 'missing-output-node',
+    bodySignalId: 'motor-move-forward',
+  };
 
-  const invalidStatus = session.setGraphIRDocument(compileInvalidDocument);
+  const invalidStatus = session.setGraphIRDocument(validDocument, invalidBody);
   assert.equal(invalidStatus.state, 'invalid');
-  assert.ok(invalidStatus.message.includes('unsupported world action signal'));
+  assert.ok(invalidStatus.message.includes('non-root or non-output brain signal'));
   assert.deepEqual(
     invalidStatus.appliedDocument.root.links.map((link) => link.id),
     ['vision-b1-to-forward']
@@ -425,7 +434,7 @@ test('brain-program backed snn control consumes GraphIR output signal channels',
     },
   ];
 
-  controller.setGraphIRDocument(1, document);
+  controller.installBrainProgram(1, compileDefaultBrain(document));
 
   const agent = createAgent({
     id: 1,
@@ -516,8 +525,8 @@ test('GraphIR leaf link weights change runtime action outputs', () => {
   weakForwardLink.weight = 0.2;
   strongForwardLink.weight = 3;
 
-  const weakProgram = compileGraphIRDocument(weakDocument);
-  const strongProgram = compileGraphIRDocument(strongDocument);
+  const weakProgram = compileDefaultBrain(weakDocument);
+  const strongProgram = compileDefaultBrain(strongDocument);
   const weakResult = stepBrainProgram(weakProgram, [1, 1, 0], createBrainProgramRuntimeState(weakProgram), 1);
   const strongResult = stepBrainProgram(strongProgram, [1, 1, 0], createBrainProgramRuntimeState(strongProgram), 1);
 
@@ -538,8 +547,8 @@ test('GraphIR parameter overrides change runtime action outputs', () => {
   lowThresholdNeuron.parameterOverrides = { ...(lowThresholdNeuron.parameterOverrides ?? {}), threshold: -70 };
   highThresholdNeuron.parameterOverrides = { ...(highThresholdNeuron.parameterOverrides ?? {}), threshold: 1000 };
 
-  const lowProgram = compileGraphIRDocument(lowThresholdDocument);
-  const highProgram = compileGraphIRDocument(highThresholdDocument);
+  const lowProgram = compileDefaultBrain(lowThresholdDocument);
+  const highProgram = compileDefaultBrain(highThresholdDocument);
 
   const lowResult = stepBrainProgram(lowProgram, [1, 1, 0], createBrainProgramRuntimeState(lowProgram), 1);
   const highResult = stepBrainProgram(highProgram, [1, 1, 0], createBrainProgramRuntimeState(highProgram), 1);
@@ -549,7 +558,7 @@ test('GraphIR parameter overrides change runtime action outputs', () => {
 
 test('GraphIR runtime keeps outputs at zero when there is no sensory input or spike drive', () => {
   const document = createDefaultGraphIRDocument(1);
-  const program = compileGraphIRDocument(document);
+  const program = compileDefaultBrain(document);
 
   const result = stepBrainProgram(program, [0, 0, 0], createBrainProgramRuntimeState(program), 1);
 

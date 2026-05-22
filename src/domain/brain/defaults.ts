@@ -653,7 +653,7 @@ export const createDefaultGraphIRDocument = (visionCells: number = 36): GraphIRD
               id: 'core-input-adapter',
               label: '组输入',
               adapterType: 'input',
-              position: { x: -120, y: 170 },
+              position: { x: -180, y: 170 },
               children: createDefaultCoreInputSignals(),
             },
             ...createDefaultGraphIRNeurons(),

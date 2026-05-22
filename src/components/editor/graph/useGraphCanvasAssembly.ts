@@ -109,7 +109,7 @@ export const useGraphCanvasAssembly = ({
       };
     }
 
-    const focusNodes = scene.list.filter((node) => !node.proxy || node.direction === 'input');
+    const focusNodes = scene.list.filter((node) => !node.proxy && (width >= 520 || node.navigable || node.leaf));
     const minFocusX = Math.min(...focusNodes.map((node) => node.sceneX));
     const maxFocusRight = Math.max(...focusNodes.map((node) => node.sceneX + node.width));
     const preferredX = Math.round(width / 2 - (minFocusX + maxFocusRight) / 2);

@@ -101,6 +101,12 @@
   cursor: pointer;
 }
 
+.topology-link-hit {
+  stroke: rgba(255, 255, 255, 0.001);
+  stroke-width: 14;
+  pointer-events: stroke;
+}
+
 .topology-link-stroke {
   stroke: #9a9;
   stroke-width: 2;

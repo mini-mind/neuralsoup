@@ -13,7 +13,7 @@ import { WorldManager } from './WorldManager';
 import { CollisionDetector } from './CollisionDetector';
 import { SimulationSession } from '../runtime/SimulationSession';
 import type { SimulationControlMode } from '../domain/world';
-import type { GraphIRDocument } from '../domain/brain';
+import type { BodyDefinition, GraphIRDocument } from '../domain/brain';
 import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../types/graphIRRuntime';
 
 export type SimulationLifecycleState = 'idle' | 'running' | 'paused';
@@ -76,8 +76,8 @@ export class SimulationEngine {
     );
   }
 
-  public setGraphIRDocument(document: GraphIRDocument): GraphIRRuntimeStatus {
-    const status = this.session.setGraphIRDocument(document);
+  public setGraphIRDocument(document: GraphIRDocument, body?: BodyDefinition): GraphIRRuntimeStatus {
+    const status = this.session.setGraphIRDocument(document, body);
     this.onGraphIRStatusChange?.(status);
     this.onGraphIRActivityChange?.(this.getGraphIRRuntimeActivitySnapshot());
     return status;

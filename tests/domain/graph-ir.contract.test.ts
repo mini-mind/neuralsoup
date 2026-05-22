@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   assertValidGraphIRDocument,
-  compileGraphIRDocument,
+  compileBrainDefinition,
   createBrainProgramRuntimeState,
+  createDefaultBodyDefinition,
   createDefaultGraphIRDocument,
   GraphIRValidationError,
   reconcileGraphIRDocumentVisionCells,
@@ -11,6 +12,14 @@ import {
   type GraphIRDocument,
   validateGraphIRDocument,
 } from '../../src/domain/brain';
+
+const getRootVisionCells = (document: GraphIRDocument) => {
+  const inputAdapter = document.root.children.find((node) => node.id === 'input-adapter' && node.kind === 'adapter');
+  return inputAdapter?.kind === 'adapter' ? inputAdapter.children.length / 3 : 1;
+};
+
+const compileDefaultBrain = (document: GraphIRDocument) =>
+  compileBrainDefinition(document, createDefaultBodyDefinition(getRootVisionCells(document)));
 
 const createValidGraphIRDocument = (): GraphIRDocument => ({
   version: 1,
@@ -761,9 +770,9 @@ test('default Graph IR document keeps default seed connectivity explicit', () =>
   );
 });
 
-test('compileGraphIRDocument excludes non-leaf topology nodes from runtime executable nodes', () => {
+test('compileBrainDefinition excludes non-leaf topology nodes from runtime executable nodes', () => {
   const document = createDefaultGraphIRDocument(1);
-  const program = compileGraphIRDocument(document);
+  const program = compileDefaultBrain(document);
 
   assert.equal(program.neuronNodes.some((node) => node.id === 'core-neuron-group'), false);
   assert.equal(program.signalNodes.some((node) => node.id === 'input-adapter'), false);
@@ -771,9 +780,9 @@ test('compileGraphIRDocument excludes non-leaf topology nodes from runtime execu
   assert.equal(program.links.some((link) => link.from.nodeId === 'core-neuron-group' || link.to.nodeId === 'core-neuron-group'), false);
 });
 
-test('compileGraphIRDocument binds output SignalNodes to runtime action channels', () => {
+test('compileBrainDefinition binds output SignalNodes to runtime action channels', () => {
   const document = createDefaultGraphIRDocument(1);
-  const program = compileGraphIRDocument(document);
+  const program = compileDefaultBrain(document);
 
   assert.deepEqual(
     program.outputBindings.map((binding) => binding.channel),
@@ -789,9 +798,9 @@ test('compileGraphIRDocument binds output SignalNodes to runtime action channels
   );
 });
 
-test('compileGraphIRDocument binds input SignalNodes using model output ports', () => {
+test('compileBrainDefinition binds input SignalNodes using model output ports', () => {
   const document = createDefaultGraphIRDocument(1);
-  const program = compileGraphIRDocument(document);
+  const program = compileDefaultBrain(document);
 
   assert.deepEqual(
     program.inputBindings.map((binding) => binding.portId),
@@ -799,7 +808,7 @@ test('compileGraphIRDocument binds input SignalNodes using model output ports', 
   );
 });
 
-test('compileGraphIRDocument excludes nested adapter signals from world input and output bindings', () => {
+test('compileBrainDefinition excludes nested adapter signals from world input and output bindings', () => {
   const document = createDefaultGraphIRDocument(1);
   const coreGroup = document.root.children.find((node) => node.id === 'core-neuron-group');
   assert.ok(coreGroup && coreGroup.kind === 'neuron-group');
@@ -834,7 +843,7 @@ test('compileGraphIRDocument excludes nested adapter signals from world input an
     ],
   });
 
-  const program = compileGraphIRDocument(document);
+  const program = compileDefaultBrain(document);
 
   assert.equal(program.signalNodes.some((node) => node.id === 'nested-in'), true);
   assert.equal(program.signalNodes.some((node) => node.id === 'nested-out'), true);
@@ -842,9 +851,9 @@ test('compileGraphIRDocument excludes nested adapter signals from world input an
   assert.equal(program.outputBindings.some((binding) => binding.nodeId === 'nested-out'), false);
 });
 
-test('compileGraphIRDocument maps vision input bindings to visualInput channel order instead of leaf order', () => {
+test('compileBrainDefinition maps vision input bindings to visualInput channel order instead of leaf order', () => {
   const document = createDefaultGraphIRDocument(2);
-  const program = compileGraphIRDocument(document);
+  const program = compileDefaultBrain(document);
   const inputBindingIndices = new Map(
     program.inputBindings.map((binding) => [binding.nodeId, binding.index])
   );
@@ -898,7 +907,7 @@ test('GraphIR runtime step reads visualInput values using channel-interleaved vi
     },
   ];
 
-  const program = compileGraphIRDocument(document);
+  const program = compileDefaultBrain(document);
   const result = stepBrainProgram(
     program,
     [0, 0.4, 0, 0.7, 0, 1],
@@ -922,7 +931,7 @@ test('output SignalNodes produce action outputs at runtime', () => {
     threshold: -70,
   };
 
-  const program = compileGraphIRDocument(document);
+  const program = compileDefaultBrain(document);
   const result = stepBrainProgram(program, [1, 1, 0], createBrainProgramRuntimeState(program), 1);
 
   assert.ok(result.outputs['move-forward'] > 0);
@@ -939,7 +948,7 @@ test('GraphIR runtime step exposes active leaf node ids for input, neuron, and o
     threshold: -70,
   };
 
-  const program = compileGraphIRDocument(document);
+  const program = compileDefaultBrain(document);
   const result = stepBrainProgram(program, [1, 1, 0], createBrainProgramRuntimeState(program), 1);
 
   assert.deepEqual(
@@ -956,17 +965,17 @@ test('GraphIR runtime step exposes active leaf node ids for input, neuron, and o
   );
 });
 
-test('compileGraphIRDocument rejects unsupported world action signal bindings', () => {
+test('compileBrainDefinition rejects invalid body output bindings', () => {
   const document = createDefaultGraphIRDocument(1);
-  const outputAdapter = document.root.children.find((node) => node.id === 'output-adapter');
-  assert.ok(outputAdapter && outputAdapter.kind === 'adapter');
-  const moveForward = outputAdapter.children.find((node) => node.id === 'output-move-forward');
-  assert.ok(moveForward && moveForward.kind === 'signal');
-  moveForward.signal.id = 'custom-action';
+  const body = createDefaultBodyDefinition(1);
+  body.brainBindings.outputs[0] = {
+    brainSignalNodeId: 'missing-output-node',
+    bodySignalId: 'motor-turn-left',
+  };
 
   assert.throws(
-    () => compileGraphIRDocument(document),
-    /unsupported world action signal/
+    () => compileBrainDefinition(document, body),
+    /non-root or non-output brain signal/
   );
 });
 

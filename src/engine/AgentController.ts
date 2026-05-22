@@ -6,10 +6,8 @@
 import { Agent } from '../types/simulation';
 import type { SimulationControlMode } from '../domain/world';
 import {
-  compileGraphIRDocument,
   createBrainProgramRuntimeState,
   stepBrainProgram,
-  type GraphIRDocument,
   type BrainProgram,
   type BrainProgramRuntimeState
 } from '../domain/brain';
@@ -28,11 +26,6 @@ export interface AgentUpdateContext {
 export class AgentController {
   private brainPrograms: Map<number, BrainProgram> = new Map();
   private brainRuntimeStates: Map<number, BrainProgramRuntimeState> = new Map();
-
-  public setGraphIRDocument(agentId: number, document: GraphIRDocument): void {
-    const program = compileGraphIRDocument(document);
-    this.installBrainProgram(agentId, program);
-  }
 
   public installBrainProgram(agentId: number, program: BrainProgram): void {
     this.brainPrograms.set(agentId, program);

@@ -1,7 +1,13 @@
 import React, { useState, useCallback, useEffect, useRef, type CSSProperties } from 'react';
 import SimulationCanvas from './components/SimulationCanvas';
 import {
+  createBrainPackage,
+  createDefaultBodyDefinition,
   createDefaultGraphIRDocument,
+  getBodyVisionCellCount,
+  type BrainDefinition,
+  type BodyDefinition,
+  type BrainPackage,
   reconcileGraphIRDocumentVisionCells,
   summarizeGraphIRDocument,
   validateGraphIRDocument,
@@ -11,12 +17,23 @@ import type { SimulationControlMode } from './domain/world';
 import type { SimulationLifecycleState } from './engine/SimulationEngine';
 import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from './types/graphIRRuntime';
 import type { SimulationState } from './types/simulation';
+import BrainLibraryModal from './components/editor/BrainLibraryModal';
 import EditorToolbar from './components/editor/EditorToolbar';
 import GraphEditorPanel from './components/editor/GraphEditorPanel';
 import { isEditableOrInteractiveTarget } from './components/editor/graph/isEditableOrInteractiveTarget';
 import SettingsPanel from './components/editor/SettingsPanel';
 import type { AgentParameters, EditorTab, GraphPathItem, SettingsSection } from './components/editor/types';
 import type { GraphDocumentChangeOptions } from './components/hooks/useSNNTopologyState';
+import {
+  createBrainLibraryItem,
+  deleteBrainLibraryItem,
+  duplicateBrainLibraryItem,
+  isBrainPackage,
+  loadBrainLibraryWithStatus,
+  renameBrainLibraryItem,
+  saveBrainLibrary,
+  upsertBrainLibraryItemDefinition,
+} from './storage/brainLibraryStorage';
 import './App.css';
 
 declare global {
@@ -68,6 +85,7 @@ const areAgentParametersEqual = (left: AgentParameters, right: AgentParameters):
 };
 
 const App: React.FC = () => {
+  const initialBrainLibraryLoad = useRef(loadBrainLibraryWithStatus()).current;
   const isE2ETestMode = import.meta.env.MODE === 'test' || import.meta.env.VITE_E2E === 'true';
   const [runState, setRunState] = useState<SimulationLifecycleState>('idle');
   const [requestedLifecycleState, setRequestedLifecycleState] = useState<SimulationLifecycleState>('idle');
@@ -77,12 +95,21 @@ const App: React.FC = () => {
   const [runtimeGraphDocument, setRuntimeGraphDocument] = useState<GraphIRDocument>(() =>
     createDefaultGraphIRDocument(36)
   );
+  const [runtimeBodyDefinition, setRuntimeBodyDefinition] = useState<BodyDefinition>(() =>
+    createDefaultBodyDefinition(36)
+  );
   const [graphIRRuntimeStatus, setGraphIRRuntimeStatus] = useState<GraphIRRuntimeStatus>(() =>
     createInitialGraphIRRuntimeStatus(createDefaultGraphIRDocument(36))
   );
   const [graphIRRuntimeActivity, setGraphIRRuntimeActivity] = useState<GraphIRRuntimeActivitySnapshot>({
     activeNodeIds: []
   });
+  const [brainLibrary, setBrainLibrary] = useState<BrainPackage[]>(() => initialBrainLibraryLoad.brains);
+  const [activeBrainId, setActiveBrainId] = useState<string | null>(null);
+  const [isBrainLibraryOpen, setIsBrainLibraryOpen] = useState(false);
+  const [brainLibraryStatusMessage, setBrainLibraryStatusMessage] = useState<string | null>(
+    initialBrainLibraryLoad.status.message
+  );
   const [canvasWidth, setCanvasWidth] = useState(1);
   const [canvasHeight, setCanvasHeight] = useState(1);
   const [agentParameters, setAgentParameters] = useState<AgentParameters>({
@@ -110,6 +137,17 @@ const App: React.FC = () => {
   const appRef = useRef<HTMLDivElement | null>(null);
   const simulationPanelRef = useRef<HTMLDivElement | null>(null);
   const installedGraphSummary = graphIRRuntimeStatus.appliedSummary;
+
+  useEffect(() => {
+    try {
+      saveBrainLibrary(brainLibrary);
+      setBrainLibraryStatusMessage((currentMessage) =>
+        currentMessage?.startsWith('Brain Library 保存失败') ? null : currentMessage
+      );
+    } catch (error) {
+      setBrainLibraryStatusMessage(error instanceof Error ? error.message : 'Brain Library 保存失败。');
+    }
+  }, [brainLibrary]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia(`(max-width: ${STACKED_LAYOUT_BREAKPOINT}px)`);
@@ -174,6 +212,13 @@ const App: React.FC = () => {
     setResetToken((current) => current + 1);
   }, [setLifecycleRequest]);
 
+  const resetRuntimeForBrainSwitch = useCallback(() => {
+    setStats(INITIAL_STATS);
+    setGraphIRRuntimeActivity({ activeNodeIds: [] });
+    setLifecycleRequest('idle');
+    setResetToken((current) => current + 1);
+  }, [setLifecycleRequest]);
+
   const handleStatsUpdate = useCallback((newStats: SimulationState['stats']) => {
     setStats(newStats);
   }, []);
@@ -183,14 +228,23 @@ const App: React.FC = () => {
   }, []);
 
   const updateGraphDocument = useCallback(
-    (nextDocument: GraphIRDocument, installToRuntime: boolean = true) => {
+    (
+      nextDocument: GraphIRDocument,
+      installToRuntime: boolean = true,
+      persistActiveBrain: boolean = true
+    ) => {
       graphDocumentRef.current = nextDocument;
       setGraphDocument(nextDocument);
+      setBrainLibrary((currentLibrary) =>
+        persistActiveBrain && activeBrainId
+          ? upsertBrainLibraryItemDefinition(currentLibrary, activeBrainId, nextDocument, runtimeBodyDefinition)
+          : currentLibrary
+      );
       if (installToRuntime) {
         setRuntimeGraphDocument(nextDocument);
       }
     },
-    []
+    [activeBrainId, runtimeBodyDefinition]
   );
 
   useEffect(() => {
@@ -218,9 +272,22 @@ const App: React.FC = () => {
   }, [handleStartPause]);
 
   const handleAgentParametersApply = useCallback((params: AgentParameters) => {
+    const nextBodyDefinition = createDefaultBodyDefinition(params.visionCells);
+    const nextDocument = reconcileGraphIRDocumentVisionCells(graphDocumentRef.current, params.visionCells);
     setAgentParameters((current) => (areAgentParametersEqual(current, params) ? current : params));
-    updateGraphDocument(reconcileGraphIRDocumentVisionCells(graphDocumentRef.current, params.visionCells));
-  }, [updateGraphDocument]);
+    updateGraphDocument(nextDocument, true, false);
+    setRuntimeBodyDefinition(nextBodyDefinition);
+    setBrainLibrary((currentLibrary) =>
+      activeBrainId
+        ? upsertBrainLibraryItemDefinition(
+            currentLibrary,
+            activeBrainId,
+            nextDocument,
+            nextBodyDefinition
+          )
+        : currentLibrary
+    );
+  }, [activeBrainId, updateGraphDocument]);
 
   const handleAgentParametersChange = useCallback((params: AgentParameters) => {
     setAgentParameters((current) => (areAgentParametersEqual(current, params) ? current : params));
@@ -266,6 +333,102 @@ const App: React.FC = () => {
 
   const handleGraphPathNavigate = useCallback((pathId: string) => {
     graphPathNavigateRef.current(pathId);
+  }, []);
+
+  const handleCreateBrainFromCurrent = useCallback((name: string) => {
+    const nextBrain = createBrainLibraryItem(name, graphDocumentRef.current);
+    setBrainLibrary((currentLibrary) => [...currentLibrary, nextBrain]);
+    setActiveBrainId(nextBrain.metadata.id);
+  }, []);
+
+  const confirmUnsavedBrainReplacement = useCallback((): boolean => {
+    if (activeBrainId) {
+      return true;
+    }
+
+    return window.confirm('当前 Brain 尚未保存到库。继续会切换当前编辑内容，是否继续？');
+  }, [activeBrainId]);
+
+  const handleSelectBrain = useCallback((brainId: string) => {
+    if (!confirmUnsavedBrainReplacement()) {
+      return;
+    }
+
+    const selectedBrain = brainLibrary.find((brain) => brain.metadata.id === brainId);
+    if (!selectedBrain) {
+      return;
+    }
+
+    const bodyVisionCells = getBodyVisionCellCount(selectedBrain.body);
+    resetRuntimeForBrainSwitch();
+    setActiveBrainId(selectedBrain.metadata.id);
+    updateGraphDocument(selectedBrain.definition, true, false);
+    setRuntimeBodyDefinition(selectedBrain.body);
+    setAgentParameters((current) =>
+      current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells }
+    );
+    setEditorTab('graph');
+    graphPathNavigateRef.current('root');
+  }, [brainLibrary, confirmUnsavedBrainReplacement, resetRuntimeForBrainSwitch, updateGraphDocument]);
+
+  const handleImportBrain = useCallback((name: string, payload: BrainPackage) => {
+    if (!isBrainPackage(payload)) {
+      throw new Error('导入内容不是有效的 BrainPackage。');
+    }
+    if (!confirmUnsavedBrainReplacement()) {
+      return;
+    }
+
+    const nextBrain = createBrainPackage(payload.metadata.name || name, payload.definition as BrainDefinition, {
+      id: payload.metadata.id,
+      createdAt: payload.metadata.createdAt,
+      updatedAt: payload.metadata.updatedAt,
+      description: payload.metadata.description,
+      tags: payload.metadata.tags,
+      body: payload.body,
+      layout: payload.layout,
+    });
+    resetRuntimeForBrainSwitch();
+    setBrainLibrary((currentLibrary) => [...currentLibrary, nextBrain]);
+    setActiveBrainId(nextBrain.metadata.id);
+    updateGraphDocument(nextBrain.definition, true, false);
+    setRuntimeBodyDefinition(nextBrain.body);
+    setAgentParameters((current) => {
+      const bodyVisionCells = getBodyVisionCellCount(nextBrain.body);
+      return current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells };
+    });
+    setEditorTab('graph');
+    graphPathNavigateRef.current('root');
+  }, [confirmUnsavedBrainReplacement, resetRuntimeForBrainSwitch, updateGraphDocument]);
+
+  const handleExportBrain = useCallback((brainId: string) => {
+    const selectedBrain = brainLibrary.find((brain) => brain.metadata.id === brainId);
+    if (!selectedBrain) {
+      return;
+    }
+
+    const blob = new Blob([JSON.stringify(selectedBrain, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${selectedBrain.metadata.name || selectedBrain.metadata.id}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [brainLibrary]);
+
+  const handleRenameBrain = useCallback((brainId: string, name: string) => {
+    setBrainLibrary((currentLibrary) => renameBrainLibraryItem(currentLibrary, brainId, name));
+  }, []);
+
+  const handleDeleteBrain = useCallback((brainId: string) => {
+    setBrainLibrary((currentLibrary) => deleteBrainLibraryItem(currentLibrary, brainId));
+    setActiveBrainId((currentId) => (currentId === brainId ? null : currentId));
+  }, []);
+
+  const handleDuplicateBrain = useCallback((brainId: string) => {
+    setBrainLibrary((currentLibrary) => duplicateBrainLibraryItem(currentLibrary, brainId));
   }, []);
 
   const updateSplitRatioFromClientPoint = useCallback((clientX: number, clientY: number) => {
@@ -450,6 +613,7 @@ const App: React.FC = () => {
           height={canvasHeight}
           controlMode={'snn' as Extract<SimulationControlMode, 'keyboard' | 'snn'>}
           graphDocument={runtimeGraphDocument}
+          bodyDefinition={runtimeBodyDefinition}
           agentParameters={agentParameters}
           requestedLifecycleState={requestedLifecycleState}
           resetToken={resetToken}
@@ -487,6 +651,7 @@ const App: React.FC = () => {
           editorTab={editorTab}
           graphPath={graphPath}
           runState={runState}
+          onBrainLibraryOpen={() => setIsBrainLibraryOpen(true)}
           onEditorTabChange={setEditorTab}
           onGraphPathNavigate={handleGraphPathNavigate}
           onStartPause={handleStartPause}
@@ -539,6 +704,20 @@ const App: React.FC = () => {
             />
           </div>
         </div>
+        <BrainLibraryModal
+          activeBrainId={activeBrainId}
+          brains={brainLibrary}
+          isOpen={isBrainLibraryOpen}
+          statusMessage={brainLibraryStatusMessage}
+          onClose={() => setIsBrainLibraryOpen(false)}
+          onCreateFromCurrent={handleCreateBrainFromCurrent}
+          onSelectBrain={handleSelectBrain}
+          onRenameBrain={handleRenameBrain}
+          onDeleteBrain={handleDeleteBrain}
+          onDuplicateBrain={handleDuplicateBrain}
+          onExportBrain={handleExportBrain}
+          onImportBrain={handleImportBrain}
+        />
       </div>
     </div>
   );

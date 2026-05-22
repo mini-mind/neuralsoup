@@ -3,12 +3,14 @@ import { CollisionDetector } from '../engine/CollisionDetector';
 import { VisionSystem } from '../engine/VisionSystem';
 import { WorldManager } from '../engine/WorldManager';
 import {
-  compileGraphIRDocument,
+  compileBrainDefinition,
+  createDefaultBodyDefinition,
   createDefaultGraphIRDocument,
   GraphIRValidationError,
   reconcileGraphIRDocumentVisionCells,
   summarizeGraphIRDocument,
   validateGraphIRDocument,
+  type BodyDefinition,
   type GraphIRDocument,
   type GraphIRValidationIssue,
 } from '../domain/brain';
@@ -52,6 +54,7 @@ export class SimulationSession {
 
   private currentControlMode: SimulationControlMode;
   private currentGraphIRDocument: GraphIRDocument;
+  private currentBodyDefinition: BodyDefinition;
   private graphIRRuntimeStatus: GraphIRRuntimeStatus;
   private keyboardInputState: SimulationSessionInputState = {
     turnLeft: false,
@@ -75,6 +78,7 @@ export class SimulationSession {
     });
     this.currentControlMode = options.initialControlMode ?? 'keyboard';
     this.currentGraphIRDocument = createDefaultGraphIRDocument(this.visionSystem.getVisionCells());
+    this.currentBodyDefinition = createDefaultBodyDefinition(this.visionSystem.getVisionCells());
     this.graphIRRuntimeStatus = this.createAppliedGraphIRRuntimeStatus(this.currentGraphIRDocument);
     this.state = createEmptyWorldState(this.config, this.worldManager.getWorldBounds());
   }
@@ -172,10 +176,11 @@ export class SimulationSession {
     this.keyboardInputState = { ...nextState };
   }
 
-  public setGraphIRDocument(document: GraphIRDocument): GraphIRRuntimeStatus {
+  public setGraphIRDocument(document: GraphIRDocument, body?: BodyDefinition): GraphIRRuntimeStatus {
     const mainAgent = this.getMainAgent();
     const visionCells = mainAgent?.visionCells.length ?? this.visionSystem.getVisionCells();
     const reconciledDocument = this.reconcileGraphIR(visionCells, document);
+    const reconciledBody = body ?? this.reconcileBodyDefinition(visionCells);
     const issues = validateGraphIRDocument(reconciledDocument);
 
     if (issues.length > 0) {
@@ -183,7 +188,7 @@ export class SimulationSession {
     }
 
     try {
-      this.applyGraphIRDocument(reconciledDocument, mainAgent);
+      this.applyGraphIRDocument(reconciledDocument, reconciledBody, mainAgent);
     } catch (error) {
       if (error instanceof GraphIRValidationError) {
         return this.setInvalidGraphIRRuntimeStatus(error.issues);
@@ -276,7 +281,8 @@ export class SimulationSession {
     }
 
     const graphIR = this.reconcileGraphIR(mainAgent.visionCells.length);
-    this.applyGraphIRDocument(graphIR, mainAgent);
+    const body = this.reconcileBodyDefinition(mainAgent.visionCells.length);
+    this.applyGraphIRDocument(graphIR, body, mainAgent);
     this.setAppliedGraphIRRuntimeStatus(graphIR);
   }
 
@@ -287,14 +293,23 @@ export class SimulationSession {
     return reconcileGraphIRDocumentVisionCells(document, visionCells);
   }
 
-  private applyGraphIRDocument(document: GraphIRDocument, mainAgent: Agent | null): void {
-    const compiledProgram = compileGraphIRDocument(document);
+  private reconcileBodyDefinition(
+    visionCells: number,
+    body: BodyDefinition = this.currentBodyDefinition
+  ): BodyDefinition {
+    const defaultBody = createDefaultBodyDefinition(visionCells);
+    return body.inputSignals.length === defaultBody.inputSignals.length ? body : defaultBody;
+  }
+
+  private applyGraphIRDocument(document: GraphIRDocument, body: BodyDefinition, mainAgent: Agent | null): void {
+    const compiledProgram = compileBrainDefinition(document, body);
 
     if (mainAgent) {
       this.agentController.installBrainProgram(mainAgent.id, compiledProgram);
     }
 
     this.currentGraphIRDocument = document;
+    this.currentBodyDefinition = body;
   }
 
   private createAppliedGraphIRRuntimeStatus(document: GraphIRDocument): GraphIRRuntimeStatus {

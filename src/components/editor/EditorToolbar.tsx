@@ -7,6 +7,7 @@ interface EditorToolbarProps {
   editorTab: EditorTab;
   graphPath: GraphPathItem[];
   runState: SimulationLifecycleState;
+  onBrainLibraryOpen: () => void;
   onEditorTabChange: (nextTab: EditorTab) => void;
   onGraphPathNavigate: (pathId: string) => void;
   onStartPause: () => void;
@@ -30,6 +31,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
   editorTab,
   graphPath,
   runState,
+  onBrainLibraryOpen,
   onEditorTabChange,
   onGraphPathNavigate,
   onStartPause,
@@ -44,14 +46,13 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
       <div className="tab-strip-left">
         <button
           type="button"
-          className={`tab-strip-tab tab-strip-icon-tab ${editorTab === 'settings' ? 'active' : ''}`}
-          data-testid="editor-tab-settings"
-          title="设置"
-          aria-label="设置"
-          aria-pressed={editorTab === 'settings'}
-          onClick={() => onEditorTabChange('settings')}
+          className="tab-icon-button tab-strip-brain-button"
+          data-testid="brain-library-button"
+          title="切换 Brain"
+          aria-label="切换 Brain"
+          onClick={onBrainLibraryOpen}
         >
-          ⚙
+          🧠
         </button>
         <div
           className={`tab-strip-path-tab ${editorTab === 'graph' ? 'active' : ''}`}
@@ -92,6 +93,19 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
       <div className="tab-button-group">
         <div className="control-buttons">
           <button
+            type="button"
+            className={`tab-icon-button ${editorTab === 'settings' ? 'active' : ''}`}
+            data-testid="editor-tab-settings"
+            title="设置"
+            aria-label="设置"
+            aria-pressed={editorTab === 'settings'}
+            onClick={() => onEditorTabChange('settings')}
+          >
+            ⚙
+          </button>
+
+          <button
+            type="button"
             onClick={onStartPause}
             className="tab-icon-button"
             title={startPauseLabel}
@@ -102,6 +116,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
           </button>
 
           <button
+            type="button"
             onClick={onReset}
             className="tab-icon-button"
             title="重置仿真"

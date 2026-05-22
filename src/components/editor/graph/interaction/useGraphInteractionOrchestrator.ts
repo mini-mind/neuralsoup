@@ -496,6 +496,12 @@ export const useGraphInteractionOrchestrator = ({
           return;
         }
 
+        if (currentInteraction.surfaceTarget === 'link') {
+          clearSelection();
+          setInteractionState(null);
+          return;
+        }
+
         clearSelection();
         beginSelectionRect(currentInteraction.startScene);
         setInteractionState({
@@ -730,7 +736,7 @@ export const useGraphInteractionOrchestrator = ({
         return;
       }
 
-      const target = event.target instanceof HTMLElement ? event.target : null;
+      const target = event.target instanceof Element ? event.target : null;
       const clientPoint = { x: event.clientX, y: event.clientY };
       const hitLink = Boolean(target?.closest('[data-topology-link="true"]'));
       const hitNode = resolveNodeHit(event.target, clientPoint);

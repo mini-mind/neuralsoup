@@ -4,15 +4,25 @@ import {
   GraphIRValidationError,
   collectNeuronNodes,
   collectSignalNodes,
-  compileGraphIRDocument,
+  compileBrainDefinition,
+  createDefaultBodyDefinition,
   createDefaultGraphIRDocument,
   summarizeGraphIRDocument,
   validateGraphIRDocument,
 } from '../../src/domain/brain';
+import type { GraphIRDocument } from '../../src/domain/brain';
+
+const getRootVisionCells = (document: GraphIRDocument) => {
+  const inputAdapter = document.root.children.find((node) => node.id === 'input-adapter' && node.kind === 'adapter');
+  return inputAdapter?.kind === 'adapter' ? inputAdapter.children.length / 3 : 1;
+};
+
+const compileDefaultBrain = (document: GraphIRDocument) =>
+  compileBrainDefinition(document, createDefaultBodyDefinition(getRootVisionCells(document)));
 
 test('default GraphIR document compiles into a runtime program with vision-aligned bindings', () => {
   const document = createDefaultGraphIRDocument(24);
-  const program = compileGraphIRDocument(document);
+  const program = compileDefaultBrain(document);
 
   assert.equal(program.inputPorts.length, 72);
   assert.equal(program.outputPorts.length, 3);
@@ -78,7 +88,7 @@ test('validation rejects links that target output-only ports', () => {
   });
 
   assert.throws(
-    () => compileGraphIRDocument(document),
+    () => compileDefaultBrain(document),
     (error: unknown) =>
       error instanceof GraphIRValidationError &&
       error.issues.some((issue) => issue.code === 'invalid-link-direction')
