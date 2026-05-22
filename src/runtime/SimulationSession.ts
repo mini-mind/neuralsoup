@@ -5,11 +5,12 @@ import { WorldManager } from '../engine/WorldManager';
 import {
   compileAgentIR,
   compileBrainDefinition,
+  createDefaultAgentIR,
   createAgentIRFromLegacyGraph,
   createLegacyGraphBridgeFromAgent,
   createDefaultBodyDefinition,
-  createDefaultGraphIRDocument,
   GraphIRValidationError,
+  reconcileAgentIRVisionCells,
   reconcileGraphIRDocumentVisionCells,
   summarizeAgentIR,
   validateGraphIRDocument,
@@ -82,13 +83,10 @@ export class SimulationSession {
       ...options.world
     });
     this.currentControlMode = options.initialControlMode ?? 'keyboard';
-    this.currentGraphIRDocument = createDefaultGraphIRDocument(this.visionSystem.getVisionCells());
-    this.currentBodyDefinition = createDefaultBodyDefinition(this.visionSystem.getVisionCells());
-    this.currentAgentIR = createAgentIRFromLegacyGraph(
-      '默认 Agent',
-      this.currentGraphIRDocument,
-      this.currentBodyDefinition
-    );
+    this.currentAgentIR = createDefaultAgentIR(this.visionSystem.getVisionCells(), '默认 Agent');
+    const initialCompatBridge = createLegacyGraphBridgeFromAgent(this.currentAgentIR);
+    this.currentGraphIRDocument = initialCompatBridge.document;
+    this.currentBodyDefinition = initialCompatBridge.body;
     this.graphIRRuntimeStatus = this.createAppliedGraphIRRuntimeStatus(this.currentAgentIR);
     this.state = createEmptyWorldState(this.config, this.worldManager.getWorldBounds());
   }
@@ -184,7 +182,8 @@ export class SimulationSession {
     this.keyboardInputState = { ...nextState };
   }
 
-  public setGraphIRDocument(document: GraphIRDocument, body?: BodyDefinition): GraphIRRuntimeStatus {
+  // Legacy compat entry for tests and transitional GraphIR callers.
+  public setLegacyGraphIRDocument(document: GraphIRDocument, body?: BodyDefinition): GraphIRRuntimeStatus {
     const mainAgent = this.getMainAgent();
     const visionCells = mainAgent?.visionCells.length ?? this.visionSystem.getVisionCells();
     const reconciledDocument = this.reconcileGraphIR(visionCells, document);
@@ -225,6 +224,11 @@ export class SimulationSession {
     return this.setAppliedGraphIRRuntimeStatus(this.currentAgentIR);
   }
 
+  // Backward-compatible alias; do not introduce new production callers.
+  public setGraphIRDocument(document: GraphIRDocument, body?: BodyDefinition): GraphIRRuntimeStatus {
+    return this.setLegacyGraphIRDocument(document, body);
+  }
+
   public setAgentIR(agent: AgentIR): GraphIRRuntimeStatus {
     const mainAgent = this.getMainAgent();
 
@@ -256,8 +260,12 @@ export class SimulationSession {
     return agent ? this.getEffectiveControlMode(agent) : null;
   }
 
-  public getCurrentGraphIRDocument(): GraphIRDocument {
+  public getCurrentLegacyGraphIRDocument(): GraphIRDocument {
     return this.currentGraphIRDocument;
+  }
+
+  public getCurrentGraphIRDocument(): GraphIRDocument {
+    return this.getCurrentLegacyGraphIRDocument();
   }
 
   public getCurrentAgentIR(): AgentIR {
@@ -321,15 +329,9 @@ export class SimulationSession {
       return;
     }
 
+    const nextAgent = reconcileAgentIRVisionCells(this.currentAgentIR, mainAgent.visionCells.length);
     const reconciledDocument = this.reconcileGraphIR(mainAgent.visionCells.length, this.currentGraphIRDocument);
     const reconciledBody = this.reconcileBodyDefinition(mainAgent.visionCells.length, this.currentBodyDefinition);
-    const nextAgent = createAgentIRFromLegacyGraph(
-      this.currentAgentIR.metadata.name,
-      reconciledDocument,
-      reconciledBody,
-      undefined,
-      this.currentAgentIR.metadata
-    );
     this.applyAgentIR(nextAgent, mainAgent, reconciledDocument, reconciledBody);
     this.setAppliedGraphIRRuntimeStatus(nextAgent);
   }

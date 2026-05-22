@@ -76,11 +76,16 @@ export class SimulationEngine {
     );
   }
 
-  public setGraphIRDocument(document: GraphIRDocument, body?: BodyDefinition): GraphIRRuntimeStatus {
-    const status = this.session.setGraphIRDocument(document, body);
+  // Legacy compat entry; production UI should use setAgentIR().
+  public setLegacyGraphIRDocument(document: GraphIRDocument, body?: BodyDefinition): GraphIRRuntimeStatus {
+    const status = this.session.setLegacyGraphIRDocument(document, body);
     this.onGraphIRStatusChange?.(status);
     this.onGraphIRActivityChange?.(this.getGraphIRRuntimeActivitySnapshot());
     return status;
+  }
+
+  public setGraphIRDocument(document: GraphIRDocument, body?: BodyDefinition): GraphIRRuntimeStatus {
+    return this.setLegacyGraphIRDocument(document, body);
   }
 
   public setAgentIR(agent: AgentIR): GraphIRRuntimeStatus {

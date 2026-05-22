@@ -6,6 +6,7 @@ import {
   BRAIN_LIBRARY_STATUS_STORAGE_KEY,
   BRAIN_LIBRARY_STORAGE_KEY,
   loadBrainLibraryWithStatus,
+  normalizeImportedAgentPackage,
   saveBrainLibrary,
 } from '../../src/storage/brainLibraryStorage';
 
@@ -157,4 +158,62 @@ test('Brain Library storage migrates legacy AgentPackage payloads missing body v
     brains: Array<{ agent: { body: { visionCellCount: number } } }>;
   };
   assert.equal(persisted.brains[0].agent.body.visionCellCount, 2);
+});
+
+test('Brain Library storage normalizes top-level metadata to agent metadata truth', () => {
+  const storage = installMemoryLocalStorage();
+  const brain = createAgentPackage('Metadata Brain', createDefaultGraphIRDocument(1));
+  const inconsistentBrain = {
+    ...brain,
+    metadata: {
+      ...brain.metadata,
+      id: 'top-level-id',
+      name: 'Top Level Name',
+    },
+    agent: {
+      ...brain.agent,
+      metadata: {
+        ...brain.agent.metadata,
+        id: 'agent-level-id',
+        name: 'Agent Level Name',
+      },
+    },
+  };
+
+  storage.setItem(
+    BRAIN_LIBRARY_STORAGE_KEY,
+    JSON.stringify({
+      storageVersion: 1,
+      savedAt: new Date().toISOString(),
+      brains: [inconsistentBrain],
+    })
+  );
+
+  const loaded = loadBrainLibraryWithStatus();
+
+  assert.equal(loaded.status.state, 'ok');
+  assert.equal(loaded.brains[0].metadata.id, 'agent-level-id');
+  assert.equal(loaded.brains[0].metadata.name, 'Agent Level Name');
+  assert.equal(loaded.brains[0].agent.metadata.id, 'agent-level-id');
+  assert.equal(loaded.brains[0].agent.metadata.name, 'Agent Level Name');
+
+  const persisted = JSON.parse(storage.getItem(BRAIN_LIBRARY_STORAGE_KEY) ?? 'null') as {
+    brains: Array<{ metadata: { id: string; name: string }; agent: { metadata: { id: string; name: string } } }>;
+  };
+  assert.equal(persisted.brains[0].metadata.id, 'agent-level-id');
+  assert.equal(persisted.brains[0].metadata.name, 'Agent Level Name');
+});
+
+test('normalizeImportedAgentPackage applies import name and rewrites conflicting ids', () => {
+  const brain = createAgentPackage('Import Source', createDefaultGraphIRDocument(1));
+  const normalized = normalizeImportedAgentPackage(brain, {
+    name: 'Imported Brain',
+    existingIds: [brain.metadata.id],
+  });
+
+  assert.ok(normalized);
+  assert.equal(normalized.metadata.name, 'Imported Brain');
+  assert.equal(normalized.agent.metadata.name, 'Imported Brain');
+  assert.notEqual(normalized.metadata.id, brain.metadata.id);
+  assert.equal(normalized.metadata.id, normalized.agent.metadata.id);
 });

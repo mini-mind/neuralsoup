@@ -1,17 +1,12 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import SimulationCanvas from './components/SimulationCanvas';
 import {
-  createAgentIRFromLegacyGraph,
-  createLegacyGraphBridgeFromAgent,
-  createDefaultBodyDefinition,
-  createDefaultGraphIRDocument,
+  createDefaultAgentIR,
   reconcileAgentIRVisionCells,
   summarizeAgentIR,
-  summarizeGraphIRDocument,
+  validateAgentIR,
   type AgentIR,
   type AgentPackage,
-  validateGraphIRDocument,
-  type GraphIRDocument,
 } from './domain/brain';
 import type { SimulationControlMode } from './domain/world';
 import type { SimulationLifecycleState } from './engine/SimulationEngine';
@@ -30,6 +25,7 @@ import {
   duplicateBrainLibraryItem,
   isAgentPackage,
   loadBrainLibraryWithStatus,
+  normalizeImportedAgentPackage,
   renameBrainLibraryItem,
   saveBrainLibrary,
   upsertBrainLibraryItemAgent,
@@ -76,9 +72,9 @@ const createInitialGraphIRRuntimeStatus = (agent: AgentIR): GraphIRRuntimeStatus
   message: null,
 });
 
-const createGraphIRDraftStatus = (draftDocument: GraphIRDocument): GraphIRDraftStatus => {
-  const summary = summarizeGraphIRDocument(draftDocument);
-  const validationIssues = validateGraphIRDocument(draftDocument);
+const createGraphIRDraftStatus = (draftAgent: AgentIR): GraphIRDraftStatus => {
+  const summary = summarizeAgentIR(draftAgent);
+  const validationIssues = validateAgentIR(draftAgent);
 
   if (validationIssues.length > 0) {
     return {
@@ -124,9 +120,7 @@ const ROOT_GRAPH_PATH: GraphPathItem[] = [{ id: 'root', label: 'root' }];
 
 const App: React.FC = () => {
   const initialBrainLibraryLoad = useRef(loadBrainLibraryWithStatus()).current;
-  const initialGraphDocument = createDefaultGraphIRDocument(36);
-  const initialBodyDefinition = createDefaultBodyDefinition(36);
-  const initialAgentDocument = createAgentIRFromLegacyGraph('当前 Agent', initialGraphDocument, initialBodyDefinition);
+  const initialAgentDocument = createDefaultAgentIR(36, '当前 Agent');
   const isE2ETestMode = import.meta.env.MODE === 'test' || import.meta.env.VITE_E2E === 'true';
   const [runState, setRunState] = useState<SimulationLifecycleState>('idle');
   const [requestedLifecycleState, setRequestedLifecycleState] = useState<SimulationLifecycleState>('idle');
@@ -170,16 +164,10 @@ const App: React.FC = () => {
   const [graphEditorSessionKey, setGraphEditorSessionKey] = useState(0);
   const requestedLifecycleStateRef = useRef<SimulationLifecycleState>('idle');
   const draftAgentDocumentRef = useRef(draftAgentDocument);
-  const draftAgentBridge = useMemo(
-    () => createLegacyGraphBridgeFromAgent(draftAgentDocument),
-    [draftAgentDocument]
-  );
-  const graphDocument = draftAgentBridge.document;
   const graphIRDraftStatus = useMemo<GraphIRDraftStatus>(
-    () => draftGraphStatusOverride ?? createGraphIRDraftStatus(graphDocument),
-    [draftGraphStatusOverride, graphDocument]
+    () => draftGraphStatusOverride ?? createGraphIRDraftStatus(draftAgentDocument),
+    [draftAgentDocument, draftGraphStatusOverride]
   );
-  const graphDocumentRef = useRef(graphDocument);
   const activeAgentDocumentRef = useRef(activeAgentDocument);
   const graphPathNavigateRef = useRef<(pathId: string) => void>(() => {});
   const graphPathSessionKeyRef = useRef(0);
@@ -291,8 +279,6 @@ const App: React.FC = () => {
           updatedAt: nextUpdatedAt,
         },
       };
-      const bridgedDocument = createLegacyGraphBridgeFromAgent(normalizedAgentDocument).document;
-      graphDocumentRef.current = bridgedDocument;
       setDraftGraphStatusOverride(null);
       setDraftAgentDocument(normalizedAgentDocument);
       if (installToRuntime) {
@@ -343,10 +329,6 @@ const App: React.FC = () => {
   useEffect(() => {
     setDraftAgentParameters(agentParameters);
   }, [agentParameters]);
-
-  useEffect(() => {
-    graphDocumentRef.current = graphDocument;
-  }, [graphDocument]);
 
   useEffect(() => {
     draftAgentDocumentRef.current = draftAgentDocument;
@@ -467,11 +449,17 @@ const App: React.FC = () => {
     setEditorTab((currentTab) => (currentTab === 'graph' ? 'graph' : currentTab));
   }, [brainLibrary, confirmUnsavedBrainReplacement, resetGraphEditorSession, resetRuntimeForBrainSwitch]);
 
-  const handleImportBrain = useCallback((_name: string, payload: AgentPackage) => {
+  const handleImportBrain = useCallback((name: string, payload: AgentPackage) => {
     if (!isAgentPackage(payload)) {
       throw new Error('导入内容不是有效的 AgentPackage。');
     }
-    const nextBrain = payload;
+    const nextBrain = normalizeImportedAgentPackage(payload, {
+      name,
+      existingIds: brainLibrary.map((brain) => brain.metadata.id),
+    });
+    if (!nextBrain) {
+      throw new Error('导入内容规范化失败。');
+    }
     if (!confirmUnsavedBrainReplacement()) {
       return;
     }
@@ -489,7 +477,7 @@ const App: React.FC = () => {
       return current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells };
     });
     setEditorTab((currentTab) => (currentTab === 'graph' ? 'graph' : currentTab));
-  }, [confirmUnsavedBrainReplacement, resetGraphEditorSession, resetRuntimeForBrainSwitch]);
+  }, [brainLibrary, confirmUnsavedBrainReplacement, resetGraphEditorSession, resetRuntimeForBrainSwitch]);
 
   const handleExportBrain = useCallback((brainId: string) => {
     const selectedBrain = brainLibrary.find((brain) => brain.metadata.id === brainId);
@@ -683,20 +671,32 @@ const App: React.FC = () => {
         );
       },
       injectInvalidGraphDraft: () => {
-        const current = graphDocumentRef.current;
-        const [firstLink, ...remainingLinks] = current.root.links;
-        if (!firstLink) {
+        const currentAgent = draftAgentDocumentRef.current;
+        const firstConnection = currentAgent.connections[0];
+        if (!firstConnection) {
           return;
         }
-
-        const invalidDocument = {
-          ...current,
-          root: {
-            ...current.root,
-            links: [firstLink, { ...firstLink, id: `${firstLink.id}-duplicate` }, ...remainingLinks]
-          }
+        const invalidAgent: AgentIR = {
+          ...currentAgent,
+          connections: [
+            ...currentAgent.connections,
+            {
+              id: `${firstConnection.id}-invalid-body-output-source`,
+              from: {
+                scope: 'bodyOutput',
+                nodeId: 'output-move-forward',
+                portId: 'out',
+              },
+              to: {
+                scope: 'brain',
+                nodeId: firstConnection.to.scope === 'brain' ? firstConnection.to.nodeId : 'neuron-1',
+                portId: 'dendrite',
+              },
+              weight: 1,
+            },
+          ],
         };
-        setDraftGraphStatusOverride(createGraphIRDraftStatus(invalidDocument));
+        setDraftGraphStatusOverride(createGraphIRDraftStatus(invalidAgent));
       },
       getRuntimeActiveNodeIds: () => [...graphIRRuntimeActivity.activeNodeIds],
       getGraphPathIds: () => graphPath.map((item) => item.id),

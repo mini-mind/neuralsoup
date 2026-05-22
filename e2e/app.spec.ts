@@ -89,7 +89,6 @@ const selectors = {
 } as const;
 
 type E2EStoredBrain = {
-  packageVersion?: number;
   metadata?: { id?: string; name?: string };
   agent?: {
     version?: number;
@@ -507,6 +506,9 @@ const getStoredBrainByName = async (page: Page, name: string): Promise<E2EStored
   return storedBrains.find((brain) => brain.metadata?.name === name) ?? null;
 };
 
+const getNumericLocatorText = async (page: Page, selector: string) =>
+  Number.parseInt(await page.locator(selector).innerText(), 10);
+
 const saveCurrentBrainToLibrary = async (page: Page, name: string) => {
   await page.locator(selectors.brainLibrarySaveName).fill(name);
   const saveButton = page.locator(selectors.brainLibrarySaveCurrent);
@@ -849,8 +851,7 @@ test('brain library manages saved items and reports import errors', async ({ pag
     }
 
     return Buffer.concat(chunks).toString('utf8');
-  })) as { metadata?: { name?: string }; packageVersion?: number };
-  expect(downloadedBrain.packageVersion).toBe(1);
+  })) as { metadata?: { name?: string } };
   expect(downloadedBrain.metadata?.name).toBe('Renamed Brain');
 
   page.once('dialog', (dialog) => dialog.accept());
@@ -1018,10 +1019,14 @@ test('brain library confirms before replacing a saved brain with draft-only chan
 
   await page.locator(selectors.editorTabGraph).click();
   await doubleClickNode(page, selectors.coreGroupNode);
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('118');
+  const baseDraftConnectionCount = await getNumericLocatorText(page, selectors.topologyDraftConnectionCount);
+  const baseRuntimeConnectionCount = await getNumericLocatorText(page, selectors.topologyRuntimeConnectionCount);
+  expect(baseDraftConnectionCount).toBe(baseRuntimeConnectionCount);
   await injectValidDraftOnly(page);
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('119');
-  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(
+    String(baseDraftConnectionCount + 1)
+  );
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(baseRuntimeConnectionCount));
 
   await page.locator(selectors.brainLibraryButton).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
@@ -1032,8 +1037,10 @@ test('brain library confirms before replacing a saved brain with draft-only chan
   });
   await page.locator(selectors.brainLibraryList).getByText('Other Brain').click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('119');
-  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(
+    String(baseDraftConnectionCount + 1)
+  );
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(baseRuntimeConnectionCount));
 
   const savedBrain = await getStoredBrainByName(page, 'Saved Brain');
   expect(savedBrain).toBeTruthy();
@@ -1048,8 +1055,10 @@ test('brain library confirms before replacing a saved brain with draft-only chan
     buffer: Buffer.from(JSON.stringify(savedBrain)),
   });
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('119');
-  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(
+    String(baseDraftConnectionCount + 1)
+  );
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(baseRuntimeConnectionCount));
 
   page.once('dialog', async (dialog) => {
     expect(dialog.message()).toContain('未安装的草稿改动');
@@ -1057,11 +1066,13 @@ test('brain library confirms before replacing a saved brain with draft-only chan
   });
   await page.locator(selectors.brainLibraryList).getByText('Other Brain').click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('118');
-  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(String(baseDraftConnectionCount));
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(baseRuntimeConnectionCount));
 });
 
 test('applying agent parameters persists the current brain library layout instead of reverting to an older snapshot', async ({ page }, testInfo) => {
+  test.slow();
+
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
   }

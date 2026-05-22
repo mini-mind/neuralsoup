@@ -218,7 +218,7 @@ runtime 不从节点命名、label 或模板以外的字段推断 world 语义�
 - `LeafLink` 需要替换为 `AgentConnection`。
 - `position`、`collapsed`、`expanded`、`size` 和 viewport 需要从 topology/UI 临时状态移入 `AgentLayoutIR`。
 
-迁移完成后，导入、导出和 LocalStorage 只接受 `AgentIR`。
+当前 Brain Library 的导入、导出和 LocalStorage 外部格式仍是 `AgentPackage` envelope；内部编辑与运行时真源正在收口到 `AgentIR`。后续再决定是否继续把外部格式收口为裸 `AgentIR`。
 
 ## 验收边界
 

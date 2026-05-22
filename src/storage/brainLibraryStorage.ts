@@ -42,6 +42,8 @@ export interface BrainLibraryLoadResult {
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const createAgentLibraryId = (): string => `agent-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
 const inferVisionCellCountFromAgent = (agent: AgentIR): number =>
   agent.connections.reduce((maxCount, connection) => {
     const endpoints = [connection.from, connection.to];
@@ -256,6 +258,21 @@ const isBrainLibraryStorageEnvelope = (value: unknown): value is BrainLibrarySto
   Array.isArray(value.brains) &&
   value.brains.every(isAgentPackage);
 
+const normalizeAgentPackageMetadata = (candidate: AgentPackage): AgentPackage => {
+  const metadata = {
+    ...candidate.agent.metadata,
+  };
+
+  return {
+    ...candidate,
+    metadata,
+    agent: {
+      ...candidate.agent,
+      metadata,
+    },
+  };
+};
+
 const normalizeAgentPackage = (candidate: unknown): AgentPackage | null => {
   if (!isAgentPackage(candidate)) {
     return null;
@@ -268,7 +285,7 @@ const normalizeAgentPackage = (candidate: unknown): AgentPackage | null => {
 
   const normalizedVisionCellCount = Math.max(visionCellCount, 0);
 
-  return {
+  return normalizeAgentPackageMetadata({
     ...candidate,
     agent: {
       ...candidate.agent,
@@ -277,7 +294,7 @@ const normalizeAgentPackage = (candidate: unknown): AgentPackage | null => {
         visionCellCount: normalizedVisionCellCount,
       },
     },
-  };
+  });
 };
 
 export const createBrainLibraryItem = (name: string, definition: BrainDefinition): AgentPackage =>
@@ -285,24 +302,51 @@ export const createBrainLibraryItem = (name: string, definition: BrainDefinition
 
 export const createBrainLibraryItemFromAgent = (name: string, agent: AgentIR): AgentPackage => {
   const timestamp = new Date().toISOString();
+  const metadata = {
+    ...agent.metadata,
+    id: createAgentLibraryId(),
+    name: name.trim() || '未命名 Brain',
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+
   return {
     packageVersion: 1,
-    metadata: {
-      ...agent.metadata,
-      id: `agent-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      name: name.trim() || '未命名 Brain',
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    },
+    metadata,
     agent: {
       ...agent,
-      metadata: {
-        ...agent.metadata,
-        id: `agent-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        name: name.trim() || '未命名 Brain',
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      },
+      metadata,
+    },
+  };
+};
+
+export const normalizeImportedAgentPackage = (
+  candidate: unknown,
+  options?: {
+    name?: string;
+    existingIds?: Iterable<string>;
+  }
+): AgentPackage | null => {
+  const normalized = normalizeAgentPackage(candidate);
+  if (!normalized) {
+    return null;
+  }
+
+  const trimmedName = options?.name?.trim();
+  const existingIds = new Set(options?.existingIds ?? []);
+  const nextId = existingIds.has(normalized.metadata.id) ? createAgentLibraryId() : normalized.metadata.id;
+  const metadata = {
+    ...normalized.agent.metadata,
+    id: nextId,
+    name: trimmedName || normalized.agent.metadata.name,
+  };
+
+  return {
+    ...normalized,
+    metadata,
+    agent: {
+      ...normalized.agent,
+      metadata,
     },
   };
 };
@@ -386,9 +430,20 @@ export const loadBrainLibraryWithStatus = (): BrainLibraryLoadResult => {
       .map(normalizeAgentPackage)
       .filter((brain): brain is AgentPackage => brain !== null);
 
-    const shouldRewriteStorage = normalizedBrains.some(
-      (brain, index) => brain.agent.body.visionCellCount !== parsed.brains[index]?.agent?.body?.visionCellCount
-    );
+    const shouldRewriteStorage = normalizedBrains.some((brain, index) => {
+      const persistedBrain = parsed.brains[index];
+      return (
+        brain.agent.body.visionCellCount !== persistedBrain?.agent?.body?.visionCellCount ||
+        brain.metadata.id !== persistedBrain?.metadata?.id ||
+        brain.metadata.name !== persistedBrain?.metadata?.name ||
+        brain.metadata.createdAt !== persistedBrain?.metadata?.createdAt ||
+        brain.metadata.updatedAt !== persistedBrain?.metadata?.updatedAt ||
+        brain.agent.metadata.id !== persistedBrain?.agent?.metadata?.id ||
+        brain.agent.metadata.name !== persistedBrain?.agent?.metadata?.name ||
+        brain.agent.metadata.createdAt !== persistedBrain?.agent?.metadata?.createdAt ||
+        brain.agent.metadata.updatedAt !== persistedBrain?.agent?.metadata?.updatedAt
+      );
+    });
     if (shouldRewriteStorage) {
       saveBrainLibrary(normalizedBrains);
     }
@@ -505,7 +560,7 @@ export const duplicateBrainLibraryItem = (brains: AgentPackage[], brainId: strin
     return brains;
   }
   const timestamp = new Date().toISOString();
-  const duplicateId = `agent-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const duplicateId = createAgentLibraryId();
 
   return [
     ...brains,

@@ -586,3 +586,89 @@ test('simulation session preserves custom output signal metadata when vision-cel
   assert.equal(reconciledMoveForward.signal.doc, 'custom output doc');
   assert.deepEqual(reconciledMoveForward.position, { x: 999, y: 111 });
 });
+
+test('simulation session vision-cell reconcile preserves AgentIR-only body rule semantics', () => {
+  const session = new SimulationSession({
+    visionSystem: new VisionSystem(),
+    agentController: new AgentController(),
+    worldManager: new WorldManager(1600, 1200),
+    collisionDetector: new CollisionDetector(),
+  });
+
+  session.initialize();
+
+  const currentAgent = session.getCurrentAgentIR();
+  const customAgent = {
+    ...currentAgent,
+    body: {
+      ...currentAgent.body,
+      inputRules: [
+        {
+          id: 'custom-vision-rule',
+          nodeIdPattern: '^vision-([RGB])-(\\d+)$',
+          sourceTemplate: 'vision.$1.$2',
+          scale: 3,
+        },
+      ],
+      outputRules: [
+        {
+          id: 'custom-output-rule',
+          nodeIdPattern: '^output-(turn-left|move-forward|turn-right)$',
+          targetTemplate: 'action.$1',
+          decayPerSecond: 9,
+        },
+      ],
+    },
+  };
+
+  const status = session.setAgentIR(customAgent);
+  assert.equal(status.state, 'applied');
+
+  session.updateAgentParameters({ visionCells: 12 });
+
+  const reconciledAgent = session.getCurrentAgentIR();
+  assert.equal(reconciledAgent.body.visionCellCount, 12);
+  assert.equal(reconciledAgent.body.inputRules[0]?.scale, 3);
+  assert.equal(reconciledAgent.body.outputRules[0]?.decayPerSecond, 9);
+});
+
+test('simulation session legacy GraphIR compat aliases stay behaviorally equivalent', () => {
+  const session = new SimulationSession({
+    visionSystem: new VisionSystem(),
+    agentController: new AgentController(),
+    worldManager: new WorldManager(1600, 1200),
+    collisionDetector: new CollisionDetector(),
+  });
+
+  session.initialize();
+
+  const document = createDefaultGraphIRDocument(2);
+  document.root.links = [
+    {
+      id: 'compat-forward-link',
+      from: {
+        nodeId: 'vision-G-0',
+        portId: 'out',
+      },
+      to: {
+        nodeId: 'output-move-forward',
+        portId: 'in',
+      },
+      weight: 1.5,
+    },
+  ];
+
+  const legacyNamedStatus = session.setLegacyGraphIRDocument(document);
+  const legacyAliasStatus = session.setGraphIRDocument(document);
+
+  assert.equal(legacyNamedStatus.state, 'applied');
+  assert.equal(legacyAliasStatus.state, 'applied');
+  assert.deepEqual(
+    session.getCurrentLegacyGraphIRDocument().root.links.map((link) => link.id),
+    ['compat-forward-link']
+  );
+  assert.deepEqual(
+    session.getCurrentGraphIRDocument().root.links.map((link) => link.id),
+    ['compat-forward-link']
+  );
+});

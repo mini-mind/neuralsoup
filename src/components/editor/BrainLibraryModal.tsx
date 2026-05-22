@@ -120,7 +120,7 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
         <div className="brain-library-header">
           <div>
             <h3 id={importInputId}>Brain 切换</h3>
-            <p>使用 LocalStorage 保存完整 AgentPackage。</p>
+            <p>使用 LocalStorage 保存 Agent Brain 文档。</p>
           </div>
           <button type="button" className="brain-library-close" data-testid="brain-library-close" onClick={onClose}>
             ×
