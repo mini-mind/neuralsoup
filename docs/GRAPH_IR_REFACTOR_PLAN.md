@@ -1,152 +1,213 @@
-# Brain Package、Body 与 Graph IR 设计
+# AgentIR 冻结设计
 
-本文档记录当前 `world -> body -> brain` 分层设计、已落地边界和下一步重构验收项。
+本文档冻结下一代 IR 目标结构。后续重构不保留旧结构兼容，当前 `BrainPackage / GraphIRDocument / BodyDefinition` 仅作为迁移来源。
 
-## 分层边界
+## 总体边界
 
-运行时边界分为三层：
+运行时语义分为三层：
 
-- `world`：环境、观测来源、动作作用点和宿主能力。
-- `body`：具身信号层，声明哪些 world 信号接入哪些 brain 边界节点。
-- `brain`：模型、拓扑、叶子连接和内部计算语义。
+- `world`：环境、观测来源、动作作用点和宿主能力，不进入持久化 AgentIR。
+- `body`：world 与 brain 的适配层，记录输入/输出信号节点的映射规则。
+- `brain`：神经元节点及其组织结构，不记录 world 映射、不记录输入/输出 signal node。
 
-`body` 是 world 与 brain 之间的适配器。compiler 不再从 `SignalNode.signal.id`、节点 ID 或 label 推断世界语义。
-
-## 当前格式
-
-导入、导出和 LocalStorage 的真源是完整 `BrainPackage`：
+持久化真源统一为 `AgentIR`：
 
 ```ts
-export interface BrainPackage {
-  packageVersion: 1;
-  metadata: BrainMetadata;
-  definition: BrainDefinition;
-  layout: BrainLayoutDocument;
-  body: BodyDefinition;
+export interface AgentIR {
+  version: 1;
+  metadata: AgentMetadata;
+  body: BodyIR;
+  brain: BrainIR;
+  connections: AgentConnection[];
+  layout?: AgentLayoutIR;
 }
 ```
 
-规则：
+`connections` 是唯一连接真源，覆盖 `body -> brain`、`brain -> brain`、`brain -> body` 三类连接。
 
-- 导入器只接受完整 `BrainPackage`。
-- 不接受裸 `GraphIRDocument`。
-- 不为缺失的 `body` 或 `layout` 自动补默认值。
-- JSON 导出包含 metadata、brain definition、layout 和 body。
-- LocalStorage 使用 `neuralsoup.brain-library.v1` 保存 `BrainPackage[]`。
+## BodyIR
 
-`BrainDefinition` 当前是 `GraphIRDocument` 的别名。这个别名只用于分阶段降低改动面，不代表长期命名已经完成。
-
-## BodyDefinition
-
-`BodyDefinition` 显式描述具身信号和 brain 绑定：
+`BodyIR` 只保存规则，规则是真源。运行时或编辑器可按规则展开出实际 body input/output 节点，但展开结果不作为第二真源保存。
 
 ```ts
-export interface BodyDefinition {
+export interface BodyIR {
   version: 1;
-  inputSignals: BodyInputSignal[];
-  outputSignals: BodyOutputSignal[];
-  brainBindings: {
-    inputs: BodyInputBinding[];
-    outputs: BodyOutputBinding[];
+  inputRules: BodyInputRule[];
+  outputRules: BodyOutputRule[];
+}
+
+export interface BodyInputRule {
+  id: string;
+  nodeIdPattern: string;
+  sourceTemplate: string;
+  scale: number;
+}
+
+export interface BodyOutputRule {
+  id: string;
+  nodeIdPattern: string;
+  targetTemplate: string;
+  decayPerSecond: number;
+}
+```
+
+规则语义：
+
+- `nodeIdPattern` 是正则表达式，用于匹配 body 节点 ID。
+- `sourceTemplate` 生成 world 输入路径，例如 `vision.$1.$2`，可得到 `vision.G.12`。
+- `targetTemplate` 生成 world 输出路径，例如 `action.$1`。
+- `scale` 用于把已归一化到 `[0, 1]` 的外界输入缩放成向后继神经元传递的信号强度。
+- `decayPerSecond` 表示输出动作激活值每秒衰退量；输出节点收到一次 brain 信号后激活值重置为 `1`，随后按 `max(0, value - decayPerSecond * deltaTime)` 衰退。
+
+示例：
+
+```ts
+const body: BodyIR = {
+  version: 1,
+  inputRules: [
+    {
+      id: 'vision-rgb-cells',
+      nodeIdPattern: '^vision-([RGB])-(\\d+)$',
+      sourceTemplate: 'vision.$1.$2',
+      scale: 1
+    }
+  ],
+  outputRules: [
+    {
+      id: 'motor-actions',
+      nodeIdPattern: '^motor-(turn-left|move-forward|turn-right)$',
+      targetTemplate: 'action.$1',
+      decayPerSecond: 4
+    }
+  ]
+};
+```
+
+## BrainIR
+
+`BrainIR` 只描述神经元及分组。通用神经元运行逻辑由引擎托管，节点 IR 只保留模型选择和关键参数。
+
+```ts
+export interface BrainIR {
+  version: 1;
+  neurons: BrainNeuronNode[];
+  groups: BrainGroupNode[];
+}
+
+export interface BrainNeuronNode {
+  id: string;
+  model: 'izhikevich';
+  params: {
+    a: number;
+    b: number;
+    c: number;
+    d: number;
+    threshold: number;
   };
 }
-```
 
-默认 body 的命名：
-
-- 输入：`vision-r-0`、`vision-g-0`、`vision-b-0`。
-- 输出：`motor-turn-left`、`motor-move-forward`、`motor-turn-right`。
-
-绑定规则：
-
-- `bodySignalId` 必须引用 body 内存在的信号。
-- input binding 只能绑定 root 直系 adapter 内的 input signal node。
-- output binding 只能绑定 root 直系 adapter 内的 output signal node。
-- 嵌套 adapter 可用于组内对外中转，但不参与 world/body 绑定。
-- 显式传入 runtime 的 body 必须被编译校验，不能被静默替换为默认 body。
-
-## BrainDefinition
-
-当前 `BrainDefinition = GraphIRDocument`，仍包含 `models` 和 `root`：
-
-```ts
-export interface GraphIRDocument {
-  version: 1;
-  models: ModelDefinition[];
-  root: RootGraph;
+export interface BrainGroupNode {
+  id: string;
+  label?: string;
+  children: Array<{ scope: 'brain'; nodeId: string } | { scope: 'group'; nodeId: string }>;
 }
 ```
 
-语义原则：
+约束：
 
-- `models` 描述神经元和信号节点模型，结构继续参考 NESTML 的 state、parameters、internals、input、output、equations、onReceive、update。
-- `synapse` 不作为实例节点或模型定义出现。
-- 连接权重和延迟保存在叶子连接上。
-- 叶子节点是可执行模型实例。
-- 非叶子节点只组织子图，不直接参与运行时执行。
-- adapter 可出现在 root 或任意 group 内。
-- 保存级连接只允许存在于叶子节点端口之间。
-- 非叶子连接只作为 GraphView 聚合视图派生，不写回 IR。
+- BrainIR 不包含 adapter。
+- BrainIR 不包含 input/output signal node。
+- BrainIR 不包含 world-facing source/target。
+- BrainIR 不包含 layout 字段。
+- 第一阶段神经元模型可固定为 `izhikevich`，后续再扩展模型枚举或模型注册表。
+
+## AgentConnection
+
+连接端点保留可扩展结构：
+
+```ts
+export type AgentConnectionEndpoint =
+  | { scope: 'bodyInput'; nodeId: string; portId?: string }
+  | { scope: 'bodyOutput'; nodeId: string; portId?: string }
+  | { scope: 'brain'; nodeId: string; portId?: string };
+
+export interface AgentConnection {
+  id: string;
+  from: AgentConnectionEndpoint;
+  to: AgentConnectionEndpoint;
+  weight: number;
+  delayMs?: number;
+}
+```
+
+合法方向：
+
+- 允许 `bodyInput -> brain`。
+- 允许 `brain -> brain`。
+- 允许 `brain -> bodyOutput`。
+- 禁止 `bodyOutput -> brain`。
+- 禁止 `brain -> bodyInput`。
+- 禁止 `bodyInput -> bodyOutput`。
+
+`portId` 当前可选，第一阶段可以不使用；保留它是为了后续支持多端口神经元或更复杂模型。
 
 ## Layout
 
-`BrainLayoutDocument` 保存编辑器状态：
+布局是编辑器状态，不属于语义 IR。
 
 ```ts
-export interface BrainLayoutDocument {
+export interface AgentLayoutIR {
   version: 1;
-  nodes: Record<string, BrainLayoutNodeState>;
+  nodes: Record<string, AgentLayoutNodeState>;
+}
+
+export interface AgentLayoutNodeState {
+  position?: { x: number; y: number };
+  collapsed?: boolean;
 }
 ```
 
-当前 layout 由 `GraphIRDocument` 中的 `position` 和 `collapsed` 派生。下一阶段要把这些字段从 topology node 中移走，让 layout 成为唯一 UI 状态真源。
+layout 只影响 GraphView 展示，不参与 runtime 编译。
 
-## Runtime
+## 编译边界
 
-compiler 入口是：
+目标入口：
 
 ```ts
-compileBrainDefinition(definition, body)
+compileAgentIR(agent: AgentIR): AgentProgram
 ```
 
 编译流程：
 
-1. 校验 brain 模型、topology 和叶子连接。
-2. 校验 body 信号和 body-brain binding。
-3. 展开 topology 树，收集 leaf node。
-4. 实例化模型参数。
-5. lower 叶子连接为 runtime connection。
-6. 由 `BodyDefinition` 生成 runtime input/output binding。
+1. 校验 `body.inputRules` / `body.outputRules` 的正则和模板。
+2. 从 `connections` 中收集被引用的 `bodyInput` / `bodyOutput` 节点 ID。
+3. 用 body 规则解析这些 body 节点 ID，得到 world `source` / `target`、`scale` 和 `decayPerSecond`。
+4. 校验 brain neuron 和 group 引用。
+5. 校验连接方向和端点存在性。
+6. lower `bodyInput -> brain` 为 runtime input injection。
+7. lower `brain -> brain` 为 neuron connection。
+8. lower `brain -> bodyOutput` 为 runtime action output。
 
-关键约束：
+runtime 不从节点命名、label 或模板以外的字段推断 world 语义。
 
-- runtime 不读 layout。
-- runtime 不从 signal 名称推断 world binding。
-- GraphView 聚合连接不参与 runtime 编译。
-- 选择 Brain 时，App 同步 `definition`、`body` 和由 body 推导出的视觉格数量。
+## 当前实现迁移
 
-## GraphView
+当前实现仍是过渡结构：
 
-GraphView 当前仍直接编辑 `GraphIRDocument`。长期目标是：
+- `BrainPackage` 需要替换为 `AgentIR`。
+- `BodyDefinition` 需要替换为规则真源 `BodyIR`。
+- `GraphIRDocument` 需要替换为纯 `BrainIR`。
+- `AdapterNode` 和 `SignalNode` 需要从 brain topology 中移除。
+- `LeafLink` 需要替换为 `AgentConnection`。
+- `position` 和 `collapsed` 需要从 topology node 移入 `AgentLayoutIR`。
 
-- 编辑 `BrainDefinition.topology`。
-- 编辑 `BrainLayoutDocument`。
-- 展示 `AggregateLinkView`。
-- 编辑 leaf node 参数覆盖和 leaf edge 参数。
-- 不编辑 body 与 world 的具身映射细节。
-- 不把 layout 状态混进语义 IR。
-
-## 后续任务
-
-1. 把 `position` 和 `collapsed` 从 topology node 移入 `BrainLayoutDocument`。
-2. 将 `GraphIRDocument` 正式重命名或替换为 `BrainDefinition`。
-3. 将 `LeafLink` 正式重命名或替换为 `ConnectionEdge`。
-4. 移除 `SignalNode.signal` 的 world-facing 用途；如果保留，只作为模型信号类型描述。
-5. 为 body schema 增加更严格的重复绑定、fan-in/fan-out 策略和容量边界校验。
+迁移完成后，导入、导出和 LocalStorage 只接受 `AgentIR`。
 
 ## 验收边界
 
-- `rg "compileGraphIRDocument|StoredBrain|createStoredBrain|upsertStoredBrainDocument" src tests e2e docs` 不命中新运行路径。
+- 生产代码不再暴露 `BrainPackage`、`GraphIRDocument`、`BodyDefinition`、`AdapterNode`、`SignalNode`、`LeafLink` 作为持久化主结构。
+- 运行时入口收口为 `compileAgentIR(agent)` 或等价 AgentIR 编译边界。
+- GraphView 直接编辑 `AgentIR.brain`、`AgentIR.connections` 和 `AgentIR.layout`，不再把 body signal node 混入 brain topology。
 - `npm run type-check` 通过。
 - `npm run test:domain` 通过。
-- Brain Library e2e 覆盖保存完整 package、LocalStorage 持久化、reload 后选择 Brain、导入导出、重命名、删除、复制、脏状态提示，并同步 body 对应的视觉格数量。
+- 涉及 GraphView 或 Brain Library 行为时，`npm run test:e2e -- --grep "graph view|brain library"` 通过。
