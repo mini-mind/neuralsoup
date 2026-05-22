@@ -45,6 +45,7 @@ declare global {
       injectValidDraftOnly: () => void;
       injectInvalidGraphDraft: () => void;
       getRuntimeActiveNodeIds: () => string[];
+      getGraphPathIds: () => string[];
     };
   }
 }
@@ -311,12 +312,25 @@ const App: React.FC = () => {
     graphDocumentRef.current = graphDocument;
   }, [graphDocument]);
 
-  const handleGraphDocumentChange = useCallback((
-    nextDocument: GraphIRDocument,
+  const handleAgentDocumentChange = useCallback((
+    nextAgent: AgentIR,
     options?: GraphDocumentChangeOptions
   ) => {
-    updateGraphDocument(nextDocument, options?.installToRuntime ?? true);
-  }, [updateGraphDocument]);
+    const bridge = createLegacyGraphBridgeFromAgent(nextAgent);
+    graphDocumentRef.current = bridge.document;
+    setActiveAgentDocument(nextAgent);
+    setGraphDocument(bridge.document);
+    setBrainLibrary((currentLibrary) =>
+      activeBrainId
+        ? currentLibrary.map((brain) =>
+            brain.metadata.id === activeBrainId
+              ? { ...brain, metadata: nextAgent.metadata, agent: nextAgent }
+              : brain
+      )
+        : currentLibrary
+    );
+    void options?.installToRuntime;
+  }, [activeBrainId]);
 
   const handleGraphIRRuntimeStatusChange = useCallback((nextStatus: GraphIRRuntimeStatus) => {
     setGraphIRRuntimeStatus(nextStatus);
@@ -606,13 +620,14 @@ const App: React.FC = () => {
           }
         });
       },
-      getRuntimeActiveNodeIds: () => [...graphIRRuntimeActivity.activeNodeIds]
+      getRuntimeActiveNodeIds: () => [...graphIRRuntimeActivity.activeNodeIds],
+      getGraphPathIds: () => graphPath.map((item) => item.id),
     };
 
     return () => {
       delete window.__NEURALSOUP_TEST_API__;
     };
-  }, [graphIRRuntimeActivity.activeNodeIds, isE2ETestMode, updateGraphDocument]);
+  }, [graphIRRuntimeActivity.activeNodeIds, graphPath, isE2ETestMode, updateGraphDocument]);
 
   return (
     <div
@@ -696,11 +711,11 @@ const App: React.FC = () => {
         <div className={`content-area ${editorTab === 'graph' ? 'snn-mode' : 'settings-mode'}`}>
           <GraphEditorPanel
             isActive={editorTab === 'graph'}
-            document={graphDocument}
+            agent={activeAgentDocument}
             visionCells={agentParameters.visionCells}
             runtimeStatus={graphIRRuntimeStatus}
             runtimeActivity={graphIRRuntimeActivity}
-            onDocumentChange={handleGraphDocumentChange}
+            onDocumentChange={handleAgentDocumentChange}
             onGraphPathChange={setGraphPath}
             onGraphPathNavigateRegister={(navigate) => {
               graphPathNavigateRef.current = navigate;

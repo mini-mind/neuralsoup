@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { type GraphIRDocument } from '../domain/brain';
+import type { AgentIR } from '../domain/brain';
 import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../types/graphIRRuntime';
 import GraphDetailModal from './editor/graph/GraphDetailModal';
 import GraphTopologyCanvas from './editor/graph/GraphTopologyCanvas';
@@ -13,9 +13,9 @@ import './SNNTopologyEditor.css';
 interface SNNTopologyEditorProps {
   width: number;
   height: number;
-  document: GraphIRDocument;
+  agent: AgentIR;
   visionCells?: number;
-  onDocumentChange?: (document: GraphIRDocument, options?: GraphDocumentChangeOptions) => void;
+  onDocumentChange?: (document: AgentIR, options?: GraphDocumentChangeOptions) => void;
   onGraphPathChange?: (graphPath: GraphPathItem[]) => void;
   onGraphPathNavigateRegister?: (navigate: (pathId: string) => void) => void;
   runtimeStatus: GraphIRRuntimeStatus;
@@ -26,7 +26,7 @@ interface SNNTopologyEditorProps {
 const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   width,
   height,
-  document,
+  agent,
   visionCells = 36,
   onDocumentChange,
   onGraphPathChange,
@@ -36,7 +36,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   isActive = true,
 }) => {
   const state = useSNNTopologyState({
-    document,
+    agent,
     runtimeActiveNodeIds: runtimeActivity.activeNodeIds,
     onDocumentChange,
   });
@@ -138,7 +138,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   });
 
   const diagnostics = useGraphTopologyDiagnosticsModel({
-    document,
+    agent,
     visionCells,
     runtimeStatus,
     runtimeActivity,

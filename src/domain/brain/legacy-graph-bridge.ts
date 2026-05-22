@@ -36,6 +36,9 @@ const DEFAULT_NEURON_PARAMS: IzhikevichNeuronParameters = {
 const DEFAULT_ROOT_CONTAINER_ID = 'root-container';
 const DEFAULT_VISION_SCALE = 1;
 const DEFAULT_OUTPUT_DECAY_PER_SECOND = 4;
+const LEGACY_ROOT_GROUP_ID = 'core-neuron-group';
+const LEGACY_CORE_INPUT_ADAPTER_ID = 'core-input-adapter';
+const LEGACY_CORE_OUTPUT_ADAPTER_ID = 'core-output-adapter';
 
 const INPUT_CHANNEL_PATTERN = /^vision-([RGB])-(\d+)$/;
 const OUTPUT_CHANNEL_PATTERN = /^output-(turn-left|move-forward|turn-right)$/;
@@ -445,9 +448,18 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
   const visionCells = visionCellIds.size > 0 ? Math.max(...visionCellIds) + 1 : 1;
   const nextDocument = createDefaultGraphIRDocument(visionCells);
   const nextBody = createDefaultBodyDefinition(visionCells);
+  const defaultRootGroup = nextDocument.root.children.find(
+    (node): node is NeuronGroupNode => node.kind === 'neuron-group' && node.id === LEGACY_ROOT_GROUP_ID
+  );
+  const defaultCoreInputAdapter = defaultRootGroup?.children.find(
+    (node): node is Extract<TopologyNode, { kind: 'adapter' }> => node.kind === 'adapter' && node.id === LEGACY_CORE_INPUT_ADAPTER_ID
+  );
+  const defaultCoreOutputAdapter = defaultRootGroup?.children.find(
+    (node): node is Extract<TopologyNode, { kind: 'adapter' }> => node.kind === 'adapter' && node.id === LEGACY_CORE_OUTPUT_ADAPTER_ID
+  );
 
   const rootChildren: TopologyNode[] = nextDocument.root.children.map((node: TopologyNode) => {
-    if (node.kind === 'neuron-group' && node.id === 'core-neuron-group') {
+    if (node.kind === 'neuron-group' && node.id === LEGACY_ROOT_GROUP_ID) {
       const rootContainer = agent.brain.containers.find((entry) => entry.id === agent.brain.rootContainerId);
       if (!rootContainer) {
         return node;
@@ -455,21 +467,25 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
 
       return {
         ...node,
-        children: rootContainer.children.flatMap<TopologyNode>((childRef) => {
-          if (childRef.scope === 'brain') {
-            const neuron = agent.brain.neurons.find((entry) => entry.id === childRef.nodeId);
-            if (!neuron) {
+        children: [
+          ...(defaultCoreInputAdapter ? [{ ...defaultCoreInputAdapter }] : []),
+          ...rootContainer.children.flatMap<TopologyNode>((childRef) => {
+            if (childRef.scope === 'brain') {
+              const neuron = agent.brain.neurons.find((entry) => entry.id === childRef.nodeId);
+              if (!neuron) {
+                return [];
+              }
+              return [createNeuronNodeFromAgent(neuron, agent.layout?.nodes[neuron.id]?.position)];
+            }
+
+            const container = agent.brain.containers.find((entry) => entry.id === childRef.nodeId);
+            if (!container) {
               return [];
             }
-            return [createNeuronNodeFromAgent(neuron, agent.layout?.nodes[neuron.id]?.position)];
-          }
-
-          const container = agent.brain.containers.find((entry) => entry.id === childRef.nodeId);
-          if (!container) {
-            return [];
-          }
-          return [createContainerNodeFromAgent(container, agent, agent.layout?.nodes[container.id]?.position)];
-        }),
+            return [createContainerNodeFromAgent(container, agent, agent.layout?.nodes[container.id]?.position)];
+          }),
+          ...(defaultCoreOutputAdapter ? [{ ...defaultCoreOutputAdapter }] : []),
+        ],
       };
     }
 
@@ -480,68 +496,105 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
     };
   });
 
-  const links: LeafLink[] = agent.connections
-    .flatMap((connection) => {
-      if (connection.from.scope === 'bodyOutput' || connection.to.scope === 'bodyInput') {
-        return [];
+  const links: LeafLink[] = [];
+
+  for (const connection of agent.connections) {
+    if (connection.from.scope === 'bodyOutput' || connection.to.scope === 'bodyInput') {
+      continue;
+    }
+
+    if (connection.from.scope === 'bodyInput' && connection.to.scope === 'brain') {
+      const channelMatch = connection.from.nodeId.match(INPUT_CHANNEL_PATTERN);
+      if (!channelMatch) {
+        continue;
       }
 
-      if (connection.from.scope === 'bodyInput' && connection.to.scope === 'brain') {
-        return [
-          {
-            id: connection.id,
-            from: {
-              nodeId: connection.from.nodeId,
-              portId: connection.from.portId ?? SIGNAL_OUTPUT_PORT,
-            },
-            to: {
-              nodeId: connection.to.nodeId,
-              portId: connection.to.portId ?? NEURON_INPUT_PORT,
-            },
-            weight: connection.weight,
-            delayMs: connection.delayMs,
+      const channel = channelMatch[1];
+      const coreInputNodeId = `core-input-${channel}`;
+      links.push(
+        {
+          id: connection.id,
+          from: {
+            nodeId: connection.from.nodeId,
+            portId: connection.from.portId ?? SIGNAL_OUTPUT_PORT,
           },
-        ];
-      }
-
-      if (connection.from.scope === 'brain' && connection.to.scope === 'brain') {
-        return [
-          {
-            id: connection.id,
-            from: {
-              nodeId: connection.from.nodeId,
-              portId: connection.from.portId ?? NEURON_OUTPUT_PORT,
-            },
-            to: {
-              nodeId: connection.to.nodeId,
-              portId: connection.to.portId ?? NEURON_INPUT_PORT,
-            },
-            weight: connection.weight,
-            delayMs: connection.delayMs,
+          to: {
+            nodeId: coreInputNodeId,
+            portId: SIGNAL_INPUT_PORT,
           },
-        ];
-      }
-
-      if (connection.from.scope === 'brain' && connection.to.scope === 'bodyOutput') {
-        return [
-          {
-            id: connection.id,
-            from: {
-              nodeId: connection.from.nodeId,
-              portId: connection.from.portId ?? NEURON_OUTPUT_PORT,
-            },
-            to: {
-              nodeId: connection.to.nodeId,
-              portId: connection.to.portId ?? SIGNAL_INPUT_PORT,
-            },
-            weight: connection.weight,
-            delayMs: connection.delayMs,
+          weight: 1,
+        },
+        {
+          id: `${connection.id}__core`,
+          from: {
+            nodeId: coreInputNodeId,
+            portId: SIGNAL_OUTPUT_PORT,
           },
-        ];
+          to: {
+            nodeId: connection.to.nodeId,
+            portId: connection.to.portId ?? NEURON_INPUT_PORT,
+          },
+          weight: connection.weight,
+          delayMs: connection.delayMs,
+        }
+      );
+      continue;
+    }
+
+    if (connection.from.scope === 'brain' && connection.to.scope === 'brain') {
+      links.push({
+        id: connection.id,
+        from: {
+          nodeId: connection.from.nodeId,
+          portId: connection.from.portId ?? NEURON_OUTPUT_PORT,
+        },
+        to: {
+          nodeId: connection.to.nodeId,
+          portId: connection.to.portId ?? NEURON_INPUT_PORT,
+        },
+        weight: connection.weight,
+        delayMs: connection.delayMs,
+      });
+      continue;
+    }
+
+    if (connection.from.scope === 'brain' && connection.to.scope === 'bodyOutput') {
+      const outputMatch = connection.to.nodeId.match(OUTPUT_CHANNEL_PATTERN);
+      if (!outputMatch) {
+        continue;
       }
 
-      return [];
-    });
+      const action = outputMatch[1];
+      const coreOutputNodeId = `core-output-${action}`;
+      links.push(
+        {
+          id: connection.id,
+          from: {
+            nodeId: connection.from.nodeId,
+            portId: connection.from.portId ?? NEURON_OUTPUT_PORT,
+          },
+          to: {
+            nodeId: coreOutputNodeId,
+            portId: SIGNAL_INPUT_PORT,
+          },
+          weight: connection.weight,
+          delayMs: connection.delayMs,
+        },
+        {
+          id: `${connection.id}__root`,
+          from: {
+            nodeId: coreOutputNodeId,
+            portId: SIGNAL_OUTPUT_PORT,
+          },
+          to: {
+            nodeId: connection.to.nodeId,
+            portId: connection.to.portId ?? SIGNAL_INPUT_PORT,
+          },
+          weight: 1,
+        }
+      );
+    }
+  }
 
   const layout: BrainLayoutDocument = {
     version: 1,
