@@ -50,6 +50,12 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
     return null;
   }
 
+  const queueSelectBrain = (brainId: string) => {
+    window.setTimeout(() => {
+      onSelectBrain(brainId);
+    }, 0);
+  };
+
   const handleImportFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -101,7 +107,7 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
   };
 
   return (
-    <div className="brain-library-modal-overlay" data-testid="brain-library-modal-overlay" onMouseDown={onClose}>
+    <div className="brain-library-modal-overlay" data-testid="brain-library-modal-overlay" onClick={onClose}>
       <div
         className="brain-library-modal"
         data-testid="brain-library-modal"
@@ -109,6 +115,7 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
         aria-modal="true"
         aria-labelledby={importInputId}
         onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
         <div className="brain-library-header">
           <div>
@@ -167,7 +174,10 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
                       <button
                         type="button"
                         className="brain-library-item-title"
-                        onClick={() => onSelectBrain(brain.metadata.id)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          queueSelectBrain(brain.metadata.id);
+                        }}
                       >
                         <span>{brain.metadata.name}</span>
                         <small>{new Date(brain.metadata.updatedAt).toLocaleString()}</small>
@@ -179,7 +189,10 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
                       type="button"
                       className="brain-library-small-button"
                       data-testid={`brain-library-rename-${brain.metadata.id}`}
-                      onClick={() => startRenamingBrain(brain)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        startRenamingBrain(brain);
+                      }}
                     >
                       重命名
                     </button>
@@ -187,7 +200,10 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
                       type="button"
                       className="brain-library-small-button"
                       data-testid={`brain-library-duplicate-${brain.metadata.id}`}
-                      onClick={() => onDuplicateBrain(brain.metadata.id)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onDuplicateBrain(brain.metadata.id);
+                      }}
                     >
                       复制
                     </button>
@@ -195,7 +211,10 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
                       type="button"
                       className="brain-library-small-button"
                       data-testid={`brain-library-export-${brain.metadata.id}`}
-                      onClick={() => onExportBrain(brain.metadata.id)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onExportBrain(brain.metadata.id);
+                      }}
                     >
                       导出
                     </button>
@@ -203,7 +222,10 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
                       type="button"
                       className="brain-library-small-button danger"
                       data-testid={`brain-library-delete-${brain.metadata.id}`}
-                      onClick={() => deleteBrain(brain)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        deleteBrain(brain);
+                      }}
                     >
                       删除
                     </button>

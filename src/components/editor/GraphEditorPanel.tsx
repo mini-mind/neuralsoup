@@ -13,8 +13,8 @@ interface GraphEditorPanelProps {
   draftStatus: GraphIRDraftStatus;
   runtimeActivity: GraphIRRuntimeActivitySnapshot;
   onAgentChange: (updater: (current: AgentIR) => AgentIR) => void;
-  onGraphPathChange: (graphPath: GraphPathItem[]) => void;
-  onGraphPathNavigateRegister: (navigate: (pathId: string) => void) => void;
+  onGraphPathChange: (graphPath: GraphPathItem[], sourceAgentId: string) => void;
+  onGraphPathNavigateRegister: (navigate: (pathId: string) => void, sourceAgentId: string) => void;
 }
 
 const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({

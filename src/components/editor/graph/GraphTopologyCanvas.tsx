@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useRef } from 'react';
 import type { GraphViewLink } from './graphViewTypes';
 import type { GraphInteractionState, GraphContextMenuState } from './interaction/interactionSession';
 import type { GraphSceneProjection } from './graphSceneProjection';
@@ -97,6 +97,80 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
   onUngroupNode,
   onToggleGroupExpanded,
 }) => {
+  const linkPointerIntentRef = useRef<{
+    linkId: string;
+    startX: number;
+    startY: number;
+    moved: boolean;
+  } | null>(null);
+
+  const findEditableLinkNearClientPoint = useCallback(
+    (clientX: number, clientY: number) => {
+      const sceneElement = sceneRef.current;
+      if (!sceneElement || canvasScale === 0) {
+        return null;
+      }
+
+      const rect = sceneElement.getBoundingClientRect();
+      const point = {
+        x: (clientX - rect.left) / canvasScale,
+        y: (clientY - rect.top) / canvasScale,
+      };
+
+      const distanceToSegment = (
+        segmentStart: { x: number; y: number },
+        segmentEnd: { x: number; y: number }
+      ) => {
+        const dx = segmentEnd.x - segmentStart.x;
+        const dy = segmentEnd.y - segmentStart.y;
+        if (dx === 0 && dy === 0) {
+          return Math.hypot(point.x - segmentStart.x, point.y - segmentStart.y);
+        }
+
+        const projection =
+          ((point.x - segmentStart.x) * dx + (point.y - segmentStart.y) * dy) / (dx * dx + dy * dy);
+        const ratio = Math.max(0, Math.min(1, projection));
+        const nearestPoint = {
+          x: segmentStart.x + dx * ratio,
+          y: segmentStart.y + dy * ratio,
+        };
+        return Math.hypot(point.x - nearestPoint.x, point.y - nearestPoint.y);
+      };
+
+      for (const link of links) {
+        if (link.aggregate || !link.editable) {
+          continue;
+        }
+
+        const fromNode = scene.map.get(link.fromNodeId);
+        const toNode = scene.map.get(link.toNodeId);
+        if (!fromNode || !toNode) {
+          continue;
+        }
+
+        const from = getNodeCenter({
+          x: fromNode.sceneX,
+          y: fromNode.sceneY,
+          width: fromNode.width,
+          height: fromNode.height,
+        });
+        const to = getNodeCenter({
+          x: toNode.sceneX,
+          y: toNode.sceneY,
+          width: toNode.width,
+          height: toNode.height,
+        });
+
+        if (distanceToSegment(from, to) <= 12) {
+          return link;
+        }
+      }
+
+      return null;
+    },
+    [canvasScale, links, scene.map, sceneRef]
+  );
+
   const normalizedSelectionRect = selectionRect ? normalizeRect(selectionRect) : null;
   const pendingNodeIds = interaction?.type === 'linking' ? interaction.sourceNodeIds : [];
 
@@ -215,8 +289,29 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
           transform: `translate(${canvasViewport.x}px, ${canvasViewport.y}px) scale(${canvasScale})`,
           transformOrigin: '0 0',
         }}
+        onDoubleClick={(event) => {
+          const nearbyLink = findEditableLinkNearClientPoint(event.clientX, event.clientY);
+          if (!nearbyLink) {
+            return;
+          }
+
+          event.stopPropagation();
+          onOpenLinkDetail(nearbyLink.id);
+        }}
       >
-        <svg className="topology-links" aria-hidden="true">
+        <svg
+          className="topology-links"
+          aria-hidden="true"
+          onDoubleClick={(event) => {
+            const nearbyLink = findEditableLinkNearClientPoint(event.clientX, event.clientY);
+            if (!nearbyLink) {
+              return;
+            }
+
+            event.stopPropagation();
+            onOpenLinkDetail(nearbyLink.id);
+          }}
+        >
           {links.map((link) => {
             const fromNode = scene.map.get(link.fromNodeId);
             const toNode = scene.map.get(link.toNodeId);
@@ -244,7 +339,38 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
                 className={`topology-link ${link.aggregate ? 'is-aggregate' : 'is-leaf'} ${selected ? 'is-selected' : ''}`}
                 data-testid={`topology-link-${link.id}`}
                 data-topology-link="true"
+                onMouseDown={(event) => {
+                  linkPointerIntentRef.current = {
+                    linkId: link.id,
+                    startX: event.clientX,
+                    startY: event.clientY,
+                    moved: false,
+                  };
+                }}
+                onMouseMove={(event) => {
+                  const currentIntent = linkPointerIntentRef.current;
+                  if (!currentIntent || currentIntent.linkId !== link.id) {
+                    return;
+                  }
+
+                  if (Math.abs(event.clientX - currentIntent.startX) > 4 || Math.abs(event.clientY - currentIntent.startY) > 4) {
+                    currentIntent.moved = true;
+                  }
+                }}
+                onMouseUp={() => {
+                  const currentIntent = linkPointerIntentRef.current;
+                  if (currentIntent?.linkId === link.id) {
+                    linkPointerIntentRef.current = currentIntent;
+                  }
+                }}
                 onClick={(event) => {
+                  const currentIntent = linkPointerIntentRef.current;
+                  if (currentIntent?.linkId === link.id && currentIntent.moved) {
+                    linkPointerIntentRef.current = null;
+                    return;
+                  }
+
+                  linkPointerIntentRef.current = null;
                   event.stopPropagation();
                   if (selected && !link.aggregate) {
                     onOpenLinkDetail(link.id);
@@ -324,6 +450,13 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
               onContextMenu={onNodeContextMenu}
               onDoubleClick={(event) => {
                 event.stopPropagation();
+                const nearbyLink =
+                  node.expanded || node.expansionParentId ? findEditableLinkNearClientPoint(event.clientX, event.clientY) : null;
+                if (nearbyLink) {
+                  onOpenLinkDetail(nearbyLink.id);
+                  return;
+                }
+
                 const action = getNodeDoubleClickAction(node.viewId);
                 if (action === 'navigate') {
                   onNavigateToNode(node.viewId);

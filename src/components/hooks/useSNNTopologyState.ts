@@ -108,6 +108,14 @@ export const useSNNTopologyState = ({
     links,
     activeViewNodeIds,
   } = agentViewModel;
+  const hasValidNavigationPath = useMemo(() => {
+    if (navigationPath.length === 0) {
+      return true;
+    }
+
+    const currentPath = agentViewModel.indexes.pathById.get(navigationPath[navigationPath.length - 1] ?? '');
+    return currentPath != null && areStringArraysEqual(currentPath, navigationPath);
+  }, [agentViewModel.indexes.pathById, navigationPath]);
   const localSelectableNodeIds = useMemo(
     () => new Set(nodes.filter((node) => !node.proxy).map((node) => node.viewId)),
     [nodes]
@@ -198,6 +206,7 @@ export const useSNNTopologyState = ({
   }, [activeLink, activeNode, setShowDetailModal, showDetailModal]);
 
   const clearTransientState = useCallback(() => {
+    scopeSessionRef.current = null;
     setSelectionState(createEmptySelectionState());
     setSelectionRect(null);
     setShowDetailModal(null);
@@ -207,6 +216,15 @@ export const useSNNTopologyState = ({
     setPendingFocusNodeId(null);
     setPendingFocusLinkId(null);
   }, [setCanvasScale, setPendingFocusLinkId]);
+
+  useEffect(() => {
+    if (hasValidNavigationPath) {
+      return;
+    }
+
+    setNavigationPath([]);
+    clearTransientState();
+  }, [clearTransientState, hasValidNavigationPath]);
 
   useEffect(() => {
     if (scopeSessionRef.current === scopeKey) {

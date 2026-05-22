@@ -59,6 +59,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
           data-testid="editor-tab-graph"
           role="tab"
           aria-selected={editorTab === 'graph'}
+          onClick={() => onEditorTabChange('graph')}
         >
           {visibleGraphPath.map((item, index) => (
             <React.Fragment key={item.id}>

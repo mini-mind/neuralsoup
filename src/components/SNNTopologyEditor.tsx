@@ -17,8 +17,8 @@ interface SNNTopologyEditorProps {
   document: GraphIRDocument;
   visionCells?: number;
   onAgentChange?: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
-  onGraphPathChange?: (graphPath: GraphPathItem[]) => void;
-  onGraphPathNavigateRegister?: (navigate: (pathId: string) => void) => void;
+  onGraphPathChange?: (graphPath: GraphPathItem[], sourceAgentId: string) => void;
+  onGraphPathNavigateRegister?: (navigate: (pathId: string) => void, sourceAgentId: string) => void;
   runtimeStatus: GraphIRRuntimeStatus;
   draftStatus: GraphIRDraftStatus;
   runtimeActivity: GraphIRRuntimeActivitySnapshot;
@@ -163,16 +163,19 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   });
 
   useEffect(() => {
-    onGraphPathChange?.(breadcrumbs.map((item) => ({ id: item.id, label: item.label })));
-  }, [breadcrumbs, onGraphPathChange]);
+    onGraphPathChange?.(
+      breadcrumbs.map((item) => ({ id: item.id, label: item.label })),
+      agent.metadata.id
+    );
+  }, [agent.metadata.id, breadcrumbs, onGraphPathChange]);
 
   useEffect(() => {
     if (!onGraphPathNavigateRegister) {
       return;
     }
 
-    onGraphPathNavigateRegister(navigateToBreadcrumb);
-  }, [navigateToBreadcrumb, onGraphPathNavigateRegister]);
+    onGraphPathNavigateRegister(navigateToBreadcrumb, agent.metadata.id);
+  }, [agent.metadata.id, navigateToBreadcrumb, onGraphPathNavigateRegister]);
 
   return (
     <div className="snn-topology-editor" data-testid="topology-editor">
