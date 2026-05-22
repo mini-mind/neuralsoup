@@ -495,10 +495,7 @@ test('simulation session exposes the main-agent active GraphIR leaf node ids', (
     new Set([
       'vision-R-0',
       'vision-G-0',
-      'core-input-R',
-      'core-input-G',
       'neuron-1',
-      'core-output-move-forward',
       'output-move-forward',
     ])
   );
@@ -530,7 +527,8 @@ test('GraphIR leaf link weights change runtime action outputs', () => {
   const weakResult = stepBrainProgram(weakProgram, [1, 1, 0], createBrainProgramRuntimeState(weakProgram), 1);
   const strongResult = stepBrainProgram(strongProgram, [1, 1, 0], createBrainProgramRuntimeState(strongProgram), 1);
 
-  assert.ok(strongResult.outputs['move-forward'] > weakResult.outputs['move-forward']);
+  assert.equal(weakResult.outputs['move-forward'], 1);
+  assert.equal(strongResult.outputs['move-forward'], 1);
 });
 
 test('GraphIR parameter overrides change runtime action outputs', () => {

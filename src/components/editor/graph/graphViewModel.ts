@@ -14,71 +14,14 @@ import type {
   TopologyNode,
 } from '../../../domain/brain';
 import { getGraphLinkCapabilities } from './graphLinkPolicy';
-
-export interface GraphBreadcrumbItem {
-  id: string;
-  label: string;
-}
-
-export interface GraphViewNode {
-  id: string;
-  refNodeId: string;
-  label: string;
-  kind: TopologyNode['kind'];
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  parentId: string | null;
-  detail: string;
-  editable: boolean;
-  navigable: boolean;
-  leaf: boolean;
-  proxy: boolean;
-  movable: boolean;
-  local: boolean;
-  direction: 'input' | 'output' | 'internal';
-  connectableSource: boolean;
-  connectableTarget: boolean;
-  expanded: boolean;
-  expansionParentId: string | null;
-  expansionOffsetX: number;
-  expansionOffsetY: number;
-}
-
-export interface GraphViewLink {
-  id: string;
-  fromNodeId: string;
-  toNodeId: string;
-  weight: number;
-  count: number;
-  aggregate: boolean;
-  leafLinkIds: string[];
-  editable: boolean;
-}
-
-export interface GraphTopologyIndexes {
-  pathById: Map<string, string[]>;
-  nodeById: Map<string, TopologyNode>;
-}
-
-export interface GraphViewModel {
-  indexes: GraphTopologyIndexes;
-  breadcrumbs: GraphBreadcrumbItem[];
-  currentContainer: RootGraph | AdapterNode | NeuronGroupNode;
-  currentChildren: TopologyNode[];
-  currentScope: 'root' | 'child';
-  currentContainerKind: 'root' | AdapterNode['kind'] | NeuronGroupNode['kind'];
-  scopeKey: string;
-  localLeafIds: Set<string>;
-  nodes: GraphViewNode[];
-  viewNodeById: Map<string, GraphViewNode>;
-  links: GraphViewLink[];
-  activeViewNodeIds: Set<string>;
-  modelById: Map<string, ModelDefinition>;
-}
-
-type NodePositionDraftMap = Record<string, Position>;
+import type {
+  GraphBreadcrumbItem,
+  GraphTopologyIndexes,
+  GraphViewLink,
+  GraphViewModel,
+  GraphViewNode,
+  NodePositionDraftMap,
+} from './graphViewTypes';
 
 export const CHILD_SCOPE_OFFSET = {
   x: 260,
@@ -267,7 +210,7 @@ const getDefaultStoredPosition = (node: TopologyNode, index: number, scope: 'roo
 const getLayoutPosition = (node: TopologyNode, index: number, scope: 'root' | 'child'): Position =>
   toViewPosition(node.position ?? getDefaultStoredPosition(node, index, scope), scope);
 
-export const collectNodePathById = (root: RootGraph): GraphTopologyIndexes => {
+export const collectNodePathById = (root: RootGraph): GraphTopologyIndexes<TopologyNode> => {
   const pathById = new Map<string, string[]>();
   const nodeById = new Map<string, TopologyNode>();
 
@@ -431,7 +374,7 @@ export const buildGraphViewModel = ({
   navigationPath: string[];
   draftNodePositions: NodePositionDraftMap;
   runtimeActiveNodeIds: string[];
-}): GraphViewModel => {
+}): GraphViewModel<TopologyNode, RootGraph | AdapterNode | NeuronGroupNode> => {
   const indexes = collectNodePathById(document.root);
   const currentContainer = getNodeByPath(document.root, navigationPath, indexes.nodeById);
   const currentChildren = currentContainer.children;

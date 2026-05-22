@@ -10,7 +10,6 @@ import {
   type AgentIR,
   type AgentPackage,
   type BrainPackage,
-  type BodyDefinition,
   reconcileGraphIRDocumentVisionCells,
   summarizeGraphIRDocument,
   validateGraphIRDocument,
@@ -100,12 +99,6 @@ const App: React.FC = () => {
   const [stats, setStats] = useState<SimulationState['stats']>(INITIAL_STATS);
   const [activeAgentDocument, setActiveAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
   const [graphDocument, setGraphDocument] = useState<GraphIRDocument>(() => initialGraphDocument);
-  const [runtimeGraphDocument, setRuntimeGraphDocument] = useState<GraphIRDocument>(() =>
-    initialGraphDocument
-  );
-  const [runtimeBodyDefinition, setRuntimeBodyDefinition] = useState<BodyDefinition>(() =>
-    initialBodyDefinition
-  );
   const [graphIRRuntimeStatus, setGraphIRRuntimeStatus] = useState<GraphIRRuntimeStatus>(() =>
     createInitialGraphIRRuntimeStatus(initialGraphDocument)
   );
@@ -241,10 +234,11 @@ const App: React.FC = () => {
       installToRuntime: boolean = true,
       persistActiveBrain: boolean = true
     ) => {
+      const activeBridge = createLegacyGraphBridgeFromAgent(activeAgentDocument);
       const nextAgentDocument = createAgentIRFromLegacyGraph(
         activeAgentDocument.metadata.name,
         nextDocument,
-        runtimeBodyDefinition,
+        activeBridge.body,
         undefined,
         activeAgentDocument.metadata
       );
@@ -253,14 +247,12 @@ const App: React.FC = () => {
       setGraphDocument(nextDocument);
       setBrainLibrary((currentLibrary) =>
         persistActiveBrain && activeBrainId
-          ? upsertBrainLibraryItemDefinition(currentLibrary, activeBrainId, nextDocument, runtimeBodyDefinition)
+          ? upsertBrainLibraryItemDefinition(currentLibrary, activeBrainId, nextDocument, activeBridge.body)
           : currentLibrary
       );
-      if (installToRuntime) {
-        setRuntimeGraphDocument(nextDocument);
-      }
+      void installToRuntime;
     },
-    [activeAgentDocument, activeBrainId, runtimeBodyDefinition]
+    [activeAgentDocument, activeBrainId]
   );
 
   useEffect(() => {
@@ -292,7 +284,6 @@ const App: React.FC = () => {
     const nextDocument = reconcileGraphIRDocumentVisionCells(graphDocumentRef.current, params.visionCells);
     setAgentParameters((current) => (areAgentParametersEqual(current, params) ? current : params));
     updateGraphDocument(nextDocument, true, false);
-    setRuntimeBodyDefinition(nextBodyDefinition);
     setActiveAgentDocument((current) =>
       createAgentIRFromLegacyGraph(current.metadata.name, nextDocument, nextBodyDefinition, undefined, current.metadata)
     );
@@ -383,8 +374,8 @@ const App: React.FC = () => {
     resetRuntimeForBrainSwitch();
     setActiveBrainId(selectedBrain.metadata.id);
     setActiveAgentDocument(selectedBrain.agent);
-    updateGraphDocument(bridge.document, true, false);
-    setRuntimeBodyDefinition(bridge.body);
+    graphDocumentRef.current = bridge.document;
+    setGraphDocument(bridge.document);
     setAgentParameters((current) =>
       current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells }
     );
@@ -418,8 +409,8 @@ const App: React.FC = () => {
     setBrainLibrary((currentLibrary) => [...currentLibrary, nextBrain]);
     setActiveBrainId(nextBrain.metadata.id);
     setActiveAgentDocument(nextBrain.agent);
-    updateGraphDocument(bridge.document, true, false);
-    setRuntimeBodyDefinition(bridge.body);
+    graphDocumentRef.current = bridge.document;
+    setGraphDocument(bridge.document);
     setAgentParameters((current) => {
       const bodyVisionCells = getBodyVisionCellCount(bridge.body);
       return current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells };
@@ -639,8 +630,7 @@ const App: React.FC = () => {
           width={canvasWidth}
           height={canvasHeight}
           controlMode={'snn' as Extract<SimulationControlMode, 'keyboard' | 'snn'>}
-          graphDocument={runtimeGraphDocument}
-          bodyDefinition={runtimeBodyDefinition}
+          agentDocument={activeAgentDocument}
           agentParameters={agentParameters}
           requestedLifecycleState={requestedLifecycleState}
           resetToken={resetToken}

@@ -16,8 +16,8 @@ import {
   LEAF_NODE_SIZE,
   isContainerNode,
   isLeafNode,
-  type GraphViewNode,
 } from '../editor/graph/graphViewModel';
+import type { GraphViewNode } from '../editor/graph/graphViewTypes';
 import { canGraphNodesConnect } from '../editor/graph/graphLinkPolicy';
 import type {
   DetailModalData,

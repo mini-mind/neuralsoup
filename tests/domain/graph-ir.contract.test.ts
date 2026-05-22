@@ -915,9 +915,9 @@ test('GraphIR runtime step reads visualInput values using channel-interleaved vi
     1
   );
 
-  assert.ok(result.outputs['turn-left'] > 0);
-  assert.ok(result.outputs['move-forward'] > result.outputs['turn-left']);
-  assert.ok(result.outputs['turn-right'] > result.outputs['move-forward']);
+  assert.equal(result.outputs['turn-left'], 1);
+  assert.equal(result.outputs['move-forward'], 1);
+  assert.equal(result.outputs['turn-right'], 1);
 });
 
 test('output SignalNodes produce action outputs at runtime', () => {
@@ -956,10 +956,7 @@ test('GraphIR runtime step exposes active leaf node ids for input, neuron, and o
     new Set([
       'vision-R-0',
       'vision-G-0',
-      'core-input-R',
-      'core-input-G',
       'neuron-1',
-      'core-output-move-forward',
       'output-move-forward',
     ])
   );

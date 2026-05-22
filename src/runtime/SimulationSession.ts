@@ -6,6 +6,7 @@ import {
   compileAgentIR,
   compileBrainDefinition,
   createAgentIRFromLegacyGraph,
+  createLegacyGraphBridgeFromAgent,
   createDefaultBodyDefinition,
   createDefaultGraphIRDocument,
   GraphIRValidationError,
@@ -195,6 +196,7 @@ export class SimulationSession {
     }
 
     try {
+      compileBrainDefinition(reconciledDocument, reconciledBody);
       this.applyAgentIR(
         createAgentIRFromLegacyGraph(
           this.currentAgentIR.metadata.name,
@@ -225,9 +227,10 @@ export class SimulationSession {
 
   public setAgentIR(agent: AgentIR): GraphIRRuntimeStatus {
     const mainAgent = this.getMainAgent();
+    const bridge = createLegacyGraphBridgeFromAgent(agent);
 
     try {
-      this.applyAgentIR(agent, this.currentGraphIRDocument, this.currentBodyDefinition, mainAgent);
+      this.applyAgentIR(agent, bridge.document, bridge.body, mainAgent);
     } catch (error) {
       if (error instanceof GraphIRValidationError) {
         return this.setInvalidGraphIRRuntimeStatus(error.issues);
@@ -241,7 +244,7 @@ export class SimulationSession {
       ]);
     }
 
-    return this.setAppliedGraphIRRuntimeStatus(this.currentGraphIRDocument);
+    return this.setAppliedGraphIRRuntimeStatus(bridge.document);
   }
 
   public getMainAgentControlMode(): SimulationControlMode {
@@ -271,13 +274,8 @@ export class SimulationSession {
       return { activeNodeIds: [] };
     }
 
-    const runtimeState = this.agentController.getBrainRuntimeState(mainAgent.id);
-    if (!runtimeState) {
-      return { activeNodeIds: [] };
-    }
-
     return {
-      activeNodeIds: [...runtimeState.activeLeafNodeIds],
+      activeNodeIds: this.agentController.getActiveLeafNodeIds(mainAgent.id),
     };
   }
 
@@ -361,11 +359,10 @@ export class SimulationSession {
     body: BodyDefinition,
     mainAgent: Agent | null
   ): void {
-    const compiledProgram = compileBrainDefinition(document, body);
-    compileAgentIR(agent);
+    const compiledProgram = compileAgentIR(agent);
 
     if (mainAgent) {
-      this.agentController.installBrainProgram(mainAgent.id, compiledProgram);
+      this.agentController.installAgentProgram(mainAgent.id, compiledProgram);
     }
 
     this.currentAgentIR = agent;

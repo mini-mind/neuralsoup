@@ -6,8 +6,12 @@
 import { Agent } from '../types/simulation';
 import type { SimulationControlMode } from '../domain/world';
 import {
+  createAgentProgramRuntimeState,
   createBrainProgramRuntimeState,
+  stepAgentProgram,
   stepBrainProgram,
+  type AgentProgram,
+  type AgentProgramRuntimeState,
   type BrainProgram,
   type BrainProgramRuntimeState
 } from '../domain/brain';
@@ -26,10 +30,21 @@ export interface AgentUpdateContext {
 export class AgentController {
   private brainPrograms: Map<number, BrainProgram> = new Map();
   private brainRuntimeStates: Map<number, BrainProgramRuntimeState> = new Map();
+  private agentPrograms: Map<number, AgentProgram> = new Map();
+  private agentRuntimeStates: Map<number, AgentProgramRuntimeState> = new Map();
 
   public installBrainProgram(agentId: number, program: BrainProgram): void {
+    this.agentPrograms.delete(agentId);
+    this.agentRuntimeStates.delete(agentId);
     this.brainPrograms.set(agentId, program);
     this.brainRuntimeStates.set(agentId, createBrainProgramRuntimeState(program));
+  }
+
+  public installAgentProgram(agentId: number, program: AgentProgram): void {
+    this.brainPrograms.delete(agentId);
+    this.brainRuntimeStates.delete(agentId);
+    this.agentPrograms.set(agentId, program);
+    this.agentRuntimeStates.set(agentId, createAgentProgramRuntimeState(program));
   }
 
   public getBrainRuntimeState(agentId: number): BrainProgramRuntimeState | null {
@@ -38,6 +53,20 @@ export class AgentController {
 
   public getBrainProgram(agentId: number): BrainProgram | null {
     return this.brainPrograms.get(agentId) ?? null;
+  }
+
+  public getActiveLeafNodeIds(agentId: number): string[] {
+    const agentRuntimeState = this.agentRuntimeStates.get(agentId);
+    if (agentRuntimeState) {
+      return [...agentRuntimeState.activeLeafNodeIds];
+    }
+
+    const brainRuntimeState = this.brainRuntimeStates.get(agentId);
+    if (brainRuntimeState) {
+      return [...brainRuntimeState.activeLeafNodeIds];
+    }
+
+    return [];
   }
 
   /**
@@ -87,9 +116,11 @@ export class AgentController {
     deltaTime: number,
     keyboardInputs: [number, number, number]
   ): void {
+    const agentProgram = this.agentPrograms.get(agent.id);
+    const agentRuntimeState = this.agentRuntimeStates.get(agent.id);
     const brainProgram = this.brainPrograms.get(agent.id);
     const runtimeState = this.brainRuntimeStates.get(agent.id);
-    if (!brainProgram || !runtimeState) {
+    if (!agentProgram && (!brainProgram || !runtimeState)) {
       return;
     }
     
@@ -99,10 +130,31 @@ export class AgentController {
     if (hasKeyboardInput) {
       this.applyAction(agent, keyboardInputs, deltaTime);
     } else {
+      if (agentProgram && agentRuntimeState) {
+        const result = stepAgentProgram(
+          agentProgram,
+          agent.visualInput,
+          agentRuntimeState,
+          deltaTime,
+          Date.now()
+        );
+        this.agentRuntimeStates.set(agent.id, result.runtimeState);
+        this.applyAction(
+          agent,
+          [
+            result.outputs['turn-left'],
+            result.outputs['move-forward'],
+            result.outputs['turn-right']
+          ],
+          deltaTime
+        );
+        return;
+      }
+
       const result = stepBrainProgram(
-        brainProgram,
+        brainProgram!,
         agent.visualInput,
-        runtimeState,
+        runtimeState!,
         deltaTime,
         Date.now()
       );
@@ -185,5 +237,7 @@ export class AgentController {
   public destroy(): void {
     this.brainPrograms.clear();
     this.brainRuntimeStates.clear();
+    this.agentPrograms.clear();
+    this.agentRuntimeStates.clear();
   }
 } 

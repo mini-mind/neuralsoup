@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import type { GraphViewNode } from './graphViewModel';
+import type { GraphViewNode } from './graphViewTypes';
 import { projectGraphScene, type GraphSceneNode } from './graphSceneProjection';
 import { useGraphViewSessionController } from './interaction/useGraphViewSessionController';
 import type { GraphCanvasViewport } from '../../hooks/useSNNTopologyState';

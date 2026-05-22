@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as PIXI from '../engine/pixi';
-import type { BodyDefinition, GraphIRDocument } from '../domain/brain';
+import type { AgentIR } from '../domain/brain';
 import { SimulationEngine, type SimulationLifecycleState } from '../engine/SimulationEngine';
 import type { SimulationControlMode } from '../domain/world';
 import type { SimulationState } from '../types/simulation';
@@ -14,8 +14,7 @@ interface SimulationCanvasProps {
   onGraphIRStatusChange: (status: GraphIRRuntimeStatus) => void;
   onGraphIRActivityChange: (snapshot: GraphIRRuntimeActivitySnapshot) => void;
   controlMode: Extract<SimulationControlMode, 'keyboard' | 'snn'>;
-  graphDocument: GraphIRDocument;
-  bodyDefinition: BodyDefinition;
+  agentDocument: AgentIR;
   agentParameters: AgentParameters;
   requestedLifecycleState: SimulationLifecycleState;
   resetToken: number;
@@ -40,8 +39,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   onGraphIRStatusChange,
   onGraphIRActivityChange,
   controlMode,
-  graphDocument,
-  bodyDefinition,
+  agentDocument,
   agentParameters,
   requestedLifecycleState,
   resetToken,
@@ -232,8 +230,8 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       return;
     }
 
-    engine.setGraphIRDocument(graphDocument, bodyDefinition);
-  }, [bodyDefinition, graphDocument]);
+    engine.setAgentIR(agentDocument);
+  }, [agentDocument]);
 
   useEffect(() => {
     const engine = engineRef.current;
@@ -248,9 +246,9 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     }
 
     engine.updateAgentParameters(agentParameters);
-    engine.setGraphIRDocument(graphDocument, bodyDefinition);
+    engine.setAgentIR(agentDocument);
     onAgentParametersChange(engine.getAgentParameters());
-  }, [agentParameters, bodyDefinition, graphDocument, onAgentParametersChange]);
+  }, [agentDocument, agentParameters, onAgentParametersChange]);
 
   useEffect(() => {
     const engine = engineRef.current;
@@ -289,12 +287,12 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
     lastAppliedResetTokenRef.current = resetToken;
     engine.reset();
-    engine.setGraphIRDocument(graphDocument, bodyDefinition);
+    engine.setAgentIR(agentDocument);
     engine.setControlMode(controlMode);
     engine.updateAgentParameters(agentParameters);
-    engine.setGraphIRDocument(graphDocument, bodyDefinition);
+    engine.setAgentIR(agentDocument);
     onAgentParametersChange(engine.getAgentParameters());
-  }, [agentParameters, bodyDefinition, graphDocument, controlMode, onAgentParametersChange, resetToken]);
+  }, [agentDocument, agentParameters, controlMode, onAgentParametersChange, resetToken]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {

@@ -1,4 +1,4 @@
-import type { GraphViewNode } from './graphViewModel';
+import type { GraphViewNode } from './graphViewTypes';
 import { SCENE_PADDING } from './tools/canvasGeometry';
 
 export interface GraphSceneNode extends GraphViewNode {

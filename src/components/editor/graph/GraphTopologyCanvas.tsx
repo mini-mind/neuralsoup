@@ -1,5 +1,5 @@
 import React from 'react';
-import type { GraphViewLink } from './graphViewModel';
+import type { GraphViewLink } from './graphViewTypes';
 import type { GraphInteractionState, GraphContextMenuState } from './interaction/interactionSession';
 import type { GraphSceneProjection } from './graphSceneProjection';
 import { getNodeCenter, normalizeRect } from './tools/canvasGeometry';
