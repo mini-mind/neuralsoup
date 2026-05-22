@@ -85,13 +85,14 @@ const body: BodyIR = {
 
 ## BrainIR
 
-`BrainIR` 只描述神经元及分组。通用神经元运行逻辑由引擎托管，节点 IR 只保留模型选择和关键参数。
+`BrainIR` 只描述神经元及容器层级。通用神经元运行逻辑由引擎托管，节点 IR 只保留模型选择、关键参数和初始状态。
 
 ```ts
 export interface BrainIR {
   version: 1;
   neurons: BrainNeuronNode[];
-  groups: BrainGroupNode[];
+  containers: BrainContainerNode[];
+  rootContainerId: string;
 }
 
 export interface BrainNeuronNode {
@@ -104,12 +105,16 @@ export interface BrainNeuronNode {
     d: number;
     threshold: number;
   };
+  initialState: {
+    v: number;
+    u?: number;
+  };
 }
 
-export interface BrainGroupNode {
+export interface BrainContainerNode {
   id: string;
   label?: string;
-  children: Array<{ scope: 'brain'; nodeId: string } | { scope: 'group'; nodeId: string }>;
+  children: Array<{ scope: 'brain'; nodeId: string } | { scope: 'container'; nodeId: string }>;
 }
 ```
 
@@ -119,7 +124,10 @@ export interface BrainGroupNode {
 - BrainIR 不包含 input/output signal node。
 - BrainIR 不包含 world-facing source/target。
 - BrainIR 不包含 layout 字段。
+- `rootContainerId` 指向唯一根容器。
+- 每个 neuron 或 container 除 root container 外只能被一个 container 持有。
 - 第一阶段神经元模型可固定为 `izhikevich`，后续再扩展模型枚举或模型注册表。
+- `initialState.v` 是初始膜电位；`initialState.u` 未设置时由 runtime 使用模型默认规则推导，例如 `b * v`。
 
 ## AgentConnection
 
@@ -159,15 +167,24 @@ export interface AgentConnection {
 export interface AgentLayoutIR {
   version: 1;
   nodes: Record<string, AgentLayoutNodeState>;
+  viewportByContainerId?: Record<string, AgentLayoutViewport>;
 }
 
 export interface AgentLayoutNodeState {
   position?: { x: number; y: number };
+  size?: { width: number; height: number };
   collapsed?: boolean;
+  expanded?: boolean;
+}
+
+export interface AgentLayoutViewport {
+  x: number;
+  y: number;
+  scale: number;
 }
 ```
 
-layout 只影响 GraphView 展示，不参与 runtime 编译。
+layout 只影响 GraphView 展示，不参与 runtime 编译。`viewportByContainerId` 用于恢复不同层级画布的平移和缩放状态；`size` 用于保存展开容器或自定义节点尺寸。
 
 ## 编译边界
 
@@ -182,7 +199,7 @@ compileAgentIR(agent: AgentIR): AgentProgram
 1. 校验 `body.inputRules` / `body.outputRules` 的正则和模板。
 2. 从 `connections` 中收集被引用的 `bodyInput` / `bodyOutput` 节点 ID。
 3. 用 body 规则解析这些 body 节点 ID，得到 world `source` / `target`、`scale` 和 `decayPerSecond`。
-4. 校验 brain neuron 和 group 引用。
+4. 校验 brain neuron、container 引用和 root container。
 5. 校验连接方向和端点存在性。
 6. lower `bodyInput -> brain` 为 runtime input injection。
 7. lower `brain -> brain` 为 neuron connection。
@@ -199,7 +216,7 @@ runtime 不从节点命名、label 或模板以外的字段推断 world 语义�
 - `GraphIRDocument` 需要替换为纯 `BrainIR`。
 - `AdapterNode` 和 `SignalNode` 需要从 brain topology 中移除。
 - `LeafLink` 需要替换为 `AgentConnection`。
-- `position` 和 `collapsed` 需要从 topology node 移入 `AgentLayoutIR`。
+- `position`、`collapsed`、`expanded`、`size` 和 viewport 需要从 topology/UI 临时状态移入 `AgentLayoutIR`。
 
 迁移完成后，导入、导出和 LocalStorage 只接受 `AgentIR`。
 
