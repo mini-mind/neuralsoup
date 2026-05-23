@@ -8,15 +8,18 @@ import {
   AGENT_GRAPH_CHILD_SCOPE_OFFSET,
   AGENT_GRAPH_EXPANDED_GROUP_PADDING,
   AGENT_GRAPH_LEAF_NODE_SIZE,
-  AGENT_GRAPH_ROOT_BRAIN_GROUP_ID,
 } from '../editor/graph/agentGraphViewConstants';
 import {
   aggregateAgentNodesIntoGroup,
   createNeuronAndConnectInContainer,
   ungroupAgentContainer,
 } from '../editor/graph/agentGraphEditing';
+import {
+  GRAPH_LAYOUT_ONLY_CHANGE,
+  GRAPH_SEMANTIC_CHANGE,
+} from './graphDocumentChangePolicy';
 import type { GraphNodeUpdatePayload } from '../editor/graph/graphNodeUpdate';
-import type { GraphViewNode } from '../editor/graph/graphViewTypes';
+import type { GraphViewLink, GraphViewNode } from '../editor/graph/graphViewTypes';
 import type { AgentGraphViewIndexes, AgentGraphViewNodeRecord } from '../editor/graph/agentGraphViewModel';
 import { canGraphNodesConnect } from '../editor/graph/graphLinkPolicy';
 import type {
@@ -147,10 +150,6 @@ const resolveCurrentBrainContainerId = (agent: AgentIR, navigationPath: string[]
   }
 
   const currentNodeId = navigationPath[navigationPath.length - 1]!;
-  if (currentNodeId === AGENT_GRAPH_ROOT_BRAIN_GROUP_ID) {
-    return agent.brain.rootContainerId;
-  }
-
   return agent.brain.containers.some((container) => container.id === currentNodeId) ? currentNodeId : null;
 };
 
@@ -259,6 +258,7 @@ interface GraphEditorCommandDependencies {
   viewNodeById: Map<string, GraphViewNode>;
   selectionState: GraphSelectionState;
   draftNodePositions: NodePositionDraftMap;
+  links: GraphViewLink[];
   setDraftNodePositions: React.Dispatch<React.SetStateAction<NodePositionDraftMap>>;
   clearSelection: () => void;
   scheduleFocusNode: (nodeId: string | null) => void;
@@ -280,6 +280,7 @@ export const useGraphEditorCommands = ({
   viewNodeById,
   selectionState,
   draftNodePositions,
+  links,
   setDraftNodePositions,
   clearSelection,
   scheduleFocusNode,
@@ -414,7 +415,7 @@ export const useGraphEditorCommands = ({
           }));
         }
         return nextAgent;
-      }, { installToRuntime: false, commitToCurrentDocument: true, persistActiveBrain: true });
+      }, GRAPH_LAYOUT_ONLY_CHANGE);
       setDraftNodePositions({});
     },
     [draftNodePositions, setAgent, setDraftNodePositions]
@@ -452,6 +453,12 @@ export const useGraphEditorCommands = ({
   const removeSelected = useCallback(() => {
     if (selectionState.linkId) {
       const removableLinkId = selectionState.linkId;
+      const selectedLink = links.find((link) => link.id === removableLinkId);
+      if (!selectedLink?.editable) {
+        clearSelection();
+        dismissDetailModalIf((detail) => detail.type === 'link' && detail.id === removableLinkId);
+        return;
+      }
       setAgent((current) => ({
         ...current,
         connections: current.connections.filter((link) => link.id !== removableLinkId),
@@ -537,6 +544,7 @@ export const useGraphEditorCommands = ({
     clearSelection,
     dismissDetailModalIf,
     indexes.nodeById,
+    links,
     navigationPath,
     selectionState,
     setAgent,
@@ -659,6 +667,7 @@ export const useGraphEditorCommands = ({
         id: nextNeuronId,
         viewId: nextNeuronId,
         refNodeId: nextNeuronId,
+        rootContainer: false,
         label: nextNeuronId,
         kind: 'neuron',
         x,
@@ -816,7 +825,7 @@ export const useGraphEditorCommands = ({
           })
         ),
       });
-    }, { installToRuntime: true, commitToCurrentDocument: true, persistActiveBrain: true });
+    }, GRAPH_SEMANTIC_CHANGE);
     scheduleFocusNode(nextGroupId);
     closeDetailModal();
     clearSelectionRect();
@@ -854,7 +863,7 @@ export const useGraphEditorCommands = ({
         }
 
         return ungroupAgentContainer(current, currentContainerId, targetGroup.refNodeId);
-      }, { installToRuntime: true, commitToCurrentDocument: true, persistActiveBrain: true });
+      }, GRAPH_SEMANTIC_CHANGE);
       clearSelection();
       closeDetailModal();
       clearSelectionRect();
@@ -882,7 +891,7 @@ export const useGraphEditorCommands = ({
             ...layoutNode,
             collapsed: layoutNode.collapsed === false ? true : false,
           })),
-        { installToRuntime: false, commitToCurrentDocument: true, persistActiveBrain: true }
+        GRAPH_LAYOUT_ONLY_CHANGE
       );
       clearSelection();
       clearSelectionRect();

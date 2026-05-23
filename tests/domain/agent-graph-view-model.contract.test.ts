@@ -93,9 +93,10 @@ const createTestAgent = (): AgentIR => ({
 });
 
 test('agent graph view expanded children are addressable by both id and viewId', () => {
+  const agent = createTestAgent();
   const viewModel = buildAgentGraphViewModel({
-    agent: createTestAgent(),
-    navigationPath: ['core-neuron-group'],
+    agent,
+    navigationPath: [agent.brain.rootContainerId],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
   });
@@ -107,9 +108,10 @@ test('agent graph view expanded children are addressable by both id and viewId',
 });
 
 test('agent graph view expanded children use viewId for active highlights', () => {
+  const agent = createTestAgent();
   const viewModel = buildAgentGraphViewModel({
-    agent: createTestAgent(),
-    navigationPath: ['core-neuron-group'],
+    agent,
+    navigationPath: [agent.brain.rootContainerId],
     draftNodePositions: {},
     runtimeActiveNodeIds: ['neuron-1'],
   });
@@ -119,9 +121,10 @@ test('agent graph view expanded children use viewId for active highlights', () =
 });
 
 test('agent graph root brain child scope does not inject orphan adapter proxy nodes', () => {
+  const agent = createTestAgent();
   const viewModel = buildAgentGraphViewModel({
-    agent: createTestAgent(),
-    navigationPath: ['core-neuron-group'],
+    agent,
+    navigationPath: [agent.brain.rootContainerId],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
   });
@@ -162,7 +165,7 @@ test('agent graph root brain child scope projects boundary adapters without prox
 
   const viewModel = buildAgentGraphViewModel({
     agent,
-    navigationPath: ['core-neuron-group'],
+    navigationPath: [agent.brain.rootContainerId],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
   });
@@ -170,6 +173,10 @@ test('agent graph root brain child scope projects boundary adapters without prox
   assert.equal(viewModel.nodes.some((node) => node.id === 'core-input-adapter'), true);
   assert.equal(viewModel.nodes.some((node) => node.id === 'core-output-adapter'), true);
   assert.equal(viewModel.nodes.some((node) => node.proxy), false);
+  const boundaryLinks = viewModel.links.filter((link) => link.aggregate);
+  assert.equal(boundaryLinks.length > 0, true);
+  assert.equal(boundaryLinks.every((link) => link.inspectable), true);
+  assert.equal(boundaryLinks.every((link) => link.editable === false), true);
 });
 
 test('agent graph root scope exposes canonical body endpoints even before any connection references them', () => {
@@ -243,4 +250,19 @@ test('agent graph root scope exposes canonical body endpoints even before any co
     new Set(outputScopeView.nodes.map((node) => node.id)),
     new Set(['output-turn-left', 'output-move-forward', 'output-turn-right'])
   );
+});
+
+test('agent graph root scope uses the canonical rootContainerId as the top-level brain node id', () => {
+  const agent = createTestAgent();
+  const rootView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+  });
+
+  const rootBrainNode = rootView.nodes.find((node) => node.refNodeId === agent.brain.rootContainerId);
+  assert.ok(rootBrainNode);
+  assert.equal(rootBrainNode.id, agent.brain.rootContainerId);
+  assert.equal(rootBrainNode.rootContainer, true);
 });

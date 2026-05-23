@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useCallback, useRef, useEffect, useState } from 'react';
 import * as PIXI from '../engine/pixi';
 import type { AgentIR } from '../domain/brain';
 import { SimulationEngine, type SimulationLifecycleState } from '../engine/SimulationEngine';
@@ -13,8 +13,9 @@ interface SimulationCanvasProps {
   onAgentParametersChange: (params: AgentParameters) => void;
   onAgentRuntimeStatusChange: (status: AgentRuntimeStatus) => void;
   onAgentRuntimeActivityChange: (snapshot: AgentRuntimeActivitySnapshot) => void;
+  onAgentRuntimeInstallApplied?: (agent: AgentIR, status: AgentRuntimeStatus) => void;
   controlMode: Extract<SimulationControlMode, 'keyboard' | 'snn'>;
-  agentDocument: AgentIR;
+  runtimeInstallRequest: AgentIR;
   agentParameters: AgentParameters;
   requestedLifecycleState: SimulationLifecycleState;
   resetToken: number;
@@ -38,8 +39,9 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   onAgentParametersChange,
   onAgentRuntimeStatusChange,
   onAgentRuntimeActivityChange,
+  onAgentRuntimeInstallApplied,
   controlMode,
-  agentDocument,
+  runtimeInstallRequest,
   agentParameters,
   requestedLifecycleState,
   resetToken,
@@ -53,6 +55,18 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   const [isEngineReady, setIsEngineReady] = useState(false);
   const [engineInstanceId, setEngineInstanceId] = useState(0);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const lastAppliedRuntimeRequestKeyRef = useRef<string | null>(null);
+
+  const applyRuntimeInstallRequest = useCallback(
+    (engine: SimulationEngine, agent: AgentIR) => {
+      const status = engine.setAgentIR(agent);
+      if (status.state === 'applied') {
+        onAgentRuntimeInstallApplied?.(agent, status);
+      }
+      return status;
+    },
+    [onAgentRuntimeInstallApplied]
+  );
 
   useEffect(() => {
     const container = canvasRef.current;
@@ -230,8 +244,14 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       return;
     }
 
-    engine.setAgentIR(agentDocument);
-  }, [agentDocument]);
+    const requestKey = JSON.stringify(runtimeInstallRequest);
+    if (lastAppliedRuntimeRequestKeyRef.current === requestKey) {
+      return;
+    }
+
+    lastAppliedRuntimeRequestKeyRef.current = requestKey;
+    applyRuntimeInstallRequest(engine, runtimeInstallRequest);
+  }, [applyRuntimeInstallRequest, runtimeInstallRequest]);
 
   useEffect(() => {
     const engine = engineRef.current;
@@ -246,9 +266,10 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     }
 
     engine.updateAgentParameters(agentParameters);
-    engine.setAgentIR(agentDocument);
+    lastAppliedRuntimeRequestKeyRef.current = null;
+    applyRuntimeInstallRequest(engine, runtimeInstallRequest);
     onAgentParametersChange(engine.getAgentParameters());
-  }, [agentDocument, agentParameters, onAgentParametersChange]);
+  }, [agentParameters, applyRuntimeInstallRequest, onAgentParametersChange, runtimeInstallRequest]);
 
   useEffect(() => {
     const engine = engineRef.current;
@@ -287,12 +308,14 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
     lastAppliedResetTokenRef.current = resetToken;
     engine.reset();
-    engine.setAgentIR(agentDocument);
+    lastAppliedRuntimeRequestKeyRef.current = null;
+    applyRuntimeInstallRequest(engine, runtimeInstallRequest);
     engine.setControlMode(controlMode);
     engine.updateAgentParameters(agentParameters);
-    engine.setAgentIR(agentDocument);
+    lastAppliedRuntimeRequestKeyRef.current = null;
+    applyRuntimeInstallRequest(engine, runtimeInstallRequest);
     onAgentParametersChange(engine.getAgentParameters());
-  }, [agentDocument, agentParameters, controlMode, onAgentParametersChange, resetToken]);
+  }, [agentParameters, applyRuntimeInstallRequest, controlMode, onAgentParametersChange, resetToken, runtimeInstallRequest]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {

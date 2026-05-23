@@ -341,7 +341,7 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
 
       return {
         ...node,
-        id: rootContainer.id,
+        id: LEGACY_ROOT_GROUP_ID,
         label: rootContainer.label ?? rootContainer.id,
         position: agent.layout?.nodes[rootContainer.id]?.position ?? node.position,
         collapsed: agent.layout?.nodes[rootContainer.id]?.collapsed ?? node.collapsed,

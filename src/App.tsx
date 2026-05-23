@@ -20,6 +20,10 @@ import SettingsPanel from './components/editor/SettingsPanel';
 import type { AgentParameters, EditorTab, GraphPathItem, SettingsSection } from './components/editor/types';
 import type { GraphDocumentChangeOptions } from './components/hooks/useSNNTopologyState';
 import {
+  GRAPH_DRAFT_ONLY_CHANGE,
+  GRAPH_SEMANTIC_CHANGE,
+} from './components/hooks/graphDocumentChangePolicy';
+import {
   loadBrainLibraryWithStatus,
   saveBrainLibrary,
 } from './storage/brainLibraryStorage';
@@ -136,6 +140,7 @@ const applyBrainRecordToEditorState = (
     setIsBrainLibraryOpen: React.Dispatch<React.SetStateAction<boolean>>;
     setActiveBrainId: React.Dispatch<React.SetStateAction<string | null>>;
     setCurrentAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
+    setRuntimeInstallRequest: React.Dispatch<React.SetStateAction<AgentIR>>;
     setInstalledAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
     setDraftAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
     setDraftGraphStatusOverride: React.Dispatch<React.SetStateAction<AgentDraftStatus | null>>;
@@ -149,6 +154,7 @@ const applyBrainRecordToEditorState = (
   options.setIsBrainLibraryOpen(true);
   options.setActiveBrainId(brain.agent.metadata.id);
   options.setCurrentAgentDocument(brain.agent);
+  options.setRuntimeInstallRequest(brain.agent);
   options.setInstalledAgentDocument(brain.agent);
   options.setDraftAgentDocument(brain.agent);
   options.setDraftGraphStatusOverride(null);
@@ -163,6 +169,7 @@ const applyBrainRecordIdentityToCurrentState = (
   options: {
     setActiveBrainId: React.Dispatch<React.SetStateAction<string | null>>;
     setCurrentAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
+    setRuntimeInstallRequest: React.Dispatch<React.SetStateAction<AgentIR>>;
     setInstalledAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
     setDraftAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
     setDraftGraphStatusOverride: React.Dispatch<React.SetStateAction<AgentDraftStatus | null>>;
@@ -170,6 +177,7 @@ const applyBrainRecordIdentityToCurrentState = (
 ): void => {
   options.setActiveBrainId(brain.agent.metadata.id);
   options.setCurrentAgentDocument(brain.agent);
+  options.setRuntimeInstallRequest(brain.agent);
   options.setInstalledAgentDocument(brain.agent);
   options.setDraftAgentDocument(brain.agent);
   options.setDraftGraphStatusOverride(null);
@@ -184,6 +192,7 @@ const App: React.FC = () => {
   const [resetToken, setResetToken] = useState(0);
   const [stats, setStats] = useState<SimulationState['stats']>(INITIAL_STATS);
   const [currentAgentDocument, setCurrentAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
+  const [runtimeInstallRequest, setRuntimeInstallRequest] = useState<AgentIR>(() => initialAgentDocument);
   const [installedAgentDocument, setInstalledAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
   const [draftAgentDocument, setDraftAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
   const [draftGraphStatusOverride, setDraftGraphStatusOverride] = useState<AgentDraftStatus | null>(null);
@@ -352,7 +361,7 @@ const App: React.FC = () => {
         setCurrentAgentDocument(normalizedAgentDocument);
       }
       if (shouldInstallToRuntime) {
-        setInstalledAgentDocument(normalizedAgentDocument);
+        setRuntimeInstallRequest(normalizedAgentDocument);
       }
       setBrainLibrary((currentLibrary) =>
         shouldPersistActiveBrain && activeBrainId
@@ -425,12 +434,18 @@ const App: React.FC = () => {
     setAgentParameters((current) => (areAgentParametersEqual(current, params) ? current : params));
     handleAgentChange(
       (currentAgent) => reconcileAgentIRVisionCells(currentAgent, params.visionCells),
-      { installToRuntime: true }
+      GRAPH_SEMANTIC_CHANGE
     );
   }, [handleAgentChange]);
 
   const handleAgentRuntimeStatusChange = useCallback((nextStatus: AgentRuntimeStatus) => {
     setAgentRuntimeStatus(nextStatus);
+  }, []);
+
+  const handleAgentRuntimeInstallApplied = useCallback((appliedAgent: AgentIR) => {
+    setInstalledAgentDocument((currentInstalled) =>
+      areAgentsEquivalent(currentInstalled, appliedAgent) ? currentInstalled : appliedAgent
+    );
   }, []);
 
   const handleAgentRuntimeActivityChange = useCallback((nextSnapshot: AgentRuntimeActivitySnapshot) => {
@@ -487,6 +502,7 @@ const App: React.FC = () => {
     applyBrainRecordIdentityToCurrentState(nextBrain, {
       setActiveBrainId,
       setCurrentAgentDocument,
+      setRuntimeInstallRequest,
       setInstalledAgentDocument,
       setDraftAgentDocument,
       setDraftGraphStatusOverride,
@@ -517,6 +533,7 @@ const App: React.FC = () => {
       setIsBrainLibraryOpen,
       setActiveBrainId,
       setCurrentAgentDocument,
+      setRuntimeInstallRequest,
       setInstalledAgentDocument,
       setDraftAgentDocument,
       setDraftGraphStatusOverride,
@@ -544,6 +561,7 @@ const App: React.FC = () => {
       setIsBrainLibraryOpen,
       setActiveBrainId,
       setCurrentAgentDocument,
+      setRuntimeInstallRequest,
       setInstalledAgentDocument,
       setDraftAgentDocument,
       setDraftGraphStatusOverride,
@@ -583,6 +601,10 @@ const App: React.FC = () => {
     }
 
     setCurrentAgentDocument((currentAgent) => ({
+      ...currentAgent,
+      metadata: { ...renamedActiveBrain.agent.metadata },
+    }));
+    setRuntimeInstallRequest((currentAgent) => ({
       ...currentAgent,
       metadata: { ...renamedActiveBrain.agent.metadata },
     }));
@@ -742,7 +764,7 @@ const App: React.FC = () => {
               },
             ],
           }),
-          { installToRuntime: false, commitToCurrentDocument: false, persistActiveBrain: false }
+          GRAPH_DRAFT_ONLY_CHANGE
         );
       },
       injectInvalidGraphDraft: () => {
@@ -775,7 +797,7 @@ const App: React.FC = () => {
               },
             ],
           }),
-          { installToRuntime: false, commitToCurrentDocument: false, persistActiveBrain: false }
+          GRAPH_DRAFT_ONLY_CHANGE
         );
       },
       getRuntimeActiveNodeIds: () => [...agentRuntimeActivity.activeNodeIds],
@@ -805,7 +827,7 @@ const App: React.FC = () => {
           width={canvasWidth}
           height={canvasHeight}
           controlMode={'snn' as Extract<SimulationControlMode, 'keyboard' | 'snn'>}
-          agentDocument={installedAgentDocument}
+          runtimeInstallRequest={runtimeInstallRequest}
           agentParameters={agentParameters}
           requestedLifecycleState={requestedLifecycleState}
           resetToken={resetToken}
@@ -814,6 +836,7 @@ const App: React.FC = () => {
           onAgentParametersChange={handleAgentParametersChange}
           onAgentRuntimeStatusChange={handleAgentRuntimeStatusChange}
           onAgentRuntimeActivityChange={handleAgentRuntimeActivityChange}
+          onAgentRuntimeInstallApplied={handleAgentRuntimeInstallApplied}
         />
         <div className="game-stats-overlay">
           <div className="game-stat-chip">
@@ -862,6 +885,7 @@ const App: React.FC = () => {
           <span data-testid="graph-ir-runtime-state">{agentRuntimeStatus.state}</span>
           <span data-testid="graph-ir-runtime-validation-count">{agentRuntimeStatus.issues.length}</span>
           <span data-testid="graph-ir-runtime-message">{agentRuntimeStatus.message ?? ''}</span>
+          <span data-testid="graph-ir-installed-agent-id">{installedAgentDocument.metadata.id}</span>
           <span data-testid="graph-ir-installed-input-count">{installedGraphSummary.inputSignalCount}</span>
           <span data-testid="graph-ir-installed-neuron-count">{installedGraphSummary.neuronCount}</span>
           <span data-testid="graph-ir-installed-output-count">{installedGraphSummary.outputSignalCount}</span>

@@ -10,7 +10,7 @@ import {
 } from './agent-ir';
 
 const INPUT_CHANNELS = ['R', 'G', 'B'] as const;
-const DEFAULT_ROOT_CONTAINER_ID = 'core-neuron-group';
+export const DEFAULT_ROOT_CONTAINER_ID = 'root-container';
 
 const DEFAULT_AGENT_LAYOUT_VERSION = 1 as const;
 const DEFAULT_AGENT_VERSION = 1 as const;

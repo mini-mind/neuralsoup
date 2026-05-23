@@ -431,6 +431,7 @@ export const buildLegacyGraphViewModel = ({
         id: node.id,
         viewId: getViewNodeId(node.id),
         refNodeId: node.id,
+        rootContainer: false,
         label: node.label,
         kind: node.kind,
         x: position.x,
@@ -482,6 +483,7 @@ export const buildLegacyGraphViewModel = ({
             id: child.id,
             viewId: getViewNodeId(child.id, node.id),
             refNodeId: child.id,
+            rootContainer: false,
             label: child.label,
             kind: child.kind,
             x: position.x + childStoredPosition.x,
@@ -539,10 +541,13 @@ export const buildLegacyGraphViewModel = ({
           id: leafLink.id,
           fromNodeId: fromViewNode.id,
           toNodeId: toViewNode.id,
+          fromRefNodeId: leafLink.from.nodeId,
+          toRefNodeId: leafLink.to.nodeId,
           weight: leafLink.weight,
           count: 1,
           aggregate: false,
           leafLinkIds: [leafLink.id],
+          inspectable: true,
           editable: true,
         };
       }
@@ -551,10 +556,13 @@ export const buildLegacyGraphViewModel = ({
         id: `aggregate:${link.fromNodeId}:${link.toNodeId}`,
         fromNodeId: fromViewNode.id,
         toNodeId: toViewNode.id,
+        fromRefNodeId: link.fromNodeId,
+        toRefNodeId: link.toNodeId,
         weight: link.totalWeight,
         count: link.count,
         aggregate: true,
         leafLinkIds: [...link.leafLinkIds],
+        inspectable: false,
         editable: false,
       };
     })

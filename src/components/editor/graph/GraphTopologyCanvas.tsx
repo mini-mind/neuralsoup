@@ -104,7 +104,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
         ?.closest<SVGGElement | HTMLElement>('[data-topology-link-id]')
         ?.getAttribute('data-topology-link-id');
       if (directLinkId) {
-        const directLink = links.find((link) => link.id === directLinkId && !link.aggregate && link.editable);
+        const directLink = links.find((link) => link.id === directLinkId && link.inspectable);
         if (directLink) {
           return directLink;
         }
@@ -144,7 +144,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
       };
 
       for (const link of links) {
-        if (link.aggregate || !link.editable) {
+        if (!link.inspectable) {
           continue;
         }
 
@@ -350,13 +350,17 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
                 data-topology-link-id={link.id}
                 onClick={(event) => {
                   event.stopPropagation();
-                  if (!link.aggregate) {
+                  if (link.aggregate && link.inspectable) {
+                    onOpenLinkDetail(link.id);
+                    return;
+                  }
+                  if (link.inspectable) {
                     onSelectLink(link.id);
                   }
                 }}
                 onDoubleClick={(event) => {
                   event.stopPropagation();
-                  if (!link.aggregate) {
+                  if (link.inspectable) {
                     onOpenLinkDetail(link.id);
                   }
                 }}
@@ -369,7 +373,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
                   y2={to.y}
                   onDoubleClick={(event) => {
                     event.stopPropagation();
-                    if (!link.aggregate) {
+                    if (link.inspectable) {
                       onOpenLinkDetail(link.id);
                     }
                   }}
@@ -381,7 +385,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
                   y={(from.y + to.y) / 2 - 8}
                   onDoubleClick={(event) => {
                     event.stopPropagation();
-                    if (!link.aggregate) {
+                    if (link.inspectable) {
                       onOpenLinkDetail(link.id);
                     }
                   }}
@@ -436,6 +440,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
               key={node.viewId}
               className={nodeClassName}
               data-testid={`topology-node-${node.id}`}
+              data-topology-root-container={node.rootContainer ? 'true' : undefined}
               data-topology-view-node-id={node.viewId}
               style={{
                 left: node.sceneX,
@@ -447,7 +452,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
               onContextMenu={onNodeContextMenu}
               onDoubleClick={(event) => {
                 event.stopPropagation();
-                if (node.expanded || node.expansionParentId) {
+                if (!node.leaf || node.expanded || node.expansionParentId) {
                   const nearbyLink = findEditableLinkNearClientPoint(event.clientX, event.clientY);
                   if (nearbyLink) {
                     onOpenLinkDetail(nearbyLink.id);

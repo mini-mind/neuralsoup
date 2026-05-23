@@ -74,6 +74,7 @@ const selectors = {
   topologyRuntimeOutputCount: '[data-testid="topology-runtime-output-count"]',
   topologyRuntimeNeuronCount: '[data-testid="topology-runtime-neuron-count"]',
   topologyRuntimeConnectionCount: '[data-testid="topology-runtime-connection-count"]',
+  graphInstalledAgentId: '[data-testid="graph-ir-installed-agent-id"]',
   topologyInputCount: '[data-testid="topology-input-count"]',
   topologyOutputCount: '[data-testid="topology-output-count"]',
   topologyValidationCount: '[data-testid="topology-validation-count"]',
@@ -82,10 +83,13 @@ const selectors = {
   neuronInitialStateUInput: '[data-testid="neuron-initial-state-u-input"]',
   connectionWeightInput: '[data-testid="connection-weight-input"]',
   inputAdapterNode: '[data-testid="topology-node-input-adapter"]',
-  coreGroupNode: '[data-testid="topology-node-core-neuron-group"]',
+  coreGroupNode: '[data-topology-root-container="true"]',
   outputAdapterNode: '[data-testid="topology-node-output-adapter"]',
   coreInputAdapterNode: '[data-testid="topology-node-core-input-adapter"]',
   coreOutputAdapterNode: '[data-testid="topology-node-core-output-adapter"]',
+  aggregateLinkDetail: '[data-testid="topology-aggregate-link-detail"]',
+  aggregateLinkCount: '[data-testid="topology-aggregate-link-count"]',
+  aggregateLinkReadonly: '[data-testid="topology-aggregate-link-readonly"]',
   linkNeuronOneNeuronTwo: '[data-testid="topology-link-link-neuron-1-neuron-2"]',
   nodeNeuronOne: '[data-testid="topology-node-neuron-1"]',
   nodeNeuronTwo: '[data-testid="topology-node-neuron-2"]'
@@ -440,6 +444,15 @@ const getNodeViewPositionFromSummary = async (page: Page, nodeId: string) => {
   const [, coordinates] = entry.split(':');
   const [x, y] = coordinates.split(',').map((value) => Number.parseInt(value, 10));
   return { x, y };
+};
+
+const getNodeViewId = async (page: Page, selector: string) => {
+  const viewId = await page.locator(selector).getAttribute('data-topology-view-node-id');
+  if (!viewId) {
+    throw new Error(`Missing data-topology-view-node-id for selector ${selector}`);
+  }
+
+  return viewId;
 };
 
 const injectInvalidGraphDraft = async (page: Page) => {
@@ -1157,7 +1170,8 @@ test('applying agent parameters persists the current brain library layout instea
   }
 
   await page.locator(selectors.editorTabGraph).click();
-  const initialPosition = await getNodeViewPositionFromSummary(page, 'core-neuron-group');
+  const rootContainerViewId = await getNodeViewId(page, selectors.coreGroupNode);
+  const initialPosition = await getNodeViewPositionFromSummary(page, rootContainerViewId);
   const nodeCenter = await getLocatorCenter(page, selectors.coreGroupNode);
   await dragOnCanvas(page, nodeCenter, {
     x: nodeCenter.x + 92,
@@ -1165,13 +1179,13 @@ test('applying agent parameters persists the current brain library layout instea
   });
 
   await expect
-    .poll(() => getNodeViewPositionFromSummary(page, 'core-neuron-group'))
+    .poll(() => getNodeViewPositionFromSummary(page, rootContainerViewId))
     .toMatchObject({
       x: expect.any(Number),
       y: expect.any(Number),
     });
 
-  const movedPosition = await getNodeViewPositionFromSummary(page, 'core-neuron-group');
+  const movedPosition = await getNodeViewPositionFromSummary(page, rootContainerViewId);
   expect(movedPosition.x !== initialPosition.x || movedPosition.y !== initialPosition.y).toBe(true);
 
   await page.locator(selectors.brainLibraryButton).click();
@@ -1201,7 +1215,7 @@ test('applying agent parameters persists the current brain library layout instea
   await expect(page.locator(selectors.topologyNodeCount)).toHaveText('3');
   await expect(page.locator(selectors.topologyBreadcrumbRoot)).toBeVisible();
   await expect(page.locator(selectors.coreGroupNode)).toBeVisible();
-  const restoredPosition = await getNodeViewPositionFromSummary(page, 'core-neuron-group');
+  const restoredPosition = await getNodeViewPositionFromSummary(page, rootContainerViewId);
   expect(restoredPosition.x).toBe(movedPosition.x);
   expect(restoredPosition.y).toBe(movedPosition.y);
 
@@ -1601,6 +1615,7 @@ test('graph view diagnostics expose invalid draft divergence through the real dr
     return;
   }
 
+  const installedAgentIdBefore = await page.locator(selectors.graphInstalledAgentId).innerText();
   await page.locator(selectors.editorTabGraph).click();
   await doubleClickNode(page, selectors.coreGroupNode);
 
@@ -1631,6 +1646,7 @@ test('graph view diagnostics expose invalid draft divergence through the real dr
       state: 'applied',
       validationCount: '0'
     });
+  await expect(page.locator(selectors.graphInstalledAgentId)).toHaveText(installedAgentIdBefore);
 
   await page.reload();
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
@@ -1641,6 +1657,28 @@ test('graph view diagnostics expose invalid draft divergence through the real dr
   await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(baseRuntimeConnectionCount);
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(baseRuntimeConnectionCount);
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
+});
+
+test('graph view boundary aggregate links are inspectable but remain read-only', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+
+  const aggregateLink = page.locator('[data-testid^="topology-link-aggregate:"]').first();
+  await expect(aggregateLink).toBeVisible();
+  const runtimeConnectionCount = await page.locator(selectors.topologyRuntimeConnectionCount).innerText();
+
+  await doubleClickAtCenter(page, '[data-testid^="topology-link-aggregate:"]');
+  await expect(page.locator(selectors.aggregateLinkDetail)).toBeVisible();
+  await expect(page.locator(selectors.aggregateLinkReadonly)).toHaveText('只读摘要链路');
+  await expect(page.locator(selectors.aggregateLinkCount)).not.toHaveText('0');
+
+  await page.keyboard.press('Delete');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(runtimeConnectionCount);
+  await expect(page.locator(selectors.aggregateLinkDetail)).toHaveCount(0);
 });
 
 test('graph view keyboard interactions remain safe after event hook removal', async ({ page }, testInfo) => {

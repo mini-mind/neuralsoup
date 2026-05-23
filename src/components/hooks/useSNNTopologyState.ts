@@ -10,6 +10,20 @@ export interface DetailModalData {
   id: string;
 }
 
+export interface GraphLinkDetailData {
+  id: string;
+  fromNodeId: string;
+  toNodeId: string;
+  fromRefNodeId: string;
+  toRefNodeId: string;
+  weight: number;
+  count: number;
+  aggregate: boolean;
+  inspectable: boolean;
+  editable: boolean;
+  leafLinkIds: string[];
+}
+
 export interface GraphPoint {
   x: number;
   y: number;
@@ -187,13 +201,31 @@ export const useSNNTopologyState = ({
     return agentViewModel.indexes.nodeById.get(showDetailModal.id) ?? null;
   }, [agentViewModel.indexes.nodeById, showDetailModal]);
 
-  const activeLink = useMemo(() => {
+  const activeLink = useMemo<GraphLinkDetailData | null>(() => {
     if (showDetailModal?.type !== 'link') {
       return null;
     }
 
-    return agent.connections.find((link) => link.id === showDetailModal.id) ?? null;
-  }, [agent.connections, showDetailModal]);
+    const viewLink = links.find((link) => link.id === showDetailModal.id);
+    if (!viewLink) {
+      return null;
+    }
+
+    const leafLink = agent.connections.find((link) => link.id === showDetailModal.id) ?? null;
+    return {
+      id: viewLink.id,
+      fromNodeId: viewLink.fromNodeId,
+      toNodeId: viewLink.toNodeId,
+      fromRefNodeId: viewLink.fromRefNodeId,
+      toRefNodeId: viewLink.toRefNodeId,
+      weight: leafLink?.weight ?? viewLink.weight,
+      count: viewLink.count,
+      aggregate: viewLink.aggregate,
+      inspectable: viewLink.inspectable,
+      editable: viewLink.editable,
+      leafLinkIds: [...viewLink.leafLinkIds],
+    };
+  }, [agent.connections, links, showDetailModal]);
 
   useEffect(() => {
     if (!showDetailModal) {
@@ -510,6 +542,7 @@ export const useSNNTopologyState = ({
     indexes: agentViewModel.indexes,
     localLeafIds: agentViewModel.localLeafIds,
     viewNodeById,
+    links,
     selectionState,
     draftNodePositions,
     setDraftNodePositions,

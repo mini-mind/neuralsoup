@@ -212,9 +212,13 @@
         "cleanup": null
       },
       "error_log": [
-        "Remaining P1/P2 after GraphView cleanup: App/GraphView still mixes draft/current/installed commit semantics across operation types; boundary aggregate links in root brain child scope remain visible but non-operable; root alias core-neuron-group is still a canonical cross-layer id."
+        "Remaining P1/P2 after GraphView cleanup: App still prewrites installedAgentDocument before runtime success is known, so installedAgentDocument can diverge from the true last-applied runtime AgentIR on invalid installs; boundary aggregate links in root brain child scope remain visible but non-operable."
       ],
       "checkpoints": [
+        {
+          "at": "2026-05-24T00:35:00Z",
+          "message": "GraphView main-path cleanup phase 3 landed: graph document change intent is now explicit via semantic/layout/draft-only policies, default AgentIR rootContainerId moved to neutral root-container, production GraphView/navigation now uses canonical rootContainerId instead of the legacy core-neuron-group alias, legacy export still synthesizes core-neuron-group only at the compat boundary, and revalidation passed with npm run type-check, npm run test:domain, npm run test:compat, and npm run test:e2e -- --grep \"graph view|brain library\"."
+        },
         {
           "at": "2026-05-22T19:17:02.240Z",
           "message": "Started AgentIR editor truth cutover: App draft source now anchored on AgentIR, Brain Library normal load/save path preserves AgentPackage without legacy round-trip, and active-brain persistence now updates stored AgentIR directly."

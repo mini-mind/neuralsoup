@@ -17,4 +17,4 @@ export const AGENT_GRAPH_EXPANDED_GROUP_MIN_SIZE = {
 
 export const AGENT_GRAPH_EXPANDED_GROUP_PADDING = 30;
 
-export const AGENT_GRAPH_ROOT_BRAIN_GROUP_ID = 'core-neuron-group';
+export const AGENT_GRAPH_ROOT_CONTAINER_TEST_ID = 'root-container';

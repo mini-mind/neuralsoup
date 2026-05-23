@@ -10,6 +10,7 @@ export interface GraphViewNode {
   id: string;
   viewId: string;
   refNodeId: string;
+  rootContainer: boolean;
   label: string;
   kind: 'adapter' | 'neuron-group' | 'neuron' | 'signal';
   x: number;
@@ -37,10 +38,13 @@ export interface GraphViewLink {
   id: string;
   fromNodeId: string;
   toNodeId: string;
+  fromRefNodeId: string;
+  toRefNodeId: string;
   weight: number;
   count: number;
   aggregate: boolean;
   leafLinkIds: string[];
+  inspectable: boolean;
   editable: boolean;
 }
 

@@ -2,24 +2,13 @@ import React from 'react';
 import NeuronDetailEditor from '../../NeuronDetailEditor';
 import ConnectionDetailEditor from '../../ConnectionDetailEditor';
 import type { GraphNodeUpdatePayload } from './graphNodeUpdate';
-import type { DetailModalData } from '../../hooks/useSNNTopologyState';
+import type { DetailModalData, GraphLinkDetailData } from '../../hooks/useSNNTopologyState';
 import type { AgentGraphViewNodeRecord } from './agentGraphViewModel';
-
-interface GraphLeafLink {
-  id: string;
-  from: {
-    nodeId: string;
-  };
-  to: {
-    nodeId: string;
-  };
-  weight: number;
-}
 
 interface GraphDetailModalProps {
   detailModal: DetailModalData | null;
   activeNode: AgentGraphViewNodeRecord | null;
-  activeLink: GraphLeafLink | null;
+  activeLink: GraphLinkDetailData | null;
   activeNeuronParameters: {
     a: number;
     b: number;
@@ -110,12 +99,12 @@ const GraphDetailModal: React.FC<GraphDetailModalProps> = ({
             onUpdate={() => {}}
           />
         )}
-        {detailModal.type === 'link' && activeLink && (
+        {detailModal.type === 'link' && activeLink && !activeLink.aggregate && (
           <ConnectionDetailEditor
             connection={{
               id: activeLink.id,
-              from: activeLink.from.nodeId,
-              to: activeLink.to.nodeId,
+              from: activeLink.fromNodeId,
+              to: activeLink.toNodeId,
               weight: activeLink.weight,
             }}
             onUpdate={(updatedConnection) => {
@@ -123,9 +112,23 @@ const GraphDetailModal: React.FC<GraphDetailModalProps> = ({
             }}
           />
         )}
+        {detailModal.type === 'link' && activeLink && activeLink.aggregate && (
+          <div className="topology-aggregate-link-detail" data-testid="topology-aggregate-link-detail">
+            <div data-testid="topology-aggregate-link-from">{activeLink.fromNodeId}</div>
+            <div data-testid="topology-aggregate-link-to">{activeLink.toNodeId}</div>
+            <div data-testid="topology-aggregate-link-from-ref">{activeLink.fromRefNodeId}</div>
+            <div data-testid="topology-aggregate-link-to-ref">{activeLink.toRefNodeId}</div>
+            <div data-testid="topology-aggregate-link-count">{String(activeLink.count)}</div>
+            <div data-testid="topology-aggregate-link-weight">{formatAggregateWeight(activeLink.weight)}</div>
+            <div data-testid="topology-aggregate-link-readonly">只读摘要链路</div>
+            <div data-testid="topology-aggregate-link-leaf-ids">{activeLink.leafLinkIds.join('|')}</div>
+          </div>
+        )}
       </div>
     </div>
   );
 };
+
+const formatAggregateWeight = (weight: number) => (Number.isInteger(weight) ? `${weight}` : weight.toFixed(2));
 
 export default GraphDetailModal;

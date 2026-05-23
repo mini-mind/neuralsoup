@@ -38,7 +38,8 @@ test('default AgentIR seed layout does not persist compat-only bridge nodes', ()
   assert.equal(layoutNodeIds.has('core-output-turn-right'), false);
   assert.equal(layoutNodeIds.has('input-adapter'), false);
   assert.equal(layoutNodeIds.has('output-adapter'), false);
-  assert.equal(layoutNodeIds.has('core-neuron-group'), true);
+  assert.equal(layoutNodeIds.has(agent.brain.rootContainerId), true);
+  assert.equal(agent.brain.rootContainerId, 'root-container');
   assert.equal(layoutNodeIds.has('neuron-1'), true);
   assert.equal(layoutNodeIds.has('neuron-2'), true);
 });

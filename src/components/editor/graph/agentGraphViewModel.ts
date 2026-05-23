@@ -23,7 +23,7 @@ import {
   AGENT_GRAPH_EXPANDED_GROUP_PADDING,
   AGENT_GRAPH_GROUP_NODE_SIZE,
   AGENT_GRAPH_LEAF_NODE_SIZE,
-  AGENT_GRAPH_ROOT_BRAIN_GROUP_ID,
+  AGENT_GRAPH_ROOT_CONTAINER_TEST_ID,
 } from './agentGraphViewConstants';
 
 export interface AgentGraphViewNodeRecord {
@@ -52,7 +52,7 @@ export interface AgentGraphViewModel
 
 const ROOT_FALLBACK_LAYOUT: Record<string, Position> = {
   'input-adapter': { x: 24, y: 180 },
-  'core-neuron-group': { x: 300, y: 200 },
+  [AGENT_GRAPH_ROOT_CONTAINER_TEST_ID]: { x: 300, y: 200 },
   'output-adapter': { x: 644, y: 200 },
   'core-input-adapter': { x: 40, y: 180 },
   'core-output-adapter': { x: 520, y: 180 },
@@ -62,7 +62,6 @@ const DEFAULT_MODELS: ModelDefinition[] = [];
 
 const BODY_INPUTS_GROUP_ID = 'input-adapter';
 const BODY_OUTPUTS_GROUP_ID = 'output-adapter';
-const ROOT_BRAIN_GROUP_ID = AGENT_GRAPH_ROOT_BRAIN_GROUP_ID;
 const CORE_BODY_INPUTS_GROUP_ID = 'core-input-adapter';
 const CORE_BODY_OUTPUTS_GROUP_ID = 'core-output-adapter';
 type RootContainerView = { id: 'root'; children: AgentGraphViewNodeRecord[] };
@@ -286,9 +285,6 @@ const getLayoutPosition = (
   );
 };
 
-const getPathPrefixForContainer = (containerId: string, rootContainerId: string) =>
-  containerId === rootContainerId ? [ROOT_BRAIN_GROUP_ID] : [containerId];
-
 const buildIndexes = (agent: AgentIR): AgentGraphViewIndexes => {
   const pathById = new Map<string, string[]>();
   const nodeById = new Map<string, AgentGraphViewNodeRecord>();
@@ -313,7 +309,7 @@ const buildIndexes = (agent: AgentIR): AgentGraphViewIndexes => {
   const rootContainer = containerById.get(agent.brain.rootContainerId);
   if (rootContainer) {
     rootChildren.push({
-      id: ROOT_BRAIN_GROUP_ID,
+      id: rootContainer.id,
       refNodeId: rootContainer.id,
       kind: 'neuron-group',
       label: rootContainer.label ?? rootContainer.id,
@@ -386,7 +382,7 @@ const buildIndexes = (agent: AgentIR): AgentGraphViewIndexes => {
   };
 
   if (rootContainer) {
-    visitContainer(rootContainer.id, getPathPrefixForContainer(rootContainer.id, agent.brain.rootContainerId));
+    visitContainer(rootContainer.id, [rootContainer.id]);
   }
 
   for (const nodeId of bodyInputIds) {
@@ -597,7 +593,8 @@ const getCurrentChildren = (
   navigationPath: string[]
 ): { currentContainer: RootContainerView | BrainContainerNode; currentChildren: AgentGraphViewNodeRecord[]; currentContainerKind: 'root' | 'adapter' | 'neuron-group' } => {
   if (navigationPath.length === 0) {
-    const currentChildren = [BODY_INPUTS_GROUP_ID, ROOT_BRAIN_GROUP_ID, BODY_OUTPUTS_GROUP_ID]
+    const rootContainerNodeId = [...indexes.containerById.keys()].find((containerId) => indexes.nodeById.has(containerId));
+    const currentChildren = [BODY_INPUTS_GROUP_ID, ...(rootContainerNodeId ? [rootContainerNodeId] : []), BODY_OUTPUTS_GROUP_ID]
       .map((nodeId) => indexes.nodeById.get(nodeId))
       .filter((node): node is AgentGraphViewNodeRecord => node != null);
     return {
@@ -641,7 +638,7 @@ const getCurrentChildren = (
     .map((childRef) => indexes.nodeById.get(childRef.nodeId))
     .filter((node): node is AgentGraphViewNodeRecord => node != null);
 
-  if (currentNode.id === ROOT_BRAIN_GROUP_ID) {
+  if (currentNode.refNodeId === container.id && indexes.containerById.get(currentNode.refNodeId)?.id === currentNode.refNodeId) {
     const bodyInputCount = indexes.bodyInputNodeIds.length;
     const bodyOutputCount = indexes.bodyOutputNodeIds.length;
 
@@ -706,7 +703,7 @@ export const buildAgentGraphViewModel = ({
   );
   const aggregateLinks = collectAggregateLinks(containerConnections, indexes.pathById, currentPath, expandedContainerIds);
   const boundaryAggregateLinks =
-    navigationPath.length === 1 && navigationPath[0] === ROOT_BRAIN_GROUP_ID
+    navigationPath.length === 1 && navigationPath[0] === agent.brain.rootContainerId
       ? collectBoundaryAggregateLinks({
           connections: agent.connections,
           pathById: indexes.pathById,
@@ -748,6 +745,7 @@ export const buildAgentGraphViewModel = ({
       id: node.id,
       viewId: node.id,
       refNodeId: node.refNodeId,
+      rootContainer: node.refNodeId === agent.brain.rootContainerId,
       label: node.label,
       kind: node.kind,
       x: position.x,
@@ -802,6 +800,7 @@ export const buildAgentGraphViewModel = ({
         id: child.id,
         viewId: `${node.id}::${child.id}`,
         refNodeId: child.refNodeId,
+        rootContainer: false,
         label: child.label,
         kind: child.kind,
         x: position.x + childPosition.x + childOffset.x,
@@ -850,10 +849,13 @@ export const buildAgentGraphViewModel = ({
           id: connection.id,
           fromNodeId: fromViewNode?.viewId ?? link.fromNodeId,
           toNodeId: toViewNode?.viewId ?? link.toNodeId,
+          fromRefNodeId: connection.from.nodeId,
+          toRefNodeId: connection.to.nodeId,
           weight: connection.weight,
           count: 1,
           aggregate: false,
           leafLinkIds: [connection.id],
+          inspectable: true,
           editable: true,
         };
       }
@@ -862,10 +864,13 @@ export const buildAgentGraphViewModel = ({
         id: `aggregate:${link.fromNodeId}:${link.toNodeId}`,
         fromNodeId: link.fromNodeId,
         toNodeId: link.toNodeId,
+        fromRefNodeId: viewNodeById.get(link.fromNodeId)?.refNodeId ?? link.fromNodeId,
+        toRefNodeId: viewNodeById.get(link.toNodeId)?.refNodeId ?? link.toNodeId,
         weight: link.totalWeight,
         count: link.count,
         aggregate: true,
         leafLinkIds: [...link.leafLinkIds],
+        inspectable: true,
         editable: false,
       };
     });
