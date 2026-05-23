@@ -30,12 +30,6 @@ export {
   createDefaultLegacyBodyDefinition,
   getLegacyBodyVisionCellCount,
   isLegacyBrainPackage,
-  createAgentPackage,
-  createBrainLayoutFromDefinition,
-  createBrainPackage,
-  createDefaultBodyDefinition,
-  getBodyVisionCellCount,
-  isBrainPackage,
 } from './package';
 export type {
   AgentPackage,
@@ -44,16 +38,16 @@ export type {
   BodyInputSignal,
   BodyOutputBinding,
   BodyOutputSignal,
-  BrainDefinition,
+  LegacyBrainDefinition as BrainDefinition,
   BrainLayoutDocument,
   BrainLayoutNodeState,
   BrainMetadata,
   LegacyBrainPackage as BrainPackage,
 } from './package';
 
-export { compileBrainDefinition } from './compiler';
+export { compileLegacyBrainDefinition } from './compiler';
 export type {
-  BrainProgram,
+  LegacyGraphProgram,
   BrainProgramConnection,
   BrainProgramInputBinding,
   BrainProgramNeuronNode,
@@ -77,11 +71,11 @@ export {
 } from './defaults';
 
 export {
-  createBrainProgramRuntimeState,
-  resetBrainProgramRuntimeState,
-  stepBrainProgram,
+  createLegacyBrainProgramRuntimeState,
+  resetLegacyBrainProgramRuntimeState,
+  stepLegacyBrainProgram,
 } from './step';
 export type {
-  BrainProgramRuntimeState,
-  BrainProgramStepResult,
+  LegacyBrainProgramRuntimeState,
+  LegacyBrainProgramStepResult,
 } from './step';

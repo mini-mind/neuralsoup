@@ -15,12 +15,12 @@ import type {
 } from './ir';
 import type { BodyDefinition, BodyInputSignal, BodyOutputSignal, BrainDefinition } from './package';
 import type {
-  BrainProgram,
   BrainProgramConnection,
   BrainProgramInputBinding,
   BrainProgramNeuronNode,
   BrainProgramOutputBinding,
   BrainProgramSignalNode,
+  LegacyGraphProgram,
   LegacyBrainProgram,
   ProgramInputPort,
   ProgramOutputPort,
@@ -221,7 +221,10 @@ const assertBodyBindingsTargetRootAdapterSignals = (
   }
 };
 
-export const compileBrainDefinition = (document: BrainDefinition, body: BodyDefinition): BrainProgram => {
+export const compileLegacyBrainDefinition = (
+  document: BrainDefinition,
+  body: BodyDefinition
+): LegacyGraphProgram => {
   const issues = validateGraphIRDocument(document);
   if (issues.length > 0) {
     throw new GraphIRValidationError(issues);
@@ -357,5 +360,5 @@ export const compileBrainDefinition = (document: BrainDefinition, body: BodyDefi
       enumerable: true,
       get: () => legacyProgram.compiledAgentProgram,
     },
-  }) as BrainProgram;
+  }) as LegacyGraphProgram;
 };

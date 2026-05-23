@@ -3,7 +3,8 @@ import type { AgentLibraryItem } from './agent-ir';
 import type { GraphIRDocument } from './ir';
 import { createAgentIRFromLegacyGraph } from './legacy-graph-bridge';
 
-export type BrainDefinition = GraphIRDocument;
+export type LegacyBrainDefinition = GraphIRDocument;
+export type BrainDefinition = LegacyBrainDefinition;
 
 export interface BrainMetadata {
   id: string;
@@ -109,7 +110,7 @@ const createBrainPackageId = (): string => {
   return `brain-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
-const collectLayoutNodes = (nodes: BrainDefinition['root']['children'], layout: BrainLayoutDocument['nodes']): void => {
+const collectLayoutNodes = (nodes: LegacyBrainDefinition['root']['children'], layout: BrainLayoutDocument['nodes']): void => {
   for (const node of nodes) {
     const collapsed = 'collapsed' in node ? node.collapsed : undefined;
     if (node.position || collapsed !== undefined) {
@@ -125,7 +126,7 @@ const collectLayoutNodes = (nodes: BrainDefinition['root']['children'], layout: 
   }
 };
 
-const getRootInputAdapterVisionCells = (definition: BrainDefinition): number => {
+const getRootInputAdapterVisionCells = (definition: LegacyBrainDefinition): number => {
   const inputAdapter = definition.root.children.find((node) => node.id === 'input-adapter' && node.kind === 'adapter');
   return inputAdapter?.kind === 'adapter'
     ? Math.floor(
@@ -135,7 +136,7 @@ const getRootInputAdapterVisionCells = (definition: BrainDefinition): number => 
     : 0;
 };
 
-export const createLegacyBrainLayoutFromDefinition = (definition: BrainDefinition): BrainLayoutDocument => {
+export const createLegacyBrainLayoutFromDefinition = (definition: LegacyBrainDefinition): BrainLayoutDocument => {
   const nodes: BrainLayoutDocument['nodes'] = {};
   collectLayoutNodes(definition.root.children, nodes);
   return {
@@ -188,7 +189,7 @@ export const getLegacyBodyVisionCellCount = (body: BodyDefinition): number =>
 
 export const createLegacyBrainPackage = (
   name: string,
-  definition: BrainDefinition,
+  definition: LegacyBrainDefinition,
   options?: {
     id?: string;
     createdAt?: string;
@@ -219,9 +220,9 @@ export const createLegacyBrainPackage = (
   };
 };
 
-export const createAgentPackage = (
+export const createLegacyAgentPackage = (
   name: string,
-  definition: BrainDefinition,
+  definition: LegacyBrainDefinition,
   options?: {
     id?: string;
     createdAt?: string;
@@ -247,11 +248,6 @@ export const createAgentPackage = (
     agent,
   };
 };
-
-/**
- * @deprecated Compat-only legacy GraphIR package helper. Prefer AgentIR package APIs on the main domain surface.
- */
-export const createLegacyAgentPackage = createAgentPackage;
 
 export const isLegacyBrainPackage = (value: unknown): value is BrainPackage => {
   if (!isObject(value) || value.packageVersion !== 1 || !isObject(value.metadata)) {
@@ -337,28 +333,3 @@ export const isLegacyBrainPackage = (value: unknown): value is BrainPackage => {
     Array.isArray(body.brainBindings.outputs)
   );
 };
-
-/**
- * @deprecated Compat-only legacy GraphIR package helper. Prefer AgentIR package APIs on the main domain surface.
- */
-export const createBrainLayoutFromDefinition = createLegacyBrainLayoutFromDefinition;
-
-/**
- * @deprecated Compat-only legacy GraphIR body helper. Prefer BodyIR on the main domain surface.
- */
-export const createDefaultBodyDefinition = createDefaultLegacyBodyDefinition;
-
-/**
- * @deprecated Compat-only legacy GraphIR body helper. Prefer BodyIR on the main domain surface.
- */
-export const getBodyVisionCellCount = getLegacyBodyVisionCellCount;
-
-/**
- * @deprecated Compat-only legacy GraphIR package helper. Prefer AgentIR package APIs on the main domain surface.
- */
-export const createBrainPackage = createLegacyBrainPackage;
-
-/**
- * @deprecated Compat-only legacy GraphIR package validator. Prefer AgentIR package validation on the main domain surface.
- */
-export const isBrainPackage = isLegacyBrainPackage;

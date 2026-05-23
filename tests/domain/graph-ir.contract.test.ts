@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   assertValidGraphIRDocument,
-  compileBrainDefinition,
-  createBrainProgramRuntimeState,
+  compileLegacyBrainDefinition,
+  createLegacyBrainProgramRuntimeState,
   createDefaultGraphIRDocument,
   createDefaultLegacyBodyDefinition,
   GraphIRValidationError,
   reconcileGraphIRDocumentVisionCells,
-  stepBrainProgram,
+  stepLegacyBrainProgram,
   type GraphIRDocument,
   type LegacyBrainProgram,
   validateGraphIRDocument,
@@ -21,7 +21,7 @@ const getRootVisionCells = (document: GraphIRDocument) => {
 };
 
 const compileDefaultBrain = (document: GraphIRDocument) =>
-  compileBrainDefinition(document, createDefaultLegacyBodyDefinition(getRootVisionCells(document)));
+  compileLegacyBrainDefinition(document, createDefaultLegacyBodyDefinition(getRootVisionCells(document)));
 
 const createValidGraphIRDocument = (): GraphIRDocument => ({
   version: 1,
@@ -772,7 +772,7 @@ test('default Graph IR document keeps default seed connectivity explicit', () =>
   );
 });
 
-test('compileBrainDefinition excludes non-leaf topology nodes from runtime executable nodes', () => {
+test('compileLegacyBrainDefinition excludes non-leaf topology nodes from runtime executable nodes', () => {
   const document = createDefaultGraphIRDocument(1);
   const program: LegacyBrainProgram = compileDefaultBrain(document);
 
@@ -782,7 +782,7 @@ test('compileBrainDefinition excludes non-leaf topology nodes from runtime execu
   assert.equal(program.links.some((link) => link.from.nodeId === 'core-neuron-group' || link.to.nodeId === 'core-neuron-group'), false);
 });
 
-test('compileBrainDefinition binds output SignalNodes to runtime action channels', () => {
+test('compileLegacyBrainDefinition binds output SignalNodes to runtime action channels', () => {
   const document = createDefaultGraphIRDocument(1);
   const program: LegacyBrainProgram = compileDefaultBrain(document);
 
@@ -800,7 +800,7 @@ test('compileBrainDefinition binds output SignalNodes to runtime action channels
   );
 });
 
-test('compileBrainDefinition binds input SignalNodes using model output ports', () => {
+test('compileLegacyBrainDefinition binds input SignalNodes using model output ports', () => {
   const document = createDefaultGraphIRDocument(1);
   const program: LegacyBrainProgram = compileDefaultBrain(document);
 
@@ -810,7 +810,7 @@ test('compileBrainDefinition binds input SignalNodes using model output ports', 
   );
 });
 
-test('compileBrainDefinition excludes nested adapter signals from world input and output bindings', () => {
+test('compileLegacyBrainDefinition excludes nested adapter signals from world input and output bindings', () => {
   const document = createDefaultGraphIRDocument(1);
   const coreGroup = document.root.children.find((node) => node.id === 'core-neuron-group');
   assert.ok(coreGroup && coreGroup.kind === 'neuron-group');
@@ -853,7 +853,7 @@ test('compileBrainDefinition excludes nested adapter signals from world input an
   assert.equal(program.outputBindings.some((binding) => binding.nodeId === 'nested-out'), false);
 });
 
-test('compileBrainDefinition maps vision input bindings to visualInput channel order instead of leaf order', () => {
+test('compileLegacyBrainDefinition maps vision input bindings to visualInput channel order instead of leaf order', () => {
   const document = createDefaultGraphIRDocument(2);
   const program: LegacyBrainProgram = compileDefaultBrain(document);
   const inputBindingIndices = new Map(
@@ -868,7 +868,7 @@ test('compileBrainDefinition maps vision input bindings to visualInput channel o
   assert.equal(inputBindingIndices.get('vision-B-1'), 5);
 });
 
-test('compileBrainDefinition keeps deprecated BrainProgram aliases for compat callers', () => {
+test('compileLegacyBrainDefinition exposes readonly compat graph aliases on LegacyGraphProgram', () => {
   const document = createDefaultGraphIRDocument(1);
   const program = compileDefaultBrain(document);
 
@@ -926,10 +926,10 @@ test('GraphIR runtime step reads visualInput values using channel-interleaved vi
   ];
 
   const program = compileDefaultBrain(document);
-  const result = stepBrainProgram(
+  const result = stepLegacyBrainProgram(
     program,
     [0, 0.4, 0, 0.7, 0, 1],
-    createBrainProgramRuntimeState(program),
+    createLegacyBrainProgramRuntimeState(program),
     1
   );
 
@@ -950,7 +950,7 @@ test('output SignalNodes produce action outputs at runtime', () => {
   };
 
   const program = compileDefaultBrain(document);
-  const result = stepBrainProgram(program, [1, 1, 0], createBrainProgramRuntimeState(program), 1);
+  const result = stepLegacyBrainProgram(program, [1, 1, 0], createLegacyBrainProgramRuntimeState(program), 1);
 
   assert.ok(result.outputs['move-forward'] > 0);
 });
@@ -967,7 +967,7 @@ test('GraphIR runtime step exposes active leaf node ids for input, neuron, and o
   };
 
   const program = compileDefaultBrain(document);
-  const result = stepBrainProgram(program, [1, 1, 0], createBrainProgramRuntimeState(program), 1);
+  const result = stepLegacyBrainProgram(program, [1, 1, 0], createLegacyBrainProgramRuntimeState(program), 1);
 
   assert.deepEqual(
     new Set(result.runtimeState.activeLeafNodeIds),
@@ -980,7 +980,7 @@ test('GraphIR runtime step exposes active leaf node ids for input, neuron, and o
   );
 });
 
-test('compileBrainDefinition rejects invalid body output bindings', () => {
+test('compileLegacyBrainDefinition rejects invalid body output bindings', () => {
   const document = createDefaultGraphIRDocument(1);
   const body = createDefaultLegacyBodyDefinition(1);
   body.brainBindings.outputs[0] = {
@@ -989,12 +989,12 @@ test('compileBrainDefinition rejects invalid body output bindings', () => {
   };
 
   assert.throws(
-    () => compileBrainDefinition(document, body),
+    () => compileLegacyBrainDefinition(document, body),
     /non-root or non-output brain signal/
   );
 });
 
-test('compileBrainDefinition honors legacy compat body bindings that use non-legacy brain signal node ids', () => {
+test('compileLegacyBrainDefinition honors legacy compat body bindings that use non-legacy brain signal node ids', () => {
   const document = createValidGraphIRDocument();
   const body: LegacyBodyDefinition = {
     version: 1,
@@ -1035,7 +1035,7 @@ test('compileBrainDefinition honors legacy compat body bindings that use non-leg
     },
   };
 
-  const program = compileBrainDefinition(document, body);
+  const program = compileLegacyBrainDefinition(document, body);
 
   assert.deepEqual(program.compiledAgentProgram?.inputPorts, [
     {

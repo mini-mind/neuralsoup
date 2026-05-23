@@ -1,11 +1,11 @@
 import { Agent } from '../types/simulation';
 import type { KeyboardInputState } from './AgentController';
 import {
-  createBrainProgramRuntimeState,
-  stepBrainProgram,
-  type BrainProgramRuntimeState,
+  createLegacyBrainProgramRuntimeState,
+  stepLegacyBrainProgram,
+  type LegacyBrainProgramRuntimeState,
 } from '../domain/brain/step';
-import type { BrainProgram } from '../domain/brain/program';
+import type { LegacyGraphProgram } from '../domain/brain/program';
 
 const applyLegacyAction = (agent: Agent, output: number[], deltaTime: number): void => {
   const [turnLeft, moveForward, turnRight] = output;
@@ -46,13 +46,13 @@ const getKeyboardInputs = (inputState: KeyboardInputState): [number, number, num
 };
 
 export interface LegacyBrainController {
-  program: BrainProgram;
-  runtimeState: BrainProgramRuntimeState;
+  program: LegacyGraphProgram;
+  runtimeState: LegacyBrainProgramRuntimeState;
 }
 
-export const createLegacyBrainController = (program: BrainProgram): LegacyBrainController => ({
+export const createLegacyBrainController = (program: LegacyGraphProgram): LegacyBrainController => ({
   program,
-  runtimeState: createBrainProgramRuntimeState(program),
+  runtimeState: createLegacyBrainProgramRuntimeState(program),
 });
 
 export const updateLegacyBrainAgent = (
@@ -69,7 +69,7 @@ export const updateLegacyBrainAgent = (
     return;
   }
 
-  const result = stepBrainProgram(
+  const result = stepLegacyBrainProgram(
     controller.program,
     agent.visualInput,
     controller.runtimeState,

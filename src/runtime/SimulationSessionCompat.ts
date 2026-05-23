@@ -3,7 +3,7 @@ import {
   deriveAgentIRVisionCellCount,
   type AgentValidationIssue,
 } from '../domain/brain';
-import { compileBrainDefinition } from '../domain/brain/compiler';
+import { compileLegacyBrainDefinition } from '../domain/brain/compiler';
 import {
   createAgentIRFromLegacyGraphDetailed,
   createLegacyGraphBridgeFromAgent,
@@ -138,7 +138,7 @@ export const setLegacyGraphIRDocument = (
   }
 
   try {
-    compileBrainDefinition(reconciledDocument, reconciledBody);
+    compileLegacyBrainDefinition(reconciledDocument, reconciledBody);
   } catch (error) {
     if (error instanceof GraphIRValidationError || error instanceof AgentValidationError) {
       const compatIssues = error instanceof GraphIRValidationError ? toAgentValidationIssues(error.issues) : error.issues;

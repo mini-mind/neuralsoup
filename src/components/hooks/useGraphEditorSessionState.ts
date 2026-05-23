@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Position } from '../../domain/brain';
+import type { Position } from '../../domain/brain/shared';
 import type {
   DetailModalData,
   GraphCanvasViewport,

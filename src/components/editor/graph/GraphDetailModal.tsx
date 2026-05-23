@@ -1,5 +1,5 @@
 import React from 'react';
-import type { LiteralValue } from '../../../domain/brain';
+import type { LiteralValue } from '../../../domain/brain/compat';
 import NeuronDetailEditor from '../../NeuronDetailEditor';
 import ConnectionDetailEditor from '../../ConnectionDetailEditor';
 import type { DetailModalData } from '../../hooks/useSNNTopologyState';

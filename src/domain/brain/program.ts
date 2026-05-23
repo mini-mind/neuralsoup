@@ -77,7 +77,7 @@ export interface LegacyBrainProgram {
   modelsById: Map<string, ModelDefinition>;
   nodeIndex: BrainProgramNodeIndex;
 }
-export interface BrainProgram extends LegacyBrainProgram {
+export interface LegacyGraphProgram extends LegacyBrainProgram {
   readonly graphIR: GraphIRDocument;
   readonly agentProgram?: AgentProgram;
 }

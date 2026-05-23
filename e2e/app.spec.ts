@@ -448,6 +448,12 @@ const injectValidDraftOnly = async (page: Page) => {
   });
 };
 
+const getActiveAgentId = async (page: Page) =>
+  page.evaluate(() => window.__NEURALSOUP_TEST_API__?.getActiveAgentId() ?? null);
+
+const getDraftAgentId = async (page: Page) =>
+  page.evaluate(() => window.__NEURALSOUP_TEST_API__?.getDraftAgentId() ?? null);
+
 const dispatchCanvasMouseSequence = async (
   page: Page,
   sequence: Array<{ type: 'mousedown' | 'mouseup'; x: number; y: number; button?: number }>
@@ -743,6 +749,8 @@ test('editor tabs switch between settings and graph view with settings sidebar n
 });
 
 test('brain library opens from the editor toolbar and saves the current IR to LocalStorage', async ({ page }, testInfo) => {
+  test.slow();
+
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
   }
@@ -758,6 +766,12 @@ test('brain library opens from the editor toolbar and saves the current IR to Lo
   await page.locator(selectors.brainLibrarySaveName).fill('E2E Brain');
   await page.locator(selectors.brainLibrarySaveCurrent).click();
   await expect(page.locator(selectors.brainLibraryList)).toContainText('E2E Brain');
+  await expect
+    .poll(async () => {
+      const [activeId, draftId] = await Promise.all([getActiveAgentId(page), getDraftAgentId(page)]);
+      return activeId && draftId && activeId === draftId;
+    })
+    .toBe(true);
 
   const storedBrains = await page.evaluate((storageKey) => {
     const rawValue = window.localStorage.getItem(storageKey);
@@ -772,6 +786,17 @@ test('brain library opens from the editor toolbar and saves the current IR to Lo
   expect(storedBrain).toBeTruthy();
   expect(storedBrain?.metadata?.id).toBeTruthy();
   expect(storedBrain?.agent?.metadata?.name).toBe('E2E Brain');
+  expect(storedBrain?.agent?.metadata?.id).toBe(storedBrain?.metadata?.id);
+
+  await page.locator(selectors.brainLibraryClose).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeHidden();
+
+  await page.locator(selectors.brainLibraryButton).click();
+  page.once('dialog', async (dialog) => {
+    throw new Error(`保存当前 Brain 后不应立即出现未保存确认，但收到: ${dialog.message()}`);
+  });
+  await page.locator(selectors.brainLibraryList).getByText('E2E Brain').click();
+  await expect(page.locator(selectors.visionCellsValue)).toHaveText('24');
 
   await page.locator(selectors.brainLibraryClose).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeHidden();
@@ -873,6 +898,46 @@ test('brain library manages saved items and reports import errors', async ({ pag
     buffer: Buffer.from('{broken'),
   });
   await expect(page.locator(selectors.brainLibraryError)).toContainText('JSON 解析失败');
+});
+
+test('renaming the active brain preserves draft-only edits instead of replacing the current draft snapshot', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await saveCurrentBrainToLibrary(page, 'Rename Active Brain');
+  await page.locator(selectors.brainLibraryClose).click();
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  const baseDraftConnectionCount = await getNumericLocatorText(page, selectors.topologyDraftConnectionCount);
+  const baseRuntimeConnectionCount = await getNumericLocatorText(page, selectors.topologyRuntimeConnectionCount);
+  await injectValidDraftOnly(page);
+
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(String(baseDraftConnectionCount + 1));
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(baseRuntimeConnectionCount));
+
+  const savedBrainId = await page.evaluate((storageKey) => {
+    const rawValue = window.localStorage.getItem(storageKey);
+    const brains = rawValue ? ((JSON.parse(rawValue) as { brains?: E2EStoredBrain[] }).brains ?? []) : [];
+    return brains.find((brain) => brain.metadata?.name === 'Rename Active Brain')?.metadata?.id ?? '';
+  }, BRAIN_LIBRARY_STORAGE_KEY);
+  expect(savedBrainId).not.toBe('');
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await page.locator(`[data-testid="brain-library-rename-${savedBrainId}"]`).click();
+  await page.locator(`[data-testid="brain-library-rename-input-${savedBrainId}"]`).fill('Renamed Active Brain');
+  await page.locator(`[data-testid="brain-library-rename-save-${savedBrainId}"]`).click();
+  await expect(page.locator(selectors.brainLibraryList)).toContainText('Renamed Active Brain');
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(String(baseDraftConnectionCount + 1));
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(baseRuntimeConnectionCount));
+  await expect
+    .poll(async () => {
+      const [activeId, draftId] = await Promise.all([getActiveAgentId(page), getDraftAgentId(page)]);
+      return activeId && draftId && activeId === draftId;
+    })
+    .toBe(true);
 });
 
 test('brain library recovers from corrupted LocalStorage payloads', async ({ page }, testInfo) => {

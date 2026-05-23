@@ -40,6 +40,8 @@ declare global {
       injectInvalidGraphDraft: () => void;
       getRuntimeActiveNodeIds: () => string[];
       getGraphPathIds: () => string[];
+      getActiveAgentId: () => string;
+      getDraftAgentId: () => string;
     };
   }
 }
@@ -147,15 +149,17 @@ const applyBrainRecordToEditorState = (
   options.setEditorTab((currentTab) => (currentTab === 'graph' ? 'graph' : currentTab));
 };
 
-const applyBrainRecordMetadataToDraftOnly = (
+const applyBrainRecordIdentityToCurrentState = (
   brain: BrainLibraryRecord,
   options: {
     setActiveBrainId: React.Dispatch<React.SetStateAction<string | null>>;
+    setActiveAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
     setDraftAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
     setDraftGraphStatusOverride: React.Dispatch<React.SetStateAction<AgentDraftStatus | null>>;
   }
 ): void => {
   options.setActiveBrainId(brain.metadata.id);
+  options.setActiveAgentDocument(brain.agent);
   options.setDraftAgentDocument(brain.agent);
   options.setDraftGraphStatusOverride(null);
 };
@@ -457,8 +461,9 @@ const App: React.FC = () => {
     const nextBrain = createBrainLibraryItemFromAgent(name, draftAgentDocumentRef.current);
     setBrainLibrary((currentLibrary) => [...currentLibrary, nextBrain]);
     setIsBrainLibraryOpen(true);
-    applyBrainRecordMetadataToDraftOnly(nextBrain, {
+    applyBrainRecordIdentityToCurrentState(nextBrain, {
       setActiveBrainId,
+      setActiveAgentDocument,
       setDraftAgentDocument,
       setDraftGraphStatusOverride,
     });
@@ -551,8 +556,14 @@ const App: React.FC = () => {
       return;
     }
 
-    setActiveAgentDocument(renamedActiveBrain.agent);
-    setDraftAgentDocument(renamedActiveBrain.agent);
+    setActiveAgentDocument((currentAgent) => ({
+      ...currentAgent,
+      metadata: { ...renamedActiveBrain.agent.metadata },
+    }));
+    setDraftAgentDocument((currentAgent) => ({
+      ...currentAgent,
+      metadata: { ...renamedActiveBrain.agent.metadata },
+    }));
   }, [activeBrainId, brainLibrary]);
 
   const handleDeleteBrain = useCallback((brainId: string) => {
@@ -734,6 +745,8 @@ const App: React.FC = () => {
       },
       getRuntimeActiveNodeIds: () => [...agentRuntimeActivity.activeNodeIds],
       getGraphPathIds: () => graphPath.map((item) => item.id),
+      getActiveAgentId: () => activeAgentDocumentRef.current.metadata.id,
+      getDraftAgentId: () => draftAgentDocumentRef.current.metadata.id,
     };
 
     return () => {

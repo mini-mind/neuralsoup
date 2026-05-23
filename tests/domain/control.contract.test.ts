@@ -11,11 +11,11 @@ import {
   setLegacyGraphIRDocument,
 } from '../../src/runtime/SimulationSessionCompat';
 import {
-  compileBrainDefinition,
-  createBrainProgramRuntimeState,
+  compileLegacyBrainDefinition,
+  createLegacyBrainProgramRuntimeState,
   createDefaultGraphIRDocument,
   createDefaultLegacyBodyDefinition,
-  stepBrainProgram,
+  stepLegacyBrainProgram,
   summarizeGraphIRDocument,
   type GraphIRDocument,
   type LegacyBrainProgram,
@@ -60,7 +60,7 @@ const getRootVisionCells = (document: GraphIRDocument) => {
 };
 
 const compileDefaultBrain = (document: GraphIRDocument) =>
-  compileBrainDefinition(document, createDefaultLegacyBodyDefinition(getRootVisionCells(document)));
+  compileLegacyBrainDefinition(document, createDefaultLegacyBodyDefinition(getRootVisionCells(document)));
 
 const createValidCompatBoundaryDocument = (): GraphIRDocument => ({
   version: 1,
@@ -730,8 +730,8 @@ test('GraphIR leaf link weights change runtime action outputs', () => {
 
   const weakProgram = compileDefaultBrain(weakDocument);
   const strongProgram = compileDefaultBrain(strongDocument);
-  const weakResult = stepBrainProgram(weakProgram, [1, 1, 0], createBrainProgramRuntimeState(weakProgram), 1);
-  const strongResult = stepBrainProgram(strongProgram, [1, 1, 0], createBrainProgramRuntimeState(strongProgram), 1);
+  const weakResult = stepLegacyBrainProgram(weakProgram, [1, 1, 0], createLegacyBrainProgramRuntimeState(weakProgram), 1);
+  const strongResult = stepLegacyBrainProgram(strongProgram, [1, 1, 0], createLegacyBrainProgramRuntimeState(strongProgram), 1);
 
   assert.equal(weakResult.outputs['move-forward'], 0);
   assert.equal(strongResult.outputs['move-forward'], 1);
@@ -754,8 +754,8 @@ test('GraphIR parameter overrides change runtime action outputs', () => {
   const lowProgram = compileDefaultBrain(lowThresholdDocument);
   const highProgram = compileDefaultBrain(highThresholdDocument);
 
-  const lowResult = stepBrainProgram(lowProgram, [1, 1, 0], createBrainProgramRuntimeState(lowProgram), 1);
-  const highResult = stepBrainProgram(highProgram, [1, 1, 0], createBrainProgramRuntimeState(highProgram), 1);
+  const lowResult = stepLegacyBrainProgram(lowProgram, [1, 1, 0], createLegacyBrainProgramRuntimeState(lowProgram), 1);
+  const highResult = stepLegacyBrainProgram(highProgram, [1, 1, 0], createLegacyBrainProgramRuntimeState(highProgram), 1);
 
   assert.ok(lowResult.outputs['move-forward'] > highResult.outputs['move-forward']);
 });
@@ -764,7 +764,7 @@ test('GraphIR runtime keeps outputs at zero when there is no sensory input or sp
   const document = createDefaultGraphIRDocument(1);
   const program = compileDefaultBrain(document);
 
-  const result = stepBrainProgram(program, [0, 0, 0], createBrainProgramRuntimeState(program), 1);
+  const result = stepLegacyBrainProgram(program, [0, 0, 0], createLegacyBrainProgramRuntimeState(program), 1);
 
   assert.deepEqual(result.outputs, {
     'turn-left': 0,

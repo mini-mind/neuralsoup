@@ -1,4 +1,5 @@
-import type { ModelDefinition, Position } from '../../../domain/brain';
+import type { ModelDefinition } from '../../../domain/brain/compat';
+import type { Position } from '../../../domain/brain/shared';
 
 export interface GraphBreadcrumbItem {
   id: string;

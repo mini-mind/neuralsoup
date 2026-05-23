@@ -14,6 +14,9 @@ export interface BrainProgramStepResult {
   outputs: Record<BrainOutputChannel, number>;
 }
 
+export type LegacyBrainProgramRuntimeState = BrainProgramRuntimeState;
+export type LegacyBrainProgramStepResult = BrainProgramStepResult;
+
 const DEFAULT_RUNTIME_STATE = (): IzhikevichNeuronRuntimeState => ({
   v: -65,
   u: 0,
@@ -48,7 +51,7 @@ const buildCompatSignalSnapshotFromAgentRuntime = (
   return nextSignals;
 };
 
-export const createBrainProgramRuntimeState = (
+export const createLegacyBrainProgramRuntimeState = (
   program: LegacyBrainProgram
 ): BrainProgramRuntimeState => ({
   neurons: new Map(
@@ -61,11 +64,11 @@ export const createBrainProgramRuntimeState = (
   activeLeafNodeIds: [],
 });
 
-export const resetBrainProgramRuntimeState = (
+export const resetLegacyBrainProgramRuntimeState = (
   program: LegacyBrainProgram
-): BrainProgramRuntimeState => createBrainProgramRuntimeState(program);
+): BrainProgramRuntimeState => createLegacyBrainProgramRuntimeState(program);
 
-export const stepBrainProgram = (
+export const stepLegacyBrainProgram = (
   program: LegacyBrainProgram,
   sensoryInputs: number[],
   previousState: BrainProgramRuntimeState,

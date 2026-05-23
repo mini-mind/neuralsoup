@@ -4,9 +4,9 @@ import type {
   AgentIR,
   BrainContainerNode,
   BrainNeuronNode,
-  ModelDefinition,
-  Position,
 } from '../../../domain/brain';
+import type { ModelDefinition } from '../../../domain/brain/compat';
+import type { Position } from '../../../domain/brain/shared';
 import { getGraphLinkCapabilities } from './graphLinkPolicy';
 import type {
   GraphBreadcrumbItem,

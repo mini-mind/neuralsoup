@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import type { IzhikevichNeuronParameters } from '../domain/brain';
+import type { IzhikevichNeuronParameters } from '../domain/brain/shared';
 
 interface InspectorNeuron {
   id: string;
