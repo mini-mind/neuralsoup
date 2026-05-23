@@ -126,8 +126,50 @@ test('agent graph root brain child scope does not inject orphan adapter proxy no
     runtimeActiveNodeIds: [],
   });
 
-  assert.equal(viewModel.nodes.some((node) => node.id === 'core-input-adapter'), false);
-  assert.equal(viewModel.nodes.some((node) => node.id === 'core-output-adapter'), false);
+  assert.equal(viewModel.nodes.some((node) => node.proxy), false);
+});
+
+test('agent graph root brain child scope projects boundary adapters without proxy nodes', () => {
+  const agent = createTestAgent();
+  agent.body.inputRules = [
+    {
+      id: 'vision-inputs',
+      nodeIdPattern: '^vision-([RGB])-(\\d+)$',
+      sourceTemplate: 'vision.$1.$2',
+      scale: 1,
+    },
+  ];
+  agent.body.outputRules = [
+    {
+      id: 'motor-outputs',
+      nodeIdPattern: '^output-(turn-left|move-forward|turn-right)$',
+      targetTemplate: 'action.$1',
+      decayPerSecond: 4,
+    },
+  ];
+  agent.layout = {
+    version: 1,
+    nodes: {
+      ...agent.layout?.nodes,
+      'vision-R-0': { position: { x: 0, y: 0 } },
+      'vision-G-0': { position: { x: 0, y: 24 } },
+      'vision-B-0': { position: { x: 0, y: 48 } },
+      'output-turn-left': { position: { x: 320, y: 0 } },
+      'output-move-forward': { position: { x: 320, y: 24 } },
+      'output-turn-right': { position: { x: 320, y: 48 } },
+    },
+  };
+
+  const viewModel = buildAgentGraphViewModel({
+    agent,
+    navigationPath: ['core-neuron-group'],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+  });
+
+  assert.equal(viewModel.nodes.some((node) => node.id === 'core-input-adapter'), true);
+  assert.equal(viewModel.nodes.some((node) => node.id === 'core-output-adapter'), true);
+  assert.equal(viewModel.nodes.some((node) => node.proxy), false);
 });
 
 test('agent graph root scope exposes canonical body endpoints even before any connection references them', () => {

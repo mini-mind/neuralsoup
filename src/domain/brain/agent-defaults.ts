@@ -163,7 +163,7 @@ const createDefaultConnections = (visionCells: number): AgentConnection[] => {
 const createDefaultLayout = (visionCells: number): AgentLayoutIR => {
   const nodes: AgentLayoutIR['nodes'] = {
     [DEFAULT_ROOT_CONTAINER_ID]: {
-      position: { x: 50, y: 200 },
+      position: { x: 300, y: 200 },
     },
     'neuron-1': {
       position: { x: 50, y: 150 },

@@ -212,6 +212,7 @@
     box-shadow 120ms ease,
     transform 120ms ease,
     background-color 120ms ease;
+  pointer-events: none;
 }
 
 .topology-node.is-leaf .topology-node-shape {

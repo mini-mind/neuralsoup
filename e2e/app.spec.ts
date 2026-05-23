@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Page, TestInfo } from '@playwright/test';
+import { createDefaultAgentIR } from '../src/domain/brain/agent-defaults';
 
 const selectors = {
   simulationCanvas: '[data-testid="simulation-canvas"]',
@@ -113,6 +114,7 @@ const diagnosticsExpectationsByPage = new WeakMap<Page, DiagnosticsExpectation>(
 
 const degradedRendererProjectName = 'chromium-webgl-disabled';
 const expectedRenderInitErrorPrefix = 'Failed to initialize simulation canvas:';
+const DEFAULT_AGENT_CONNECTION_COUNT = createDefaultAgentIR(36).connections.length;
 
 const installStartupDiagnostics = (page: Page) => {
   const diagnostics: StartupDiagnostics = {
@@ -1374,15 +1376,15 @@ test('graph view diagnostics keep draft and installed runtime summaries aligned 
   await expect(page.locator(selectors.topologyOutputCount)).toHaveText(initialDraftOutputCount);
   await expect(page.locator(selectors.topologyRuntimeOutputCount)).toHaveText(initialDraftOutputCount);
   await expect(page.locator(selectors.topologyRuntimeNeuronCount)).toHaveText(initialDraftNeuronCount);
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('118');
-  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(String(DEFAULT_AGENT_CONNECTION_COUNT));
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(DEFAULT_AGENT_CONNECTION_COUNT));
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
 
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('118');
-  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(String(DEFAULT_AGENT_CONNECTION_COUNT));
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(DEFAULT_AGENT_CONNECTION_COUNT));
   await expect(page.locator(selectors.topologyRuntimeInputCount)).toHaveText(initialDraftInputCount);
   await expect(page.locator(selectors.topologyRuntimeOutputCount)).toHaveText(initialDraftOutputCount);
   await expect(page.locator(selectors.topologyRuntimeNeuronCount)).toHaveText(initialDraftNeuronCount);
@@ -1522,7 +1524,7 @@ test('graph view blocks duplicate local links and keeps external nodes out of th
 
   await page.locator(selectors.editorTabGraph).click();
   await doubleClickNode(page, selectors.coreGroupNode);
-  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(DEFAULT_AGENT_CONNECTION_COUNT));
 
   const canvasBox = await getCanvasBox(page);
   const createPoint = { x: canvasBox.x + 300, y: canvasBox.y + 220 };
@@ -1537,13 +1539,13 @@ test('graph view blocks duplicate local links and keeps external nodes out of th
 
   await rightDragBetweenNodes(page, selectors.nodeNeuronOne, newNeuronSelector);
   await expect(page.locator('[data-testid^="topology-link-link-neuron-1-neuron-3-"]')).toHaveCount(1);
-  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('119');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(DEFAULT_AGENT_CONNECTION_COUNT + 1));
 
   await rightDragBetweenNodes(page, selectors.nodeNeuronOne, newNeuronSelector);
   await expect(page.locator('[data-testid^="topology-link-link-neuron-1-neuron-3-"]')).toHaveCount(1);
   await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
   await expect(page.locator(selectors.topologySelectedLink)).toHaveText(/link-neuron-1-neuron-3-/);
-  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('119');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(DEFAULT_AGENT_CONNECTION_COUNT + 1));
 
   await expect(page.locator('[data-testid^="topology-node-proxy:"]')).toHaveCount(0);
   await expect(page.locator('[data-testid^="topology-link-link-vision-R-0-output-move-forward-"]')).toHaveCount(0);

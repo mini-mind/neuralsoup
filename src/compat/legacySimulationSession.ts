@@ -129,6 +129,11 @@ const auditLegacyCompatImport = (
   }
 };
 
+const auditLegacyGraphIRDocumentOnlyImport = (document: GraphIRDocument): AgentValidationIssue[] => {
+  const graphIssues = validateGraphIRDocument(document);
+  return graphIssues.length > 0 ? toAgentValidationIssues(graphIssues) : [];
+};
+
 export const inspectLegacyGraphIRExport = (
   session: SimulationSession
 ): { compatBridge: LegacyGraphBridgeResult; issues: AgentValidationIssue[] } =>
@@ -164,7 +169,9 @@ export const setLegacyGraphIRDocument = (
       )
     );
   }
-  const importIssues = auditLegacyCompatImport(document, resolvedBody);
+  const importIssues = body
+    ? auditLegacyCompatImport(document, resolvedBody)
+    : auditLegacyGraphIRDocumentOnlyImport(document);
   if (importIssues.length > 0) {
     return createInvalidCompatStatus(session, importIssues);
   }

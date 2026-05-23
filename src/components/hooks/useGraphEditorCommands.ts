@@ -816,7 +816,7 @@ export const useGraphEditorCommands = ({
           })
         ),
       });
-    }, { installToRuntime: false, commitToCurrentDocument: true, persistActiveBrain: true });
+    }, { installToRuntime: true, commitToCurrentDocument: true, persistActiveBrain: true });
     scheduleFocusNode(nextGroupId);
     closeDetailModal();
     clearSelectionRect();
@@ -854,7 +854,7 @@ export const useGraphEditorCommands = ({
         }
 
         return ungroupAgentContainer(current, currentContainerId, targetGroup.refNodeId);
-      }, { installToRuntime: false, commitToCurrentDocument: true, persistActiveBrain: true });
+      }, { installToRuntime: true, commitToCurrentDocument: true, persistActiveBrain: true });
       clearSelection();
       closeDetailModal();
       clearSelectionRect();

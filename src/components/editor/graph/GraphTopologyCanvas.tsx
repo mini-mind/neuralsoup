@@ -350,7 +350,9 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
                 data-topology-link-id={link.id}
                 onClick={(event) => {
                   event.stopPropagation();
-                  onSelectLink(link.id);
+                  if (!link.aggregate) {
+                    onSelectLink(link.id);
+                  }
                 }}
                 onDoubleClick={(event) => {
                   event.stopPropagation();

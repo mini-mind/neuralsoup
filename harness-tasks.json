@@ -211,7 +211,9 @@
       "on_failure": {
         "cleanup": null
       },
-      "error_log": [],
+      "error_log": [
+        "Remaining P1/P2 after GraphView cleanup: App/GraphView still mixes draft/current/installed commit semantics across operation types; boundary aggregate links in root brain child scope remain visible but non-operable; root alias core-neuron-group is still a canonical cross-layer id."
+      ],
       "checkpoints": [
         {
           "at": "2026-05-22T19:17:02.240Z",
@@ -320,6 +322,10 @@
         {
           "at": "2026-05-23T23:10:00Z",
           "message": "GraphView main-path P0 cleanup phase 2 landed: body adapter/signal visibility no longer derives only from current connections, a new domain body-endpoint enumerator resolves canonical BodyIR-derived input/output node ids for the editor, and domain contracts now prove unconnected body endpoints remain visible in GraphView. Revalidated with npm run type-check, npm run test:domain, and targeted graph-view/brain-library Playwright flows."
+        },
+        {
+          "at": "2026-05-23T09:16:55Z",
+          "message": "GraphView cleanup stage passed end-to-end revalidation: root brain child scope now projects boundary adapters without proxy nodes, aggregate links are no longer selectable as fake editable links, root/child default layout overlap was removed, and graph view plus brain library Playwright coverage passed in both renderer modes."
         }
       ],
       "completed_at": null
@@ -342,7 +348,9 @@
       "on_failure": {
         "cleanup": null
       },
-      "error_log": [],
+      "error_log": [
+        "Remaining compat/runtime debt: legacySimulationSession still returns a compat-local invalid status contract that can diverge from canonical session invalidation semantics; SimulationSession still exposes compat/test-oriented probes; canonical AgentIR still carries visionCellCount and core-neuron-group legacy debt."
+      ],
       "checkpoints": [
         {
           "at": "2026-05-23T00:20:00Z",
@@ -364,21 +372,25 @@
           "at": "2026-05-23T05:17:41Z",
           "message": "Cross-review follow-up hardened compat getter loss detection for unconnected regex-shaped BodyIR aliases, not just literal node-id aliases, and added symmetric domain contracts for AgentIR -> compat GraphIR plus compat setter -> AgentIR initialState.u round-trip. Revalidated with npm run type-check and npm run test:domain."
         },
-      {
-        "at": "2026-05-23T18:05:00Z",
-        "message": "Legacy executable compat stack was fully pulled out of core production trees: legacy compiler/program/step moved from src/domain/brain into src/compat, SimulationSessionCompat moved from src/runtime into src/compat, and all remaining tests/compat callers were rewired. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
-      },
-      {
-        "at": "2026-05-23T19:20:00Z",
-        "message": "Cross-review-guided compat surface shrink continued: LegacyBrainProgram no longer exposes compiledAgentProgram or legacyGraphIR on its public/runtime object shape, compat runtime payload is now carried through an internal WeakMap, and legacy runtime tests were tightened to assert compat behavior without requiring those internal fields. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
-      },
-      {
-        "at": "2026-05-23T20:05:00Z",
-        "message": "Compat session contract was split: legacy GraphIR setter now validates import-side GraphIR/body correctness and session constraints without requiring future legacy-export fidelity, while legacy export/audit is exposed explicitly via exportLegacyGraphIRDocument/inspectLegacyGraphIRExport. Compat contracts were updated so lossy BodyIR rules can still install into AgentIR but fail explicit legacy export. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
-      }
-    ],
-    "completed_at": null
-  },
+        {
+          "at": "2026-05-23T18:05:00Z",
+          "message": "Legacy executable compat stack was fully pulled out of core production trees: legacy compiler/program/step moved from src/domain/brain into src/compat, SimulationSessionCompat moved from src/runtime into src/compat, and all remaining tests/compat callers were rewired. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+        },
+        {
+          "at": "2026-05-23T19:20:00Z",
+          "message": "Cross-review-guided compat surface shrink continued: LegacyBrainProgram no longer exposes compiledAgentProgram or legacyGraphIR on its public/runtime object shape, compat runtime payload is now carried through an internal WeakMap, and legacy runtime tests were tightened to assert compat behavior without requiring those internal fields. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+        },
+        {
+          "at": "2026-05-23T20:05:00Z",
+          "message": "Compat session contract was split: legacy GraphIR setter now validates import-side GraphIR/body correctness and session constraints without requiring future legacy-export fidelity, while legacy export/audit is exposed explicitly via exportLegacyGraphIRDocument/inspectLegacyGraphIRExport. Compat contracts were updated so lossy BodyIR rules can still install into AgentIR but fail explicit legacy export. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+        },
+        {
+          "at": "2026-05-23T09:16:55Z",
+          "message": "Compat setter validation/write path was partially tightened: explicit legacy body imports now validate and bridge against the same compat body object, while document-only legacy GraphIR imports keep their distinct document-driven semantics. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+        }
+      ],
+      "completed_at": null
+    },
     {
       "id": "task-010",
       "title": "持久化边界收口：统一 Brain Library 的导入导出与 LocalStorage 契约，并消除 package metadata 双真源",
@@ -419,17 +431,17 @@
           "at": "2026-05-23T05:27:56Z",
           "message": "Removed BrainLibraryRecord top-level metadata as an internal source of truth: App, BrainLibraryModal, storage helpers, unit tests, and brain-library e2e now use agent.metadata for in-memory identity while exported AgentPackage still mirrors top-level metadata only at the codec boundary. Revalidated with npm run type-check, npm run test:domain, and npm run test:e2e -- --grep \"brain library\"."
         },
-      {
-        "at": "2026-05-23T14:35:00Z",
-        "message": "Cross-review P1 fixes landed: App now de-duplicates initial Brain Library persistence so recovered/corrupt storage status survives reload until a real save, storage/import now validate AgentPackage by agent.metadata truth while treating top-level metadata as optional compat projection, and domain plus brain-library Playwright coverage were expanded and passed."
-      },
-      {
-        "at": "2026-05-23T19:05:00Z",
-        "message": "Storage canonical-load self-healing now actually rewrites non-normalized but valid record payloads instead of comparing normalized records against themselves, and a domain contract now proves load-time rewrite restores missing layout vision markers before re-persist. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
-      }
-    ],
-    "completed_at": null
-  },
+        {
+          "at": "2026-05-23T14:35:00Z",
+          "message": "Cross-review P1 fixes landed: App now de-duplicates initial Brain Library persistence so recovered/corrupt storage status survives reload until a real save, storage/import now validate AgentPackage by agent.metadata truth while treating top-level metadata as optional compat projection, and domain plus brain-library Playwright coverage were expanded and passed."
+        },
+        {
+          "at": "2026-05-23T19:05:00Z",
+          "message": "Storage canonical-load self-healing now actually rewrites non-normalized but valid record payloads instead of comparing normalized records against themselves, and a domain contract now proves load-time rewrite restores missing layout vision markers before re-persist. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+        }
+      ],
+      "completed_at": null
+    },
     {
       "id": "task-011",
       "title": "Compat 表面瘦身：隔离 legacy graph compiler/bridge/storage API，避免继续从顶层 domain surface 暴露",
@@ -561,25 +573,25 @@
           "at": "2026-05-23T17:20:00Z",
           "message": "Cross-review-guided compat surface shrink completed: legacy graph view model moved out of production editor tree into src/compat, legacy brain controller moved out of src/engine into src/compat, and legacy package/body/layout helpers moved out of core domain/brain into src/compat with all remaining callers rewired. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
         },
-      {
-        "at": "2026-05-23T18:05:00Z",
-        "message": "Legacy executable compat stack was fully pulled out of core production trees: legacy compiler/program/step moved from src/domain/brain into src/compat, SimulationSessionCompat moved from src/runtime into src/compat, and all remaining tests/compat callers were rewired. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
-      },
-      {
-        "at": "2026-05-23T19:20:00Z",
-        "message": "Compat runtime naming/surface cleanup advanced: default AgentIR body rule ids were renamed to neutral vision-inputs/motor-outputs, the unused graphIRRuntime alias module was removed, and LegacyBrainProgram no longer leaks internal AgentProgram payload or source GraphIR object identity on its public shape."
-      },
-      {
-        "at": "2026-05-23T20:40:00Z",
-        "message": "Split brain-library persistence from import/export exchange codecs: canonical BrainLibraryRecord normalization now lives outside LocalStorage I/O, the default file format switched to an AgentIR-native neuralsoup-agent envelope while explicit legacy AgentPackage export remains available as compat surface, compat session export/audit APIs were separated from the import setter, and validation passed with npm run type-check, npm run test:domain, npm run test:compat, and npm run test:e2e -- --grep \"brain library\"."
-      },
-      {
-        "at": "2026-05-23T22:10:00Z",
-        "message": "Storage boundary cleanup continued: brainLibraryStorage no longer reuses the general exchange normalizer on the canonical LocalStorage read path, legacy LocalStorage migration was narrowed to an internal storage upgrader, legacy package migration assertions moved from tests/domain into tests/compat, and brain-library e2e now explicitly rejects leaked top-level metadata/packageVersion in canonical storage while still covering the default neuralsoup-agent export/import contract."
-      }
-    ],
-    "completed_at": null
-  }
+        {
+          "at": "2026-05-23T18:05:00Z",
+          "message": "Legacy executable compat stack was fully pulled out of core production trees: legacy compiler/program/step moved from src/domain/brain into src/compat, SimulationSessionCompat moved from src/runtime into src/compat, and all remaining tests/compat callers were rewired. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+        },
+        {
+          "at": "2026-05-23T19:20:00Z",
+          "message": "Compat runtime naming/surface cleanup advanced: default AgentIR body rule ids were renamed to neutral vision-inputs/motor-outputs, the unused graphIRRuntime alias module was removed, and LegacyBrainProgram no longer leaks internal AgentProgram payload or source GraphIR object identity on its public shape."
+        },
+        {
+          "at": "2026-05-23T20:40:00Z",
+          "message": "Split brain-library persistence from import/export exchange codecs: canonical BrainLibraryRecord normalization now lives outside LocalStorage I/O, the default file format switched to an AgentIR-native neuralsoup-agent envelope while explicit legacy AgentPackage export remains available as compat surface, compat session export/audit APIs were separated from the import setter, and validation passed with npm run type-check, npm run test:domain, npm run test:compat, and npm run test:e2e -- --grep \"brain library\"."
+        },
+        {
+          "at": "2026-05-23T22:10:00Z",
+          "message": "Storage boundary cleanup continued: brainLibraryStorage no longer reuses the general exchange normalizer on the canonical LocalStorage read path, legacy LocalStorage migration was narrowed to an internal storage upgrader, legacy package migration assertions moved from tests/domain into tests/compat, and brain-library e2e now explicitly rejects leaked top-level metadata/packageVersion in canonical storage while still covering the default neuralsoup-agent export/import contract."
+        }
+      ],
+      "completed_at": null
+    }
   ],
   "session_count": 9,
   "last_session": "2026-05-23T20:40:00Z"
