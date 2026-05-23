@@ -6,3 +6,16 @@ export * from './agent-reconcile';
 export * from './agent-summary';
 export * from './agent-defaults';
 export * from './agent-step';
+export type {
+  GraphIRDocument,
+  ModelDefinition,
+  LiteralValue,
+  TopologyNode,
+  RootGraph,
+  SignalNode,
+  NeuronNode,
+  NeuronGroupNode,
+  AdapterNode,
+  LeafLink,
+  AggregateLinkView,
+} from './ir';

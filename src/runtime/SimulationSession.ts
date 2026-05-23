@@ -11,15 +11,6 @@ import {
   type AgentValidationIssue,
   type AgentIR,
 } from '../domain/brain';
-import {
-  compileBrainDefinition,
-  createAgentIRFromLegacyGraph,
-  createLegacyGraphBridgeFromAgent,
-  GraphIRValidationError,
-  validateGraphIRDocument,
-  type BodyDefinition,
-  type GraphIRDocument,
-} from '../domain/brain/compat';
 import type { Agent, SimulationState, World } from '../types/simulation';
 import type { AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../types/agentRuntime';
 import {
@@ -178,55 +169,13 @@ export class SimulationSession {
     this.keyboardInputState = { ...nextState };
   }
 
-  // Legacy compat entry for tests and transitional GraphIR callers.
-  public setLegacyGraphIRDocument(document: GraphIRDocument, body?: BodyDefinition): AgentRuntimeStatus {
-    const mainAgent = this.getMainAgent();
-    const visionCells = mainAgent?.visionCells.length ?? this.visionSystem.getVisionCells();
-    const nextAgent = reconcileAgentIRVisionCells(
-      createAgentIRFromLegacyGraph(
-        this.currentAgentIR.metadata.name,
-        document,
-        body,
-        undefined,
-        this.currentAgentIR.metadata
-      ),
-      visionCells
-    );
-    const compatBridge = createLegacyGraphBridgeFromAgent(nextAgent);
-    const reconciledDocument = compatBridge.document;
-    const reconciledBody = compatBridge.body;
-    const issues = validateGraphIRDocument(reconciledDocument);
-
-    if (issues.length > 0) {
-      return this.setInvalidAgentRuntimeStatus(issues);
-    }
-
-    try {
-      compileBrainDefinition(reconciledDocument, reconciledBody);
-      this.applyAgentIR(nextAgent, mainAgent);
-    } catch (error) {
-      if (error instanceof GraphIRValidationError || error instanceof AgentValidationError) {
-        return this.setInvalidAgentRuntimeStatus(error.issues);
-      }
-
-      return this.setInvalidAgentRuntimeStatus([
-        {
-          code: 'runtime-binding-error',
-          message: error instanceof Error ? error.message : 'Unknown GraphIR runtime binding failure.',
-        },
-      ]);
-    }
-
-    return this.setAppliedAgentRuntimeStatus(this.currentAgentIR);
-  }
-
   public setAgentIR(agent: AgentIR): AgentRuntimeStatus {
     const mainAgent = this.getMainAgent();
 
     try {
       this.applyAgentIR(agent, mainAgent);
     } catch (error) {
-      if (error instanceof GraphIRValidationError || error instanceof AgentValidationError) {
+      if (error instanceof AgentValidationError) {
         return this.setInvalidAgentRuntimeStatus(error.issues);
       }
 
@@ -250,12 +199,12 @@ export class SimulationSession {
     return agent ? this.getEffectiveControlMode(agent) : null;
   }
 
-  public getCurrentLegacyGraphIRDocument(): GraphIRDocument {
-    return createLegacyGraphBridgeFromAgent(this.currentAgentIR).document;
-  }
-
   public getCurrentAgentIR(): AgentIR {
     return this.currentAgentIR;
+  }
+
+  public getVisionCellCount(): number {
+    return this.visionSystem.getVisionCells();
   }
 
   public getAgentRuntimeStatus(): AgentRuntimeStatus {

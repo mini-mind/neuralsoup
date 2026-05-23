@@ -2,9 +2,9 @@ import { useCallback } from 'react';
 import type {
   BrainContainerNode,
   AgentIR,
+  LiteralValue,
   Position,
 } from '../../domain/brain';
-import type { LiteralValue } from '../../domain/brain/compat';
 import {
   AGENT_GRAPH_CHILD_SCOPE_OFFSET,
   AGENT_GRAPH_EXPANDED_GROUP_PADDING,

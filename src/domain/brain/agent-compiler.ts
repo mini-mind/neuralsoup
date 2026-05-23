@@ -6,12 +6,29 @@ import type {
   BodyOutputRule,
   BrainNeuronNode,
 } from './agent-ir';
-import { GraphIRValidationError, type GraphIRValidationIssue } from './ir';
 import type { AgentProgram, AgentProgramConnection, AgentProgramNeuronNode } from './agent-program';
 import type { BrainOutputChannel } from './shared';
 
-export type AgentValidationIssue = GraphIRValidationIssue;
-export class AgentValidationError extends GraphIRValidationError {}
+export type AgentValidationIssueCode =
+  | 'missing-brain-root-container'
+  | 'missing-brain-node'
+  | 'invalid-connection-direction'
+  | 'runtime-binding-error';
+
+export interface AgentValidationIssue {
+  code: AgentValidationIssueCode;
+  message: string;
+}
+
+export class AgentValidationError extends Error {
+  public readonly issues: AgentValidationIssue[];
+
+  constructor(issues: AgentValidationIssue[]) {
+    super(issues.map((issue) => issue.message).join(' | '));
+    this.name = 'AgentValidationError';
+    this.issues = issues;
+  }
+}
 
 const BODY_INPUT_SOURCE_PATTERN = /^vision\.([RGB])\.(\d+)$/;
 const BODY_OUTPUT_TARGET_PATTERN = /^action\.(turn-left|move-forward|turn-right)$/;
@@ -279,7 +296,7 @@ const buildAgentCompilationContext = (agent: AgentIR): AgentCompilationContext =
 
   if (!containerIds.has(agent.brain.rootContainerId)) {
     issues.push({
-      code: 'runtime-binding-error',
+      code: 'missing-brain-root-container',
       message: `Brain root container "${agent.brain.rootContainerId}" is missing.`,
     });
   }
@@ -287,13 +304,13 @@ const buildAgentCompilationContext = (agent: AgentIR): AgentCompilationContext =
   for (const connection of agent.connections) {
     if (connection.from.scope === 'brain' && !neuronIds.has(connection.from.nodeId)) {
       issues.push({
-        code: 'missing-link-node',
+        code: 'missing-brain-node',
         message: `Agent connection "${connection.id}" references missing brain source "${connection.from.nodeId}".`,
       });
     }
     if (connection.to.scope === 'brain' && !neuronIds.has(connection.to.nodeId)) {
       issues.push({
-        code: 'missing-link-node',
+        code: 'missing-brain-node',
         message: `Agent connection "${connection.id}" references missing brain target "${connection.to.nodeId}".`,
       });
     }
@@ -311,13 +328,13 @@ const buildAgentCompilationContext = (agent: AgentIR): AgentCompilationContext =
     }
     if (connection.from.scope === 'bodyOutput') {
       issues.push({
-        code: 'invalid-link-direction',
+        code: 'invalid-connection-direction',
         message: `Agent connection "${connection.id}" cannot start from bodyOutput.`,
       });
     }
     if (connection.to.scope === 'bodyInput') {
       issues.push({
-        code: 'invalid-link-direction',
+        code: 'invalid-connection-direction',
         message: `Agent connection "${connection.id}" cannot target bodyInput.`,
       });
     }

@@ -11,12 +11,6 @@ import {
   type AgentProgram,
   type AgentProgramRuntimeState,
 } from '../domain/brain';
-import {
-  createBrainProgramRuntimeState,
-  stepBrainProgram,
-  type BrainProgram,
-  type BrainProgramRuntimeState,
-} from '../domain/brain/compat';
 
 export interface KeyboardInputState {
   turnLeft: boolean;
@@ -30,31 +24,12 @@ export interface AgentUpdateContext {
 }
 
 export class AgentController {
-  private brainPrograms: Map<number, BrainProgram> = new Map();
-  private brainRuntimeStates: Map<number, BrainProgramRuntimeState> = new Map();
   private agentPrograms: Map<number, AgentProgram> = new Map();
   private agentRuntimeStates: Map<number, AgentProgramRuntimeState> = new Map();
 
-  public installBrainProgram(agentId: number, program: BrainProgram): void {
-    this.agentPrograms.delete(agentId);
-    this.agentRuntimeStates.delete(agentId);
-    this.brainPrograms.set(agentId, program);
-    this.brainRuntimeStates.set(agentId, createBrainProgramRuntimeState(program));
-  }
-
   public installAgentProgram(agentId: number, program: AgentProgram): void {
-    this.brainPrograms.delete(agentId);
-    this.brainRuntimeStates.delete(agentId);
     this.agentPrograms.set(agentId, program);
     this.agentRuntimeStates.set(agentId, createAgentProgramRuntimeState(program));
-  }
-
-  public getBrainRuntimeState(agentId: number): BrainProgramRuntimeState | null {
-    return this.brainRuntimeStates.get(agentId) ?? null;
-  }
-
-  public getBrainProgram(agentId: number): BrainProgram | null {
-    return this.brainPrograms.get(agentId) ?? null;
   }
 
   public getActiveLeafNodeIds(agentId: number): string[] {
@@ -62,12 +37,6 @@ export class AgentController {
     if (agentRuntimeState) {
       return [...agentRuntimeState.activeLeafNodeIds];
     }
-
-    const brainRuntimeState = this.brainRuntimeStates.get(agentId);
-    if (brainRuntimeState) {
-      return [...brainRuntimeState.activeLeafNodeIds];
-    }
-
     return [];
   }
 
@@ -120,57 +89,33 @@ export class AgentController {
   ): void {
     const agentProgram = this.agentPrograms.get(agent.id);
     const agentRuntimeState = this.agentRuntimeStates.get(agent.id);
-    const brainProgram = this.brainPrograms.get(agent.id);
-    const runtimeState = this.brainRuntimeStates.get(agent.id);
-    if (!agentProgram && (!brainProgram || !runtimeState)) {
+    if (!agentProgram || !agentRuntimeState) {
       return;
     }
-    
-    // 处理键盘输入 - 优先级高于神经网络
+
     const hasKeyboardInput = keyboardInputs[0] > 0 || keyboardInputs[1] > 0 || keyboardInputs[2] > 0;
-    
     if (hasKeyboardInput) {
       this.applyAction(agent, keyboardInputs, deltaTime);
-    } else {
-      if (agentProgram && agentRuntimeState) {
-        const result = stepAgentProgram(
-          agentProgram,
-          agent.visualInput,
-          agentRuntimeState,
-          deltaTime,
-          Date.now()
-        );
-        this.agentRuntimeStates.set(agent.id, result.runtimeState);
-        this.applyAction(
-          agent,
-          [
-            result.outputs['turn-left'],
-            result.outputs['move-forward'],
-            result.outputs['turn-right']
-          ],
-          deltaTime
-        );
-        return;
-      }
-
-      const result = stepBrainProgram(
-        brainProgram!,
-        agent.visualInput,
-        runtimeState!,
-        deltaTime,
-        Date.now()
-      );
-      this.brainRuntimeStates.set(agent.id, result.runtimeState);
-      this.applyAction(
-        agent,
-        [
-          result.outputs['turn-left'],
-          result.outputs['move-forward'],
-          result.outputs['turn-right']
-        ],
-        deltaTime
-      );
+      return;
     }
+
+    const result = stepAgentProgram(
+      agentProgram,
+      agent.visualInput,
+      agentRuntimeState,
+      deltaTime,
+      Date.now()
+    );
+    this.agentRuntimeStates.set(agent.id, result.runtimeState);
+    this.applyAction(
+      agent,
+      [
+        result.outputs['turn-left'],
+        result.outputs['move-forward'],
+        result.outputs['turn-right']
+      ],
+      deltaTime
+    );
   }
 
   /**
@@ -237,8 +182,6 @@ export class AgentController {
    * 清理资源
    */
   public destroy(): void {
-    this.brainPrograms.clear();
-    this.brainRuntimeStates.clear();
     this.agentPrograms.clear();
     this.agentRuntimeStates.clear();
   }

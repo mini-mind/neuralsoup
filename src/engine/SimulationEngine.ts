@@ -14,7 +14,6 @@ import { CollisionDetector } from './CollisionDetector';
 import { SimulationSession } from '../runtime/SimulationSession';
 import type { SimulationControlMode } from '../domain/world';
 import type { AgentIR } from '../domain/brain';
-import type { BodyDefinition, GraphIRDocument } from '../domain/brain/compat';
 import type { AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../types/agentRuntime';
 
 export type SimulationLifecycleState = 'idle' | 'running' | 'paused';
@@ -75,14 +74,6 @@ export class SimulationEngine {
         initialControlMode: this.currentControlMode
       }
     );
-  }
-
-  // Legacy compat entry; production UI should use setAgentIR().
-  public setLegacyGraphIRDocument(document: GraphIRDocument, body?: BodyDefinition): AgentRuntimeStatus {
-    const status = this.session.setLegacyGraphIRDocument(document, body);
-    this.emitAgentRuntimeStatus(status);
-    this.emitAgentRuntimeActivity(this.getAgentRuntimeActivitySnapshot());
-    return status;
   }
 
   public setAgentIR(agent: AgentIR): AgentRuntimeStatus {

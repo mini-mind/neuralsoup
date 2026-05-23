@@ -24,7 +24,3 @@ export type AgentRuntimeStatus =
       issues: AgentValidationIssue[];
       message: string;
     };
-
-export type GraphIRRuntimeStatus = AgentRuntimeStatus;
-export type GraphIRDraftStatus = AgentDraftStatus;
-export type GraphIRRuntimeActivitySnapshot = AgentRuntimeActivitySnapshot;
