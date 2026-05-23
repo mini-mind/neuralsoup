@@ -187,7 +187,7 @@ export const normalizeCanonicalBrainLibraryRecord = (
   metadataOverride?: AgentMetadata
 ): BrainLibraryRecord => {
   const metadata = metadataOverride ?? { ...agent.metadata };
-  const normalizedVisionCellCount = deriveAgentIRVisionCellCount(agent, { includeLegacyFallback: false });
+  const normalizedVisionCellCount = deriveAgentIRVisionCellCount(agent);
   const normalizedAgent = withDerivedBodyVisionCellCount(
     withVisionCellLayoutMarkers(
       stripLegacyVisionCellCount({
@@ -213,13 +213,13 @@ export const normalizeImportedBrainLibraryRecord = (
     legacyVisionCellCount?: number | null;
   }
 ): BrainLibraryRecord => {
-  const structuredVisionCellCount = deriveAgentIRVisionCellCount(agent, { includeLegacyFallback: false });
+  const structuredVisionCellCount = deriveAgentIRVisionCellCount(agent);
   const effectiveVisionCellCount =
     structuredVisionCellCount > 0
       ? structuredVisionCellCount
       : options?.legacyVisionCellCount != null
         ? options.legacyVisionCellCount
-        : deriveAgentIRVisionCellCount(agent);
+        : 0;
   const nextAgent =
     effectiveVisionCellCount > structuredVisionCellCount
       ? withVisionCellLayoutMarkers(agent, effectiveVisionCellCount)

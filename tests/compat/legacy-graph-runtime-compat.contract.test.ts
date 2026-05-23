@@ -194,10 +194,40 @@ test('compileLegacyBrainDefinition exposes legacy-named compat wrapper fields', 
 
 test('legacy GraphIR compat runtime step reads visualInput values using channel-interleaved vision layout', () => {
   const document = createDefaultGraphIRDocument(2);
+  const neuronGroup = document.root.children.find((node) => node.id === 'core-neuron-group');
+  assert.ok(neuronGroup && neuronGroup.kind === 'neuron-group');
+  for (const child of neuronGroup.children) {
+    if (child.kind !== 'neuron') {
+      continue;
+    }
+    child.parameterOverrides = {
+      ...(child.parameterOverrides ?? {}),
+      threshold: -70,
+    };
+  }
+  neuronGroup.children.push(
+    {
+      kind: 'neuron',
+      id: 'neuron-3',
+      label: 'Neuron 3',
+      modelId: 'izhikevich-neuron',
+      parameterOverrides: { threshold: -70 },
+    },
+    {
+      kind: 'neuron',
+      id: 'neuron-4',
+      label: 'Neuron 4',
+      modelId: 'izhikevich-neuron',
+      parameterOverrides: { threshold: -70 },
+    }
+  );
   document.root.links = [
-    { id: 'vision-g0-to-left', from: { nodeId: 'vision-G-0', portId: 'out' }, to: { nodeId: 'output-turn-left', portId: 'in' }, weight: 1 },
-    { id: 'vision-r1-to-forward', from: { nodeId: 'vision-R-1', portId: 'out' }, to: { nodeId: 'output-move-forward', portId: 'in' }, weight: 1 },
-    { id: 'vision-b1-to-right', from: { nodeId: 'vision-B-1', portId: 'out' }, to: { nodeId: 'output-turn-right', portId: 'in' }, weight: 1 },
+    { id: 'vision-g0-to-left-neuron', from: { nodeId: 'vision-G-0', portId: 'out' }, to: { nodeId: 'neuron-1', portId: 'dendrite' }, weight: 1 },
+    { id: 'vision-r1-to-forward-neuron', from: { nodeId: 'vision-R-1', portId: 'out' }, to: { nodeId: 'neuron-3', portId: 'dendrite' }, weight: 1 },
+    { id: 'vision-b1-to-right-neuron', from: { nodeId: 'vision-B-1', portId: 'out' }, to: { nodeId: 'neuron-4', portId: 'dendrite' }, weight: 1 },
+    { id: 'left-neuron-to-output', from: { nodeId: 'neuron-1', portId: 'axon' }, to: { nodeId: 'output-turn-left', portId: 'in' }, weight: 1 },
+    { id: 'forward-neuron-to-output', from: { nodeId: 'neuron-3', portId: 'axon' }, to: { nodeId: 'output-move-forward', portId: 'in' }, weight: 1 },
+    { id: 'right-neuron-to-output', from: { nodeId: 'neuron-4', portId: 'axon' }, to: { nodeId: 'output-turn-right', portId: 'in' }, weight: 1 },
   ];
 
   const program = compileDefaultBrain(document);

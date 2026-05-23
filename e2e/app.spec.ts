@@ -29,8 +29,14 @@ const selectors = {
   settingsPanel: '[data-testid="settings-panel"]',
   settingsSidebar: '[data-testid="settings-sidebar"]',
   settingsNavAgentParameters: '[data-testid="settings-nav-agent-parameters"]',
+  settingsNavBodyIr: '[data-testid="settings-nav-body-ir"]',
   settingsNavKeyboardInputs: '[data-testid="settings-nav-keyboard-inputs"]',
   agentParamsPanel: '[data-testid="agent-params-panel"]',
+  bodyIrSettingsPanel: '[data-testid="body-ir-settings-panel"]',
+  bodyIrPreviewPanel: '[data-testid="body-ir-preview-panel"]',
+  bodyIrValidationCount: '[data-testid="body-ir-validation-count"]',
+  bodyIrInputRulePattern0: '[data-testid="body-ir-input-rule-pattern-0"]',
+  bodyIrOutputRuleTargetTemplate0: '[data-testid="body-ir-output-rule-target-template-0"]',
   visionCellsInput: '[data-testid="vision-cells-input"]',
   visionRangeInput: '[data-testid="vision-range-input"]',
   visionAngleInput: '[data-testid="vision-angle-input"]',
@@ -738,6 +744,40 @@ test('settings page persists applied agent parameter values and supports reset d
   await expect(page.locator(selectors.visionCellsValue)).toHaveText('36');
   await expect(page.locator(selectors.visionRangeValue)).toHaveText('250');
   await expect(page.locator(selectors.visionAngleValue)).toHaveText('120');
+});
+
+test('body ir settings shows preview panel, surfaces validation after rule edits, and clears it after repair', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabSettings).click();
+  await expect(page.locator(selectors.settingsPanel)).toBeVisible();
+  await page.locator(selectors.settingsNavBodyIr).click();
+
+  await expect(page.locator(selectors.settingsSectionValue)).toHaveText('body-ir');
+  await expect(page.locator(selectors.bodyIrSettingsPanel)).toBeVisible();
+  await expect(page.locator(selectors.bodyIrPreviewPanel)).toBeVisible();
+  await expect(page.locator(selectors.bodyIrPreviewPanel)).toContainText('Preview / Validation');
+  await expect(page.locator(selectors.bodyIrPreviewPanel)).toContainText('输入 endpoint 108 个，输出 endpoint 3 个。');
+  await expect(page.locator('[data-testid="body-ir-input-preview-item-0"]')).toBeVisible();
+  await expect(page.locator('[data-testid="body-ir-input-preview-item-0"]')).toContainText('vision-B-0');
+  await expect(page.locator('[data-testid="body-ir-output-preview-item-0"]')).toBeVisible();
+  await expect(page.locator('[data-testid="body-ir-output-preview-item-0"]')).toContainText('output-move-forward');
+  await expect(page.locator(selectors.bodyIrValidationCount)).toHaveText('0');
+
+  await expect(page.locator(selectors.bodyIrInputRulePattern0)).toHaveValue('^vision-([RGB])-(\\d+)$');
+  await page.locator(selectors.bodyIrOutputRuleTargetTemplate0).fill('unsupported.$1');
+
+  await expect(page.locator(selectors.bodyIrValidationCount)).not.toHaveText('0');
+  await expect(page.locator('[data-testid^="body-ir-output-rule-message-0-"]').first()).toBeVisible();
+  await expect(page.locator('[data-testid^="body-ir-output-rule-message-0-"]').first()).toContainText('unsupported target');
+
+  await page.locator(selectors.bodyIrOutputRuleTargetTemplate0).fill('action.$1');
+
+  await expect(page.locator(selectors.bodyIrValidationCount)).toHaveText('0');
+  await expect(page.locator('[data-testid^="body-ir-output-rule-message-0-"]')).toHaveCount(0);
+  await expect(page.locator(selectors.bodyIrOutputRuleTargetTemplate0)).toHaveValue('action.$1');
 });
 
 test('editor tabs switch between settings and graph view with settings sidebar navigation', async ({ page }, testInfo) => {

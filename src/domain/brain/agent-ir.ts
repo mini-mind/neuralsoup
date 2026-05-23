@@ -154,23 +154,6 @@ const parseLegacyVisionCellIndex = (nodeId: string): number | null => {
   return Number.parseInt(match[1], 10);
 };
 
-const normalizeVisionCellCount = (value: unknown): number | null => {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return null;
-  }
-
-  return Math.max(0, Math.floor(value));
-};
-
-const getLegacyBodyVisionCellCount = (body: BodyIR): number | null => {
-  const descriptor = Object.getOwnPropertyDescriptor(body, 'visionCellCount');
-  if (!descriptor || typeof descriptor.get === 'function') {
-    return null;
-  }
-
-  return normalizeVisionCellCount(descriptor.value);
-};
-
 const stripLegacyBodyVisionCellCount = (body: BodyIR): BodyIR => {
   const { visionCellCount: _legacyVisionCellCount, ...bodyWithoutLegacyVisionCellCount } = body as LegacyBodyIR;
   return bodyWithoutLegacyVisionCellCount as BodyIR;
@@ -244,17 +227,8 @@ const deriveStructuredAgentIRVisionCellCount = (agent: AgentIR): number => {
   return maxCellIndex + 1;
 };
 
-export const deriveAgentIRVisionCellCount = (
-  agent: AgentIR,
-  options?: { includeLegacyFallback?: boolean }
-): number => {
-  const structuredVisionCellCount = deriveStructuredAgentIRVisionCellCount(agent);
-  if (options?.includeLegacyFallback === false) {
-    return structuredVisionCellCount;
-  }
-
-  return Math.max(structuredVisionCellCount, getLegacyBodyVisionCellCount(agent.body) ?? 0);
-};
+export const deriveAgentIRVisionCellCount = (agent: AgentIR): number =>
+  deriveStructuredAgentIRVisionCellCount(agent);
 
 export const withDerivedBodyVisionCellCount = (agent: AgentIR): AgentIR => {
   const body = stripLegacyBodyVisionCellCount(agent.body);

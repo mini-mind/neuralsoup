@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import SimulationCanvas from './components/SimulationCanvas';
 import {
+  buildAgentBodyRulePreviewModel,
   createDefaultAgentIR,
   deriveAgentIRVisionCellCount,
   reconcileAgentIRVisionCells,
@@ -16,8 +17,15 @@ import BrainLibraryModal from './components/editor/BrainLibraryModal';
 import EditorToolbar from './components/editor/EditorToolbar';
 import GraphEditorPanel from './components/editor/GraphEditorPanel';
 import { isEditableOrInteractiveTarget } from './components/editor/graph/isEditableOrInteractiveTarget';
-import SettingsPanel, { type BodyIRRuleIssueItem } from './components/editor/SettingsPanel';
-import type { AgentParameters, EditorTab, GraphPathItem, SettingsSection } from './components/editor/types';
+import SettingsPanel from './components/editor/SettingsPanel';
+import type {
+  AgentParameters,
+  BodyIRPreviewData,
+  BodyIRValidationMessage,
+  EditorTab,
+  GraphPathItem,
+  SettingsSection,
+} from './components/editor/types';
 import type { GraphDocumentChangeOptions } from './components/hooks/useSNNTopologyState';
 import {
   GRAPH_DRAFT_ONLY_CHANGE,
@@ -243,31 +251,89 @@ const App: React.FC = () => {
   const persistedBrainLibrarySnapshotRef = useRef(serializeBrainLibrarySnapshot(initialBrainLibraryLoad.brains));
   const installedGraphSummary = agentRuntimeStatus.appliedSummary;
   const hasUnsavedDraftChanges = !areAgentsEquivalent(currentAgentDocument, draftAgentDocument);
-  const bodyRuleIssues = useMemo<BodyIRRuleIssueItem[]>(
-    () =>
-      agentDraftStatus.issues.flatMap<BodyIRRuleIssueItem>((issue) => {
-        const bodyInputRuleMatch = issue.message.match(/body input rule "([^"]+)"/i);
-        if (bodyInputRuleMatch) {
-          return [{ scope: 'input' as const, ruleId: bodyInputRuleMatch[1], message: issue.message }];
-        }
-
-        const bodyOutputRuleMatch = issue.message.match(/body output rule "([^"]+)"/i);
-        if (bodyOutputRuleMatch) {
-          return [{ scope: 'output' as const, ruleId: bodyOutputRuleMatch[1], message: issue.message }];
-        }
-
-        if (issue.message.includes('body input')) {
-          return [{ scope: 'input' as const, ruleId: 'unresolved', message: issue.message }];
-        }
-
-        if (issue.message.includes('body output')) {
-          return [{ scope: 'output' as const, ruleId: 'unresolved', message: issue.message }];
-        }
-
-        return [];
-      }),
-    [agentDraftStatus.issues]
+  const bodyRulePreviewModel = useMemo(
+    () => buildAgentBodyRulePreviewModel(draftAgentDocument),
+    [draftAgentDocument]
   );
+  const bodyRulePreview = useMemo<BodyIRPreviewData>(() => {
+    const inputRuleById = new Map(draftAgentDocument.body.inputRules.map((rule, index) => [rule.id, { rule, index }]));
+    const outputRuleById = new Map(draftAgentDocument.body.outputRules.map((rule, index) => [rule.id, { rule, index }]));
+    const inputMatches = bodyRulePreviewModel.input.rules.flatMap((previewGroup) => {
+      const entry = inputRuleById.get(previewGroup.ruleId);
+      return previewGroup.endpoints.map((endpoint) => ({
+        nodeId: endpoint.nodeId,
+        resolvedSource: endpoint.resolved,
+        scale: entry?.rule.scale,
+        ruleIndex: entry?.index,
+      }));
+    });
+    const outputMatches = bodyRulePreviewModel.output.rules.flatMap((previewGroup) => {
+      const entry = outputRuleById.get(previewGroup.ruleId);
+      return previewGroup.endpoints.map((endpoint) => ({
+        nodeId: endpoint.nodeId,
+        resolvedTarget: endpoint.resolved,
+        decayPerSecond: entry?.rule.decayPerSecond,
+        ruleIndex: entry?.index,
+      }));
+    });
+
+    return {
+      summary: `输入 endpoint ${bodyRulePreviewModel.input.endpointNodeIds.length} 个，输出 endpoint ${bodyRulePreviewModel.output.endpointNodeIds.length} 个。`,
+      inputMatches,
+      outputMatches,
+    };
+  }, [bodyRulePreviewModel, draftAgentDocument.body.inputRules, draftAgentDocument.body.outputRules]);
+  const bodyRuleValidation = useMemo<BodyIRValidationMessage[]>(() => {
+    const inputRuleIndexById = new Map(draftAgentDocument.body.inputRules.map((rule, index) => [rule.id, index]));
+    const outputRuleIndexById = new Map(draftAgentDocument.body.outputRules.map((rule, index) => [rule.id, index]));
+    const messages: BodyIRValidationMessage[] = [];
+
+    for (const issue of bodyRulePreviewModel.issues) {
+      const level = issue.kind === 'compile-error' || issue.kind === 'conflict' ? 'error' : 'warning';
+      const scope = issue.scope === 'input' ? 'input-rule' : 'output-rule';
+      const ruleIndex =
+        issue.scope === 'input'
+          ? (issue.ruleId ? inputRuleIndexById.get(issue.ruleId) : undefined)
+          : (issue.ruleId ? outputRuleIndexById.get(issue.ruleId) : undefined);
+
+      if (ruleIndex != null && ruleIndex >= 0) {
+        messages.push({
+          level,
+          message: issue.message,
+          scope,
+          ruleIndex,
+        });
+        continue;
+      }
+
+      messages.push({
+        level,
+        message: issue.message,
+        scope: 'body',
+      });
+
+      if (issue.kind === 'conflict' && issue.relatedRuleIds?.length) {
+        for (const relatedRuleId of issue.relatedRuleIds) {
+          const relatedRuleIndex =
+            issue.scope === 'input'
+              ? inputRuleIndexById.get(relatedRuleId)
+              : outputRuleIndexById.get(relatedRuleId);
+          if (relatedRuleIndex == null || relatedRuleIndex < 0) {
+            continue;
+          }
+
+          messages.push({
+            level,
+            message: issue.message,
+            scope,
+            ruleIndex: relatedRuleIndex,
+          });
+        }
+      }
+    }
+
+    return messages;
+  }, [bodyRulePreviewModel.issues, draftAgentDocument.body.inputRules, draftAgentDocument.body.outputRules]);
 
   useEffect(() => {
     const nextSnapshot = serializeBrainLibrarySnapshot(brainLibrary);
@@ -906,7 +972,7 @@ const App: React.FC = () => {
           <span data-testid="vision-cells-value">{agentParameters.visionCells}</span>
           <span data-testid="vision-range-value">{agentParameters.visionRange}</span>
           <span data-testid="vision-angle-value">{agentParameters.visionAngle}</span>
-          <span data-testid="body-ir-validation-count">{bodyRuleIssues.length}</span>
+          <span data-testid="body-ir-validation-count">{bodyRuleValidation.length}</span>
           <span data-testid="graph-ir-validation-count">{agentDraftStatus.issues.length}</span>
           <span data-testid="graph-ir-runtime-state">{agentRuntimeStatus.state}</span>
           <span data-testid="graph-ir-runtime-validation-count">{agentRuntimeStatus.issues.length}</span>
@@ -940,7 +1006,8 @@ const App: React.FC = () => {
               draftAgentParameters={draftAgentParameters}
               body={draftAgentDocument.body}
               settingsSection={settingsSection}
-              bodyRuleIssues={bodyRuleIssues}
+              bodyRulePreview={bodyRulePreview}
+              bodyRuleValidation={bodyRuleValidation}
               onSettingsSectionChange={setSettingsSection}
               onDraftAgentParametersChange={setDraftAgentParameters}
               onBodyChange={(updater) => {

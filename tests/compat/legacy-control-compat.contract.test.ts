@@ -57,56 +57,6 @@ const getRootVisionCells = (document: GraphIRDocument) => {
 const compileDefaultBrain = (document: GraphIRDocument) =>
   compileLegacyBrainDefinition(document, createDefaultLegacyBodyDefinition(getRootVisionCells(document)));
 
-const applyLegacyAction = (agent: Agent, output: number[], deltaTime: number): void => {
-  const [turnLeft, moveForward, turnRight] = output;
-
-  const turnSpeed = 3.0;
-  const turnThreshold = 0.3;
-  if (turnLeft > turnThreshold) {
-    agent.angle -= turnSpeed * turnLeft * deltaTime;
-  }
-  if (turnRight > turnThreshold) {
-    agent.angle += turnSpeed * turnRight * deltaTime;
-  }
-
-  const maxSpeed = 60;
-  const moveThreshold = 0.2;
-  if (moveForward > moveThreshold) {
-    const speed = maxSpeed * moveForward;
-    agent.velocity.x = Math.cos(agent.angle) * speed;
-    agent.velocity.y = Math.sin(agent.angle) * speed;
-    return;
-  }
-
-  agent.velocity.x = 0;
-  agent.velocity.y = 0;
-};
-
-const updateLegacyBrainAgent = (
-  program: LegacyBrainProgram,
-  runtimeState: ReturnType<typeof createLegacyBrainProgramRuntimeState>,
-  agent: Agent,
-  deltaTime: number
-) => {
-  const result = stepLegacyBrainProgram(
-    program,
-    agent.visualInput,
-    runtimeState,
-    deltaTime,
-    Date.now()
-  );
-  applyLegacyAction(
-    agent,
-    [
-      result.outputs['turn-left'],
-      result.outputs['move-forward'],
-      result.outputs['turn-right'],
-    ],
-    deltaTime
-  );
-  return result.runtimeState;
-};
-
 const createValidCompatBoundaryDocument = (): GraphIRDocument => ({
   version: 1,
   models: [
@@ -376,6 +326,18 @@ test('simulation session legacy GraphIR compat setter keeps the last applied Age
         portId: 'out',
       },
       to: {
+        nodeId: 'neuron-1',
+        portId: 'dendrite',
+      },
+      weight: 2,
+    },
+    {
+      id: 'neuron-1-to-forward',
+      from: {
+        nodeId: 'neuron-1',
+        portId: 'axon',
+      },
+      to: {
         nodeId: 'output-move-forward',
         portId: 'in',
       },
@@ -393,38 +355,30 @@ test('simulation session legacy GraphIR compat setter keeps the last applied Age
     bodySignalId: 'motor-move-forward',
   };
   const invalidDocument = structuredClone(validDocument);
-  invalidDocument.root.links.push({
-    id: 'missing-output-to-forward',
-    from: {
-      nodeId: 'missing-output-node',
-      portId: 'out',
-    },
-    to: {
-      nodeId: 'output-move-forward',
-      portId: 'in',
-    },
-    weight: 1,
-  });
 
   const invalidStatus = setLegacyGraphIRDocument(session, invalidDocument, invalidBody);
   assert.equal(invalidStatus.state, 'invalid');
   assert.ok(
     invalidStatus.message.includes('missing-output-node') ||
       invalidStatus.message.includes('non-root or non-output brain signal') ||
-      invalidStatus.message.includes('cannot preserve draft link')
+      invalidStatus.message.includes('missing-brain-node')
   );
-  assert.deepEqual(invalidStatus.appliedSummary.leafLinkCount, 1);
   assert.deepEqual(invalidStatus.appliedSummary, appliedSummary);
   const persistedConnections = session.getCurrentAgentIR().connections.map((connection) => ({
     from: connection.from.nodeId,
     to: connection.to.nodeId,
     weight: connection.weight,
   }));
-  assert.deepEqual(persistedConnections, [{ from: 'vision-B-1', to: 'output-move-forward', weight: 2 }]);
+  assert.deepEqual(persistedConnections, [
+    { from: 'vision-B-1', to: 'neuron-1', weight: 2 },
+    { from: 'neuron-1', to: 'output-move-forward', weight: 2 },
+  ]);
 
   const runtimeStatus = session.getAgentRuntimeStatus();
   assert.equal(runtimeStatus.state, 'applied');
   assert.deepEqual(runtimeStatus.appliedSummary, appliedSummary);
+  assert.equal(session.getCurrentAgentIR().connections[0]?.from.nodeId, 'vision-B-1');
+  assert.equal(session.getCurrentAgentIR().connections[0]?.to.nodeId, 'neuron-1');
 
   const mainAgent = session.getMainAgent();
   assert.ok(mainAgent);
@@ -563,6 +517,18 @@ test('simulation session preserves custom legacy GraphIR compat leaf links acros
         portId: 'out',
       },
       to: {
+        nodeId: 'neuron-1',
+        portId: 'dendrite',
+      },
+      weight: 2,
+    },
+    {
+      id: 'neuron-1-to-forward',
+      from: {
+        nodeId: 'neuron-1',
+        portId: 'axon',
+      },
+      to: {
         nodeId: 'output-move-forward',
         portId: 'in',
       },
@@ -572,24 +538,26 @@ test('simulation session preserves custom legacy GraphIR compat leaf links acros
 
   setLegacyGraphIRDocument(session, document);
   assert.equal(session.isMainAgentBrainProgramConfigured(), true);
-  assert.equal(session.getCurrentAgentIR().connections.length, 1);
+  assert.equal(session.getCurrentAgentIR().connections.length, 2);
   assert.equal(session.getCurrentAgentIR().connections[0]?.weight, 2);
   assert.equal(session.getCurrentAgentIR().connections[0]?.from.scope, 'bodyInput');
-  assert.equal(session.getCurrentAgentIR().connections[0]?.to.scope, 'bodyOutput');
+  assert.equal(session.getCurrentAgentIR().connections[0]?.to.scope, 'brain');
+  assert.equal(session.getCurrentAgentIR().connections[1]?.from.scope, 'brain');
+  assert.equal(session.getCurrentAgentIR().connections[1]?.to.scope, 'bodyOutput');
 
   session.updateAgentParameters({ visionCells: 1 });
   assert.equal(summarizeGraphIRDocument(exportLegacyGraphIRDocument(session)).inputSignalCount, 6);
-  assert.equal(session.getCurrentAgentIR().connections.length, 1);
+  assert.equal(session.getCurrentAgentIR().connections.length, 2);
   assert.equal(session.getCurrentAgentIR().connections[0]?.weight, 2);
 
   session.reset();
   assert.equal(session.getMainAgentControlMode(), 'keyboard');
   assert.equal(summarizeGraphIRDocument(exportLegacyGraphIRDocument(session)).inputSignalCount, 6);
-  assert.equal(session.getCurrentAgentIR().connections.length, 1);
+  assert.equal(session.getCurrentAgentIR().connections.length, 2);
   assert.equal(session.getCurrentAgentIR().connections[0]?.weight, 2);
 });
 
-test('legacy brain-program backed snn control consumes legacy GraphIR output signal channels', () => {
+test('legacy brain-program compat compiler rejects legacy GraphIR drafts that lower to direct body bridges', () => {
   const document = createDefaultGraphIRDocument(1);
   document.root.links = [
     {
@@ -606,19 +574,7 @@ test('legacy brain-program backed snn control consumes legacy GraphIR output sig
     },
   ];
 
-  const program = compileDefaultBrain(document);
-  let runtimeState = createLegacyBrainProgramRuntimeState(program);
-
-  const agent = createAgent({
-    id: 1,
-    visualInput: [0, 1, 0],
-  });
-
-  runtimeState = updateLegacyBrainAgent(program, runtimeState, agent, 1);
-  assert.ok(runtimeState);
-
-  assert.ok(agent.velocity.x > 0);
-  assert.equal(agent.velocity.y, 0);
+  assert.throws(() => compileDefaultBrain(document), /bodyInput directly to bodyOutput/);
 });
 
 test('simulation session exposes the main-agent active legacy GraphIR leaf node ids through compat runtime state', () => {

@@ -313,7 +313,7 @@ const BodyIRSettingsSection: React.FC<BodyIRSettingsSectionProps> = ({ body, onB
     <div className="settings-page-section body-ir-settings" data-testid="body-ir-settings-panel">
       <div className="settings-section-header">
         <h4>BodyIR 映射规则</h4>
-        <p>维护 inputRules / outputRules，并预留接收校验与匹配预览数据的显示区域。</p>
+        <p>维护 body endpoint 到 world 信号的映射规则，并实时查看投影预览与校验结果。</p>
       </div>
 
       {bodyMessages.length > 0 ? (
@@ -397,7 +397,7 @@ const BodyIRSettingsSection: React.FC<BodyIRSettingsSectionProps> = ({ body, onB
         <div className="body-ir-section-header">
           <div>
             <h5>Preview / Validation</h5>
-            <p>未接真实运行时数据时保持空状态；接入后可直接展示规则匹配结果。</p>
+            <p>展示当前规则对 body endpoint 的投影结果，便于核对 nodeId 与 world 映射。</p>
           </div>
         </div>
 
@@ -409,7 +409,7 @@ const BodyIRSettingsSection: React.FC<BodyIRSettingsSectionProps> = ({ body, onB
             {preview?.inputMatches?.length ? (
               <ul className="body-ir-preview-list">
                 {preview.inputMatches.map((item, index) => (
-                  <li key={`input-preview-${index}`}>
+                  <li key={`input-preview-${index}`} data-testid={`body-ir-input-preview-item-${index}`}>
                     <span>{item.nodeId}</span>
                     <span>{item.resolvedSource}</span>
                     <span>{item.scale ?? '-'}</span>
@@ -426,7 +426,7 @@ const BodyIRSettingsSection: React.FC<BodyIRSettingsSectionProps> = ({ body, onB
             {preview?.outputMatches?.length ? (
               <ul className="body-ir-preview-list">
                 {preview.outputMatches.map((item, index) => (
-                  <li key={`output-preview-${index}`}>
+                  <li key={`output-preview-${index}`} data-testid={`body-ir-output-preview-item-${index}`}>
                     <span>{item.nodeId}</span>
                     <span>{item.resolvedTarget}</span>
                     <span>{item.decayPerSecond ?? '-'}</span>

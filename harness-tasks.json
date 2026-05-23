@@ -607,14 +607,14 @@
     {
       "id": "task-014",
       "title": "BodyIR 产品闭环：在设置/编辑区提供 BodyIR 规则编辑、endpoint 投影预览与可见 validation",
-      "status": "pending",
+      "status": "completed",
       "priority": "P0",
       "depends_on": [
         "task-008"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "max_attempts": 3,
-      "started_at_commit": null,
+      "started_at_commit": "f7d03ed",
       "validation": {
         "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"graph view|brain library\"",
         "timeout_seconds": 1200
@@ -622,24 +622,31 @@
       "on_failure": {
         "cleanup": null
       },
-      "error_log": [
-        "BodyIR currently exists in schema/compiler/runtime/storage but not as a production editing surface; signal/body mapping remains read-only and validation is mostly hidden test diagnostics."
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-23T11:08:47Z",
+          "message": "BodyIR product closure landed: App now derives preview/validation directly from buildAgentBodyRulePreviewModel, SettingsPanel no longer uses text-parsed placeholder issue mapping, BodyIR settings renders live endpoint projections plus visible validation, and targeted Playwright coverage now proves edit -> invalid -> repair flow in both renderer projects."
+        },
+        {
+          "at": "2026-05-23T11:08:47Z",
+          "message": "Cross-review after implementation found no remaining P0-P2 findings for task-014; residual work moved to compat input-surface cleanup and layout truth-source cleanup."
+        }
       ],
-      "checkpoints": [],
-      "completed_at": null
+      "completed_at": "2026-05-23T11:08:47Z"
     },
     {
       "id": "task-015",
       "title": "Compat 输入面收口：下沉 Brain Library legacy LocalStorage/package 兼容并移除 AgentIR 核心的 visionCellCount fallback",
-      "status": "pending",
+      "status": "in_progress",
       "priority": "P1",
       "depends_on": [
         "task-008",
         "task-010"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "max_attempts": 3,
-      "started_at_commit": null,
+      "started_at_commit": "working-tree",
       "validation": {
         "command": "npm run type-check && npm run test:domain && npm run test:compat && npm run test:e2e -- --grep \"brain library\"",
         "timeout_seconds": 1200
@@ -650,7 +657,12 @@
       "error_log": [
         "Production startup/import paths still accept legacy storage/package envelopes, and AgentIR domain helpers still read the deprecated visionCellCount fallback unless callers explicitly opt out."
       ],
-      "checkpoints": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-23T11:08:47Z",
+          "message": "Stage audit scoped task-015 precisely: startup loadBrainLibraryWithStatus still accepts legacy storage envelopes, normalizeImportedBrainExchange still accepts legacy AgentPackage on the default import path, and deriveAgentIRVisionCellCount still defaults to the deprecated visionCellCount fallback in core domain helpers."
+        }
+      ],
       "completed_at": null
     },
     {

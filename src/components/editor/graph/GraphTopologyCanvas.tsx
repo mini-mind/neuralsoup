@@ -452,14 +452,6 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
               onContextMenu={onNodeContextMenu}
               onDoubleClick={(event) => {
                 event.stopPropagation();
-                if (!node.leaf || node.expanded || node.expansionParentId) {
-                  const nearbyLink = findEditableLinkNearClientPoint(event.clientX, event.clientY);
-                  if (nearbyLink) {
-                    onOpenLinkDetail(nearbyLink.id);
-                    return;
-                  }
-                }
-
                 const action = getNodeDoubleClickAction(node.viewId);
                 if (action === 'navigate') {
                   onNavigateToNode(node.viewId);

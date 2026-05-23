@@ -109,7 +109,7 @@ test('Brain Library storage rejects old array payloads instead of migrating impl
   assert.ok(storage.getItem(BRAIN_LIBRARY_CORRUPT_STORAGE_KEY));
 });
 
-test('Brain Library storage quarantines structurally invalid AgentPackage payloads', () => {
+test('Brain Library storage quarantines structurally invalid non-canonical payloads', () => {
   const storage = installMemoryLocalStorage();
   storage.setItem(
     BRAIN_LIBRARY_STORAGE_KEY,
@@ -182,7 +182,7 @@ test('Brain Library storage rewrites canonical records into normalized AgentIR s
   assert.ok(persisted.brains[0]?.agent.layout?.nodes?.['__body-vision-cell-1']);
 });
 
-test('Brain Library canonical record storage rewrites leaked legacy body visionCellCount through the legacy migration path', () => {
+test('Brain Library canonical record storage rewrites leaked legacy body visionCellCount on canonical payload load', () => {
   const storage = installMemoryLocalStorage();
   const brain = createDefaultAgentIR(2, 'Canonical Legacy Leak');
 
