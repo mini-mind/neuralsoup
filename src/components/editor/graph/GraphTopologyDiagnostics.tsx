@@ -11,7 +11,7 @@ interface GraphTopologyDiagnosticsProps {
     neuronCount: number;
     leafLinkCount: number;
   };
-  draftValidationCount: number;
+  canonicalValidationCount: number;
   runtimeStatus: AgentRuntimeStatus;
   runtimeActivity: AgentRuntimeActivitySnapshot;
   nodeCount: number;
@@ -30,7 +30,7 @@ const GraphTopologyDiagnostics: React.FC<GraphTopologyDiagnosticsProps> = ({
   visionCells,
   draftStatus,
   canonicalSummary,
-  draftValidationCount,
+  canonicalValidationCount,
   runtimeStatus,
   runtimeActivity,
   nodeCount,
@@ -55,11 +55,11 @@ const GraphTopologyDiagnostics: React.FC<GraphTopologyDiagnosticsProps> = ({
         <span data-testid="topology-draft-vision-cells">{visionCells}</span>
         <span data-testid="topology-draft-state">{draftStatus.state}</span>
         <span data-testid="topology-draft-status-label">{draftStatusLabel}</span>
-        <span data-testid="topology-draft-input-count">{canonicalSummary.inputSignalCount}</span>
-        <span data-testid="topology-draft-output-count">{canonicalSummary.outputSignalCount}</span>
-        <span data-testid="topology-draft-neuron-count">{canonicalSummary.neuronCount}</span>
-        <span data-testid="topology-draft-connection-count">{canonicalSummary.leafLinkCount}</span>
-        <span data-testid="topology-draft-validation-count">{draftValidationCount}</span>
+        <span data-testid="topology-canonical-input-count">{canonicalSummary.inputSignalCount}</span>
+        <span data-testid="topology-canonical-output-count">{canonicalSummary.outputSignalCount}</span>
+        <span data-testid="topology-canonical-neuron-count">{canonicalSummary.neuronCount}</span>
+        <span data-testid="topology-canonical-connection-count">{canonicalSummary.leafLinkCount}</span>
+        <span data-testid="topology-draft-validation-count">{canonicalValidationCount}</span>
         <span data-testid="topology-draft-message">{draftMessage}</span>
         <span data-testid="topology-runtime-state">{runtimeStatus.state}</span>
         <span data-testid="topology-runtime-status-label">{runtimeStatusLabel}</span>
@@ -80,9 +80,7 @@ const GraphTopologyDiagnostics: React.FC<GraphTopologyDiagnosticsProps> = ({
         <span data-testid="topology-selected-node">{selectedNodeId ?? 'none'}</span>
         <span data-testid="topology-selected-link">{selectedLinkId ?? 'none'}</span>
         <span data-testid="topology-vision-cells">{visionCells}</span>
-        <span data-testid="topology-canonical-input-count">{canonicalSummary.inputSignalCount}</span>
-        <span data-testid="topology-canonical-output-count">{canonicalSummary.outputSignalCount}</span>
-        <span data-testid="topology-canonical-validation-count">{draftValidationCount}</span>
+        <span data-testid="topology-canonical-validation-count">{canonicalValidationCount}</span>
         <span data-testid="topology-node-centers">{nodeCentersSummary}</span>
         <span data-testid="topology-node-view-positions">{nodeViewPositionsSummary}</span>
         <span data-testid="topology-scope">{currentScope}</span>

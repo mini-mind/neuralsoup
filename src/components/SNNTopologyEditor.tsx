@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import type { AgentIR } from '../domain/brain';
+import type { AgentIR, AgentIRSummary } from '../domain/brain';
 import type { AgentDraftStatus, AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../types/agentRuntime';
 import GraphDetailModal from './editor/graph/GraphDetailModal';
 import GraphTopologyCanvas from './editor/graph/GraphTopologyCanvas';
@@ -16,6 +16,7 @@ interface SNNTopologyEditorProps {
   agent: AgentIR;
   graphSessionToken: string;
   visionCells?: number;
+  installedSummary: AgentIRSummary;
   onAgentChange?: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
   onGraphPathChange?: (graphPath: GraphPathItem[], sourceSessionToken: string) => void;
   onGraphPathNavigateRegister?: (navigate: (pathId: string) => void, sourceSessionToken: string) => void;
@@ -31,6 +32,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   agent,
   graphSessionToken,
   visionCells = 36,
+  installedSummary,
   onAgentChange,
   onGraphPathChange,
   onGraphPathNavigateRegister,
@@ -86,7 +88,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
     ungroupNode,
     toggleGroupExpanded,
     setCanvasOffset: setCanvasOffsetState,
-    setCanvasScale: setCanvasScaleState,
+    setCanvasSession: setCanvasSessionState,
     syncCanvasViewportForScope,
     canvasViewport,
     canvasScale,
@@ -127,9 +129,9 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
     canAggregateSelection,
     canvasViewport,
     setCanvasOffset: setCanvasOffsetState,
+    setCanvasSession: setCanvasSessionState,
     syncCanvasViewportForScope,
     canvasScale,
-    setCanvasScale: setCanvasScaleState,
     beginSelectionRect,
     updateSelectionRect,
     cancelSelectionRect,
@@ -149,6 +151,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   const diagnostics = useGraphTopologyDiagnosticsModel({
     agent,
     visionCells,
+    installedSummary,
     runtimeStatus,
     draftStatus,
     runtimeActivity,

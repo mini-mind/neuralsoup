@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, type RefObject } from 'react';
 import type { GraphInteractionOrchestratorResult } from './useGraphInteractionOrchestrator';
 import { useGraphInteractionOrchestrator } from './useGraphInteractionOrchestrator';
 import type { GraphPoint, GraphViewport, SceneNodeGeometry } from '../tools/canvasGeometry';
+import type { GraphCanvasSessionState } from '../../../hooks/useSNNTopologyState';
 
 interface GraphViewSessionControllerNode extends SceneNodeGeometry {
   proxy: boolean;
@@ -23,8 +24,8 @@ interface GraphViewSessionControllerOptions {
   sceneOrigin: GraphPoint;
   viewport: GraphViewport;
   setViewport: (nextViewport: GraphViewport) => void;
+  setCanvasSession: (nextSession: GraphCanvasSessionState) => void;
   scale: number;
-  setScale: (nextScale: number) => void;
   selectedNodeIds: string[];
   canCreateNeuronHere: boolean;
   canAggregateSelection: boolean;
@@ -63,8 +64,8 @@ export const useGraphViewSessionController = ({
   sceneOrigin,
   viewport,
   setViewport,
+  setCanvasSession,
   scale,
-  setScale,
   selectedNodeIds,
   canCreateNeuronHere,
   canAggregateSelection,
@@ -92,8 +93,8 @@ export const useGraphViewSessionController = ({
     sceneOrigin,
     viewport,
     setViewport,
+    setCanvasSession,
     scale,
-    setScale,
     selectedNodeIds,
     canCreateNeuronHere,
     canAggregateSelection,

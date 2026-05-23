@@ -2,6 +2,7 @@ import type {
   AgentConnection,
   AgentConnectionEndpoint,
   AgentIR,
+  AgentIRSummary,
   BrainContainerNode,
   BrainNeuronNode,
 } from '../../../domain/brain';
@@ -667,16 +668,20 @@ export const buildAgentGraphViewModel = ({
   navigationPath,
   draftNodePositions,
   runtimeActiveNodeIds,
+  installedSummary,
 }: {
   agent: AgentIR;
   navigationPath: string[];
   draftNodePositions: NodePositionDraftMap;
   runtimeActiveNodeIds: string[];
+  installedSummary?: AgentIRSummary;
 }): AgentGraphViewModel => {
   const indexes = buildIndexes(agent);
   const compiledEndpointIds = resolveCompiledAgentBodyEndpointIds(agent);
   const installedBodyInputNodeIds = new Set(compiledEndpointIds.bodyInputNodeIds);
   const installedBodyOutputNodeIds = new Set(compiledEndpointIds.bodyOutputNodeIds);
+  const installedInputCount = installedSummary?.inputSignalCount ?? compiledEndpointIds.bodyInputNodeIds.length;
+  const installedOutputCount = installedSummary?.outputSignalCount ?? compiledEndpointIds.bodyOutputNodeIds.length;
   const { currentContainer, currentChildren, currentContainerKind } = getCurrentChildren(indexes, navigationPath);
   const currentScope = navigationPath.length === 0 ? 'root' : 'child';
   const scopeKey = navigationPath.length === 0 ? 'root' : navigationPath.join('/');
@@ -737,10 +742,14 @@ export const buildAgentGraphViewModel = ({
         ? node.endpoint?.scope === 'bodyInput'
           ? (installedBodyInputNodeIds.has(node.refNodeId) ? 1 : 0)
           : (installedBodyOutputNodeIds.has(node.refNodeId) ? 1 : 0)
+        : node.id === BODY_INPUTS_GROUP_ID
+          ? installedInputCount
+          : node.id === BODY_OUTPUTS_GROUP_ID
+            ? installedOutputCount
         : node.id === CORE_BODY_INPUTS_GROUP_ID
-          ? compiledEndpointIds.bodyInputNodeIds.length
+          ? installedInputCount
           : node.id === CORE_BODY_OUTPUTS_GROUP_ID
-            ? compiledEndpointIds.bodyOutputNodeIds.length
+            ? installedOutputCount
           : 0;
     const direction = getNodeDirection(node);
     const leaf = isLeafNode(node);
@@ -784,6 +793,7 @@ export const buildAgentGraphViewModel = ({
       expansionOffsetY: 0,
       runtimeInstalled: runtimeInstalledLeafCount > 0,
       runtimeInstalledLeafCount,
+      adapterNavigable: node.kind !== 'adapter' || node.id === BODY_INPUTS_GROUP_ID || node.id === BODY_OUTPUTS_GROUP_ID,
     });
 
     if (!expanded || node.kind !== 'neuron-group') {
@@ -841,6 +851,7 @@ export const buildAgentGraphViewModel = ({
         expansionOffsetY: AGENT_GRAPH_EXPANDED_GROUP_PADDING,
         runtimeInstalled: false,
         runtimeInstalledLeafCount: 0,
+        adapterNavigable: false,
       });
     }
   }

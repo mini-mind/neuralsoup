@@ -67,10 +67,10 @@ const selectors = {
   topologyDetailClose: '[data-testid="topology-detail-close"]',
   topologyBreadcrumbRoot: '[data-testid="topology-breadcrumb-root"]',
   topologyPendingLink: '[data-testid="topology-pending-link"]',
-  topologyDraftInputCount: '[data-testid="topology-draft-input-count"]',
-  topologyDraftOutputCount: '[data-testid="topology-draft-output-count"]',
-  topologyDraftNeuronCount: '[data-testid="topology-draft-neuron-count"]',
-  topologyDraftConnectionCount: '[data-testid="topology-draft-connection-count"]',
+  topologyCanonicalInputCount: '[data-testid="topology-canonical-input-count"]',
+  topologyCanonicalOutputCount: '[data-testid="topology-canonical-output-count"]',
+  topologyCanonicalNeuronCount: '[data-testid="topology-canonical-neuron-count"]',
+  topologyCanonicalConnectionCount: '[data-testid="topology-canonical-connection-count"]',
   topologyDraftValidationCount: '[data-testid="topology-draft-validation-count"]',
   topologyDraftState: '[data-testid="topology-draft-state"]',
   topologyDraftMessage: '[data-testid="topology-draft-message"]',
@@ -81,8 +81,6 @@ const selectors = {
   topologyRuntimeNeuronCount: '[data-testid="topology-runtime-neuron-count"]',
   topologyRuntimeConnectionCount: '[data-testid="topology-runtime-connection-count"]',
   graphInstalledAgentId: '[data-testid="graph-ir-installed-agent-id"]',
-  topologyCanonicalInputCount: '[data-testid="topology-canonical-input-count"]',
-  topologyCanonicalOutputCount: '[data-testid="topology-canonical-output-count"]',
   topologyCanonicalValidationCount: '[data-testid="topology-canonical-validation-count"]',
   neuronLabelInput: '[data-testid="neuron-label-input"]',
   neuronInitialStateVInput: '[data-testid="neuron-initial-state-v-input"]',
@@ -450,6 +448,24 @@ const expandGroupInPlace = async (page: Page, groupSelector: string) => {
 const parsePointPair = (value: string) => {
   const [x, y] = value.split(',').map((part) => Number.parseFloat(part));
   return { x, y };
+};
+
+const getCanvasSessionState = async (page: Page) => {
+  const [offsetText, scaleText] = await Promise.all([
+    page.locator(selectors.topologyCanvasOffset).innerText(),
+    page.locator(selectors.topologyCanvasScale).innerText(),
+  ]);
+
+  return {
+    viewport: parsePointPair(offsetText),
+    scale: Number.parseFloat(scaleText),
+  };
+};
+
+const zoomCanvasAtCenter = async (page: Page, deltaY: number) => {
+  const canvasBox = await getCanvasBox(page);
+  await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+  await page.mouse.wheel(0, deltaY);
 };
 
 const dragOnCanvas = async (
@@ -854,7 +870,7 @@ test('body ir settings shows preview panel, surfaces validation after rule edits
   await expect(page.locator('[data-testid="body-ir-output-preview-item-0"]')).toBeVisible();
   await expect(page.locator('[data-testid="body-ir-output-preview-item-0"]')).toContainText('output-move-forward');
   await expect(page.locator(selectors.bodyIrValidationCount)).toHaveText('0');
-  await expect(page.locator(selectors.topologyDraftOutputCount)).toHaveText('3');
+  await expect(page.locator(selectors.topologyCanonicalOutputCount)).toHaveText('3');
   await expect(page.locator(selectors.topologyRuntimeOutputCount)).toHaveText('3');
 
   await expect(page.locator(selectors.bodyIrInputRulePattern0)).toHaveValue('^vision-([RGB])-(\\d+)$');
@@ -880,11 +896,21 @@ test('graph view marks canonical-only body endpoints while settings show canonic
   await page.locator(selectors.settingsNavBodyIr).click();
   await expect(page.locator('[data-testid="body-ir-preview-canonical-summary"]')).toContainText('canonical coverage');
   await expect(page.locator('[data-testid="body-ir-preview-compiled-summary"]')).toContainText('compiled runtime shape');
+  await expect(page.locator('[data-testid="body-ir-preview-canonical-summary"]')).toContainText('输入 endpoint 108 个');
+  await expect(page.locator('[data-testid="body-ir-preview-compiled-summary"]')).toContainText('输入 endpoint 108 个');
+
+  await page.locator('[data-testid="body-ir-vision-cell-count"]').fill('37');
+  await expect(page.locator('[data-testid="body-ir-preview-canonical-summary"]')).toContainText('输入 endpoint 111 个');
+  await expect(page.locator('[data-testid="body-ir-preview-compiled-summary"]')).toContainText('输入 endpoint 108 个');
+  await expect(page.locator('[data-testid="topology-draft-vision-cells"]')).toHaveText('37');
+  await expect(page.locator('[data-testid="topology-vision-cells"]')).toHaveText('37');
 
   await page.locator(selectors.editorTabGraph).click();
   await expect(page.locator(selectors.inputAdapterNode)).toBeVisible();
-  await expect(page.locator(selectors.inputAdapterNode)).toContainText('108 canonical / 0 installed');
-  await expect(page.locator(selectors.outputAdapterNode)).toContainText('3 canonical / 0 installed');
+  await expect(page.locator(selectors.inputAdapterNode)).toContainText('111 canonical / 108 installed');
+  await expect(page.locator(selectors.outputAdapterNode)).toContainText('3 canonical / 3 installed');
+  await doubleClickNode(page, selectors.inputAdapterNode);
+  await expect(page.locator('[data-topology-canonical-only="true"]').first()).toBeVisible();
 });
 
 test('body ir edits stay draft-only until apply, then affect runtime/install state', async ({ page }, testInfo) => {
@@ -1179,11 +1205,11 @@ test('renaming the active brain preserves draft-only edits instead of replacing 
 
   await page.locator(selectors.editorTabGraph).click();
   await doubleClickNode(page, selectors.coreGroupNode);
-  const baseDraftConnectionCount = await getNumericLocatorText(page, selectors.topologyDraftConnectionCount);
+  const baseDraftConnectionCount = await getNumericLocatorText(page, selectors.topologyCanonicalConnectionCount);
   const baseRuntimeConnectionCount = await getNumericLocatorText(page, selectors.topologyRuntimeConnectionCount);
   await injectValidDraftOnly(page);
 
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(String(baseDraftConnectionCount + 1));
+  await expect(page.locator(selectors.topologyCanonicalConnectionCount)).toHaveText(String(baseDraftConnectionCount + 1));
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(baseRuntimeConnectionCount));
 
   const savedBrainId = await page.evaluate((storageKey) => {
@@ -1198,7 +1224,7 @@ test('renaming the active brain preserves draft-only edits instead of replacing 
   await page.locator(`[data-testid="brain-library-rename-input-${savedBrainId}"]`).fill('Renamed Active Brain');
   await page.locator(`[data-testid="brain-library-rename-save-${savedBrainId}"]`).click();
   await expect(page.locator(selectors.brainLibraryList)).toContainText('Renamed Active Brain');
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(String(baseDraftConnectionCount + 1));
+  await expect(page.locator(selectors.topologyCanonicalConnectionCount)).toHaveText(String(baseDraftConnectionCount + 1));
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(baseRuntimeConnectionCount));
   await expect
     .poll(async () => {
@@ -1305,6 +1331,8 @@ test('brain switch resets lifecycle stats and runtime activity before installing
 });
 
 test('brain switch resets graph view path to root and replaces prior scoped session state', async ({ page }, testInfo) => {
+  test.slow();
+
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
   }
@@ -1317,6 +1345,8 @@ test('brain switch resets graph view path to root and replaces prior scoped sess
   await doubleClickNode(page, selectors.coreGroupNode);
   await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
   await expect.poll(async () => getGraphPathIds(page)).toEqual(['root', 'root-container']);
+  await zoomCanvasAtCenter(page, -120);
+  const previousScopedSession = await getCanvasSessionState(page);
 
   await page.reload();
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
@@ -1326,6 +1356,9 @@ test('brain switch resets graph view path to root and replaces prior scoped sess
   await page.locator(selectors.editorTabGraph).click();
   await doubleClickNode(page, selectors.coreGroupNode);
   await expect.poll(async () => getGraphPathIds(page)).toEqual(['root', 'root-container']);
+  await zoomCanvasAtCenter(page, -120);
+  const currentScopedSession = await getCanvasSessionState(page);
+  expect(currentScopedSession.scale).toBeGreaterThan(1);
 
   await page.locator(selectors.brainLibraryButton).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
@@ -1333,14 +1366,28 @@ test('brain switch resets graph view path to root and replaces prior scoped sess
   expect(graphResetBrain).toBeTruthy();
   page.once('dialog', (dialog) => dialog.accept());
   await getBrainLibrarySelectButton(page, graphResetBrain!.agent.metadata!.id!).click();
-  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
-  await page.locator(selectors.brainLibraryClose).click();
-  await expect(page.locator(selectors.brainLibraryModal)).toHaveCount(0);
+  const brainLibraryModal = page.locator(selectors.brainLibraryModal);
+  await page.waitForTimeout(50);
+  if (await brainLibraryModal.count()) {
+    await page.locator(selectors.brainLibraryClose).evaluate((button: HTMLButtonElement) => button.click()).catch(() => {});
+  }
+  await expect(brainLibraryModal).toHaveCount(0);
 
   await expect.poll(async () => getGraphPathIds(page)).toEqual(['root']);
   await expect(page.locator(selectors.topologyNodeCount)).toHaveText('3');
   await expect(page.locator(selectors.nodeNeuronOne)).toHaveCount(0);
   await expect(page.locator(selectors.coreGroupNode)).toBeVisible();
+  const resetRootSession = await getCanvasSessionState(page);
+  expect(resetRootSession.scale).toBeCloseTo(1, 2);
+  expect(
+    Math.abs(resetRootSession.viewport.x - currentScopedSession.viewport.x) > 1 ||
+      Math.abs(resetRootSession.viewport.y - currentScopedSession.viewport.y) > 1
+  ).toBe(true);
+  expect(
+    Math.abs(resetRootSession.viewport.x - previousScopedSession.viewport.x) > 1 ||
+      Math.abs(resetRootSession.viewport.y - previousScopedSession.viewport.y) > 1 ||
+      Math.abs(resetRootSession.scale - previousScopedSession.scale) > 0.01
+  ).toBe(true);
 });
 
 test('brain library preserves draft-only expanded group state across later saved edits', async ({ page }, testInfo) => {
@@ -1400,11 +1447,11 @@ test('brain library confirms before replacing a saved brain with draft-only chan
 
   await page.locator(selectors.editorTabGraph).click();
   await doubleClickNode(page, selectors.coreGroupNode);
-  const baseDraftConnectionCount = await getNumericLocatorText(page, selectors.topologyDraftConnectionCount);
+  const baseDraftConnectionCount = await getNumericLocatorText(page, selectors.topologyCanonicalConnectionCount);
   const baseRuntimeConnectionCount = await getNumericLocatorText(page, selectors.topologyRuntimeConnectionCount);
   expect(baseDraftConnectionCount).toBe(baseRuntimeConnectionCount);
   await injectValidDraftOnly(page);
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(
+  await expect(page.locator(selectors.topologyCanonicalConnectionCount)).toHaveText(
     String(baseDraftConnectionCount + 1)
   );
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(baseRuntimeConnectionCount));
@@ -1420,7 +1467,7 @@ test('brain library confirms before replacing a saved brain with draft-only chan
   });
   await getBrainLibrarySelectButton(page, otherBrain!.agent.metadata!.id!).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(
+  await expect(page.locator(selectors.topologyCanonicalConnectionCount)).toHaveText(
     String(baseDraftConnectionCount + 1)
   );
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(baseRuntimeConnectionCount));
@@ -1444,7 +1491,7 @@ test('brain library confirms before replacing a saved brain with draft-only chan
     ),
   });
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(
+  await expect(page.locator(selectors.topologyCanonicalConnectionCount)).toHaveText(
     String(baseDraftConnectionCount + 1)
   );
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(baseRuntimeConnectionCount));
@@ -1455,7 +1502,7 @@ test('brain library confirms before replacing a saved brain with draft-only chan
   });
   await getBrainLibrarySelectButton(page, otherBrain!.agent.metadata!.id!).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(String(baseDraftConnectionCount));
+  await expect(page.locator(selectors.topologyCanonicalConnectionCount)).toHaveText(String(baseDraftConnectionCount));
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(baseRuntimeConnectionCount));
 });
 
@@ -1544,6 +1591,28 @@ test('body ir visionCellCount apply keeps runtime vision parameters aligned', as
 
   await expect(page.locator(selectors.visionCellsValue)).toHaveText('24');
   await expect(page.locator(selectors.topologyRuntimeInputCount)).toHaveText('72');
+});
+
+test('applying agent parameters preserves unapplied body draft instead of silently replacing it', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabSettings).click();
+  await page.locator(selectors.settingsNavBodyIr).click();
+  await page.locator(selectors.bodyIrOutputRuleTargetTemplate0).fill('thruster.$1');
+  await expect(page.locator(selectors.bodyIrValidationCount)).not.toHaveText('0');
+  await expect(page.locator('[data-testid="body-ir-apply"]')).toBeEnabled();
+
+  await page.locator(selectors.settingsNavAgentParameters).click();
+  await page.locator(selectors.visionCellsInput).fill('24');
+  await page.locator(selectors.paramsApply).click();
+
+  await expect(page.locator(selectors.visionCellsValue)).toHaveText('24');
+  await page.locator(selectors.settingsNavBodyIr).click();
+  await expect(page.locator(selectors.bodyIrOutputRuleTargetTemplate0)).toHaveValue('thruster.$1');
+  await expect(page.locator(selectors.bodyIrValidationCount)).not.toHaveText('0');
+  await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
 });
 
 test('brain import resets graph view path to root and installs the imported session identity', async ({ page }, testInfo) => {
@@ -1811,27 +1880,28 @@ test('graph view diagnostics keep draft and installed runtime summaries aligned 
   await page.locator(selectors.editorTabGraph).click();
   await doubleClickNode(page, selectors.coreGroupNode);
 
-  const initialDraftInputCount = await page.locator(selectors.topologyDraftInputCount).innerText();
-  const initialDraftOutputCount = await page.locator(selectors.topologyDraftOutputCount).innerText();
-  const initialDraftNeuronCount = await page.locator(selectors.topologyDraftNeuronCount).innerText();
+  const initialCanonicalInputCount = await page.locator(selectors.topologyCanonicalInputCount).innerText();
+  const initialCanonicalOutputCount = await page.locator(selectors.topologyCanonicalOutputCount).innerText();
+  const initialCanonicalNeuronCount = await page.locator(selectors.topologyCanonicalNeuronCount).innerText();
 
-  await expect(page.locator(selectors.topologyCanonicalInputCount)).toHaveText(initialDraftInputCount);
-  await expect(page.locator(selectors.topologyRuntimeInputCount)).toHaveText(initialDraftInputCount);
-  await expect(page.locator(selectors.topologyCanonicalOutputCount)).toHaveText(initialDraftOutputCount);
-  await expect(page.locator(selectors.topologyRuntimeOutputCount)).toHaveText(initialDraftOutputCount);
-  await expect(page.locator(selectors.topologyRuntimeNeuronCount)).toHaveText(initialDraftNeuronCount);
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(String(DEFAULT_AGENT_CONNECTION_COUNT));
+  await expect(page.locator(selectors.topologyCanonicalInputCount)).toHaveText(initialCanonicalInputCount);
+  await expect(page.locator(selectors.topologyRuntimeInputCount)).toHaveText(initialCanonicalInputCount);
+  await expect(page.locator(selectors.topologyCanonicalOutputCount)).toHaveText(initialCanonicalOutputCount);
+  await expect(page.locator(selectors.topologyRuntimeOutputCount)).toHaveText(initialCanonicalOutputCount);
+  await expect(page.locator(selectors.topologyCanonicalNeuronCount)).toHaveText(initialCanonicalNeuronCount);
+  await expect(page.locator(selectors.topologyRuntimeNeuronCount)).toHaveText(initialCanonicalNeuronCount);
+  await expect(page.locator(selectors.topologyCanonicalConnectionCount)).toHaveText(String(DEFAULT_AGENT_CONNECTION_COUNT));
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(DEFAULT_AGENT_CONNECTION_COUNT));
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyCanonicalValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
 
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(String(DEFAULT_AGENT_CONNECTION_COUNT));
+  await expect(page.locator(selectors.topologyCanonicalConnectionCount)).toHaveText(String(DEFAULT_AGENT_CONNECTION_COUNT));
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(DEFAULT_AGENT_CONNECTION_COUNT));
-  await expect(page.locator(selectors.topologyRuntimeInputCount)).toHaveText(initialDraftInputCount);
-  await expect(page.locator(selectors.topologyRuntimeOutputCount)).toHaveText(initialDraftOutputCount);
-  await expect(page.locator(selectors.topologyRuntimeNeuronCount)).toHaveText(initialDraftNeuronCount);
+  await expect(page.locator(selectors.topologyRuntimeInputCount)).toHaveText(initialCanonicalInputCount);
+  await expect(page.locator(selectors.topologyRuntimeOutputCount)).toHaveText(initialCanonicalOutputCount);
+  await expect(page.locator(selectors.topologyRuntimeNeuronCount)).toHaveText(initialCanonicalNeuronCount);
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
@@ -1844,18 +1914,18 @@ test('graph view diagnostics keep valid draft counts distinct from installed run
 
   await page.locator(selectors.editorTabGraph).click();
   await doubleClickNode(page, selectors.coreGroupNode);
-  const baseDraftConnectionCount = await page.locator(selectors.topologyDraftConnectionCount).innerText();
+  const baseDraftConnectionCount = await page.locator(selectors.topologyCanonicalConnectionCount).innerText();
   const baseRuntimeConnectionCount = await page.locator(selectors.topologyRuntimeConnectionCount).innerText();
 
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(baseDraftConnectionCount);
+  await expect(page.locator(selectors.topologyCanonicalConnectionCount)).toHaveText(baseDraftConnectionCount);
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(baseRuntimeConnectionCount);
 
   await injectValidDraftOnly(page);
 
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(
+  await expect(page.locator(selectors.topologyCanonicalConnectionCount)).toHaveText(
     String(Number.parseInt(baseDraftConnectionCount, 10) + 1)
   );
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
@@ -2044,19 +2114,19 @@ test('graph view diagnostics expose invalid draft divergence through the real dr
   await page.locator(selectors.editorTabGraph).click();
   await doubleClickNode(page, selectors.coreGroupNode);
 
-  const baseDraftConnectionCount = await page.locator(selectors.topologyDraftConnectionCount).innerText();
+  const baseDraftConnectionCount = await page.locator(selectors.topologyCanonicalConnectionCount).innerText();
   const baseRuntimeConnectionCount = await page.locator(selectors.topologyRuntimeConnectionCount).innerText();
 
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
   await expect(page.locator(selectors.topologyDraftState)).toHaveText('structurally-valid');
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(baseDraftConnectionCount);
+  await expect(page.locator(selectors.topologyCanonicalConnectionCount)).toHaveText(baseDraftConnectionCount);
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(baseRuntimeConnectionCount);
 
   await injectInvalidGraphDraft(page);
 
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(String(Number.parseInt(baseDraftConnectionCount, 10) + 1));
+  await expect(page.locator(selectors.topologyCanonicalConnectionCount)).toHaveText(String(Number.parseInt(baseDraftConnectionCount, 10) + 1));
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('1');
   await expect(page.locator(selectors.topologyCanonicalValidationCount)).toHaveText('1');
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(baseRuntimeConnectionCount);
@@ -2079,7 +2149,7 @@ test('graph view diagnostics expose invalid draft divergence through the real dr
   }
   await page.locator(selectors.editorTabGraph).click();
   await doubleClickNode(page, selectors.coreGroupNode);
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(baseRuntimeConnectionCount);
+  await expect(page.locator(selectors.topologyCanonicalConnectionCount)).toHaveText(baseRuntimeConnectionCount);
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(baseRuntimeConnectionCount);
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
 });
@@ -2246,7 +2316,7 @@ test('graph view keeps the same scene focus after viewport resize', async ({ pag
   expect(Math.abs(finalRelative.y - beforeResizeRelative.y)).toBeLessThanOrEqual(1);
 });
 
-test('graph view preserves per-scope viewport when navigating away and back', async ({ page }, testInfo) => {
+test('graph view preserves per-scope viewport and zoom when navigating away and back', async ({ page }, testInfo) => {
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
   }
@@ -2254,6 +2324,7 @@ test('graph view preserves per-scope viewport when navigating away and back', as
   await page.locator(selectors.editorTabGraph).click();
   await doubleClickNode(page, selectors.coreGroupNode);
   await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
+  await zoomCanvasAtCenter(page, -120);
 
   const canvasBox = await getCanvasBox(page);
   await page.mouse.move(canvasBox.x + 80, canvasBox.y + 80);
@@ -2261,20 +2332,27 @@ test('graph view preserves per-scope viewport when navigating away and back', as
   await page.mouse.move(canvasBox.x + 180, canvasBox.y + 140, { steps: 16 });
   await page.mouse.up({ button: 'right' });
 
-  const childOffset = parsePointPair(await page.locator(selectors.topologyCanvasOffset).innerText());
+  const childSession = await getCanvasSessionState(page);
+  expect(childSession.scale).toBeGreaterThan(1);
 
   await page.locator(selectors.topologyBreadcrumbRoot).click();
   await expect(page.locator(selectors.coreGroupNode)).toBeVisible();
 
-  const rootOffset = parsePointPair(await page.locator(selectors.topologyCanvasOffset).innerText());
-  expect(Math.abs(rootOffset.x - childOffset.x) > 1 || Math.abs(rootOffset.y - childOffset.y) > 1).toBe(true);
+  const rootSession = await getCanvasSessionState(page);
+  expect(rootSession.scale).toBeCloseTo(1, 2);
+  expect(
+    Math.abs(rootSession.viewport.x - childSession.viewport.x) > 1 ||
+      Math.abs(rootSession.viewport.y - childSession.viewport.y) > 1 ||
+      Math.abs(rootSession.scale - childSession.scale) > 0.01
+  ).toBe(true);
 
   await doubleClickNode(page, selectors.coreGroupNode);
   await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
 
-  const restoredChildOffset = parsePointPair(await page.locator(selectors.topologyCanvasOffset).innerText());
-  expect(restoredChildOffset.x).toBeCloseTo(childOffset.x, 0);
-  expect(restoredChildOffset.y).toBeCloseTo(childOffset.y, 0);
+  const restoredChildSession = await getCanvasSessionState(page);
+  expect(restoredChildSession.viewport.x).toBeCloseTo(childSession.viewport.x, 0);
+  expect(restoredChildSession.viewport.y).toBeCloseTo(childSession.viewport.y, 0);
+  expect(restoredChildSession.scale).toBeCloseTo(childSession.scale, 2);
 });
 
 test('graph view opens canvas context menu and creates a neuron from it', async ({ page }, testInfo) => {

@@ -425,6 +425,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
           const selected = selectedNodeIds.includes(node.viewId);
           const active = activeViewNodeIds.has(node.viewId);
           const pending = pendingNodeIds.includes(node.viewId);
+          const canonicalOnly = !node.runtimeInstalled && node.kind === 'signal';
           const nodeClassName = [
             'topology-node',
             node.leaf ? 'is-leaf' : 'is-group',
@@ -435,7 +436,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
             active ? 'is-active' : '',
             pending ? 'is-pending' : '',
             node.proxy ? 'is-proxy' : '',
-            !node.runtimeInstalled && node.kind === 'signal' ? 'is-canonical-only' : '',
+            canonicalOnly ? 'is-canonical-only' : '',
           ].join(' ');
 
           return (
@@ -445,6 +446,10 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
               data-testid={`topology-node-${node.id}`}
               data-topology-root-container={node.rootContainer ? 'true' : undefined}
               data-topology-view-node-id={node.viewId}
+              data-topology-runtime-installed={node.runtimeInstalled ? 'true' : 'false'}
+              data-topology-canonical-only={canonicalOnly ? 'true' : undefined}
+              title={canonicalOnly ? `${node.detail}，当前未安装到 runtime` : node.leaf ? node.detail : undefined}
+              aria-label={canonicalOnly ? `${node.id} canonical-only` : undefined}
               style={{
                 left: node.sceneX,
                 top: node.sceneY,
@@ -470,7 +475,10 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
                 }
               }}
             >
-              {node.leaf ? <div className="topology-node-shape topology-node-dot" /> : (
+              {node.leaf ? <>
+                <div className="topology-node-shape topology-node-dot" />
+                {canonicalOnly ? <div className="topology-node-canonical-badge" data-testid={`topology-node-canonical-only-${node.id}`}>C</div> : null}
+              </> : (
                 <div className="topology-node-shape">
                   <div className="topology-node-label">{node.label}</div>
                   <div className="topology-node-detail">{node.detail}</div>

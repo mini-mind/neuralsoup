@@ -246,6 +246,10 @@ test('agent graph root scope exposes canonical body endpoints even before any co
   const outputAdapter = rootView.nodes.find((node) => node.id === 'output-adapter');
   assert.ok(inputAdapter);
   assert.ok(outputAdapter);
+  assert.equal(inputAdapter.runtimeInstalledLeafCount, 0);
+  assert.equal(outputAdapter.runtimeInstalledLeafCount, 0);
+  assert.equal(inputAdapter.detail, '3 canonical / 0 installed');
+  assert.equal(outputAdapter.detail, '3 canonical / 0 installed');
   assert.equal(rootView.links.some((link) => link.aggregate), false);
 
   const inputScopeView = buildAgentGraphViewModel({
@@ -269,6 +273,58 @@ test('agent graph root scope exposes canonical body endpoints even before any co
     new Set(outputScopeView.nodes.map((node) => node.id)),
     new Set(['output-turn-left', 'output-move-forward', 'output-turn-right'])
   );
+});
+
+test('agent graph root adapters report installed counts from compiled runtime truth', () => {
+  const agent = createTestAgent();
+  agent.body.inputRules = [
+    {
+      id: 'vision-inputs',
+      nodeIdPattern: '^vision-([RGB])-(\\d+)$',
+      sourceTemplate: 'vision.$1.$2',
+      scale: 1,
+    },
+  ];
+  agent.body.outputRules = [
+    {
+      id: 'motor-outputs',
+      nodeIdPattern: '^output-(turn-left|move-forward|turn-right)$',
+      targetTemplate: 'action.$1',
+      decayPerSecond: 4,
+    },
+  ];
+  agent.body.visionCellCount = 1;
+  agent.connections = [
+    ...agent.connections,
+    {
+      id: 'body-input-to-neuron',
+      from: { scope: 'bodyInput', nodeId: 'vision-G-0' },
+      to: { scope: 'brain', nodeId: 'neuron-1' },
+      weight: 1,
+    },
+    {
+      id: 'neuron-to-body-output',
+      from: { scope: 'brain', nodeId: 'neuron-2' },
+      to: { scope: 'bodyOutput', nodeId: 'output-move-forward' },
+      weight: 1,
+    },
+  ];
+
+  const rootView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+  });
+
+  const inputAdapter = rootView.nodes.find((node) => node.id === 'input-adapter');
+  const outputAdapter = rootView.nodes.find((node) => node.id === 'output-adapter');
+  assert.ok(inputAdapter);
+  assert.ok(outputAdapter);
+  assert.equal(inputAdapter.runtimeInstalledLeafCount, 1);
+  assert.equal(outputAdapter.runtimeInstalledLeafCount, 1);
+  assert.equal(inputAdapter.detail, '3 canonical / 1 installed');
+  assert.equal(outputAdapter.detail, '3 canonical / 1 installed');
 });
 
 test('agent graph root scope uses the canonical rootContainerId as the top-level brain node id', () => {

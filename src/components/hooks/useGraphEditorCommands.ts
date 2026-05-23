@@ -693,6 +693,7 @@ export const useGraphEditorCommands = ({
         expansionOffsetY: 0,
         runtimeInstalled: true,
         runtimeInstalledLeafCount: 1,
+        adapterNavigable: false,
       };
 
       const uniqueSourceNodeIds = uniqueIds(sourceNodeIds);

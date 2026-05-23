@@ -33,6 +33,7 @@ export interface GraphViewNode {
   expansionOffsetY: number;
   runtimeInstalled: boolean;
   runtimeInstalledLeafCount: number;
+  adapterNavigable: boolean;
 }
 
 export interface GraphViewLink {

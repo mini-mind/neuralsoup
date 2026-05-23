@@ -8,6 +8,7 @@ import {
   type RefObject,
   type SetStateAction,
 } from 'react';
+import type { GraphCanvasSessionState } from '../../../hooks/useSNNTopologyState';
 import {
   clampNodePlacement,
   clampZoom,
@@ -40,8 +41,8 @@ interface GraphInteractionDependencies {
   sceneOrigin: GraphPoint;
   viewport: GraphViewport;
   setViewport: (nextViewport: GraphViewport) => void;
+  setCanvasSession: (nextSession: GraphCanvasSessionState) => void;
   scale: number;
-  setScale: (nextScale: number) => void;
   selectedNodeIds: string[];
   canCreateNeuronHere: boolean;
   canAggregateSelection: boolean;
@@ -86,8 +87,8 @@ export const useGraphInteractionOrchestrator = ({
   sceneOrigin,
   viewport,
   setViewport,
+  setCanvasSession,
   scale,
-  setScale,
   selectedNodeIds,
   canCreateNeuronHere,
   canAggregateSelection,
@@ -715,13 +716,15 @@ export const useGraphInteractionOrchestrator = ({
       const sceneX = (pointerX - viewportRef.current.x) / currentScale;
       const sceneY = (pointerY - viewportRef.current.y) / currentScale;
 
-      setScale(nextScale);
-      setViewport({
-        x: pointerX - sceneX * nextScale,
-        y: pointerY - sceneY * nextScale,
+      setCanvasSession({
+        viewport: {
+          x: pointerX - sceneX * nextScale,
+          y: pointerY - sceneY * nextScale,
+        },
+        scale: nextScale,
       });
     },
-    [isActive, setScale, setViewport, surfaceRef]
+    [isActive, setCanvasSession, surfaceRef]
   );
 
   const handleCanvasMouseDown = useCallback(

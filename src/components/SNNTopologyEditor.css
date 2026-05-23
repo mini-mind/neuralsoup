@@ -274,6 +274,23 @@
   opacity: 0.72;
 }
 
+.topology-node-canonical-badge {
+  position: absolute;
+  right: -4px;
+  top: -4px;
+  min-width: 10px;
+  height: 10px;
+  padding: 0 2px;
+  border-radius: 999px;
+  background: #f08a24;
+  color: #1a1a1a;
+  font-size: 8px;
+  line-height: 10px;
+  font-weight: 700;
+  text-align: center;
+  pointer-events: none;
+}
+
 .topology-node-label {
   max-width: 100%;
   font-size: 14px;

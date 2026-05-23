@@ -451,6 +451,7 @@ export const buildLegacyGraphViewModel = ({
         expansionOffsetY: 0,
         runtimeInstalled: true,
         runtimeInstalledLeafCount: leaf ? 1 : 0,
+        adapterNavigable: node.kind === 'adapter',
       };
 
       if (!expanded) {
@@ -505,6 +506,7 @@ export const buildLegacyGraphViewModel = ({
             expansionOffsetY: childDisplayOffset.y,
             runtimeInstalled: true,
             runtimeInstalledLeafCount: childLeaf ? 1 : 0,
+            adapterNavigable: false,
           };
         }),
       ];

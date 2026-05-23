@@ -240,9 +240,20 @@ const App: React.FC = () => {
   const requestedLifecycleStateRef = useRef<SimulationLifecycleState>('idle');
   const draftAgentDocumentRef = useRef(draftAgentDocument);
   const draftBodyDocumentRef = useRef(draftBodyDocument);
+  const bodyPreviewAgent = useMemo<AgentIR>(
+    () => ({
+      ...draftAgentDocument,
+      body: draftBodyDocument,
+    }),
+    [draftAgentDocument, draftBodyDocument]
+  );
+  const bodyPreviewDraftStatus = useMemo<AgentDraftStatus>(
+    () => createAgentDraftStatus(bodyPreviewAgent),
+    [bodyPreviewAgent]
+  );
   const agentDraftStatus = useMemo<AgentDraftStatus>(
-    () => draftGraphStatusOverride ?? createAgentDraftStatus(draftAgentDocument),
-    [draftAgentDocument, draftGraphStatusOverride]
+    () => draftGraphStatusOverride ?? bodyPreviewDraftStatus,
+    [bodyPreviewDraftStatus, draftGraphStatusOverride]
   );
   const currentAgentDocumentRef = useRef(currentAgentDocument);
   const graphPathNavigateRef = useRef<(pathId: string) => void>(() => {});
@@ -260,13 +271,6 @@ const App: React.FC = () => {
   const hasPendingRuntimeInstall = !areAgentsEquivalent(installedAgentDocument, currentAgentDocument);
   const hasUnsavedDraftChanges =
     hasDraftEditingChanges || hasPendingRuntimeInstall || bodyDraftStatus.hasChanges;
-  const bodyPreviewAgent = useMemo<AgentIR>(
-    () => ({
-      ...draftAgentDocument,
-      body: draftBodyDocument,
-    }),
-    [draftAgentDocument, draftBodyDocument]
-  );
   const bodyRulePreviewModel = useMemo(
     () => buildAgentBodyRulePreviewModel(bodyPreviewAgent),
     [bodyPreviewAgent]
@@ -467,7 +471,6 @@ const App: React.FC = () => {
       };
       setDraftGraphStatusOverride(null);
       setDraftAgentDocument(normalizedAgentDocument);
-      setDraftBodyDocument(normalizedAgentDocument.body);
       if (shouldCommitToCurrentDocument) {
         setCurrentAgentDocument(normalizedAgentDocument);
       }
@@ -531,10 +534,6 @@ const App: React.FC = () => {
   }, [draftBodyDocument]);
 
   useEffect(() => {
-    setDraftBodyDocument(draftAgentDocument.body);
-  }, [draftAgentDocument.body]);
-
-  useEffect(() => {
     currentAgentDocumentRef.current = currentAgentDocument;
   }, [currentAgentDocument]);
 
@@ -551,8 +550,40 @@ const App: React.FC = () => {
     commitEditedAgentDocument(nextAgentDocument, options);
   }, [commitEditedAgentDocument]);
 
+  const handleGraphAgentChange = useCallback((
+    updater: (current: AgentIR) => AgentIR,
+    options?: GraphDocumentChangeOptions
+  ) => {
+    const currentPreviewAgent: AgentIR = {
+      ...draftAgentDocumentRef.current,
+      body: draftBodyDocumentRef.current,
+    };
+    const nextPreviewAgent = updater(currentPreviewAgent);
+    if (nextPreviewAgent === currentPreviewAgent) {
+      return;
+    }
+
+    const shouldInstallToRuntime = options?.installToRuntime !== false;
+    const nextAgentDocument = shouldInstallToRuntime
+      ? {
+          ...nextPreviewAgent,
+          body: draftAgentDocumentRef.current.body,
+        }
+      : nextPreviewAgent;
+
+    commitEditedAgentDocument(nextAgentDocument, options);
+  }, [commitEditedAgentDocument]);
+
   const handleAgentParametersApply = useCallback((params: AgentParameters) => {
     setAgentParameters((current) => (areAgentParametersEqual(current, params) ? current : params));
+    setDraftBodyDocument((currentBody) =>
+      currentBody.visionCellCount === params.visionCells
+        ? currentBody
+        : {
+            ...currentBody,
+            visionCellCount: params.visionCells,
+          }
+    );
     handleAgentChange(
       (currentAgent) => reconcileAgentIRVisionCells(currentAgent, params.visionCells),
       GRAPH_SEMANTIC_CHANGE
@@ -1073,13 +1104,14 @@ const App: React.FC = () => {
         <div className={`content-area ${editorTab === 'graph' ? 'snn-mode' : 'settings-mode'}`}>
           <GraphEditorPanel
             isActive={editorTab === 'graph'}
-            agent={draftAgentDocument}
+            agent={bodyPreviewAgent}
             graphSessionToken={graphEditorSessionToken}
-            visionCells={agentParameters.visionCells}
+            visionCells={bodyPreviewAgent.body.visionCellCount}
+            installedSummary={installedGraphSummary}
             runtimeStatus={agentRuntimeStatus}
             draftStatus={agentDraftStatus}
             runtimeActivity={agentRuntimeActivity}
-            onAgentChange={handleAgentChange}
+            onAgentChange={handleGraphAgentChange}
             onGraphPathChange={handleGraphPathChange}
             onGraphPathNavigateRegister={handleGraphPathNavigateRegister}
           />

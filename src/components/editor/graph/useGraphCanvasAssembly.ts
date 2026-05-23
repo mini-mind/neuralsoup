@@ -3,6 +3,7 @@ import type { GraphViewNode } from './graphViewTypes';
 import { projectGraphScene, type GraphSceneNode } from './graphSceneProjection';
 import { useGraphViewSessionController } from './interaction/useGraphViewSessionController';
 import type {
+  GraphCanvasSessionState,
   GraphCanvasViewport,
   GraphCanvasViewportMetrics,
 } from '../../hooks/useSNNTopologyState';
@@ -21,6 +22,7 @@ interface GraphCanvasAssemblyOptions {
   canAggregateSelection: boolean;
   canvasViewport: GraphCanvasViewport;
   setCanvasOffset: (offset: GraphCanvasViewport) => void;
+  setCanvasSession: (nextSession: GraphCanvasSessionState) => void;
   syncCanvasViewportForScope: (payload: {
     scopeKey: string;
     recommendedViewport: GraphCanvasViewport;
@@ -28,7 +30,6 @@ interface GraphCanvasAssemblyOptions {
     isActive: boolean;
   }) => void;
   canvasScale: number;
-  setCanvasScale: (nextScale: number) => void;
   beginSelectionRect: (point: { x: number; y: number }) => void;
   updateSelectionRect: (point: { x: number; y: number }, intersectedNodeIds: string[]) => void;
   cancelSelectionRect: () => void;
@@ -57,9 +58,9 @@ export const useGraphCanvasAssembly = ({
   canAggregateSelection,
   canvasViewport,
   setCanvasOffset,
+  setCanvasSession,
   syncCanvasViewportForScope,
   canvasScale,
-  setCanvasScale,
   beginSelectionRect,
   updateSelectionRect,
   cancelSelectionRect,
@@ -259,8 +260,8 @@ export const useGraphCanvasAssembly = ({
     sceneOrigin: scene.origin,
     viewport: canvasViewport,
     setViewport: setCanvasOffset,
+    setCanvasSession,
     scale: canvasScale,
-    setScale: setCanvasScale,
     selectedNodeIds,
     canCreateNeuronHere,
     canAggregateSelection,

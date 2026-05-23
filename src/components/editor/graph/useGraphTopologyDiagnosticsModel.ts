@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import {
+  type AgentIRSummary,
   type AgentIR,
 } from '../../../domain/brain';
 import type { AgentDraftStatus, AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../../../types/agentRuntime';
@@ -8,6 +9,7 @@ import type { GraphCanvasViewport } from '../../hooks/useSNNTopologyState';
 interface UseGraphTopologyDiagnosticsModelOptions {
   agent: AgentIR;
   visionCells: number;
+  installedSummary: AgentIRSummary;
   runtimeStatus: AgentRuntimeStatus;
   draftStatus: AgentDraftStatus;
   runtimeActivity: AgentRuntimeActivitySnapshot;
@@ -26,6 +28,7 @@ interface UseGraphTopologyDiagnosticsModelOptions {
 export const useGraphTopologyDiagnosticsModel = ({
   agent,
   visionCells,
+  installedSummary,
   runtimeStatus,
   draftStatus,
   runtimeActivity,
@@ -41,13 +44,14 @@ export const useGraphTopologyDiagnosticsModel = ({
   canvasScale,
 }: UseGraphTopologyDiagnosticsModelOptions) => {
   void agent;
+  void installedSummary;
   const canonicalSummary = useMemo(() => draftStatus.summary, [draftStatus.summary]);
-  const draftValidationCount = useMemo(() => draftStatus.issues.length, [draftStatus.issues.length]);
+  const canonicalValidationCount = useMemo(() => draftStatus.issues.length, [draftStatus.issues.length]);
 
   return {
     visionCells,
     canonicalSummary,
-    draftValidationCount,
+    canonicalValidationCount,
     draftStatus,
     runtimeStatus,
     runtimeActivity,

@@ -1,18 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
 import SNNTopologyEditor from '../SNNTopologyEditor';
 import type { AgentIR } from '../../domain/brain';
+import type { AgentIRSummary } from '../../domain/brain/agent-ir';
 import type { AgentDraftStatus, AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../../types/agentRuntime';
 import type { GraphPathItem } from './types';
+import type { GraphDocumentChangeOptions } from '../hooks/useSNNTopologyState';
 
 interface GraphEditorPanelProps {
   isActive: boolean;
   agent: AgentIR;
   graphSessionToken: string;
   visionCells: number;
+  installedSummary: AgentIRSummary;
   runtimeStatus: AgentRuntimeStatus;
   draftStatus: AgentDraftStatus;
   runtimeActivity: AgentRuntimeActivitySnapshot;
-  onAgentChange: (updater: (current: AgentIR) => AgentIR) => void;
+  onAgentChange: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
   onGraphPathChange: (graphPath: GraphPathItem[], sourceSessionToken: string) => void;
   onGraphPathNavigateRegister: (navigate: (pathId: string) => void, sourceSessionToken: string) => void;
 }
@@ -22,6 +25,7 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
   agent,
   graphSessionToken,
   visionCells,
+  installedSummary,
   runtimeStatus,
   draftStatus,
   runtimeActivity,
@@ -76,6 +80,7 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
         agent={agent}
         graphSessionToken={graphSessionToken}
         visionCells={visionCells}
+        installedSummary={installedSummary}
         onAgentChange={onAgentChange}
         onGraphPathChange={onGraphPathChange}
         onGraphPathNavigateRegister={onGraphPathNavigateRegister}

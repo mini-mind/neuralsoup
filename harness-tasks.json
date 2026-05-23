@@ -1065,12 +1065,12 @@
     {
       "id": "task-028",
       "title": "App/runtime 会话尾债收口：修正 reset 重试语义、detail modal 热键穿透、删除 active brain 后的孤儿会话状态",
-      "status": "pending",
+      "status": "completed",
       "priority": "P2",
       "depends_on": [
         "task-025"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "max_attempts": 3,
       "started_at_commit": "working-tree",
       "validation": {
@@ -1081,17 +1081,23 @@
         "cleanup": null
       },
       "error_log": [],
-      "checkpoints": []
+      "checkpoints": [
+        {
+          "at": "2026-05-23T19:44:25.014Z",
+          "message": "Cross-review confirmed task-028 is already closed in current code: reset re-applies the runtime install request after engine reset, graph detail modal keyboard handling no longer leaks destructive hotkeys through interactive controls, and deleting the active brain resets editor/runtime/path state to a fallback session without orphaned active identity. Evidence rechecked in src/App.tsx, src/components/SimulationCanvas.tsx, graph session controller, and existing E2E/domain coverage."
+        }
+      ],
+      "completed_at": "2026-05-23T19:44:25.014Z"
     },
     {
       "id": "task-029",
       "title": "GraphView session ownership 尾债：补齐 per-scope zoom state 与相关交互/回归测试",
-      "status": "pending",
+      "status": "completed",
       "priority": "P2",
       "depends_on": [
         "task-025"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "max_attempts": 3,
       "started_at_commit": "working-tree",
       "validation": {
@@ -1102,17 +1108,23 @@
         "cleanup": null
       },
       "error_log": [],
-      "checkpoints": []
+      "checkpoints": [
+        {
+          "at": "2026-05-23T19:44:25.014Z",
+          "message": "Closed the real P1 in task-029 by promoting GraphView canvas session ownership from viewport-only to per-scope {viewport, scale}: scope state now restores zoom together with viewport, wheel zoom writes atomically through setCanvasSession, resize compensation uses each scope's recorded scale instead of the currently active scope, and targeted Playwright coverage now locks per-scope zoom restoration plus brain-switch session replacement."
+        }
+      ],
+      "completed_at": "2026-05-23T19:44:25.014Z"
     },
     {
       "id": "task-030",
       "title": "GraphView/diagnostics P2 收口：强化 canonical-only 可视反馈、拆清 draft/canonical 命名，并补分叉场景测试",
-      "status": "pending",
+      "status": "completed",
       "priority": "P2",
       "depends_on": [
         "task-027"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "max_attempts": 3,
       "started_at_commit": "working-tree",
       "validation": {
@@ -1131,10 +1143,15 @@
         {
           "at": "2026-05-23T20:10:00Z",
           "message": "Strengthened the GraphView/BodyIR P2 split by surfacing canonical vs compiled summaries in settings, marking canonical-only adapter counts directly in the graph view, renaming internal diagnostics flow toward canonical semantics, and adding domain/E2E coverage for canonical-only vs compiled divergence."
+        },
+        {
+          "at": "2026-05-23T19:56:29.120Z",
+          "message": "Closed task-030 on the main path: GraphView now consumes the canonical body preview agent instead of lagging behind BodyIR draft-only edits, adapter scopes are navigable so canonical-only leaf endpoints are reachable in GraphView, canonical-only leaf nodes now expose explicit badge/tooltip semantics instead of weak style-only hints, diagnostics naming now uses canonical count selectors instead of duplicating the same data under draft-vs-canonical count labels, and targeted type/domain/Playwright validation passed."
         }
-      ]
+      ],
+      "completed_at": "2026-05-23T19:56:29.120Z"
     }
   ],
   "session_count": 9,
-  "last_session": "2026-05-24T02:35:00Z"
+  "last_session": "2026-05-23T19:56:29.120Z"
 }
