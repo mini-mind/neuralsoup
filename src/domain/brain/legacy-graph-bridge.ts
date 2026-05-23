@@ -9,6 +9,11 @@ import type {
   BrainIR,
   BrainNeuronNode,
 } from './agent-ir';
+import {
+  deriveAgentIRVisionCellCount,
+  withDerivedBodyVisionCellCount,
+  withVisionCellLayoutMarkers,
+} from './agent-ir';
 import type {
   GraphIRDocument,
   LeafLink,
@@ -18,10 +23,10 @@ import type {
   TopologyNode,
 } from './ir';
 import {
-  createBrainLayoutFromDefinition,
-  createDefaultBodyDefinition,
-  getBodyVisionCellCount,
-  type BodyDefinition,
+  createLegacyBrainLayoutFromDefinition,
+  createDefaultLegacyBodyDefinition,
+  getLegacyBodyVisionCellCount,
+  type LegacyBodyDefinition,
   type BrainLayoutDocument,
 } from './package';
 import { createDefaultGraphIRDocument } from './defaults';
@@ -224,12 +229,6 @@ const buildBodyIRFromLegacy = (document: GraphIRDocument): BodyIR => {
 
   return {
     version: 1,
-    visionCellCount: Math.max(
-      0,
-      ...signals
-        .filter((signal) => INPUT_CHANNEL_PATTERN.test(signal.id))
-        .map((signal) => Number.parseInt(signal.id.match(INPUT_CHANNEL_PATTERN)?.[2] ?? '-1', 10) + 1)
-    ),
     inputRules: hasVisionSignals
       ? [
           {
@@ -253,13 +252,12 @@ const buildBodyIRFromLegacy = (document: GraphIRDocument): BodyIR => {
   };
 };
 
-const buildBodyIRFromCompatBody = (body: BodyDefinition): BodyIR => {
+const buildBodyIRFromCompatBody = (body: LegacyBodyDefinition): BodyIR => {
   const inputSignalsById = new Map(body.inputSignals.map((signal) => [signal.id, signal]));
   const outputSignalsById = new Map(body.outputSignals.map((signal) => [signal.id, signal]));
 
   return {
     version: 1,
-    visionCellCount: Math.max(0, getBodyVisionCellCount(body)),
     inputRules: body.brainBindings.inputs.flatMap((binding) => {
       const signal = inputSignalsById.get(binding.bodySignalId);
       if (!signal) {
@@ -292,6 +290,14 @@ const buildBodyIRFromCompatBody = (body: BodyDefinition): BodyIR => {
     }),
   };
 };
+
+const deriveLegacyDocumentVisionCellCount = (document: GraphIRDocument): number =>
+  Math.max(
+    0,
+    ...collectSignalNodes(document.root.children)
+      .filter((signal) => INPUT_CHANNEL_PATTERN.test(signal.id))
+      .map((signal) => Number.parseInt(signal.id.match(INPUT_CHANNEL_PATTERN)?.[2] ?? '-1', 10) + 1)
+  );
 
 const buildBrainNeuronsFromLegacy = (document: GraphIRDocument): BrainNeuronNode[] =>
   collectNeuronNodes(document.root.children).map((node) => {
@@ -524,11 +530,11 @@ const buildAgentConnectionsFromLegacy = (document: GraphIRDocument): LegacyAgent
 interface CompatBodyBindingMaps {
   inputNodeIdToBodySignalId: Map<string, string>;
   outputNodeIdToBodySignalId: Map<string, string>;
-  bodyInputSignalById: Map<string, BodyDefinition['inputSignals'][number]>;
-  bodyOutputSignalById: Map<string, BodyDefinition['outputSignals'][number]>;
+  bodyInputSignalById: Map<string, LegacyBodyDefinition['inputSignals'][number]>;
+  bodyOutputSignalById: Map<string, LegacyBodyDefinition['outputSignals'][number]>;
 }
 
-const buildCompatBodyBindingMaps = (body: BodyDefinition): CompatBodyBindingMaps => ({
+const buildCompatBodyBindingMaps = (body: LegacyBodyDefinition): CompatBodyBindingMaps => ({
   inputNodeIdToBodySignalId: new Map(
     body.brainBindings.inputs.map((binding) => [binding.brainSignalNodeId, binding.bodySignalId])
   ),
@@ -541,7 +547,7 @@ const buildCompatBodyBindingMaps = (body: BodyDefinition): CompatBodyBindingMaps
 
 const buildAgentConnectionsFromCompatBody = (
   document: GraphIRDocument,
-  body: BodyDefinition
+  body: LegacyBodyDefinition
 ): LegacyAgentConnectionBuildResult => {
   const outgoingLinksByNodeId = new Map<string, LeafLink[]>();
   const consumedLinkIds = new Set<string>();
@@ -674,7 +680,7 @@ const buildAgentLayoutFromLegacy = (
   document: GraphIRDocument,
   layout?: BrainLayoutDocument
 ): AgentLayoutIR => {
-  const graphLayout = layout ?? createBrainLayoutFromDefinition(document);
+  const graphLayout = layout ?? createLegacyBrainLayoutFromDefinition(document);
   const nodes: AgentLayoutIR['nodes'] = {};
 
   for (const [nodeId, state] of Object.entries(graphLayout.nodes)) {
@@ -703,7 +709,7 @@ const buildAgentLayoutFromLegacy = (
 export const createAgentIRFromLegacyGraph = (
   name: string,
   document: GraphIRDocument,
-  body?: BodyDefinition,
+  body?: LegacyBodyDefinition,
   layout?: BrainLayoutDocument,
   metadataOverrides?: Partial<AgentMetadata>
 ): AgentIR => {
@@ -718,18 +724,13 @@ export interface LegacyToAgentIRBridgeResult {
 export const createAgentIRFromLegacyGraphDetailed = (
   name: string,
   document: GraphIRDocument,
-  body?: BodyDefinition,
+  body?: LegacyBodyDefinition,
   layout?: BrainLayoutDocument,
   metadataOverrides?: Partial<AgentMetadata>
 ): LegacyToAgentIRBridgeResult => {
-  const resolvedBody = body ?? createDefaultBodyDefinition(1);
+  const resolvedBody = body ?? createDefaultLegacyBodyDefinition(1);
   const metadata = createAgentMetadata(name, metadataOverrides);
-  const agentBody = body
-    ? buildBodyIRFromCompatBody(resolvedBody)
-    : {
-        ...buildBodyIRFromLegacy(document),
-        visionCellCount: Math.max(0, getBodyVisionCellCount(resolvedBody)),
-      };
+  const agentBody = body ? buildBodyIRFromCompatBody(resolvedBody) : buildBodyIRFromLegacy(document);
   const { containers, rootContainerId } = buildContainersFromLegacy(document);
   const brain: BrainIR = {
     version: 1,
@@ -742,14 +743,19 @@ export const createAgentIRFromLegacyGraphDetailed = (
     : buildAgentConnectionsFromLegacy(document);
 
   return {
-    agent: {
-      version: 1,
-      metadata,
-      body: agentBody,
-      brain,
-      connections: connectionBuildResult.connections,
-      layout: buildAgentLayoutFromLegacy(document, layout),
-    },
+    agent: withDerivedBodyVisionCellCount(
+      withVisionCellLayoutMarkers(
+        {
+          version: 1,
+          metadata,
+          body: agentBody,
+          brain,
+          connections: connectionBuildResult.connections,
+          layout: buildAgentLayoutFromLegacy(document, layout),
+        },
+        Math.max(1, body ? getLegacyBodyVisionCellCount(resolvedBody) : deriveLegacyDocumentVisionCellCount(document))
+      )
+    ),
     droppedLinkIds: connectionBuildResult.droppedLinkIds,
   };
 };
@@ -809,14 +815,14 @@ const createContainerNodeFromAgent = (
 
 export interface LegacyGraphBridgeResult {
   document: GraphIRDocument;
-  body: BodyDefinition;
+  body: LegacyBodyDefinition;
   layout: BrainLayoutDocument;
   droppedConnectionIds: string[];
   documentOnlyLosses: string[];
 }
 
-const buildCompatBodyFromAgent = (agent: AgentIR, visionCells: number): BodyDefinition => {
-  const nextBody = createDefaultBodyDefinition(visionCells);
+const buildCompatBodyFromAgent = (agent: AgentIR, visionCells: number): LegacyBodyDefinition => {
+  const nextBody = createDefaultLegacyBodyDefinition(visionCells);
   const inputSignalsById = new Map(nextBody.inputSignals.map((signal) => [signal.id, signal]));
   const outputSignalsById = new Map(nextBody.outputSignals.map((signal) => [signal.id, signal]));
 
@@ -855,6 +861,110 @@ const buildCompatBodyFromAgent = (agent: AgentIR, visionCells: number): BodyDefi
   return nextBody;
 };
 
+const resolveBodyInputSemantic = (body: BodyIR, nodeId: string): string => {
+  const matches = body.inputRules.flatMap((rule) => {
+    try {
+      const regex = new RegExp(rule.nodeIdPattern);
+      const match = regex.exec(nodeId);
+      return match ? [{ rule, match }] : [];
+    } catch {
+      return [];
+    }
+  });
+
+  if (matches.length !== 1) {
+    return matches.length === 0 ? 'unmatched' : 'ambiguous';
+  }
+
+  return `source:${applyRuleTemplate(matches[0].rule.sourceTemplate, matches[0].match)}|scale:${matches[0].rule.scale}`;
+};
+
+const resolveBodyOutputSemantic = (body: BodyIR, nodeId: string): string => {
+  const matches = body.outputRules.flatMap((rule) => {
+    try {
+      const regex = new RegExp(rule.nodeIdPattern);
+      const match = regex.exec(nodeId);
+      return match ? [{ rule, match }] : [];
+    } catch {
+      return [];
+    }
+  });
+
+  if (matches.length !== 1) {
+    return matches.length === 0 ? 'unmatched' : 'ambiguous';
+  }
+
+  return `target:${applyRuleTemplate(matches[0].rule.targetTemplate, matches[0].match)}|decay:${matches[0].rule.decayPerSecond}`;
+};
+
+const compareCompatBodySemantics = (
+  agent: AgentIR,
+  compatBody: LegacyBodyDefinition
+): string[] => {
+  const losses: string[] = [];
+  const rebuiltBody = buildBodyIRFromCompatBody(compatBody);
+  const visionCellCount = deriveAgentIRVisionCellCount(agent);
+
+  if (getLegacyBodyVisionCellCount(compatBody) !== visionCellCount) {
+    losses.push(
+      `Legacy GraphIR compat getter cannot preserve BodyIR vision cell coverage (${visionCellCount} -> ${getLegacyBodyVisionCellCount(
+        compatBody
+      )}).`
+    );
+  }
+
+  const inputCandidates = new Set<string>([
+    ...Array.from({ length: visionCellCount }, (_, cellIndex) =>
+      ['R', 'G', 'B'].map((channel) => `vision-${channel}-${cellIndex}`)
+    ).flat(),
+    ...agent.connections.flatMap((connection) => {
+      const endpoints: string[] = [];
+      if (connection.from.scope === 'bodyInput') {
+        endpoints.push(connection.from.nodeId);
+      }
+      if (connection.to.scope === 'bodyInput') {
+        endpoints.push(connection.to.nodeId);
+      }
+      return endpoints;
+    }),
+  ]);
+  const outputCandidates = new Set<string>([
+    'output-turn-left',
+    'output-move-forward',
+    'output-turn-right',
+    ...agent.connections.flatMap((connection) => {
+      const endpoints: string[] = [];
+      if (connection.from.scope === 'bodyOutput') {
+        endpoints.push(connection.from.nodeId);
+      }
+      if (connection.to.scope === 'bodyOutput') {
+        endpoints.push(connection.to.nodeId);
+      }
+      return endpoints;
+    }),
+  ]);
+
+  const inputMismatches = [...inputCandidates].filter(
+    (nodeId) => resolveBodyInputSemantic(agent.body, nodeId) !== resolveBodyInputSemantic(rebuiltBody, nodeId)
+  );
+  if (inputMismatches.length > 0) {
+    losses.push(
+      `Legacy GraphIR compat getter cannot preserve full BodyIR input rule semantics for: ${inputMismatches.join(', ')}.`
+    );
+  }
+
+  const outputMismatches = [...outputCandidates].filter(
+    (nodeId) => resolveBodyOutputSemantic(agent.body, nodeId) !== resolveBodyOutputSemantic(rebuiltBody, nodeId)
+  );
+  if (outputMismatches.length > 0) {
+    losses.push(
+      `Legacy GraphIR compat getter cannot preserve full BodyIR output rule semantics for: ${outputMismatches.join(', ')}.`
+    );
+  }
+
+  return losses;
+};
+
 export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBridgeResult => {
   const visionCellIds = new Set<number>();
   for (const connection of agent.connections) {
@@ -869,10 +979,14 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
     visionCellIds.add(Number.parseInt(match[2], 10));
   }
 
-  const visionCells = Math.max(agent.body.visionCellCount, visionCellIds.size > 0 ? Math.max(...visionCellIds) + 1 : 0, 1);
+  const visionCells = Math.max(
+    deriveAgentIRVisionCellCount(agent),
+    visionCellIds.size > 0 ? Math.max(...visionCellIds) + 1 : 0,
+    1
+  );
   const nextDocument = createDefaultGraphIRDocument(visionCells);
   const nextBody = buildCompatBodyFromAgent(agent, visionCells);
-  const documentOnlyLosses: string[] = [];
+  const documentOnlyLosses = compareCompatBodySemantics(agent, nextBody);
   const defaultRootGroup = nextDocument.root.children.find(
     (node): node is NeuronGroupNode => node.kind === 'neuron-group' && node.id === LEGACY_ROOT_GROUP_ID
   );
@@ -1094,9 +1208,12 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
   };
 
   if (
-    nextBody.inputSignals.some((signal) => (signal.scale ?? DEFAULT_VISION_SCALE) !== DEFAULT_VISION_SCALE) ||
-    nextBody.outputSignals.some(
-      (signal) => (signal.decayPerSecond ?? DEFAULT_OUTPUT_DECAY_PER_SECOND) !== DEFAULT_OUTPUT_DECAY_PER_SECOND
+    documentOnlyLosses.length === 0 &&
+    (
+      nextBody.inputSignals.some((signal) => (signal.scale ?? DEFAULT_VISION_SCALE) !== DEFAULT_VISION_SCALE) ||
+      nextBody.outputSignals.some(
+        (signal) => (signal.decayPerSecond ?? DEFAULT_OUTPUT_DECAY_PER_SECOND) !== DEFAULT_OUTPUT_DECAY_PER_SECOND
+      )
     )
   ) {
     documentOnlyLosses.push('Legacy GraphIR document-only getter cannot preserve BodyIR scale/decay semantics.');

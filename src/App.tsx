@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef, type CSSPrope
 import SimulationCanvas from './components/SimulationCanvas';
 import {
   createDefaultAgentIR,
+  deriveAgentIRVisionCellCount,
   reconcileAgentIRVisionCells,
   summarizeAgentIR,
   validateAgentIR,
@@ -117,6 +118,47 @@ const areAgentsEquivalent = (left: AgentIR, right: AgentIR): boolean =>
   JSON.stringify(normalizeAgentForCompare(left)) === JSON.stringify(normalizeAgentForCompare(right));
 
 const ROOT_GRAPH_PATH: GraphPathItem[] = [{ id: 'root', label: 'root' }];
+
+const applyBrainRecordToEditorState = (
+  brain: BrainLibraryRecord,
+  options: {
+    resetGraphEditorSession: () => void;
+    resetRuntimeForBrainSwitch: () => void;
+    setIsBrainLibraryOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    setActiveBrainId: React.Dispatch<React.SetStateAction<string | null>>;
+    setActiveAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
+    setDraftAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
+    setDraftGraphStatusOverride: React.Dispatch<React.SetStateAction<AgentDraftStatus | null>>;
+    setAgentParameters: React.Dispatch<React.SetStateAction<AgentParameters>>;
+    setEditorTab: React.Dispatch<React.SetStateAction<EditorTab>>;
+  }
+): void => {
+  const bodyVisionCells = deriveAgentIRVisionCellCount(brain.agent);
+  options.resetGraphEditorSession();
+  options.resetRuntimeForBrainSwitch();
+  options.setIsBrainLibraryOpen(true);
+  options.setActiveBrainId(brain.metadata.id);
+  options.setActiveAgentDocument(brain.agent);
+  options.setDraftAgentDocument(brain.agent);
+  options.setDraftGraphStatusOverride(null);
+  options.setAgentParameters((current) =>
+    current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells }
+  );
+  options.setEditorTab((currentTab) => (currentTab === 'graph' ? 'graph' : currentTab));
+};
+
+const applyBrainRecordMetadataToDraftOnly = (
+  brain: BrainLibraryRecord,
+  options: {
+    setActiveBrainId: React.Dispatch<React.SetStateAction<string | null>>;
+    setDraftAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
+    setDraftGraphStatusOverride: React.Dispatch<React.SetStateAction<AgentDraftStatus | null>>;
+  }
+): void => {
+  options.setActiveBrainId(brain.metadata.id);
+  options.setDraftAgentDocument(brain.agent);
+  options.setDraftGraphStatusOverride(null);
+};
 
 const App: React.FC = () => {
   const initialBrainLibraryLoad = useRef(loadBrainLibraryWithStatus()).current;
@@ -414,7 +456,12 @@ const App: React.FC = () => {
   const handleCreateBrainFromCurrent = useCallback((name: string) => {
     const nextBrain = createBrainLibraryItemFromAgent(name, draftAgentDocumentRef.current);
     setBrainLibrary((currentLibrary) => [...currentLibrary, nextBrain]);
-    setActiveBrainId(nextBrain.metadata.id);
+    setIsBrainLibraryOpen(true);
+    applyBrainRecordMetadataToDraftOnly(nextBrain, {
+      setActiveBrainId,
+      setDraftAgentDocument,
+      setDraftGraphStatusOverride,
+    });
   }, []);
 
   const confirmUnsavedBrainReplacement = useCallback((): boolean => {
@@ -435,18 +482,17 @@ const App: React.FC = () => {
       return;
     }
 
-    const bodyVisionCells = selectedBrain.agent.body.visionCellCount;
-    resetGraphEditorSession();
-    resetRuntimeForBrainSwitch();
-    setIsBrainLibraryOpen(true);
-    setActiveBrainId(selectedBrain.metadata.id);
-    setActiveAgentDocument(selectedBrain.agent);
-    setDraftAgentDocument(selectedBrain.agent);
-    setDraftGraphStatusOverride(null);
-    setAgentParameters((current) =>
-      current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells }
-    );
-    setEditorTab((currentTab) => (currentTab === 'graph' ? 'graph' : currentTab));
+    applyBrainRecordToEditorState(selectedBrain, {
+      resetGraphEditorSession,
+      resetRuntimeForBrainSwitch,
+      setIsBrainLibraryOpen,
+      setActiveBrainId,
+      setActiveAgentDocument,
+      setDraftAgentDocument,
+      setDraftGraphStatusOverride,
+      setAgentParameters,
+      setEditorTab,
+    });
   }, [brainLibrary, confirmUnsavedBrainReplacement, resetGraphEditorSession, resetRuntimeForBrainSwitch]);
 
   const handleImportBrain = useCallback((name: string, payload: unknown) => {
@@ -461,19 +507,18 @@ const App: React.FC = () => {
       return;
     }
 
-    resetGraphEditorSession();
-    resetRuntimeForBrainSwitch();
-    setIsBrainLibraryOpen(true);
     setBrainLibrary((currentLibrary) => [...currentLibrary, nextBrain]);
-    setActiveBrainId(nextBrain.metadata.id);
-    setActiveAgentDocument(nextBrain.agent);
-    setDraftAgentDocument(nextBrain.agent);
-    setDraftGraphStatusOverride(null);
-    setAgentParameters((current) => {
-      const bodyVisionCells = nextBrain.agent.body.visionCellCount;
-      return current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells };
+    applyBrainRecordToEditorState(nextBrain, {
+      resetGraphEditorSession,
+      resetRuntimeForBrainSwitch,
+      setIsBrainLibraryOpen,
+      setActiveBrainId,
+      setActiveAgentDocument,
+      setDraftAgentDocument,
+      setDraftGraphStatusOverride,
+      setAgentParameters,
+      setEditorTab,
     });
-    setEditorTab((currentTab) => (currentTab === 'graph' ? 'graph' : currentTab));
   }, [brainLibrary, confirmUnsavedBrainReplacement, resetGraphEditorSession, resetRuntimeForBrainSwitch]);
 
   const handleExportBrain = useCallback((brainId: string) => {
@@ -495,29 +540,20 @@ const App: React.FC = () => {
   }, [brainLibrary]);
 
   const handleRenameBrain = useCallback((brainId: string, name: string) => {
-    setBrainLibrary((currentLibrary) => renameBrainLibraryItem(currentLibrary, brainId, name));
+    const nextLibrary = renameBrainLibraryItem(brainLibrary, brainId, name);
+    setBrainLibrary(nextLibrary);
     if (brainId !== activeBrainId) {
       return;
     }
 
-    const nextUpdatedAt = new Date().toISOString();
-    setActiveAgentDocument((currentAgent) => ({
-      ...currentAgent,
-      metadata: {
-        ...currentAgent.metadata,
-        name,
-        updatedAt: nextUpdatedAt,
-      },
-    }));
-    setDraftAgentDocument((currentAgent) => ({
-      ...currentAgent,
-      metadata: {
-        ...currentAgent.metadata,
-        name,
-        updatedAt: nextUpdatedAt,
-      },
-    }));
-  }, [activeBrainId]);
+    const renamedActiveBrain = nextLibrary.find((brain) => brain.metadata.id === brainId);
+    if (!renamedActiveBrain) {
+      return;
+    }
+
+    setActiveAgentDocument(renamedActiveBrain.agent);
+    setDraftAgentDocument(renamedActiveBrain.agent);
+  }, [activeBrainId, brainLibrary]);
 
   const handleDeleteBrain = useCallback((brainId: string) => {
     setBrainLibrary((currentLibrary) => deleteBrainLibraryItem(currentLibrary, brainId));

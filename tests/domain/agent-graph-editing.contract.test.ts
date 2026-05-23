@@ -13,7 +13,6 @@ const createEditingAgent = (): AgentIR => ({
   },
   body: {
     version: 1,
-    visionCellCount: 0,
     inputRules: [],
     outputRules: [],
   },

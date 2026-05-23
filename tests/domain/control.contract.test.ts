@@ -13,15 +13,20 @@ import {
 import {
   compileBrainDefinition,
   createBrainProgramRuntimeState,
-  createDefaultBodyDefinition,
   createDefaultGraphIRDocument,
+  createDefaultLegacyBodyDefinition,
   stepBrainProgram,
   summarizeGraphIRDocument,
   type GraphIRDocument,
   type LegacyBrainProgram,
 } from '../../src/domain/brain/compat';
-import type { BodyDefinition } from '../../src/domain/brain/compat';
+import type { BodyDefinition as LegacyBodyDefinition } from '../../src/domain/brain/compat';
 import type { AgentIR } from '../../src/domain/brain';
+import {
+  deriveAgentIRVisionCellCount,
+  withDerivedBodyVisionCellCount,
+  withVisionCellLayoutMarkers,
+} from '../../src/domain/brain';
 import type { Agent } from '../../src/types/simulation';
 
 function createAgent(overrides: Partial<Agent> = {}): Agent {
@@ -55,7 +60,7 @@ const getRootVisionCells = (document: GraphIRDocument) => {
 };
 
 const compileDefaultBrain = (document: GraphIRDocument) =>
-  compileBrainDefinition(document, createDefaultBodyDefinition(getRootVisionCells(document)));
+  compileBrainDefinition(document, createDefaultLegacyBodyDefinition(getRootVisionCells(document)));
 
 const createValidCompatBoundaryDocument = (): GraphIRDocument => ({
   version: 1,
@@ -193,7 +198,7 @@ const createValidCompatBoundaryDocument = (): GraphIRDocument => ({
   },
 });
 
-const createRuleDrivenSessionAgent = (): AgentIR => ({
+const createRuleDrivenSessionAgent = (): AgentIR => withDerivedBodyVisionCellCount(withVisionCellLayoutMarkers({
   version: 1,
   metadata: {
     id: 'agent-session-rule-driven',
@@ -203,7 +208,6 @@ const createRuleDrivenSessionAgent = (): AgentIR => ({
   },
   body: {
     version: 1,
-    visionCellCount: 3,
     inputRules: [
       {
         id: 'vision-cells',
@@ -267,7 +271,7 @@ const createRuleDrivenSessionAgent = (): AgentIR => ({
     version: 1,
     nodes: {},
   },
-});
+}, 3));
 
 test('keyboard policy moves forward and cancels opposite turns', () => {
   const controller = new AgentController();
@@ -522,7 +526,7 @@ test('simulation session keeps the last applied document and program when GraphI
   assert.equal(appliedStatus.state, 'applied');
   const appliedSummary = appliedStatus.appliedSummary;
 
-  const invalidBody = createDefaultBodyDefinition(2);
+  const invalidBody = createDefaultLegacyBodyDefinition(2);
   invalidBody.brainBindings.outputs[1] = {
     brainSignalNodeId: 'missing-output-node',
     bodySignalId: 'motor-move-forward',
@@ -841,7 +845,7 @@ test('simulation session vision-cell reconcile preserves AgentIR-only body rule 
   session.updateAgentParameters({ visionCells: 12 });
 
   const reconciledAgent = session.getCurrentAgentIR();
-  assert.equal(reconciledAgent.body.visionCellCount, 12);
+  assert.equal(deriveAgentIRVisionCellCount(reconciledAgent), 12);
   assert.equal(reconciledAgent.body.inputRules[0]?.scale, 3);
   assert.equal(reconciledAgent.body.outputRules[0]?.decayPerSecond, 9);
   assert.equal(reconciledAgent.body.inputRules[0]?.nodeIdPattern, '^vision-([RGB])-(\\d+)$');
@@ -968,7 +972,61 @@ test('simulation session legacy GraphIR compat setter rejects draft links that c
   assert.ok(status.message?.includes('invalid-output-source-link'));
 });
 
-test('simulation session legacy GraphIR compat setter accepts custom body bindings with non-legacy brain signal ids', () => {
+test('simulation session legacy GraphIR compat setter rejects drafts that would require silent vision-cell reconcile', () => {
+  const session = new SimulationSession({
+    visionSystem: new VisionSystem(),
+    agentController: new AgentController(),
+    worldManager: new WorldManager(1600, 1200),
+    collisionDetector: new CollisionDetector(),
+  });
+
+  session.initialize();
+  session.updateAgentParameters({ visionCells: 2 });
+
+  const validDocument = createDefaultGraphIRDocument(2);
+  validDocument.root.links = [
+    {
+      id: 'keep-link',
+      from: {
+        nodeId: 'vision-R-0',
+        portId: 'out',
+      },
+      to: {
+        nodeId: 'neuron-1',
+        portId: 'dendrite',
+      },
+      weight: 1,
+    },
+  ];
+
+  const appliedStatus = setLegacyGraphIRDocument(session, validDocument);
+  assert.equal(appliedStatus.state, 'applied');
+  assert.equal(session.getCurrentAgentIR().connections.length, 1);
+
+  const oversizedDraft = createDefaultGraphIRDocument(3);
+  oversizedDraft.root.links = [
+    {
+      id: 'out-of-range-link',
+      from: {
+        nodeId: 'vision-G-2',
+        portId: 'out',
+      },
+      to: {
+        nodeId: 'neuron-1',
+        portId: 'dendrite',
+      },
+      weight: 1,
+    },
+  ];
+
+  const invalidStatus = setLegacyGraphIRDocument(session, oversizedDraft);
+  assert.equal(invalidStatus.state, 'invalid');
+  assert.ok(invalidStatus.message?.includes('vision-G-2'));
+  assert.equal(session.getCurrentAgentIR().connections.length, 1);
+  assert.equal(session.getCurrentAgentIR().connections[0]?.from.nodeId, 'vision-R-0');
+});
+
+test('simulation session legacy GraphIR compat setter rejects custom body bindings that cannot round-trip through compat getter', () => {
   const session = new SimulationSession({
     visionSystem: new VisionSystem(),
     agentController: new AgentController(),
@@ -979,7 +1037,7 @@ test('simulation session legacy GraphIR compat setter accepts custom body bindin
   session.initialize();
 
   const document = createValidCompatBoundaryDocument();
-  const body: BodyDefinition = {
+  const body: LegacyBodyDefinition = {
     version: 1,
     inputSignals: [
       {
@@ -1020,5 +1078,77 @@ test('simulation session legacy GraphIR compat setter accepts custom body bindin
 
   const status = setLegacyGraphIRDocument(session, document, body);
   assert.equal(status.state, 'invalid');
-  assert.ok(status.message?.includes('core-motor-out'));
+  assert.ok(
+    status.message?.includes('cannot preserve full BodyIR input rule semantics') ||
+      status.message?.includes('cannot preserve full BodyIR output rule semantics')
+  );
+});
+
+test('simulation session legacy GraphIR compat getter rejects applied AgentIR bodies with compat-only semantic loss', () => {
+  const session = new SimulationSession({
+    visionSystem: new VisionSystem(),
+    agentController: new AgentController(),
+    worldManager: new WorldManager(1600, 1200),
+    collisionDetector: new CollisionDetector(),
+  });
+
+  session.initialize();
+
+  const currentAgent = session.getCurrentAgentIR();
+  const status = session.setAgentIR({
+    ...currentAgent,
+    body: {
+      ...currentAgent.body,
+      inputRules: [
+        {
+          id: 'custom-input-a',
+          nodeIdPattern: '^sensor-a$',
+          sourceTemplate: 'vision.G.0',
+          scale: 1,
+        },
+        {
+          id: 'custom-input-b',
+          nodeIdPattern: '^sensor-b$',
+          sourceTemplate: 'vision.G.0',
+          scale: 1,
+        },
+      ],
+      outputRules: [
+        {
+          id: 'custom-output-a',
+          nodeIdPattern: '^effector-a$',
+          targetTemplate: 'action.move-forward',
+          decayPerSecond: 4,
+        },
+        {
+          id: 'custom-output-b',
+          nodeIdPattern: '^effector-b$',
+          targetTemplate: 'action.move-forward',
+          decayPerSecond: 4,
+        },
+      ],
+    },
+    connections: [
+      {
+        id: 'input-connection-a',
+        from: { scope: 'bodyInput', nodeId: 'sensor-a' },
+        to: { scope: 'brain', nodeId: 'neuron-1' },
+        weight: 1,
+      },
+      {
+        id: 'output-connection-a',
+        from: { scope: 'brain', nodeId: 'neuron-1' },
+        to: { scope: 'bodyOutput', nodeId: 'effector-a' },
+        weight: 1,
+      },
+    ],
+  });
+
+  assert.equal(status.state, 'applied');
+  assert.throws(
+    () => getCurrentLegacyGraphIRDocument(session),
+    (error: unknown) =>
+      error instanceof Error &&
+      error.message.includes('cannot preserve full BodyIR input rule semantics')
+  );
 });

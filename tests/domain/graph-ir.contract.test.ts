@@ -4,8 +4,8 @@ import {
   assertValidGraphIRDocument,
   compileBrainDefinition,
   createBrainProgramRuntimeState,
-  createDefaultBodyDefinition,
   createDefaultGraphIRDocument,
+  createDefaultLegacyBodyDefinition,
   GraphIRValidationError,
   reconcileGraphIRDocumentVisionCells,
   stepBrainProgram,
@@ -13,7 +13,7 @@ import {
   type LegacyBrainProgram,
   validateGraphIRDocument,
 } from '../../src/domain/brain/compat';
-import type { BodyDefinition } from '../../src/domain/brain/compat';
+import type { BodyDefinition as LegacyBodyDefinition } from '../../src/domain/brain/compat';
 
 const getRootVisionCells = (document: GraphIRDocument) => {
   const inputAdapter = document.root.children.find((node) => node.id === 'input-adapter' && node.kind === 'adapter');
@@ -21,7 +21,7 @@ const getRootVisionCells = (document: GraphIRDocument) => {
 };
 
 const compileDefaultBrain = (document: GraphIRDocument) =>
-  compileBrainDefinition(document, createDefaultBodyDefinition(getRootVisionCells(document)));
+  compileBrainDefinition(document, createDefaultLegacyBodyDefinition(getRootVisionCells(document)));
 
 const createValidGraphIRDocument = (): GraphIRDocument => ({
   version: 1,
@@ -982,7 +982,7 @@ test('GraphIR runtime step exposes active leaf node ids for input, neuron, and o
 
 test('compileBrainDefinition rejects invalid body output bindings', () => {
   const document = createDefaultGraphIRDocument(1);
-  const body = createDefaultBodyDefinition(1);
+  const body = createDefaultLegacyBodyDefinition(1);
   body.brainBindings.outputs[0] = {
     brainSignalNodeId: 'missing-output-node',
     bodySignalId: 'motor-turn-left',
@@ -994,9 +994,9 @@ test('compileBrainDefinition rejects invalid body output bindings', () => {
   );
 });
 
-test('compileBrainDefinition honors BodyDefinition bindings that use non-legacy brain signal node ids', () => {
+test('compileBrainDefinition honors legacy compat body bindings that use non-legacy brain signal node ids', () => {
   const document = createValidGraphIRDocument();
-  const body: BodyDefinition = {
+  const body: LegacyBodyDefinition = {
     version: 1,
     inputSignals: [
       {

@@ -364,7 +364,7 @@ const getNodeDirection = (node: TopologyNode): GraphViewNode['direction'] => {
   return 'internal';
 };
 
-export const buildGraphViewModel = ({
+export const buildLegacyGraphViewModel = ({
   document,
   navigationPath,
   draftNodePositions,

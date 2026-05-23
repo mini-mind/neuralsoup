@@ -13,7 +13,6 @@ const createTestAgent = (): AgentIR => ({
   },
   body: {
     version: 1,
-    visionCellCount: 0,
     inputRules: [],
     outputRules: [],
   },
@@ -117,4 +116,16 @@ test('agent graph view expanded children use viewId for active highlights', () =
 
   assert.equal(viewModel.activeViewNodeIds.has('expanded-group::neuron-1'), true);
   assert.equal(viewModel.activeViewNodeIds.has('neuron-1'), false);
+});
+
+test('agent graph root brain child scope does not inject orphan adapter proxy nodes', () => {
+  const viewModel = buildAgentGraphViewModel({
+    agent: createTestAgent(),
+    navigationPath: ['core-neuron-group'],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+  });
+
+  assert.equal(viewModel.nodes.some((node) => node.id === 'core-input-adapter'), false);
+  assert.equal(viewModel.nodes.some((node) => node.id === 'core-output-adapter'), false);
 });

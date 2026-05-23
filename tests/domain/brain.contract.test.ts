@@ -5,8 +5,8 @@ import {
   collectNeuronNodes,
   collectSignalNodes,
   compileBrainDefinition,
-  createDefaultBodyDefinition,
   createDefaultGraphIRDocument,
+  createDefaultLegacyBodyDefinition,
   summarizeGraphIRDocument,
   validateGraphIRDocument,
   type LegacyBrainProgram,
@@ -19,7 +19,7 @@ const getRootVisionCells = (document: GraphIRDocument) => {
 };
 
 const compileDefaultBrain = (document: GraphIRDocument) =>
-  compileBrainDefinition(document, createDefaultBodyDefinition(getRootVisionCells(document)));
+  compileBrainDefinition(document, createDefaultLegacyBodyDefinition(getRootVisionCells(document)));
 
 test('default GraphIR document compiles into a runtime program with vision-aligned bindings', () => {
   const document = createDefaultGraphIRDocument(24);

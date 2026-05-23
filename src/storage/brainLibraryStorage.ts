@@ -1,8 +1,11 @@
 import {
+  deriveAgentIRVisionCellCount,
   type AgentIR,
   type AgentLibraryItem,
   type AgentMetadata,
   validateAgentIR,
+  withDerivedBodyVisionCellCount,
+  withVisionCellLayoutMarkers,
 } from '../domain/brain';
 
 type AgentPackage = AgentLibraryItem;
@@ -46,21 +49,45 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 
 const createAgentLibraryId = (): string => `agent-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-const inferVisionCellCountFromAgent = (agent: AgentIR): number =>
-  agent.connections.reduce((maxCount, connection) => {
-    const endpoints = [connection.from, connection.to];
-    for (const endpoint of endpoints) {
-      if (endpoint.scope !== 'bodyInput') {
-        continue;
-      }
-      const match = endpoint.nodeId.match(/^vision-[RGB]-(\d+)$/);
-      if (!match) {
-        continue;
-      }
-      maxCount = Math.max(maxCount, Number.parseInt(match[1], 10) + 1);
-    }
-    return maxCount;
-  }, 0);
+type AgentPackageWithLegacyBody = AgentPackage & {
+  agent: AgentIR & {
+    body: AgentIR['body'] & {
+      visionCellCount?: unknown;
+    };
+  };
+};
+
+const stripLegacyVisionCellCount = (agent: AgentIR): AgentIR => {
+  const { visionCellCount: _legacyVisionCellCount, ...bodyWithoutLegacyVisionCellCount } = agent.body as AgentIR['body'] & {
+    visionCellCount?: unknown;
+  };
+  return {
+    ...agent,
+    body: bodyWithoutLegacyVisionCellCount,
+  };
+};
+
+const normalizeAgentRecordShape = (
+  agent: AgentIR,
+  metadataOverride?: AgentMetadata
+): BrainLibraryRecord => {
+  const metadata = metadataOverride ?? { ...agent.metadata };
+  const normalizedVisionCellCount = deriveAgentIRVisionCellCount(agent);
+  const normalizedAgent = withDerivedBodyVisionCellCount(
+    withVisionCellLayoutMarkers(stripLegacyVisionCellCount({
+      ...agent,
+      metadata,
+    }), normalizedVisionCellCount)
+  );
+
+  return {
+    metadata: { ...metadata },
+    agent: {
+      ...normalizedAgent,
+      metadata: { ...metadata },
+    },
+  };
+};
 
 export const isAgentPackage = (value: unknown): value is AgentPackage =>
   isObject(value) &&
@@ -188,18 +215,11 @@ const isBrainLibraryStorageEnvelope = (value: unknown): value is BrainLibrarySto
   value.brains.every(isAgentPackage);
 
 const normalizeAgentPackageMetadata = (candidate: AgentPackage): AgentPackage => {
-  const metadata = {
-    ...candidate.agent.metadata,
-  };
-
-  return {
-    ...candidate,
-    metadata,
-    agent: {
-      ...candidate.agent,
-      metadata,
-    },
-  };
+  return encodeBrainLibraryRecord(
+    normalizeAgentRecordShape(candidate.agent, {
+      ...candidate.agent.metadata,
+    })
+  );
 };
 
 const normalizeAgentPackage = (candidate: unknown): AgentPackage | null => {
@@ -207,67 +227,45 @@ const normalizeAgentPackage = (candidate: unknown): AgentPackage | null => {
     return null;
   }
 
-  const visionCellCount =
-    typeof candidate.agent.body.visionCellCount === 'number'
-      ? candidate.agent.body.visionCellCount
-      : inferVisionCellCountFromAgent(candidate.agent as AgentIR);
+  const legacyVisionCellCount = (() => {
+    const value = (candidate as AgentPackageWithLegacyBody).agent.body.visionCellCount;
+    return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : null;
+  })();
 
-  const normalizedVisionCellCount = Math.max(visionCellCount, 0);
+  const normalizedRecord = normalizeAgentRecordShape(
+    legacyVisionCellCount == null
+      ? candidate.agent
+      : withVisionCellLayoutMarkers(candidate.agent, legacyVisionCellCount)
+  );
 
   return normalizeAgentPackageMetadata({
     ...candidate,
-    agent: {
-      ...candidate.agent,
-      body: {
-        ...candidate.agent.body,
-        visionCellCount: normalizedVisionCellCount,
-      },
-    },
+    metadata: normalizedRecord.metadata,
+    agent: normalizedRecord.agent,
   });
 };
 
-const toBrainLibraryRecord = (candidate: AgentPackage): BrainLibraryRecord => ({
-  metadata: {
+const toBrainLibraryRecord = (candidate: AgentPackage): BrainLibraryRecord =>
+  normalizeAgentRecordShape(candidate.agent, {
     ...candidate.agent.metadata,
-  },
-  agent: {
-    ...candidate.agent,
-    metadata: {
-      ...candidate.agent.metadata,
-    },
-  },
-});
+  });
 
 export const encodeBrainLibraryRecord = (record: BrainLibraryRecord): AgentPackage => ({
   packageVersion: 1,
-  metadata: {
-    ...record.metadata,
-  },
-  agent: {
-    ...record.agent,
-    metadata: {
-      ...record.metadata,
-    },
-  },
+  ...normalizeAgentRecordShape(record.agent, {
+    ...record.agent.metadata,
+  }),
 });
 
 export const createBrainLibraryItemFromAgent = (name: string, agent: AgentIR): BrainLibraryRecord => {
   const timestamp = new Date().toISOString();
-  const metadata = {
+  return normalizeAgentRecordShape(agent, {
     ...agent.metadata,
     id: createAgentLibraryId(),
     name: name.trim() || '未命名 Brain',
     createdAt: timestamp,
     updatedAt: timestamp,
-  };
-
-  return {
-    metadata,
-    agent: {
-      ...agent,
-      metadata,
-    },
-  };
+  });
 };
 
 export const normalizeImportedAgentPackage = (
@@ -285,20 +283,11 @@ export const normalizeImportedAgentPackage = (
   const trimmedName = options?.name?.trim();
   const existingIds = new Set(options?.existingIds ?? []);
   const nextId = existingIds.has(normalized.metadata.id) ? createAgentLibraryId() : normalized.metadata.id;
-  const metadata = {
+  return normalizeAgentRecordShape(normalized.agent, {
     ...normalized.agent.metadata,
     id: nextId,
     name: trimmedName || normalized.agent.metadata.name,
-  };
-
-  return {
-    ...normalized,
-    metadata,
-    agent: {
-      ...normalized.agent,
-      metadata,
-    },
-  };
+  });
 };
 
 const createStorageEnvelope = (brains: BrainLibraryRecord[]): BrainLibraryStorageEnvelope => ({
@@ -384,7 +373,7 @@ export const loadBrainLibraryWithStatus = (): BrainLibraryLoadResult => {
     const shouldRewriteStorage = normalizedBrains.some((brain, index) => {
       const persistedBrain = parsed.brains[index];
       return (
-        brain.agent.body.visionCellCount !== persistedBrain?.agent?.body?.visionCellCount ||
+        JSON.stringify(encodeBrainLibraryRecord(toBrainLibraryRecord(brain))) !== JSON.stringify(persistedBrain) ||
         brain.metadata.id !== persistedBrain?.metadata?.id ||
         brain.metadata.name !== persistedBrain?.metadata?.name ||
         brain.metadata.createdAt !== persistedBrain?.metadata?.createdAt ||
@@ -441,19 +430,10 @@ export const upsertBrainLibraryItemAgent = (
   const nextUpdatedAt = updatedAt ?? new Date().toISOString();
   return brains.map((brain) =>
     brain.metadata.id === brainId
-      ? {
-          metadata: {
-            ...brain.metadata,
-            updatedAt: nextUpdatedAt,
-          },
-          agent: {
-            ...agent,
-            metadata: {
-              ...brain.metadata,
-              updatedAt: nextUpdatedAt,
-            },
-          },
-        }
+      ? normalizeAgentRecordShape(agent, {
+          ...brain.metadata,
+          updatedAt: nextUpdatedAt,
+        })
       : brain
   );
 };
@@ -463,21 +443,18 @@ export const renameBrainLibraryItem = (
   brainId: string,
   name: string
 ): BrainLibraryRecord[] =>
-  brains.map((brain) =>
-    brain.metadata.id === brainId
-      ? {
-          metadata: { ...brain.metadata, name, updatedAt: new Date().toISOString() },
-          agent: {
-            ...brain.agent,
-            metadata: {
-              ...brain.agent.metadata,
-              name,
-              updatedAt: new Date().toISOString(),
-            },
-          },
-        }
-      : brain
-  );
+  brains.map((brain) => {
+    if (brain.metadata.id !== brainId) {
+      return brain;
+    }
+
+    const updatedAt = new Date().toISOString();
+    return normalizeAgentRecordShape(brain.agent, {
+      ...brain.metadata,
+      name,
+      updatedAt,
+    });
+  });
 
 export const deleteBrainLibraryItem = (brains: BrainLibraryRecord[], brainId: string): BrainLibraryRecord[] =>
   brains.filter((brain) => brain.metadata.id !== brainId);
@@ -492,24 +469,12 @@ export const duplicateBrainLibraryItem = (brains: BrainLibraryRecord[], brainId:
 
   return [
     ...brains,
-    {
-      metadata: {
-        ...sourceBrain.metadata,
-        id: duplicateId,
-        name: `${sourceBrain.metadata.name} 副本`,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      },
-      agent: {
-        ...sourceBrain.agent,
-        metadata: {
-          ...sourceBrain.agent.metadata,
-          id: duplicateId,
-          name: `${sourceBrain.metadata.name} 副本`,
-          createdAt: timestamp,
-          updatedAt: timestamp,
-        },
-      },
-    },
+    normalizeAgentRecordShape(sourceBrain.agent, {
+      ...sourceBrain.metadata,
+      id: duplicateId,
+      name: `${sourceBrain.metadata.name} 副本`,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }),
   ];
 };

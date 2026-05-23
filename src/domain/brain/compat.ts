@@ -24,6 +24,12 @@ export type {
 } from './ir';
 
 export {
+  createLegacyAgentPackage,
+  createLegacyBrainLayoutFromDefinition,
+  createLegacyBrainPackage,
+  createDefaultLegacyBodyDefinition,
+  getLegacyBodyVisionCellCount,
+  isLegacyBrainPackage,
   createAgentPackage,
   createBrainLayoutFromDefinition,
   createBrainPackage,
@@ -33,7 +39,7 @@ export {
 } from './package';
 export type {
   AgentPackage,
-  BodyDefinition,
+  LegacyBodyDefinition as BodyDefinition,
   BodyInputBinding,
   BodyInputSignal,
   BodyOutputBinding,
@@ -42,7 +48,7 @@ export type {
   BrainLayoutDocument,
   BrainLayoutNodeState,
   BrainMetadata,
-  BrainPackage,
+  LegacyBrainPackage as BrainPackage,
 } from './package';
 
 export { compileBrainDefinition } from './compiler';

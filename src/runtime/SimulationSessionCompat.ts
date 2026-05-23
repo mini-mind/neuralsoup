@@ -1,7 +1,7 @@
 import {
   AgentValidationError,
+  deriveAgentIRVisionCellCount,
   type AgentValidationIssue,
-  reconcileAgentIRVisionCells,
 } from '../domain/brain';
 import { compileBrainDefinition } from '../domain/brain/compiler';
 import {
@@ -14,9 +14,11 @@ import {
   validateGraphIRDocument,
   type GraphIRDocument,
 } from '../domain/brain/ir';
-import type { BodyDefinition } from '../domain/brain/package';
+import type { LegacyBodyDefinition } from '../domain/brain/package';
 import type { AgentRuntimeStatus } from '../types/agentRuntime';
 import { SimulationSession } from './SimulationSession';
+
+const LEGACY_VISION_INPUT_PATTERN = /^vision-[RGB]-(\d+)$/;
 
 const toAgentValidationIssues = (issues: GraphIRValidationIssue[]): AgentValidationIssue[] =>
   issues.map((issue) => ({
@@ -32,7 +34,7 @@ const toAgentValidationIssues = (issues: GraphIRValidationIssue[]): AgentValidat
 export const setLegacyGraphIRDocument = (
   session: SimulationSession,
   document: GraphIRDocument,
-  body?: BodyDefinition
+  body?: LegacyBodyDefinition
 ): AgentRuntimeStatus => {
   const mainAgent = session.getMainAgent();
   const currentAgent = session.getCurrentAgentIR();
@@ -57,10 +59,46 @@ export const setLegacyGraphIRDocument = (
         .join(' | '),
     };
   }
-  const nextAgent = reconcileAgentIRVisionCells(
-    bridgeResult.agent,
-    visionCells
-  );
+  const outOfRangeConnections = bridgeResult.agent.connections.filter((connection) => {
+    if (connection.from.scope !== 'bodyInput') {
+      return false;
+    }
+    const match = connection.from.nodeId.match(LEGACY_VISION_INPUT_PATTERN);
+    return match ? Number.parseInt(match[1] ?? '-1', 10) >= visionCells : false;
+  });
+
+  if (outOfRangeConnections.length > 0) {
+    return {
+      state: 'invalid',
+      appliedSummary: session.getAgentRuntimeStatus().appliedSummary,
+      issues: outOfRangeConnections.map((connection) => ({
+        code: 'runtime-binding-error' as const,
+        message: `Legacy GraphIR compat setter requires vision cell ${connection.from.nodeId}, but session only has ${visionCells} cells.`,
+      })),
+      message: outOfRangeConnections
+        .map(
+          (connection) =>
+            `Legacy GraphIR compat setter requires vision cell ${connection.from.nodeId}, but session only has ${visionCells} cells.`
+        )
+        .join(' | '),
+    };
+  }
+
+  const nextAgent = bridgeResult.agent;
+  const requiredVisionCells = deriveAgentIRVisionCellCount(nextAgent);
+  if (requiredVisionCells > visionCells) {
+    return {
+      state: 'invalid',
+      appliedSummary: session.getAgentRuntimeStatus().appliedSummary,
+      issues: [
+        {
+          code: 'runtime-binding-error',
+          message: `Legacy GraphIR compat setter requires ${requiredVisionCells} vision cells, but session only has ${visionCells} cells.`,
+        },
+      ],
+      message: `Legacy GraphIR compat setter requires ${requiredVisionCells} vision cells, but session only has ${visionCells} cells.`,
+    };
+  }
   const compatBridge = createLegacyGraphBridgeFromAgent(nextAgent);
   const reconciledDocument = compatBridge.document;
   const reconciledBody = compatBridge.body;
@@ -75,6 +113,17 @@ export const setLegacyGraphIRDocument = (
       message: compatBridge.droppedConnectionIds
         .map((connectionId) => `Legacy GraphIR compat bridge cannot preserve AgentIR connection "${connectionId}".`)
         .join(' | '),
+    };
+  }
+  if (compatBridge.documentOnlyLosses.length > 0) {
+    return {
+      state: 'invalid',
+      appliedSummary: session.getAgentRuntimeStatus().appliedSummary,
+      issues: compatBridge.documentOnlyLosses.map((message) => ({
+        code: 'runtime-binding-error' as const,
+        message,
+      })),
+      message: compatBridge.documentOnlyLosses.join(' | '),
     };
   }
   const issues = validateGraphIRDocument(reconciledDocument);

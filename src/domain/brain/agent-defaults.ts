@@ -1,4 +1,13 @@
-import type { AgentConnection, AgentIR, AgentLayoutIR, AgentMetadata, BodyIR, BrainIR } from './agent-ir';
+import {
+  withDerivedBodyVisionCellCount,
+  withVisionCellLayoutMarkers,
+  type AgentConnection,
+  type AgentIR,
+  type AgentLayoutIR,
+  type AgentMetadata,
+  type BodyIR,
+  type BrainIR,
+} from './agent-ir';
 
 const INPUT_CHANNELS = ['R', 'G', 'B'] as const;
 const DEFAULT_ROOT_INPUT_ADAPTER_ID = 'input-adapter';
@@ -25,9 +34,8 @@ const createAgentMetadata = (
   updatedAt: timestamp,
 });
 
-const createDefaultBodyIR = (visionCells: number): BodyIR => ({
+const createDefaultBodyIR = (): BodyIR => ({
   version: DEFAULT_BODY_VERSION,
-  visionCellCount: visionCells,
   inputRules: [
     {
       id: DEFAULT_VISION_INPUT_RULE_ID,
@@ -236,12 +244,14 @@ export const createDefaultAgentIR = (
       ? crypto.randomUUID()
       : `agent-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-  return {
+  return withDerivedBodyVisionCellCount(
+    withVisionCellLayoutMarkers({
     version: DEFAULT_AGENT_VERSION,
     metadata: createAgentMetadata(name, timestamp, idSource),
-    body: createDefaultBodyIR(normalizedVisionCells),
+    body: createDefaultBodyIR(),
     brain: createDefaultBrainIR(),
     connections: createDefaultConnections(normalizedVisionCells),
     layout: createDefaultLayout(normalizedVisionCells),
-  };
+    }, normalizedVisionCells)
+  );
 };

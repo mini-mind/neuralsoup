@@ -1,16 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  createBrainLayoutFromDefinition,
-  createBrainPackage,
-  createDefaultBodyDefinition,
   createDefaultGraphIRDocument,
-  getBodyVisionCellCount,
-  isBrainPackage,
+  createDefaultLegacyBodyDefinition,
+  createLegacyBrainLayoutFromDefinition,
+  createLegacyBrainPackage,
+  getLegacyBodyVisionCellCount,
+  isLegacyBrainPackage,
 } from '../../src/domain/brain/compat';
 
-test('createDefaultBodyDefinition maps vision cells and motor channels into explicit body signals', () => {
-  const body = createDefaultBodyDefinition(2);
+test('createDefaultLegacyBodyDefinition maps vision cells and motor channels into explicit body signals', () => {
+  const body = createDefaultLegacyBodyDefinition(2);
 
   assert.equal(body.inputSignals.length, 6);
   assert.equal(body.outputSignals.length, 3);
@@ -22,23 +22,23 @@ test('createDefaultBodyDefinition maps vision cells and motor channels into expl
   );
 });
 
-test('getBodyVisionCellCount derives the world vision width from body input signals', () => {
-  assert.equal(getBodyVisionCellCount(createDefaultBodyDefinition(0)), 0);
-  assert.equal(getBodyVisionCellCount(createDefaultBodyDefinition(24)), 24);
+test('getLegacyBodyVisionCellCount derives the world vision width from body input signals', () => {
+  assert.equal(getLegacyBodyVisionCellCount(createDefaultLegacyBodyDefinition(0)), 0);
+  assert.equal(getLegacyBodyVisionCellCount(createDefaultLegacyBodyDefinition(24)), 24);
 });
 
-test('createBrainLayoutFromDefinition extracts node position and collapsed state into layout document', () => {
+test('createLegacyBrainLayoutFromDefinition extracts node position and collapsed state into layout document', () => {
   const document = createDefaultGraphIRDocument(1);
-  const layout = createBrainLayoutFromDefinition(document);
+  const layout = createLegacyBrainLayoutFromDefinition(document);
 
   assert.equal(layout.version, 1);
   assert.ok(layout.nodes['input-adapter']);
   assert.ok(layout.nodes['core-neuron-group']);
 });
 
-test('createBrainPackage wraps brain definition with metadata, layout, and default body', () => {
+test('createLegacyBrainPackage wraps legacy brain definition with metadata, layout, and default body', () => {
   const document = createDefaultGraphIRDocument(2);
-  const brainPackage = createBrainPackage('Test Brain', document);
+  const brainPackage = createLegacyBrainPackage('Test Brain', document);
 
   assert.equal(brainPackage.packageVersion, 1);
   assert.equal(brainPackage.metadata.name, 'Test Brain');
@@ -48,11 +48,11 @@ test('createBrainPackage wraps brain definition with metadata, layout, and defau
   assert.equal(brainPackage.body?.brainBindings.inputs.length, 6);
 });
 
-test('isBrainPackage requires complete package body and layout instead of backfilling compatibility defaults', () => {
+test('isLegacyBrainPackage requires complete package body and layout instead of backfilling compatibility defaults', () => {
   const document = createDefaultGraphIRDocument(1);
-  const brainPackage = createBrainPackage('Strict Brain', document);
+  const brainPackage = createLegacyBrainPackage('Strict Brain', document);
 
-  assert.equal(isBrainPackage(brainPackage), true);
-  assert.equal(isBrainPackage({ ...brainPackage, body: undefined }), false);
-  assert.equal(isBrainPackage({ ...brainPackage, layout: undefined }), false);
+  assert.equal(isLegacyBrainPackage(brainPackage), true);
+  assert.equal(isLegacyBrainPackage({ ...brainPackage, body: undefined }), false);
+  assert.equal(isLegacyBrainPackage({ ...brainPackage, layout: undefined }), false);
 });

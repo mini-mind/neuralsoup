@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { GraphIRDocument, ModelDefinition } from '../../src/domain/brain/compat';
-import { buildGraphViewModel } from '../../src/components/editor/graph/graphViewModel';
+import { buildLegacyGraphViewModel } from '../../src/components/editor/graph/graphViewModel';
 
 const TEST_MODELS: ModelDefinition[] = [
   {
@@ -32,7 +32,7 @@ const TEST_MODELS: ModelDefinition[] = [
   },
 ];
 
-test('graph view child scope keeps only direct children and local direct leaf links visible', () => {
+test('legacy graph view child scope keeps only direct children and local direct leaf links visible', () => {
   const document: GraphIRDocument = {
     version: 1,
     models: TEST_MODELS,
@@ -82,7 +82,7 @@ test('graph view child scope keeps only direct children and local direct leaf li
     },
   };
 
-  const viewModel = buildGraphViewModel({
+  const viewModel = buildLegacyGraphViewModel({
     document,
     navigationPath: ['core-neuron-group'],
     draftNodePositions: {},
@@ -94,7 +94,7 @@ test('graph view child scope keeps only direct children and local direct leaf li
   assert.deepEqual(viewModel.links.map((link) => link.id), ['link-neuron-1-neuron-2']);
 });
 
-test('graph view child scope aggregates internal descendant links onto direct children without external proxies', () => {
+test('legacy graph view child scope aggregates internal descendant links onto direct children without external proxies', () => {
   const document: GraphIRDocument = {
     version: 1,
     models: TEST_MODELS,
@@ -168,7 +168,7 @@ test('graph view child scope aggregates internal descendant links onto direct ch
     },
   };
 
-  const viewModel = buildGraphViewModel({
+  const viewModel = buildLegacyGraphViewModel({
     document,
     navigationPath: ['parent-group'],
     draftNodePositions: {},
@@ -191,7 +191,7 @@ test('graph view child scope aggregates internal descendant links onto direct ch
   ]);
 });
 
-test('graph view expanded group projects child leaf links as editable direct links', () => {
+test('legacy graph view expanded group projects child leaf links as editable direct links', () => {
   const document: GraphIRDocument = {
     version: 1,
     models: TEST_MODELS,
@@ -228,7 +228,7 @@ test('graph view expanded group projects child leaf links as editable direct lin
     },
   };
 
-  const viewModel = buildGraphViewModel({
+  const viewModel = buildLegacyGraphViewModel({
     document,
     navigationPath: ['parent-group'],
     draftNodePositions: {},
@@ -252,7 +252,7 @@ test('graph view expanded group projects child leaf links as editable direct lin
   ]);
 });
 
-test('graph view expanded group draft move carries children without mutating relative child offsets', () => {
+test('legacy graph view expanded group draft move carries children without mutating relative child offsets', () => {
   const document: GraphIRDocument = {
     version: 1,
     models: TEST_MODELS,
@@ -281,13 +281,13 @@ test('graph view expanded group draft move carries children without mutating rel
     },
   };
 
-  const before = buildGraphViewModel({
+  const before = buildLegacyGraphViewModel({
     document,
     navigationPath: ['parent-group'],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
   });
-  const after = buildGraphViewModel({
+  const after = buildLegacyGraphViewModel({
     document,
     navigationPath: ['parent-group'],
     draftNodePositions: {

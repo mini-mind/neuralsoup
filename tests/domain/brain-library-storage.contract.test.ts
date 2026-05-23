@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAgentPackage, createDefaultGraphIRDocument } from '../../src/domain/brain/compat';
+import { createDefaultGraphIRDocument, createLegacyAgentPackage } from '../../src/domain/brain/compat';
+import { deriveAgentIRVisionCellCount } from '../../src/domain/brain';
 import {
   BRAIN_LIBRARY_CORRUPT_STORAGE_KEY,
   BRAIN_LIBRARY_STATUS_STORAGE_KEY,
@@ -9,7 +10,9 @@ import {
   encodeBrainLibraryRecord,
   loadBrainLibraryWithStatus,
   normalizeImportedAgentPackage,
+  renameBrainLibraryItem,
   saveBrainLibrary,
+  upsertBrainLibraryItemAgent,
 } from '../../src/storage/brainLibraryStorage';
 
 class MemoryStorage {
@@ -46,13 +49,14 @@ const installMemoryLocalStorage = () => {
 
 test('Brain Library storage saves and loads v1 envelope payloads', () => {
   const storage = installMemoryLocalStorage();
-  const brain = createAgentPackage('Stored Brain', createDefaultGraphIRDocument(1));
+  const brain = createLegacyAgentPackage('Stored Brain', createDefaultGraphIRDocument(1));
   const record = createBrainLibraryItemFromAgent('Stored Brain', brain.agent);
 
   saveBrainLibrary([record]);
   const rawValue = storage.getItem(BRAIN_LIBRARY_STORAGE_KEY);
   assert.ok(rawValue);
   assert.equal(JSON.parse(rawValue).storageVersion, 1);
+  assert.equal('visionCellCount' in JSON.parse(rawValue).brains[0].agent.body, false);
 
   const loaded = loadBrainLibraryWithStatus();
   assert.equal(loaded.status.state, 'ok');
@@ -80,7 +84,7 @@ test('Brain Library storage quarantines corrupted JSON payloads', () => {
 
 test('Brain Library storage rejects old array payloads instead of migrating implicitly', () => {
   const storage = installMemoryLocalStorage();
-  const brain = createAgentPackage('Old Array Brain', createDefaultGraphIRDocument(1));
+  const brain = createLegacyAgentPackage('Old Array Brain', createDefaultGraphIRDocument(1));
   storage.setItem(BRAIN_LIBRARY_STORAGE_KEY, JSON.stringify([brain]));
 
   const loaded = loadBrainLibraryWithStatus();
@@ -127,7 +131,10 @@ test('Brain Library storage quarantines structurally invalid AgentPackage payloa
 test('Brain Library storage reports LocalStorage capacity write failures', () => {
   const storage = installMemoryLocalStorage();
   storage.failWrites = true;
-  const record = createBrainLibraryItemFromAgent('Too Large', createAgentPackage('Too Large', createDefaultGraphIRDocument(1)).agent);
+  const record = createBrainLibraryItemFromAgent(
+    'Too Large',
+    createLegacyAgentPackage('Too Large', createDefaultGraphIRDocument(1)).agent
+  );
 
   assert.throws(
     () => saveBrainLibrary([record]),
@@ -137,7 +144,7 @@ test('Brain Library storage reports LocalStorage capacity write failures', () =>
 
 test('Brain Library storage migrates legacy AgentPackage payloads missing body visionCellCount', () => {
   const storage = installMemoryLocalStorage();
-  const brain = createAgentPackage('Legacy Agent', createDefaultGraphIRDocument(2));
+  const brain = createLegacyAgentPackage('Legacy Agent', createDefaultGraphIRDocument(2));
   const legacyBrain = structuredClone(brain) as typeof brain & {
     agent: typeof brain.agent & { body: Omit<typeof brain.agent.body, 'visionCellCount'> };
   };
@@ -156,17 +163,49 @@ test('Brain Library storage migrates legacy AgentPackage payloads missing body v
 
   assert.equal(loaded.status.state, 'ok');
   assert.equal(loaded.brains.length, 1);
-  assert.equal(loaded.brains[0].agent.body.visionCellCount, 2);
+  assert.equal(deriveAgentIRVisionCellCount(loaded.brains[0].agent), 2);
 
   const persisted = JSON.parse(storage.getItem(BRAIN_LIBRARY_STORAGE_KEY) ?? 'null') as {
-    brains: Array<{ agent: { body: { visionCellCount: number } } }>;
+    brains: Array<{ agent: { body: Record<string, unknown> } }>;
   };
-  assert.equal(persisted.brains[0].agent.body.visionCellCount, 2);
+  assert.equal('visionCellCount' in persisted.brains[0].agent.body, false);
+});
+
+test('Brain Library storage preserves sparse legacy vision-cell counts without writing body visionCellCount', () => {
+  const storage = installMemoryLocalStorage();
+  const brain = createLegacyAgentPackage('Sparse Legacy Agent', createDefaultGraphIRDocument(36));
+  brain.agent.connections = [
+    {
+      id: 'sparse-input',
+      from: { scope: 'bodyInput', nodeId: 'vision-G-2', portId: 'out' },
+      to: { scope: 'brain', nodeId: 'neuron-1', portId: 'dendrite' },
+      weight: 1,
+    },
+  ];
+
+  storage.setItem(
+    BRAIN_LIBRARY_STORAGE_KEY,
+    JSON.stringify({
+      storageVersion: 1,
+      savedAt: new Date().toISOString(),
+      brains: [brain],
+    })
+  );
+
+  const loaded = loadBrainLibraryWithStatus();
+  assert.equal(loaded.status.state, 'ok');
+  assert.equal(deriveAgentIRVisionCellCount(loaded.brains[0].agent), 36);
+
+  const persisted = JSON.parse(storage.getItem(BRAIN_LIBRARY_STORAGE_KEY) ?? 'null') as {
+    brains: Array<{ agent: { body: Record<string, unknown>; layout?: { nodes?: Record<string, unknown> } } }>;
+  };
+  assert.equal('visionCellCount' in persisted.brains[0].agent.body, false);
+  assert.ok(persisted.brains[0].agent.layout?.nodes?.['__body-vision-cell-35']);
 });
 
 test('Brain Library storage normalizes top-level metadata to agent metadata truth', () => {
   const storage = installMemoryLocalStorage();
-  const brain = createAgentPackage('Metadata Brain', createDefaultGraphIRDocument(1));
+  const brain = createLegacyAgentPackage('Metadata Brain', createDefaultGraphIRDocument(1));
   const inconsistentBrain = {
     ...brain,
     metadata: {
@@ -209,7 +248,7 @@ test('Brain Library storage normalizes top-level metadata to agent metadata trut
 });
 
 test('normalizeImportedAgentPackage applies import name and rewrites conflicting ids', () => {
-  const brain = createAgentPackage('Import Source', createDefaultGraphIRDocument(1));
+  const brain = createLegacyAgentPackage('Import Source', createDefaultGraphIRDocument(1));
   const normalized = normalizeImportedAgentPackage(brain, {
     name: 'Imported Brain',
     existingIds: [brain.metadata.id],
@@ -223,7 +262,7 @@ test('normalizeImportedAgentPackage applies import name and rewrites conflicting
 });
 
 test('Brain Library export payload can round-trip through import normalization', () => {
-  const brain = createAgentPackage('Roundtrip Brain', createDefaultGraphIRDocument(1));
+  const brain = createLegacyAgentPackage('Roundtrip Brain', createDefaultGraphIRDocument(1));
   const record = createBrainLibraryItemFromAgent('Roundtrip Brain', brain.agent);
   const exported = encodeBrainLibraryRecord(record);
   const normalized = normalizeImportedAgentPackage(exported, {
@@ -233,5 +272,30 @@ test('Brain Library export payload can round-trip through import normalization',
   assert.ok(normalized);
   assert.equal(normalized.metadata.name, 'Roundtrip Brain');
   assert.equal(normalized.agent.metadata.name, 'Roundtrip Brain');
-  assert.equal(normalized.agent.body.visionCellCount, brain.agent.body.visionCellCount);
+  assert.equal(deriveAgentIRVisionCellCount(normalized.agent), brain.agent.body.visionCellCount);
+  assert.equal('visionCellCount' in JSON.parse(JSON.stringify(exported)).agent.body, false);
+});
+
+test('renameBrainLibraryItem keeps top-level metadata and agent metadata fully aligned', () => {
+  const brain = createLegacyAgentPackage('Rename Source', createDefaultGraphIRDocument(1));
+  const record = createBrainLibraryItemFromAgent('Rename Source', brain.agent);
+
+  const [renamed] = renameBrainLibraryItem([record], record.metadata.id, 'Renamed Brain');
+  assert.ok(renamed);
+  assert.equal(renamed.metadata.id, renamed.agent.metadata.id);
+  assert.equal(renamed.metadata.name, renamed.agent.metadata.name);
+  assert.equal(renamed.metadata.updatedAt, renamed.agent.metadata.updatedAt);
+});
+
+test('upsertBrainLibraryItemAgent keeps top-level metadata and agent metadata fully aligned', () => {
+  const brain = createLegacyAgentPackage('Upsert Source', createDefaultGraphIRDocument(1));
+  const record = createBrainLibraryItemFromAgent('Upsert Source', brain.agent);
+  const replacement = createBrainLibraryItemFromAgent('Replacement Draft', brain.agent).agent;
+
+  const [updated] = upsertBrainLibraryItemAgent([record], record.metadata.id, replacement, '2026-05-23T04:30:00.000Z');
+  assert.ok(updated);
+  assert.equal(updated.metadata.id, updated.agent.metadata.id);
+  assert.equal(updated.metadata.name, updated.agent.metadata.name);
+  assert.equal(updated.metadata.updatedAt, updated.agent.metadata.updatedAt);
+  assert.equal(updated.metadata.updatedAt, '2026-05-23T04:30:00.000Z');
 });

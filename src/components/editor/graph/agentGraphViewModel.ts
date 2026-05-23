@@ -58,9 +58,6 @@ const DEFAULT_MODELS: ModelDefinition[] = [];
 const BODY_INPUTS_GROUP_ID = 'input-adapter';
 const BODY_OUTPUTS_GROUP_ID = 'output-adapter';
 const ROOT_BRAIN_GROUP_ID = AGENT_GRAPH_ROOT_BRAIN_GROUP_ID;
-const CHILD_INPUT_ADAPTER_ID = 'core-input-adapter';
-const CHILD_OUTPUT_ADAPTER_ID = 'core-output-adapter';
-
 type RootContainerView = { id: 'root'; children: AgentGraphViewNodeRecord[] };
 type AggregateLinkView = {
   fromNodeId: string;
@@ -572,31 +569,6 @@ const getCurrentChildren = (
   const currentChildren = container.children
     .map((childRef) => indexes.nodeById.get(childRef.nodeId))
     .filter((node): node is AgentGraphViewNodeRecord => node != null);
-
-  if (navigationPath.length === 1 && currentNode.id === ROOT_BRAIN_GROUP_ID) {
-    const inputAdapter: AgentGraphViewNodeRecord = {
-      id: CHILD_INPUT_ADAPTER_ID,
-      refNodeId: CHILD_INPUT_ADAPTER_ID,
-      kind: 'adapter',
-      label: 'Inputs',
-    };
-    const outputAdapter: AgentGraphViewNodeRecord = {
-      id: CHILD_OUTPUT_ADAPTER_ID,
-      refNodeId: CHILD_OUTPUT_ADAPTER_ID,
-      kind: 'adapter',
-      label: 'Outputs',
-    };
-    indexes.nodeById.set(inputAdapter.id, inputAdapter);
-    indexes.nodeById.set(outputAdapter.id, outputAdapter);
-    indexes.pathById.set(inputAdapter.id, [ROOT_BRAIN_GROUP_ID, inputAdapter.id]);
-    indexes.pathById.set(outputAdapter.id, [ROOT_BRAIN_GROUP_ID, outputAdapter.id]);
-
-    return {
-      currentContainer: container,
-      currentChildren: [inputAdapter, ...currentChildren, outputAdapter],
-      currentContainerKind: 'neuron-group',
-    };
-  }
 
   return {
     currentContainer: container,

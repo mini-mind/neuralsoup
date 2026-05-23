@@ -29,6 +29,12 @@ export interface AgentIR {
 
 `BodyIR` 只保存规则，规则是真源。运行时或编辑器可按规则展开出实际 body input/output 节点，但展开结果不作为第二真源保存。
 
+当前实现中，`body.visionCellCount` 已降级为兼容访问器：
+
+- 不作为持久化字段写出。
+- 运行时由 `AgentIR.connections` 与 `AgentLayoutIR` 中的 body vision markers 推导。
+- 旧存储载荷若仍带该字段，只在导入归一化时用于恢复稀疏 vision coverage，然后立即收口回推导语义。
+
 ```ts
 export interface BodyIR {
   version: 1;
@@ -58,6 +64,12 @@ export interface BodyOutputRule {
 - `targetTemplate` 生成 world 输出路径，例如 `action.$1`。
 - `scale` 用于把已归一化到 `[0, 1]` 的外界输入缩放成向后继神经元传递的信号强度。
 - `decayPerSecond` 表示输出动作激活值每秒衰退量；输出节点收到一次 brain 信号后激活值重置为 `1`，随后按 `max(0, value - decayPerSecond * deltaTime)` 衰退。
+
+当前 v1 runtime grammar 仍然是受限的 host contract，而不是完全通用的 world DSL：
+
+- 输入 `sourceTemplate` 目前必须解析成 `vision.<channel>.<cellIndex>`。
+- 输出 `targetTemplate` 目前必须解析成 `action.<turn-left|move-forward|turn-right>`。
+- 更通用的 source/target registry 仍是后续重构项，尚未完成下沉。
 
 示例：
 
@@ -97,6 +109,7 @@ export interface BrainIR {
 
 export interface BrainNeuronNode {
   id: string;
+  label: string;
   model: 'izhikevich';
   params: {
     a: number;
@@ -117,6 +130,8 @@ export interface BrainContainerNode {
   children: Array<{ scope: 'brain'; nodeId: string } | { scope: 'container'; nodeId: string }>;
 }
 ```
+
+`label` 当前仍保留在 `BrainIR` 中，作为节点显示元数据随 IR 持久化；它不参与 world/runtime 语义判定，但当前编辑器和 compat bridge 仍依赖它保真 round-trip。
 
 约束：
 
@@ -207,6 +222,11 @@ compileAgentIR(agent: AgentIR): AgentProgram
 
 runtime 不从节点命名、label 或模板以外的字段推断 world 语义。
 
+compat 约束：
+
+- legacy `GraphIRDocument` setter 若需要超出当前 session 的 `visionCells`，必须返回 `invalid`，不能再做 silent reconcile。
+- legacy getter/setter 若无法无损保留 `BodyIR` 规则语义，必须显式报错，不能伪装成功 round-trip。
+
 ## 当前实现迁移
 
 当前实现仍是过渡结构：
@@ -219,6 +239,12 @@ runtime 不从节点命名、label 或模板以外的字段推断 world 语义�
 - `position`、`collapsed`、`expanded`、`size` 和 viewport 需要从 topology/UI 临时状态移入 `AgentLayoutIR`。
 
 当前 Brain Library 的导入、导出和 LocalStorage 外部格式仍是 `AgentPackage` envelope；内部编辑与运行时真源正在收口到 `AgentIR`。后续再决定是否继续把外部格式收口为裸 `AgentIR`。
+
+当前 Brain Library 额外约束：
+
+- 内存主态与编辑主态都以 `agent.metadata` 为身份真源。
+- “保存当前 Brain”会原子切换当前编辑/运行 Agent 到新建库条目的 `AgentIR`，避免当前 Agent 与库条目身份漂移。
+- `AgentPackage` 仍作为外部兼容 envelope 保留，但 legacy package helper 已显式下沉到 compat/legacy 命名。
 
 ## 验收边界
 

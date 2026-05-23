@@ -3,87 +3,92 @@ import assert from 'node:assert/strict';
 import {
   compileAgentIR,
   createAgentProgramRuntimeState,
+  deriveAgentIRVisionCellCount,
   stepAgentProgram,
   validateAgentIR,
+  withDerivedBodyVisionCellCount,
+  withVisionCellLayoutMarkers,
   type AgentIR,
 } from '../../src/domain/brain';
 import { createLegacyGraphBridgeFromAgent } from '../../src/domain/brain/compat';
 
-const createRuleDrivenAgent = (): AgentIR => ({
-  version: 1,
-  metadata: {
-    id: 'agent-rule-driven',
-    name: 'Rule Driven Agent',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-  },
-  body: {
-    version: 1,
-    visionCellCount: 3,
-    inputRules: [
-      {
-        id: 'vision-cells',
-        nodeIdPattern: '^sensor-([RGB])-(\\d+)$',
-        sourceTemplate: 'vision.$1.$2',
-        scale: 2,
+const createRuleDrivenAgent = (): AgentIR =>
+  withDerivedBodyVisionCellCount(
+    withVisionCellLayoutMarkers({
+      version: 1,
+      metadata: {
+        id: 'agent-rule-driven',
+        name: 'Rule Driven Agent',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
       },
-    ],
-    outputRules: [
-      {
-        id: 'motor-actions',
-        nodeIdPattern: '^effector-(turn-left|move-forward|turn-right)$',
-        targetTemplate: 'action.$1',
-        decayPerSecond: 3,
+      body: {
+        version: 1,
+        inputRules: [
+          {
+            id: 'vision-cells',
+            nodeIdPattern: '^sensor-([RGB])-(\\d+)$',
+            sourceTemplate: 'vision.$1.$2',
+            scale: 2,
+          },
+        ],
+        outputRules: [
+          {
+            id: 'motor-actions',
+            nodeIdPattern: '^effector-(turn-left|move-forward|turn-right)$',
+            targetTemplate: 'action.$1',
+            decayPerSecond: 3,
+          },
+        ],
       },
-    ],
-  },
-  brain: {
-    version: 1,
-    rootContainerId: 'root',
-    neurons: [
-      {
-        id: 'neuron-1',
-        label: 'Neuron 1',
-        model: 'izhikevich',
-        params: {
-          a: 0.02,
-          b: 0.2,
-          c: -65,
-          d: 8,
-          threshold: -70,
+      brain: {
+        version: 1,
+        rootContainerId: 'root',
+        neurons: [
+          {
+            id: 'neuron-1',
+            label: 'Neuron 1',
+            model: 'izhikevich',
+            params: {
+              a: 0.02,
+              b: 0.2,
+              c: -65,
+              d: 8,
+              threshold: -70,
+            },
+            initialState: {
+              v: -65,
+            },
+          },
+        ],
+        containers: [
+          {
+            id: 'root',
+            label: 'Root',
+            children: [{ scope: 'brain', nodeId: 'neuron-1' }],
+          },
+        ],
+      },
+      connections: [
+        {
+          id: 'input-connection',
+          from: { scope: 'bodyInput', nodeId: 'sensor-G-2' },
+          to: { scope: 'brain', nodeId: 'neuron-1' },
+          weight: 1,
         },
-        initialState: {
-          v: -65,
+        {
+          id: 'output-connection',
+          from: { scope: 'brain', nodeId: 'neuron-1' },
+          to: { scope: 'bodyOutput', nodeId: 'effector-move-forward' },
+          weight: 1,
         },
+      ],
+      layout: {
+        version: 1,
+        nodes: {},
       },
-    ],
-    containers: [
-      {
-        id: 'root',
-        label: 'Root',
-        children: [{ scope: 'brain', nodeId: 'neuron-1' }],
-      },
-    ],
-  },
-  connections: [
-    {
-      id: 'input-connection',
-      from: { scope: 'bodyInput', nodeId: 'sensor-G-2' },
-      to: { scope: 'brain', nodeId: 'neuron-1' },
-      weight: 1,
-    },
-    {
-      id: 'output-connection',
-      from: { scope: 'brain', nodeId: 'neuron-1' },
-      to: { scope: 'bodyOutput', nodeId: 'effector-move-forward' },
-      weight: 1,
-    },
-  ],
-  layout: {
-    version: 1,
-    nodes: {},
-  },
-});
+    }, 3)
+  );
 
 test('compileAgentIR resolves BodyIR regex rules into runtime ports instead of relying on legacy node ids', () => {
   const program = compileAgentIR(createRuleDrivenAgent());
@@ -147,12 +152,8 @@ test('validateAgentIR rejects body endpoints that do not match any BodyIR rule',
 });
 
 test('legacy graph bridge preserves explicit BodyIR visionCellCount even when only a sparse subset is connected', () => {
-  const sparseAgent: AgentIR = {
+  const sparseAgent: AgentIR = withDerivedBodyVisionCellCount(withVisionCellLayoutMarkers({
     ...createRuleDrivenAgent(),
-    body: {
-      ...createRuleDrivenAgent().body,
-      visionCellCount: 36,
-    },
     connections: [
       {
         id: 'sparse-input',
@@ -161,13 +162,14 @@ test('legacy graph bridge preserves explicit BodyIR visionCellCount even when on
         weight: 1,
       },
     ],
-  };
+  }, 36));
 
   const bridge = createLegacyGraphBridgeFromAgent(sparseAgent);
 
   const inputAdapter = bridge.document.root.children.find((node) => node.id === 'input-adapter');
   assert.ok(inputAdapter && inputAdapter.kind === 'adapter');
   assert.equal(inputAdapter.children.length, 36 * 3);
+  assert.equal(deriveAgentIRVisionCellCount(sparseAgent), 36);
 });
 
 test('legacy graph bridge projects rule-driven body node ids onto legacy GraphIR signal nodes without dropping links', () => {
@@ -419,4 +421,67 @@ test('legacy graph bridge marks unbridgeable body endpoints as dropped connectio
   });
 
   assert.deepEqual(bridge.droppedConnectionIds, ['input-connection']);
+});
+
+test('legacy graph bridge reports document-only losses when BodyIR rules cannot round-trip through compat body', () => {
+  const bridge = createLegacyGraphBridgeFromAgent({
+    ...createRuleDrivenAgent(),
+    body: {
+      ...createRuleDrivenAgent().body,
+      inputRules: [
+        {
+          id: 'custom-input-a',
+          nodeIdPattern: '^sensor-a$',
+          sourceTemplate: 'vision.G.2',
+          scale: 2,
+        },
+        {
+          id: 'custom-input-b',
+          nodeIdPattern: '^sensor-b$',
+          sourceTemplate: 'vision.G.2',
+          scale: 2,
+        },
+      ],
+      outputRules: [
+        {
+          id: 'custom-output-a',
+          nodeIdPattern: '^effector-a$',
+          targetTemplate: 'action.move-forward',
+          decayPerSecond: 3,
+        },
+        {
+          id: 'custom-output-b',
+          nodeIdPattern: '^effector-b$',
+          targetTemplate: 'action.move-forward',
+          decayPerSecond: 3,
+        },
+      ],
+    },
+    connections: [
+      {
+        id: 'input-connection-a',
+        from: { scope: 'bodyInput', nodeId: 'sensor-a' },
+        to: { scope: 'brain', nodeId: 'neuron-1' },
+        weight: 1,
+      },
+      {
+        id: 'output-connection-a',
+        from: { scope: 'brain', nodeId: 'neuron-1' },
+        to: { scope: 'bodyOutput', nodeId: 'effector-a' },
+        weight: 1,
+      },
+    ],
+  });
+
+  assert.deepEqual(bridge.droppedConnectionIds, []);
+  assert.ok(
+    bridge.documentOnlyLosses.some((message) =>
+      message.includes('cannot preserve full BodyIR input rule semantics')
+    )
+  );
+  assert.ok(
+    bridge.documentOnlyLosses.some((message) =>
+      message.includes('cannot preserve full BodyIR output rule semantics')
+    )
+  );
 });
