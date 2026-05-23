@@ -919,13 +919,13 @@
     {
       "id": "task-023",
       "title": "Host grammar/world registry 设计准备：定义 BodyIR 到 source/target registry 的 canonical contract、迁移边界与首批实现切入点",
-      "status": "in_progress",
+      "status": "completed",
       "priority": "P1",
       "depends_on": [
         "task-018",
         "task-022"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "max_attempts": 3,
       "started_at_commit": "working-tree",
       "validation": {
@@ -941,7 +941,8 @@
           "at": "2026-05-24T05:40:00Z",
           "message": "Audited the remaining host-grammar coupling points in agent-body-rules.ts, agent-compiler.ts, agent-program.ts, and shared.ts, then documented a registry-backed canonical contract plus explicit task-024 cut points in docs/GRAPH_IR_REFACTOR_PLAN.md. Phase 1 is now scoped to preserving current vision/action behavior while moving parsing and enumeration behind a default world registry."
         }
-      ]
+      ],
+      "completed_at": "2026-05-24T05:40:00Z"
     },
     {
       "id": "task-024",
@@ -973,19 +974,123 @@
     {
       "id": "task-025",
       "title": "全局复审 Phase 4：围绕 compat 下沉、GraphIR legacy 收口与 world registry 首阶段结果做交叉复审并确认下一轮缺口",
-      "status": "pending",
+      "status": "completed",
       "priority": "P1",
       "depends_on": [
         "task-021",
         "task-022",
         "task-024"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "max_attempts": 3,
       "started_at_commit": "working-tree",
       "validation": {
         "command": "npm run type-check && npm run test:domain && npm run test:compat && npm run test:e2e -- --grep \"graph view|brain library|body\"",
         "timeout_seconds": 1800
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-24T07:05:00Z",
+          "message": "Started cross-review phase for world registry Phase 1 and compat shrink: launched multiple gpt-5.4 reviewers across App/runtime install semantics, GraphView/body endpoint boundaries, and compat surface residue, while locally re-auditing active task state and main-path invariants."
+        },
+        {
+          "at": "2026-05-24T08:20:00Z",
+          "message": "Cross-review completed. Fixed two P1 findings on the main path: Brain replacement confirmation now also covers runtime-install divergence after failed semantic commits, and Brain Library save/storage now rejects invalid AgentIR instead of persisting records that would quarantine the whole library on next load. Revalidated with npm run type-check, node --import tsx --test tests/domain/brain-library-storage.contract.test.ts, and targeted Playwright coverage for BodyIR validation plus Brain Library replacement/save flows."
+        }
+      ],
+      "completed_at": "2026-05-24T08:20:00Z"
+    },
+    {
+      "id": "task-026",
+      "title": "BodyIR 编辑边界收口：将设置页改为显式草稿/应用模型，避免每次输入跨越 current/runtime/install 边界",
+      "status": "completed",
+      "priority": "P1",
+      "depends_on": [
+        "task-025"
+      ],
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"body ir|brain library|graph view diagnostics\"",
+        "timeout_seconds": 1500
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-24T09:05:00Z",
+          "message": "Converted BodyIR settings from immediate semantic commits to a local draft/apply boundary. Preview and validation now run against a dedicated BodyIR draft, runtime/install only move on explicit apply, and Brain Library save still rejects invalid committed AgentIR. Revalidated with npm run type-check, npm run test:domain, npm run test:e2e -- --grep \"body ir|brain library|graph view diagnostics\", and git diff --check."
+        },
+        {
+          "at": "2026-05-24T10:10:00Z",
+          "message": "Closed follow-up review findings for task-026: BodyIR-only drafts now participate in unsaved replacement confirmation and Save Current flows, invalid semantic apply no longer throws via active-brain auto-persist, and BodyIR visionCellCount stays aligned with runtime vision parameters on draft/apply/reset. Revalidated with npm run type-check and targeted Playwright coverage for invalid save, body-only draft replacement, and visionCellCount apply alignment."
+        }
+      ],
+      "completed_at": "2026-05-24T10:10:00Z"
+    },
+    {
+      "id": "task-027",
+      "title": "Body endpoint projector 收口：分离 compile/runtime 规则解析与 GraphView 主动投影策略，消除 projection 假阴性",
+      "status": "pending",
+      "priority": "P1",
+      "depends_on": [
+        "task-025"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"body ir|graph view\"",
+        "timeout_seconds": 1500
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": []
+    },
+    {
+      "id": "task-028",
+      "title": "App/runtime 会话尾债收口：修正 reset 重试语义、detail modal 热键穿透、删除 active brain 后的孤儿会话状态",
+      "status": "pending",
+      "priority": "P2",
+      "depends_on": [
+        "task-025"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"brain library|simulation lifecycle|graph detail|keyboard\"",
+        "timeout_seconds": 1500
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": []
+    },
+    {
+      "id": "task-029",
+      "title": "GraphView session ownership 尾债：补齐 per-scope zoom state 与相关交互/回归测试",
+      "status": "pending",
+      "priority": "P2",
+      "depends_on": [
+        "task-025"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"graph view\"",
+        "timeout_seconds": 1200
       },
       "on_failure": {
         "cleanup": null

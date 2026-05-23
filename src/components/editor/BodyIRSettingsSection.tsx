@@ -4,9 +4,12 @@ import type { BodyIRPreviewData, BodyIRValidationMessage } from './types';
 
 interface BodyIRSettingsSectionProps {
   body?: BodyIR;
+  hasBodyDraftChanges?: boolean;
   onBodyChange?: (updater: (current: BodyIR) => BodyIR) => void;
   validation?: BodyIRValidationMessage[];
   preview?: BodyIRPreviewData;
+  onApply?: () => void;
+  onReset?: () => void;
 }
 
 const DEFAULT_BODY_IR_VALUE: BodyIR = {
@@ -76,7 +79,15 @@ const updateOutputRuleAt = (
   updater: (rule: BodyOutputRule) => BodyOutputRule
 ): BodyOutputRule[] => rules.map((rule, ruleIndex) => (ruleIndex === index ? updater(rule) : rule));
 
-const BodyIRSettingsSection: React.FC<BodyIRSettingsSectionProps> = ({ body, onBodyChange, validation, preview }) => {
+const BodyIRSettingsSection: React.FC<BodyIRSettingsSectionProps> = ({
+  body,
+  hasBodyDraftChanges = false,
+  onBodyChange,
+  validation,
+  preview,
+  onApply,
+  onReset,
+}) => {
   const [localBody, setLocalBody] = useState<BodyIR>(() => body ?? DEFAULT_BODY_IR_VALUE);
   const inputRulesHeaderId = useId();
   const outputRulesHeaderId = useId();
@@ -315,6 +326,27 @@ const BodyIRSettingsSection: React.FC<BodyIRSettingsSectionProps> = ({ body, onB
       <div className="settings-section-header">
         <h4>BodyIR 映射规则</h4>
         <p>维护 body endpoint 到 world 信号的映射规则、视觉 coverage，并实时查看投影预览与校验结果。</p>
+      </div>
+
+      <div className="settings-actions">
+        <button
+          type="button"
+          className="settings-action-button secondary"
+          data-testid="body-ir-reset"
+          onClick={onReset}
+          disabled={!hasBodyDraftChanges}
+        >
+          重置草稿
+        </button>
+        <button
+          type="button"
+          className="settings-action-button"
+          data-testid="body-ir-apply"
+          onClick={onApply}
+          disabled={!hasBodyDraftChanges}
+        >
+          应用 Body IR
+        </button>
       </div>
 
       <section className="body-ir-rule-section" data-testid="body-ir-coverage-section">

@@ -867,6 +867,64 @@ test('body ir settings shows preview panel, surfaces validation after rule edits
   await expect(page.locator(selectors.bodyIrOutputRuleTargetTemplate0)).toHaveValue('action.$1');
 });
 
+test('body ir edits stay draft-only until apply, then affect runtime/install state', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabSettings).click();
+  await expect(page.locator(selectors.settingsPanel)).toBeVisible();
+  await page.locator(selectors.settingsNavBodyIr).click();
+
+  const runtimeInputCountBefore = await page.locator(selectors.topologyRuntimeInputCount).innerText();
+  const runtimeStateBefore = await page.locator(selectors.topologyRuntimeState).innerText();
+
+  await page.locator(selectors.bodyIrOutputRuleTargetTemplate0).fill('thruster.$1');
+  await expect(page.locator(selectors.bodyIrValidationCount)).not.toHaveText('0');
+  await expect(page.locator('[data-testid^="body-ir-output-rule-message-0-"]').first()).toBeVisible();
+  await expect(page.locator('[data-testid="body-ir-apply"]')).toBeEnabled();
+  await expect(page.locator('[data-testid="body-ir-reset"]')).toBeEnabled();
+  await expect(page.locator(selectors.topologyRuntimeState)).toHaveText(runtimeStateBefore);
+  await expect(page.locator(selectors.topologyRuntimeInputCount)).toHaveText(runtimeInputCountBefore);
+
+  await page.locator('[data-testid="body-ir-reset"]').click();
+  await expect(page.locator(selectors.bodyIrValidationCount)).toHaveText('0');
+  await expect(page.locator(selectors.bodyIrOutputRuleTargetTemplate0)).toHaveValue('action.$1');
+  await expect(page.locator('[data-testid="body-ir-apply"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="body-ir-reset"]')).toBeDisabled();
+
+  await page.locator(selectors.bodyIrOutputRuleTargetTemplate0).fill('thruster.$1');
+  await expect(page.locator('[data-testid="body-ir-apply"]')).toBeEnabled();
+
+  await page.locator('[data-testid="body-ir-apply"]').click();
+  await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('invalid');
+  await expect(page.locator(selectors.graphInstalledAgentId)).not.toHaveText('');
+});
+
+test('brain library refuses to save an invalid current brain instead of persisting corrupt library data', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabSettings).click();
+  await expect(page.locator(selectors.settingsPanel)).toBeVisible();
+  await page.locator(selectors.settingsNavBodyIr).click();
+  await expect(page.locator(selectors.bodyIrSettingsPanel)).toBeVisible();
+
+  await page.locator(selectors.bodyIrOutputRuleTargetTemplate0).fill('thruster.$1');
+  await expect(page.locator(selectors.bodyIrValidationCount)).not.toHaveText('0');
+  await page.locator('[data-testid="body-ir-apply"]').click();
+  await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('invalid');
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  await page.locator(selectors.brainLibrarySaveName).fill('Invalid Brain');
+  await page.locator(selectors.brainLibrarySaveCurrent).click();
+
+  await expect(page.locator(selectors.brainLibraryError)).toContainText('当前 AgentIR 无效');
+  await expect(page.locator(selectors.brainLibraryList)).not.toContainText('Invalid Brain');
+});
+
 test('editor tabs switch between settings and graph view with settings sidebar navigation', async ({ page }, testInfo) => {
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
@@ -1047,6 +1105,47 @@ test('brain library manages saved items and reports import errors', async ({ pag
     buffer: Buffer.from('{broken'),
   });
   await expect(page.locator(selectors.brainLibraryError)).toContainText('JSON 解析失败');
+});
+
+test('deleting the active brain resets the editor/runtime session instead of leaving an orphan active identity', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await page.locator(selectors.brainLibrarySaveName).fill('Delete Active Brain');
+  await page.locator(selectors.brainLibrarySaveCurrent).click();
+
+  const savedBrainId = await page.evaluate((storageKey) => {
+    const rawValue = window.localStorage.getItem(storageKey);
+    const brains = rawValue ? ((JSON.parse(rawValue) as { brains?: E2EStoredBrain[] }).brains ?? []) : [];
+    return brains.find((brain) => brain.agent?.metadata?.name === 'Delete Active Brain')?.agent?.metadata?.id ?? '';
+  }, BRAIN_LIBRARY_STORAGE_KEY);
+  expect(savedBrainId).not.toBe('');
+
+  await expect.poll(async () => getActiveBrainId(page)).toBe(savedBrainId);
+  await expect.poll(async () => getActiveAgentId(page)).toBe(savedBrainId);
+  await expect.poll(async () => getDraftAgentId(page)).toBe(savedBrainId);
+
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.locator(`[data-testid="brain-library-delete-${savedBrainId}"]`).click();
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        ({ storageKey, brainId }) => {
+          const rawValue = window.localStorage.getItem(storageKey);
+          const brains = rawValue ? ((JSON.parse(rawValue) as { brains?: E2EStoredBrain[] }).brains ?? []) : [];
+          return brains.some((brain) => brain.agent?.metadata?.id === brainId);
+        },
+        { storageKey: BRAIN_LIBRARY_STORAGE_KEY, brainId: savedBrainId }
+      )
+    )
+    .toBe(false);
+
+  await expect.poll(async () => getActiveBrainId(page)).toBe(null);
+  await expect.poll(async () => getActiveAgentId(page)).not.toBe(savedBrainId);
+  await expect.poll(async () => getDraftAgentId(page)).not.toBe(savedBrainId);
+  await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
 });
 
 test('renaming the active brain preserves draft-only edits instead of replacing the current draft snapshot', async ({ page }, testInfo) => {
@@ -1338,6 +1437,93 @@ test('brain library confirms before replacing a saved brain with draft-only chan
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
   await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(String(baseDraftConnectionCount));
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(baseRuntimeConnectionCount));
+});
+
+test('brain library also confirms when runtime install is behind current draft after an invalid semantic commit', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await saveCurrentBrainToLibrary(page, 'Runtime Diverged Brain');
+  await saveCurrentBrainToLibrary(page, 'Runtime Diverged Target');
+  await page.locator(selectors.brainLibraryClose).click();
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+
+  const installedAgentIdBefore = await page.locator(selectors.graphInstalledAgentId).innerText();
+  const baseRuntimeConnectionCount = await getNumericLocatorText(page, selectors.topologyRuntimeConnectionCount);
+
+  await injectInvalidGraphDraft(page);
+
+  await expect(page.locator(selectors.topologyDraftState)).toHaveText('invalid');
+  await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
+  await expect(page.locator(selectors.graphInstalledAgentId)).toHaveText(installedAgentIdBefore);
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(baseRuntimeConnectionCount));
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  const targetBrain = await getStoredBrainByName(page, 'Runtime Diverged Target');
+  expect(targetBrain).toBeTruthy();
+
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('未安装的草稿改动');
+    await dialog.dismiss();
+  });
+  await getBrainLibrarySelectButton(page, targetBrain!.agent.metadata!.id!).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  await expect(page.locator(selectors.graphInstalledAgentId)).toHaveText(installedAgentIdBefore);
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(baseRuntimeConnectionCount));
+});
+
+test('body-only draft changes trigger replacement confirmation and are included when saving current brain', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await saveCurrentBrainToLibrary(page, 'Body Draft Target');
+  await page.locator(selectors.brainLibraryClose).click();
+
+  await page.locator(selectors.editorTabSettings).click();
+  await page.locator(selectors.settingsNavBodyIr).click();
+  await page.locator('[data-testid="body-ir-output-rule-decay-0"]').fill('9');
+  await expect(page.locator(selectors.bodyIrValidationCount)).toHaveText('0');
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  const targetBrain = await getStoredBrainByName(page, 'Body Draft Target');
+  expect(targetBrain).toBeTruthy();
+
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('未安装的草稿改动');
+    await dialog.dismiss();
+  });
+  await getBrainLibrarySelectButton(page, targetBrain!.agent.metadata!.id!).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  await expect(page.locator('[data-testid="body-ir-output-rule-decay-0"]')).toHaveValue('9');
+
+  await saveCurrentBrainToLibrary(page, 'Body Draft Saved');
+  const savedBodyDraftBrain = await getStoredBrainByName(page, 'Body Draft Saved');
+  expect(savedBodyDraftBrain?.agent.body?.outputRules?.[0]?.decayPerSecond).toBe(9);
+});
+
+test('body ir visionCellCount apply keeps runtime vision parameters aligned', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabSettings).click();
+  await page.locator(selectors.settingsNavBodyIr).click();
+  await expect(page.locator(selectors.bodyIrSettingsPanel)).toBeVisible();
+
+  await page.locator('[data-testid="body-ir-vision-cell-count"]').fill('24');
+  await expect(page.locator(selectors.visionCellsValue)).toHaveText('36');
+  await page.locator('[data-testid="body-ir-apply"]').click();
+
+  await expect(page.locator(selectors.visionCellsValue)).toHaveText('24');
+  await expect(page.locator(selectors.topologyRuntimeInputCount)).toHaveText('72');
 });
 
 test('brain import resets graph view path to root and installs the imported session identity', async ({ page }, testInfo) => {

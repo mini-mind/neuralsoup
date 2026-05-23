@@ -7,7 +7,7 @@ interface BrainLibraryModalProps {
   isOpen: boolean;
   statusMessage: string | null;
   onClose: () => void;
-  onCreateFromCurrent: (name: string) => void;
+  onCreateFromCurrent: (name: string) => void | Promise<void>;
   onSelectBrain: (brainId: string) => void;
   onRenameBrain: (brainId: string, name: string) => void;
   onDeleteBrain: (brainId: string) => void;
@@ -67,6 +67,15 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
   if (!isOpen) {
     return null;
   }
+
+  const handleCreateFromCurrent = async () => {
+    try {
+      await onCreateFromCurrent(newBrainName);
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '保存失败');
+    }
+  };
 
   const handleImportFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget;
@@ -270,7 +279,9 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
             type="button"
             className="brain-library-primary"
             data-testid="brain-library-save-current"
-            onClick={() => onCreateFromCurrent(newBrainName)}
+            onClick={() => {
+              void handleCreateFromCurrent();
+            }}
           >
             保存到库
           </button>

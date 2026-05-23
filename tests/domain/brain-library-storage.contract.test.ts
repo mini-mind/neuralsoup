@@ -64,6 +64,19 @@ test('Brain Library storage saves and loads v1 record payloads', () => {
   assert.equal(loaded.brains[0].agent.metadata.name, 'Stored Brain');
 });
 
+test('Brain Library record creation rejects invalid AgentIR instead of persisting a corrupt entry', () => {
+  const invalidAgent = createDefaultAgentIR(1, 'Invalid Brain');
+  invalidAgent.body.outputRules[0] = {
+    ...invalidAgent.body.outputRules[0],
+    targetTemplate: 'thruster.$1',
+  };
+
+  assert.throws(
+    () => createBrainLibraryItemFromAgent('Invalid Brain', invalidAgent),
+    /当前 AgentIR 无效/
+  );
+});
+
 test('Brain Library storage quarantines corrupted JSON payloads', () => {
   const storage = installMemoryLocalStorage();
   storage.setItem(BRAIN_LIBRARY_STORAGE_KEY, '{broken');

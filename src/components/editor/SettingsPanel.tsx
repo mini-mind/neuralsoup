@@ -2,6 +2,7 @@ import React from 'react';
 import BodyIRSettingsSection from './BodyIRSettingsSection';
 import type {
   AgentParameters,
+  BodyIRDraftStatus,
   BodyIRPreviewData,
   BodyIRValidationMessage,
   SettingsSection,
@@ -12,28 +13,36 @@ interface SettingsPanelProps {
   agentParameters: AgentParameters;
   draftAgentParameters: AgentParameters;
   body: BodyIR;
+  draftBody: BodyIR;
   settingsSection: SettingsSection;
+  bodyDraftStatus: BodyIRDraftStatus;
   bodyRulePreview?: BodyIRPreviewData;
   bodyRuleValidation?: BodyIRValidationMessage[];
   onSettingsSectionChange: (section: SettingsSection) => void;
   onDraftAgentParametersChange: React.Dispatch<React.SetStateAction<AgentParameters>>;
-  onBodyChange?: (updater: (current: BodyIR) => BodyIR) => void;
-  onApply: () => void;
+  onDraftBodyChange?: (updater: (current: BodyIR) => BodyIR) => void;
+  onApplyAgentParameters: () => void;
+  onApplyBody: () => void;
+  onResetBody: () => void;
   onResetDefaults: () => void;
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
   agentParameters,
   draftAgentParameters,
-  body,
+  body: _body,
+  draftBody,
   settingsSection,
+  bodyDraftStatus,
   bodyRulePreview,
   bodyRuleValidation,
   onSettingsSectionChange,
   onDraftAgentParametersChange,
-  onBodyChange: _onBodyChange,
-  onApply,
-  onResetDefaults
+  onDraftBodyChange,
+  onApplyAgentParameters,
+  onApplyBody,
+  onResetBody,
+  onResetDefaults,
 }) => {
   const renderKeyboardInputGuide = () => (
     <div className="settings-page-section manual-control" data-testid="keyboard-input-panel">
@@ -231,7 +240,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           type="button"
           className="settings-action-button"
           data-testid="agent-params-apply"
-          onClick={onApply}
+          onClick={onApplyAgentParameters}
         >
           应用设置
         </button>
@@ -276,10 +285,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           : settingsSection === 'body-ir'
             ? (
                 <BodyIRSettingsSection
-                  body={body}
-                  onBodyChange={_onBodyChange}
+                  body={draftBody}
+                  hasBodyDraftChanges={bodyDraftStatus.hasChanges}
+                  onBodyChange={onDraftBodyChange}
                   validation={bodyRuleValidation}
                   preview={bodyRulePreview}
+                  onApply={onApplyBody}
+                  onReset={onResetBody}
                 />
               )
             : renderKeyboardInputGuide()}

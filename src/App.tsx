@@ -19,6 +19,7 @@ import { isEditableOrInteractiveTarget } from './components/editor/graph/isEdita
 import SettingsPanel from './components/editor/SettingsPanel';
 import type {
   AgentParameters,
+  BodyIRDraftStatus,
   BodyIRPreviewData,
   BodyIRValidationMessage,
   EditorTab,
@@ -149,6 +150,7 @@ const applyBrainRecordToEditorState = (
     setCurrentAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
     setRuntimeInstallRequest: React.Dispatch<React.SetStateAction<AgentIR>>;
     setDraftAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
+    setDraftBodyDocument: React.Dispatch<React.SetStateAction<AgentIR['body']>>;
     setDraftGraphStatusOverride: React.Dispatch<React.SetStateAction<AgentDraftStatus | null>>;
     setAgentParameters: React.Dispatch<React.SetStateAction<AgentParameters>>;
     setEditorTab: React.Dispatch<React.SetStateAction<EditorTab>>;
@@ -161,6 +163,7 @@ const applyBrainRecordToEditorState = (
   options.setCurrentAgentDocument(brain.agent);
   options.setRuntimeInstallRequest(brain.agent);
   options.setDraftAgentDocument(brain.agent);
+  options.setDraftBodyDocument(brain.agent.body);
   options.setDraftGraphStatusOverride(null);
   options.setAgentParameters((current) =>
     current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells }
@@ -175,6 +178,7 @@ const applyBrainRecordIdentityToCurrentState = (
     setCurrentAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
     setRuntimeInstallRequest: React.Dispatch<React.SetStateAction<AgentIR>>;
     setDraftAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
+    setDraftBodyDocument: React.Dispatch<React.SetStateAction<AgentIR['body']>>;
     setDraftGraphStatusOverride: React.Dispatch<React.SetStateAction<AgentDraftStatus | null>>;
   }
 ): void => {
@@ -182,6 +186,7 @@ const applyBrainRecordIdentityToCurrentState = (
   options.setCurrentAgentDocument(brain.agent);
   options.setRuntimeInstallRequest(brain.agent);
   options.setDraftAgentDocument(brain.agent);
+  options.setDraftBodyDocument(brain.agent.body);
   options.setDraftGraphStatusOverride(null);
 };
 
@@ -197,6 +202,7 @@ const App: React.FC = () => {
   const [runtimeInstallRequest, setRuntimeInstallRequest] = useState<AgentIR>(() => initialAgentDocument);
   const [installedAgentDocument, setInstalledAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
   const [draftAgentDocument, setDraftAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
+  const [draftBodyDocument, setDraftBodyDocument] = useState(() => initialAgentDocument.body);
   const [draftGraphStatusOverride, setDraftGraphStatusOverride] = useState<AgentDraftStatus | null>(null);
   const [agentRuntimeStatus, setAgentRuntimeStatus] = useState<AgentRuntimeStatus>(() =>
     createInitialAgentRuntimeStatus(initialAgentDocument)
@@ -232,6 +238,7 @@ const App: React.FC = () => {
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('agent-parameters');
   const requestedLifecycleStateRef = useRef<SimulationLifecycleState>('idle');
   const draftAgentDocumentRef = useRef(draftAgentDocument);
+  const draftBodyDocumentRef = useRef(draftBodyDocument);
   const agentDraftStatus = useMemo<AgentDraftStatus>(
     () => draftGraphStatusOverride ?? createAgentDraftStatus(draftAgentDocument),
     [draftAgentDocument, draftGraphStatusOverride]
@@ -241,15 +248,31 @@ const App: React.FC = () => {
   const appRef = useRef<HTMLDivElement | null>(null);
   const simulationPanelRef = useRef<HTMLDivElement | null>(null);
   const persistedBrainLibrarySnapshotRef = useRef(serializeBrainLibrarySnapshot(initialBrainLibraryLoad.brains));
+  const bodyDraftStatus = useMemo<BodyIRDraftStatus>(
+    () => ({
+      hasChanges: JSON.stringify(draftBodyDocument) !== JSON.stringify(draftAgentDocument.body),
+    }),
+    [draftAgentDocument.body, draftBodyDocument]
+  );
   const installedGraphSummary = agentRuntimeStatus.appliedSummary;
-  const hasUnsavedDraftChanges = !areAgentsEquivalent(currentAgentDocument, draftAgentDocument);
+  const hasDraftEditingChanges = !areAgentsEquivalent(currentAgentDocument, draftAgentDocument);
+  const hasPendingRuntimeInstall = !areAgentsEquivalent(installedAgentDocument, currentAgentDocument);
+  const hasUnsavedDraftChanges =
+    hasDraftEditingChanges || hasPendingRuntimeInstall || bodyDraftStatus.hasChanges;
+  const bodyPreviewAgent = useMemo<AgentIR>(
+    () => ({
+      ...draftAgentDocument,
+      body: draftBodyDocument,
+    }),
+    [draftAgentDocument, draftBodyDocument]
+  );
   const bodyRulePreviewModel = useMemo(
-    () => buildAgentBodyRulePreviewModel(draftAgentDocument),
-    [draftAgentDocument]
+    () => buildAgentBodyRulePreviewModel(bodyPreviewAgent),
+    [bodyPreviewAgent]
   );
   const bodyRulePreview = useMemo<BodyIRPreviewData>(() => {
-    const inputRuleById = new Map(draftAgentDocument.body.inputRules.map((rule, index) => [rule.id, { rule, index }]));
-    const outputRuleById = new Map(draftAgentDocument.body.outputRules.map((rule, index) => [rule.id, { rule, index }]));
+    const inputRuleById = new Map(draftBodyDocument.inputRules.map((rule, index) => [rule.id, { rule, index }]));
+    const outputRuleById = new Map(draftBodyDocument.outputRules.map((rule, index) => [rule.id, { rule, index }]));
     const inputMatches = bodyRulePreviewModel.input.rules.flatMap((previewGroup) => {
       const entry = inputRuleById.get(previewGroup.ruleId);
       return previewGroup.endpoints.map((endpoint) => ({
@@ -270,14 +293,14 @@ const App: React.FC = () => {
     });
 
     return {
-      summary: `coverage ${draftAgentDocument.body.visionCellCount} cells；输入 endpoint ${bodyRulePreviewModel.input.endpointNodeIds.length} 个，输出 endpoint ${bodyRulePreviewModel.output.endpointNodeIds.length} 个。`,
+      summary: `coverage ${draftBodyDocument.visionCellCount} cells；输入 endpoint ${bodyRulePreviewModel.input.endpointNodeIds.length} 个，输出 endpoint ${bodyRulePreviewModel.output.endpointNodeIds.length} 个。`,
       inputMatches,
       outputMatches,
     };
-  }, [bodyRulePreviewModel, draftAgentDocument.body.visionCellCount, draftAgentDocument.body.inputRules, draftAgentDocument.body.outputRules]);
+  }, [bodyRulePreviewModel, draftBodyDocument]);
   const bodyRuleValidation = useMemo<BodyIRValidationMessage[]>(() => {
-    const inputRuleIndexById = new Map(draftAgentDocument.body.inputRules.map((rule, index) => [rule.id, index]));
-    const outputRuleIndexById = new Map(draftAgentDocument.body.outputRules.map((rule, index) => [rule.id, index]));
+    const inputRuleIndexById = new Map(draftBodyDocument.inputRules.map((rule, index) => [rule.id, index]));
+    const outputRuleIndexById = new Map(draftBodyDocument.outputRules.map((rule, index) => [rule.id, index]));
     const messages: BodyIRValidationMessage[] = [];
 
     for (const issue of bodyRulePreviewModel.issues) {
@@ -325,7 +348,7 @@ const App: React.FC = () => {
     }
 
     return messages;
-  }, [bodyRulePreviewModel.issues, draftAgentDocument.body.inputRules, draftAgentDocument.body.outputRules]);
+  }, [bodyRulePreviewModel.issues, draftBodyDocument]);
 
   useEffect(() => {
     const nextSnapshot = serializeBrainLibrarySnapshot(brainLibrary);
@@ -440,14 +463,16 @@ const App: React.FC = () => {
       };
       setDraftGraphStatusOverride(null);
       setDraftAgentDocument(normalizedAgentDocument);
+      setDraftBodyDocument(normalizedAgentDocument.body);
       if (shouldCommitToCurrentDocument) {
         setCurrentAgentDocument(normalizedAgentDocument);
       }
       if (shouldInstallToRuntime) {
         setRuntimeInstallRequest(normalizedAgentDocument);
       }
+      const canPersistActiveBrain = validateAgentIR(normalizedAgentDocument).length === 0;
       setBrainLibrary((currentLibrary) =>
-        shouldPersistActiveBrain && activeBrainId
+        shouldPersistActiveBrain && canPersistActiveBrain && activeBrainId
           ? upsertBrainLibraryItemAgent(
               currentLibrary,
               activeBrainId,
@@ -498,6 +523,14 @@ const App: React.FC = () => {
   }, [draftAgentDocument]);
 
   useEffect(() => {
+    draftBodyDocumentRef.current = draftBodyDocument;
+  }, [draftBodyDocument]);
+
+  useEffect(() => {
+    setDraftBodyDocument(draftAgentDocument.body);
+  }, [draftAgentDocument.body]);
+
+  useEffect(() => {
     currentAgentDocumentRef.current = currentAgentDocument;
   }, [currentAgentDocument]);
 
@@ -521,6 +554,52 @@ const App: React.FC = () => {
       GRAPH_SEMANTIC_CHANGE
     );
   }, [handleAgentChange]);
+
+  const handleDraftAgentParametersChange = useCallback<React.Dispatch<React.SetStateAction<AgentParameters>>>((value) => {
+    setDraftAgentParameters((current) => {
+      const next = typeof value === 'function' ? value(current) : value;
+      setDraftBodyDocument((currentBody) =>
+        currentBody.visionCellCount === next.visionCells
+          ? currentBody
+          : {
+              ...currentBody,
+              visionCellCount: next.visionCells,
+            }
+      );
+      return next;
+    });
+  }, []);
+
+  const handleBodyApply = useCallback(() => {
+    setAgentParameters((current) =>
+      current.visionCells === draftBodyDocument.visionCellCount
+        ? current
+        : { ...current, visionCells: draftBodyDocument.visionCellCount }
+    );
+    handleAgentChange(
+      (currentAgent) =>
+        reconcileAgentIRVisionCells(
+          {
+            ...currentAgent,
+            body: draftBodyDocument,
+          },
+          draftBodyDocument.visionCellCount
+        ),
+      GRAPH_SEMANTIC_CHANGE
+    );
+  }, [draftBodyDocument, handleAgentChange]);
+
+  const handleBodyReset = useCallback(() => {
+    setDraftBodyDocument(draftAgentDocumentRef.current.body);
+    setDraftAgentParameters((current) =>
+      current.visionCells === draftAgentDocumentRef.current.body.visionCellCount
+        ? current
+        : {
+            ...current,
+            visionCells: draftAgentDocumentRef.current.body.visionCellCount,
+          }
+    );
+  }, []);
 
   const handleAgentRuntimeStatusChange = useCallback((nextStatus: AgentRuntimeStatus) => {
     setAgentRuntimeStatus(nextStatus);
@@ -579,7 +658,10 @@ const App: React.FC = () => {
   }, []);
 
   const handleCreateBrainFromCurrent = useCallback((name: string) => {
-    const nextBrain = createBrainLibraryItemFromAgent(name, draftAgentDocumentRef.current);
+    const nextBrain = createBrainLibraryItemFromAgent(name, {
+      ...draftAgentDocumentRef.current,
+      body: draftBodyDocumentRef.current,
+    });
     setBrainLibrary((currentLibrary) => [...currentLibrary, nextBrain]);
     setIsBrainLibraryOpen(true);
     applyBrainRecordIdentityToCurrentState(nextBrain, {
@@ -587,6 +669,7 @@ const App: React.FC = () => {
       setCurrentAgentDocument,
       setRuntimeInstallRequest,
       setDraftAgentDocument,
+      setDraftBodyDocument,
       setDraftGraphStatusOverride,
     });
   }, []);
@@ -616,6 +699,7 @@ const App: React.FC = () => {
       setCurrentAgentDocument,
       setRuntimeInstallRequest,
       setDraftAgentDocument,
+      setDraftBodyDocument,
       setDraftGraphStatusOverride,
       setAgentParameters,
       setEditorTab,
@@ -642,6 +726,7 @@ const App: React.FC = () => {
       setCurrentAgentDocument,
       setRuntimeInstallRequest,
       setDraftAgentDocument,
+      setDraftBodyDocument,
       setDraftGraphStatusOverride,
       setAgentParameters,
       setEditorTab,
@@ -694,8 +779,21 @@ const App: React.FC = () => {
 
   const handleDeleteBrain = useCallback((brainId: string) => {
     setBrainLibrary((currentLibrary) => deleteBrainLibraryItem(currentLibrary, brainId));
-    setActiveBrainId((currentId) => (currentId === brainId ? null : currentId));
-  }, []);
+    if (activeBrainId !== brainId) {
+      return;
+    }
+
+    const fallbackAgent = createDefaultAgentIR(agentParameters.visionCells, '当前 Agent');
+    setActiveBrainId(null);
+    setCurrentAgentDocument(fallbackAgent);
+    setRuntimeInstallRequest(fallbackAgent);
+    setInstalledAgentDocument(fallbackAgent);
+    setDraftAgentDocument(fallbackAgent);
+    setDraftBodyDocument(fallbackAgent.body);
+    setDraftGraphStatusOverride(null);
+    setGraphPath(ROOT_GRAPH_PATH);
+    resetRuntimeForBrainSwitch();
+  }, [activeBrainId, agentParameters.visionCells, resetRuntimeForBrainSwitch]);
 
   const handleDuplicateBrain = useCallback((brainId: string) => {
     setBrainLibrary((currentLibrary) => duplicateBrainLibraryItem(currentLibrary, brainId));
@@ -989,26 +1087,27 @@ const App: React.FC = () => {
               agentParameters={agentParameters}
               draftAgentParameters={draftAgentParameters}
               body={draftAgentDocument.body}
+              draftBody={draftBodyDocument}
               settingsSection={settingsSection}
+              bodyDraftStatus={bodyDraftStatus}
               bodyRulePreview={bodyRulePreview}
               bodyRuleValidation={bodyRuleValidation}
               onSettingsSectionChange={setSettingsSection}
-              onDraftAgentParametersChange={setDraftAgentParameters}
-              onBodyChange={(updater) => {
-                handleAgentChange((currentAgent) => {
-                  const nextBody = updater(currentAgent.body);
+              onDraftAgentParametersChange={handleDraftAgentParametersChange}
+              onDraftBodyChange={(updater) => {
+                setDraftBodyDocument((currentBody) => {
+                  const nextBody = updater(currentBody);
                   setDraftAgentParameters((current) =>
                     current.visionCells === nextBody.visionCellCount
                       ? current
                       : { ...current, visionCells: nextBody.visionCellCount }
                   );
-                  return {
-                    ...currentAgent,
-                    body: nextBody,
-                  };
-                }, GRAPH_SEMANTIC_CHANGE);
+                  return nextBody;
+                });
               }}
-              onApply={applyDraftAgentParameters}
+              onApplyAgentParameters={applyDraftAgentParameters}
+              onApplyBody={handleBodyApply}
+              onResetBody={handleBodyReset}
               onResetDefaults={resetDraftAgentParameters}
             />
           </div>

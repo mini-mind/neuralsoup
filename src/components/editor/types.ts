@@ -49,6 +49,10 @@ export interface BodyIRPreviewData {
   outputMatches?: BodyIROutputPreviewItem[];
 }
 
+export interface BodyIRDraftStatus {
+  hasChanges: boolean;
+}
+
 export interface GraphPathItem {
   id: string;
   label: string;

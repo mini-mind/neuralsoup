@@ -185,7 +185,19 @@ export const normalizeCanonicalBrainLibraryRecord = (
   };
 };
 
+const assertValidBrainLibraryAgent = (agent: AgentIR, context: string): void => {
+  const issues = validateAgentIR(agent);
+  if (issues.length === 0) {
+    return;
+  }
+
+  throw new Error(
+    `Brain Library ${context}失败：当前 AgentIR 无效。${issues.map((issue) => issue.message).join(' | ')}`
+  );
+};
+
 export const createBrainLibraryItemFromAgent = (name: string, agent: AgentIR): BrainLibraryRecord => {
+  assertValidBrainLibraryAgent(agent, '保存');
   const timestamp = new Date().toISOString();
   return normalizeCanonicalBrainLibraryRecord(agent, {
     ...agent.metadata,
@@ -202,6 +214,7 @@ export const upsertBrainLibraryItemAgent = (
   agent: AgentIR,
   updatedAt?: string
 ): BrainLibraryRecord[] => {
+  assertValidBrainLibraryAgent(agent, '写入');
   const nextUpdatedAt = updatedAt ?? new Date().toISOString();
   return brains.map((brain) =>
     brain.agent.metadata.id === brainId

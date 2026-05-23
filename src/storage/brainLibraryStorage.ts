@@ -1,4 +1,5 @@
 import {
+  isValidBrainLibraryAgentPayload,
   isBrainLibraryStoredRecord,
   normalizeCanonicalBrainLibraryRecord,
   type BrainLibraryRecord,
@@ -46,11 +47,18 @@ const isBrainLibraryStorageEnvelope = (value: unknown): value is BrainLibrarySto
 const createStorageEnvelope = (brains: BrainLibraryRecord[]): BrainLibraryStorageEnvelope => ({
   storageVersion: 1,
   savedAt: new Date().toISOString(),
-  brains: brains.map((brain) =>
-    normalizeCanonicalBrainLibraryRecord(brain.agent, {
+  brains: brains.map((brain: BrainLibraryRecord) => {
+    const normalized = normalizeCanonicalBrainLibraryRecord(brain.agent, {
       ...brain.agent.metadata,
-    })
-  ),
+    });
+    const brainName = normalized.agent.metadata.name;
+
+    if (!isValidBrainLibraryAgentPayload(normalized.agent)) {
+      throw new Error(`Brain "${brainName}" 无法保存：AgentIR 校验失败。`);
+    }
+
+    return normalized;
+  }),
 });
 
 const backupCorruptStorage = (rawValue: string): void => {
