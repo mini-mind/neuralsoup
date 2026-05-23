@@ -21,7 +21,11 @@ export interface BrainLibraryRecord {
 interface BrainLibraryStorageEnvelope {
   storageVersion: 1;
   savedAt: string;
-  brains: AgentPackage[];
+  brains: BrainLibraryStoredRecord[];
+}
+
+interface BrainLibraryStoredRecord {
+  agent: AgentIR;
 }
 
 export type BrainLibraryLoadStatus =
@@ -44,6 +48,12 @@ export interface BrainLibraryLoadResult {
 }
 
 type AgentPackageLike = {
+  packageVersion?: unknown;
+  metadata?: unknown;
+  agent?: unknown;
+};
+
+type BrainLibraryStoredRecordLike = {
   packageVersion?: unknown;
   metadata?: unknown;
   agent?: unknown;
@@ -79,12 +89,12 @@ const stripLegacyVisionCellCount = (agent: AgentIR): AgentIR => {
   };
 };
 
-const normalizeAgentRecordShape = (
+const normalizeCanonicalAgentRecordShape = (
   agent: AgentIR,
   metadataOverride?: AgentMetadata
 ): BrainLibraryRecord => {
   const metadata = metadataOverride ?? { ...agent.metadata };
-  const normalizedVisionCellCount = deriveAgentIRVisionCellCount(agent);
+  const normalizedVisionCellCount = deriveAgentIRVisionCellCount(agent, { includeLegacyFallback: false });
   const normalizedAgent = withDerivedBodyVisionCellCount(
     withVisionCellLayoutMarkers(stripLegacyVisionCellCount({
       ...agent,
@@ -100,6 +110,28 @@ const normalizeAgentRecordShape = (
   };
 };
 
+const normalizeImportedAgentRecordShape = (
+  agent: AgentIR,
+  metadataOverride?: AgentMetadata,
+  options?: {
+    legacyVisionCellCount?: number | null;
+  }
+): BrainLibraryRecord => {
+  const structuredVisionCellCount = deriveAgentIRVisionCellCount(agent, { includeLegacyFallback: false });
+  const effectiveVisionCellCount =
+    structuredVisionCellCount > 0
+      ? structuredVisionCellCount
+      : options?.legacyVisionCellCount != null
+        ? options.legacyVisionCellCount
+        : deriveAgentIRVisionCellCount(agent);
+  const nextAgent =
+    effectiveVisionCellCount > structuredVisionCellCount
+      ? withVisionCellLayoutMarkers(agent, effectiveVisionCellCount)
+      : agent;
+
+  return normalizeCanonicalAgentRecordShape(nextAgent, metadataOverride);
+};
+
 const isAgentMetadata = (value: unknown): value is AgentPackageMetadataShape =>
   isObject(value) &&
   typeof value.id === 'string' &&
@@ -109,16 +141,23 @@ const isAgentMetadata = (value: unknown): value is AgentPackageMetadataShape =>
 
 const hasValidOptionalTopLevelMetadata = (value: unknown): boolean => value === undefined || isAgentMetadata(value);
 
-const hasValidAgentPayload = (agent: unknown): agent is AgentIR =>
+const hasValidAgentPayload = (
+  agent: unknown,
+  options?: {
+    allowLegacyVisionCellCount?: boolean;
+  }
+): agent is AgentIR =>
   isObject(agent) &&
   agent.version === 1 &&
   isAgentMetadata(agent.metadata) &&
   isObject(agent.body) &&
   agent.body.version === 1 &&
-  (agent.body.visionCellCount === undefined ||
-    (typeof agent.body.visionCellCount === 'number' &&
-      Number.isFinite(agent.body.visionCellCount) &&
-      agent.body.visionCellCount >= 0)) &&
+  (options?.allowLegacyVisionCellCount === true
+    ? agent.body.visionCellCount === undefined ||
+      (typeof agent.body.visionCellCount === 'number' &&
+        Number.isFinite(agent.body.visionCellCount) &&
+        agent.body.visionCellCount >= 0)
+    : agent.body.visionCellCount === undefined) &&
   Array.isArray(agent.body.inputRules) &&
   agent.body.inputRules.every(
     (rule) =>
@@ -220,9 +259,24 @@ export const isAgentPackage = (value: unknown): value is AgentPackage =>
   isObject(value) &&
   value.packageVersion === 1 &&
   hasValidOptionalTopLevelMetadata((value as AgentPackageLike).metadata) &&
-  hasValidAgentPayload((value as AgentPackageLike).agent);
+  hasValidAgentPayload((value as AgentPackageLike).agent, { allowLegacyVisionCellCount: true });
+
+const isBrainLibraryStoredRecord = (value: unknown): value is BrainLibraryStoredRecord =>
+  isObject(value) &&
+  (value as BrainLibraryStoredRecordLike).packageVersion === undefined &&
+  (value as BrainLibraryStoredRecordLike).metadata === undefined &&
+  hasValidAgentPayload((value as BrainLibraryStoredRecordLike).agent);
 
 const isBrainLibraryStorageEnvelope = (value: unknown): value is BrainLibraryStorageEnvelope =>
+  isObject(value) &&
+  value.storageVersion === 1 &&
+  typeof value.savedAt === 'string' &&
+  Array.isArray(value.brains) &&
+  value.brains.every(isBrainLibraryStoredRecord);
+
+const isLegacyBrainLibraryStorageEnvelope = (
+  value: unknown
+): value is { storageVersion: 1; savedAt: string; brains: AgentPackage[] } =>
   isObject(value) &&
   value.storageVersion === 1 &&
   typeof value.savedAt === 'string' &&
@@ -231,7 +285,7 @@ const isBrainLibraryStorageEnvelope = (value: unknown): value is BrainLibrarySto
 
 const normalizeAgentPackageMetadata = (candidate: AgentPackage): AgentPackage => {
   return encodeBrainLibraryRecord(
-    normalizeAgentRecordShape(candidate.agent, {
+    normalizeCanonicalAgentRecordShape(candidate.agent, {
       ...candidate.agent.metadata,
     })
   );
@@ -247,11 +301,9 @@ const normalizeAgentPackage = (candidate: unknown): AgentPackage | null => {
     return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : null;
   })();
 
-  const normalizedRecord = normalizeAgentRecordShape(
-    legacyVisionCellCount == null
-      ? candidate.agent
-      : withVisionCellLayoutMarkers(candidate.agent, legacyVisionCellCount)
-  );
+  const normalizedRecord = normalizeImportedAgentRecordShape(candidate.agent, undefined, {
+    legacyVisionCellCount,
+  });
 
   return normalizeAgentPackageMetadata({
     ...candidate,
@@ -260,13 +312,13 @@ const normalizeAgentPackage = (candidate: unknown): AgentPackage | null => {
   });
 };
 
-const toBrainLibraryRecord = (candidate: AgentPackage): BrainLibraryRecord =>
-  normalizeAgentRecordShape(candidate.agent, {
+const toBrainLibraryRecord = (candidate: { agent: AgentIR }): BrainLibraryRecord =>
+  normalizeCanonicalAgentRecordShape(candidate.agent, {
     ...candidate.agent.metadata,
   });
 
 export const encodeBrainLibraryRecord = (record: BrainLibraryRecord): AgentPackage => {
-  const normalized = normalizeAgentRecordShape(record.agent, {
+  const normalized = normalizeCanonicalAgentRecordShape(record.agent, {
     ...record.agent.metadata,
   });
 
@@ -279,7 +331,7 @@ export const encodeBrainLibraryRecord = (record: BrainLibraryRecord): AgentPacka
 
 export const createBrainLibraryItemFromAgent = (name: string, agent: AgentIR): BrainLibraryRecord => {
   const timestamp = new Date().toISOString();
-  return normalizeAgentRecordShape(agent, {
+  return normalizeCanonicalAgentRecordShape(agent, {
     ...agent.metadata,
     id: createAgentLibraryId(),
     name: name.trim() || '未命名 Brain',
@@ -303,7 +355,7 @@ export const normalizeImportedAgentPackage = (
   const trimmedName = options?.name?.trim();
   const existingIds = new Set(options?.existingIds ?? []);
   const nextId = existingIds.has(normalized.agent.metadata.id) ? createAgentLibraryId() : normalized.agent.metadata.id;
-  return normalizeAgentRecordShape(normalized.agent, {
+  return normalizeCanonicalAgentRecordShape(normalized.agent, {
     ...normalized.agent.metadata,
     id: nextId,
     name: trimmedName || normalized.agent.metadata.name,
@@ -313,7 +365,7 @@ export const normalizeImportedAgentPackage = (
 const createStorageEnvelope = (brains: BrainLibraryRecord[]): BrainLibraryStorageEnvelope => ({
   storageVersion: 1,
   savedAt: new Date().toISOString(),
-  brains: brains.map(encodeBrainLibraryRecord),
+  brains: brains.map((brain) => toBrainLibraryRecord(brain)),
 });
 
 const backupCorruptStorage = (rawValue: string): void => {
@@ -374,7 +426,36 @@ export const loadBrainLibraryWithStatus = (): BrainLibraryLoadResult => {
 
   try {
     const parsed = JSON.parse(rawValue);
-    if (!isBrainLibraryStorageEnvelope(parsed)) {
+    if (isBrainLibraryStorageEnvelope(parsed)) {
+      const records = parsed.brains.map(toBrainLibraryRecord);
+      const shouldRewriteStorage = parsed.brains.some((brain, index) => {
+        const normalized = toBrainLibraryRecord(brain);
+        return JSON.stringify(normalized) !== JSON.stringify(records[index]);
+      });
+
+      if (shouldRewriteStorage) {
+        saveBrainLibrary(records);
+      }
+
+      return {
+        brains: records,
+        status: { state: 'ok', message: null },
+      };
+    }
+
+    if (isLegacyBrainLibraryStorageEnvelope(parsed)) {
+      const normalizedBrains = parsed.brains
+        .map(normalizeAgentPackage)
+        .filter((brain): brain is AgentPackage => brain !== null);
+      const records = normalizedBrains.map(toBrainLibraryRecord);
+      saveBrainLibrary(records);
+      return {
+        brains: records,
+        status: { state: 'ok', message: null },
+      };
+    }
+
+    {
       backupCorruptStorage(rawValue);
       return {
         brains: [],
@@ -384,30 +465,6 @@ export const loadBrainLibraryWithStatus = (): BrainLibraryLoadResult => {
         },
       };
     }
-
-    const normalizedBrains = parsed.brains
-      .map(normalizeAgentPackage)
-      .filter((brain): brain is AgentPackage => brain !== null);
-    const records = normalizedBrains.map(toBrainLibraryRecord);
-
-    const shouldRewriteStorage = normalizedBrains.some((brain, index) => {
-      const persistedBrain = parsed.brains[index];
-      return (
-        JSON.stringify(encodeBrainLibraryRecord(toBrainLibraryRecord(brain))) !== JSON.stringify(persistedBrain) ||
-        brain.agent.metadata.id !== persistedBrain?.agent?.metadata?.id ||
-        brain.agent.metadata.name !== persistedBrain?.agent?.metadata?.name ||
-        brain.agent.metadata.createdAt !== persistedBrain?.agent?.metadata?.createdAt ||
-        brain.agent.metadata.updatedAt !== persistedBrain?.agent?.metadata?.updatedAt
-      );
-    });
-    if (shouldRewriteStorage) {
-      saveBrainLibrary(records);
-    }
-
-    return {
-      brains: records,
-      status: { state: 'ok', message: null },
-    };
   } catch {
     backupCorruptStorage(rawValue);
     return {
@@ -446,7 +503,7 @@ export const upsertBrainLibraryItemAgent = (
   const nextUpdatedAt = updatedAt ?? new Date().toISOString();
   return brains.map((brain) =>
     brain.agent.metadata.id === brainId
-      ? normalizeAgentRecordShape(agent, {
+      ? normalizeCanonicalAgentRecordShape(agent, {
           ...brain.agent.metadata,
           updatedAt: nextUpdatedAt,
         })
@@ -465,7 +522,7 @@ export const renameBrainLibraryItem = (
     }
 
     const updatedAt = new Date().toISOString();
-    return normalizeAgentRecordShape(brain.agent, {
+    return normalizeCanonicalAgentRecordShape(brain.agent, {
       ...brain.agent.metadata,
       name,
       updatedAt,
@@ -485,7 +542,7 @@ export const duplicateBrainLibraryItem = (brains: BrainLibraryRecord[], brainId:
 
   return [
     ...brains,
-    normalizeAgentRecordShape(sourceBrain.agent, {
+    normalizeCanonicalAgentRecordShape(sourceBrain.agent, {
       ...sourceBrain.agent.metadata,
       id: duplicateId,
       name: `${sourceBrain.agent.metadata.name} 副本`,

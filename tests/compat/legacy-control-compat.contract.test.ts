@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AgentController } from '../../src/engine/AgentController';
-import { createLegacyBrainController, updateLegacyBrainAgent } from '../../src/compat/legacyBrainController';
 import { VisionSystem } from '../../src/engine/VisionSystem';
 import { WorldManager } from '../../src/engine/WorldManager';
 import { CollisionDetector } from '../../src/engine/CollisionDetector';
@@ -17,7 +16,7 @@ import {
   type AgentIR,
 } from '../../src/domain/brain';
 import { compileLegacyBrainDefinition } from '../../src/compat/legacyBrainCompiler';
-import { createDefaultGraphIRDocument } from '../../src/domain/brain/defaults';
+import { createDefaultGraphIRDocument } from '../../src/compat/legacyGraphDefaults';
 import { summarizeGraphIRDocument, type GraphIRDocument, type NeuronNode } from '../../src/domain/brain/ir';
 import { createDefaultLegacyBodyDefinition, type LegacyBodyDefinition } from '../../src/compat/legacyBrainPackage';
 import type { LegacyBrainProgram } from '../../src/compat/legacyBrainProgram';
@@ -56,6 +55,56 @@ const getRootVisionCells = (document: GraphIRDocument) => {
 
 const compileDefaultBrain = (document: GraphIRDocument) =>
   compileLegacyBrainDefinition(document, createDefaultLegacyBodyDefinition(getRootVisionCells(document)));
+
+const applyLegacyAction = (agent: Agent, output: number[], deltaTime: number): void => {
+  const [turnLeft, moveForward, turnRight] = output;
+
+  const turnSpeed = 3.0;
+  const turnThreshold = 0.3;
+  if (turnLeft > turnThreshold) {
+    agent.angle -= turnSpeed * turnLeft * deltaTime;
+  }
+  if (turnRight > turnThreshold) {
+    agent.angle += turnSpeed * turnRight * deltaTime;
+  }
+
+  const maxSpeed = 60;
+  const moveThreshold = 0.2;
+  if (moveForward > moveThreshold) {
+    const speed = maxSpeed * moveForward;
+    agent.velocity.x = Math.cos(agent.angle) * speed;
+    agent.velocity.y = Math.sin(agent.angle) * speed;
+    return;
+  }
+
+  agent.velocity.x = 0;
+  agent.velocity.y = 0;
+};
+
+const updateLegacyBrainAgent = (
+  program: LegacyBrainProgram,
+  runtimeState: ReturnType<typeof createLegacyBrainProgramRuntimeState>,
+  agent: Agent,
+  deltaTime: number
+) => {
+  const result = stepLegacyBrainProgram(
+    program,
+    agent.visualInput,
+    runtimeState,
+    deltaTime,
+    Date.now()
+  );
+  applyLegacyAction(
+    agent,
+    [
+      result.outputs['turn-left'],
+      result.outputs['move-forward'],
+      result.outputs['turn-right'],
+    ],
+    deltaTime
+  );
+  return result.runtimeState;
+};
 
 const createValidCompatBoundaryDocument = (): GraphIRDocument => ({
   version: 1,
@@ -257,7 +306,8 @@ test('legacy GraphIR compilation remains a compat wrapper over compiled Agent ru
   const program: LegacyBrainProgram = compileDefaultBrain(document);
 
   assert.equal(program.legacyGraphIR, document);
-  assert.ok(program.compiledAgentProgram);
+  assert.equal(program.inputBindings.length, 3);
+  assert.equal(program.outputBindings.length, 3);
 });
 
 test('simulation session legacy GraphIR compat setter rejects invalid drafts without dropping the last applied AgentIR', () => {
@@ -554,18 +604,16 @@ test('legacy brain-program backed snn control consumes legacy GraphIR output sig
     },
   ];
 
-  const controller = createLegacyBrainController(compileDefaultBrain(document));
+  const program = compileDefaultBrain(document);
+  let runtimeState = createLegacyBrainProgramRuntimeState(program);
 
   const agent = createAgent({
     id: 1,
     visualInput: [0, 1, 0],
   });
 
-  updateLegacyBrainAgent(controller, agent, 1, {
-    turnLeft: false,
-    moveForward: false,
-    turnRight: false,
-  });
+  runtimeState = updateLegacyBrainAgent(program, runtimeState, agent, 1);
+  assert.ok(runtimeState);
 
   assert.ok(agent.velocity.x > 0);
   assert.equal(agent.velocity.y, 0);

@@ -8,7 +8,7 @@ import {
   validateGraphIRDocument,
   type GraphIRDocument,
 } from '../../src/domain/brain/ir';
-import { createDefaultGraphIRDocument } from '../../src/domain/brain/defaults';
+import { createDefaultGraphIRDocument } from '../../src/compat/legacyGraphDefaults';
 import { compileLegacyBrainDefinition } from '../../src/compat/legacyBrainCompiler';
 import { createDefaultLegacyBodyDefinition } from '../../src/compat/legacyBrainPackage';
 import type { LegacyBrainProgram } from '../../src/compat/legacyBrainProgram';
@@ -38,6 +38,23 @@ test('legacy GraphIR document compiles into a compat runtime program with vision
     ['turn-left', 'move-forward', 'turn-right']
   );
   assert.equal(program.legacyGraphIR, document);
+});
+
+test('compileLegacyBrainDefinition rejects legacy drafts whose lowering drops bridge links', () => {
+  const document = createDefaultGraphIRDocument(1);
+  document.root.links.push({
+    id: 'output-to-neuron',
+    from: { nodeId: 'output-turn-left', portId: 'out' },
+    to: { nodeId: 'neuron-1', portId: 'dendrite' },
+    weight: 1,
+  });
+
+  assert.throws(
+    () => compileDefaultLegacyBrain(document),
+    (error: unknown) =>
+      error instanceof Error &&
+      error.message.includes('Legacy GraphIR compilation cannot preserve legacy draft link')
+  );
 });
 
 test('default legacy GraphIR summary reflects leaf topology counts', () => {

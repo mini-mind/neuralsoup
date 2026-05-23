@@ -3,8 +3,8 @@ import {
   GraphIRValidationError,
   validateGraphIRDocument,
 } from '../domain/brain/ir';
-import { compileAgentIR } from '../domain/brain/agent-compiler';
-import { createAgentIRFromLegacyGraph } from '../domain/brain/legacy-graph-bridge';
+import { AgentValidationError, compileAgentIR } from '../domain/brain/agent-compiler';
+import { createAgentIRFromLegacyGraphDetailed } from './legacyGraphBridge';
 import type {
   LeafLink,
   LiteralValue,
@@ -22,6 +22,7 @@ import type {
 import type {
   BrainProgramConnection,
   BrainProgramInputBinding,
+  LegacyBrainProgram,
   BrainProgramNeuronNode,
   BrainProgramOutputBinding,
   BrainProgramSignalNode,
@@ -29,6 +30,7 @@ import type {
   ProgramInputPort,
   ProgramOutputPort,
 } from '../compat/legacyBrainProgram';
+import type { AgentProgram } from '../domain/brain/agent-program';
 import type { BrainInputChannel } from '../domain/brain/shared';
 
 const INPUT_CHANNEL_OFFSET = {
@@ -225,27 +227,60 @@ const assertBodyBindingsTargetRootAdapterSignals = (
   }
 };
 
-export const compileLegacyBrainDefinition = (
+const compileLegacyAgentProgram = (
   document: LegacyBrainDefinition,
   body: LegacyBodyDefinition
-): LegacyGraphProgram => {
+) => {
+  const bridgeResult = createAgentIRFromLegacyGraphDetailed('legacy-graph-bridge', document, body);
+  if (bridgeResult.droppedLinkIds.length > 0) {
+    throw new AgentValidationError(
+      bridgeResult.droppedLinkIds.map((linkId) => ({
+        code: 'runtime-binding-error',
+        message: `Legacy GraphIR compilation cannot preserve legacy draft link "${linkId}".`,
+      }))
+    );
+  }
+
+  return compileAgentIR(bridgeResult.agent);
+};
+
+type AgentBackedLegacyBrainProgram = LegacyBrainProgram & {
+  compiledAgentProgram: AgentProgram;
+};
+
+interface LegacyCompileAnalysis {
+  inputSignalsByNodeId: Map<string, SignalNode>;
+  outputSignalsByNodeId: Map<string, SignalNode>;
+  bodyInputById: Map<string, LegacyBodyInputSignal>;
+  bodyOutputById: Map<string, LegacyBodyOutputSignal>;
+  orderedInputBindings: Array<{
+    node: SignalNode;
+    bodySignal: LegacyBodyInputSignal;
+    index: number;
+  }>;
+  orderedOutputBindings: Array<{
+    node: SignalNode;
+    bodySignal: LegacyBodyOutputSignal;
+    index: number;
+  }>;
+}
+
+const analyzeLegacyCompileBindings = (
+  document: LegacyBrainDefinition,
+  body: LegacyBodyDefinition
+): LegacyCompileAnalysis => {
   const issues = validateGraphIRDocument(document);
   if (issues.length > 0) {
     throw new GraphIRValidationError(issues);
   }
 
-  const modelsById = new Map<string, ModelDefinition>(document.models.map((model) => [model.id, model]));
-  const leafNodes = collectLeafNodes(document.root.children);
-  const allSignalNodes = leafNodes.filter((node): node is SignalNode => node.kind === 'signal');
   const { inputSignals: inputSignalNodes, outputSignals: outputSignalNodes } =
     collectRootAdapterSignals(document.root.children);
   const inputSignalsByNodeId = new Map(inputSignalNodes.map((node) => [node.id, node]));
   const outputSignalsByNodeId = new Map(outputSignalNodes.map((node) => [node.id, node]));
-  const bodyInputById = createBodySignalIndex(body.inputSignals);
-  const bodyOutputById = createBodySignalIndex(body.outputSignals);
-  const neuronLeafNodes = leafNodes.filter((node): node is NeuronNode => node.kind === 'neuron');
   assertBodyBindingsTargetRootAdapterSignals(body, inputSignalsByNodeId, outputSignalsByNodeId);
 
+  const bodyInputById = createBodySignalIndex(body.inputSignals);
   const orderedInputBindings = body.brainBindings.inputs
     .map((binding) => {
       const node = inputSignalsByNodeId.get(binding.brainSignalNodeId);
@@ -268,10 +303,10 @@ export const compileLegacyBrainDefinition = (
         `Body input bindings for "${existingNodeId}" and "${binding.node.id}" resolve to the same visual input index ${binding.index}.`
       );
     }
-
     seenInputIndices.set(binding.index, binding.node.id);
   }
 
+  const bodyOutputById = createBodySignalIndex(body.outputSignals);
   const orderedOutputBindings = body.brainBindings.outputs.map((binding, index) => {
     const node = outputSignalsByNodeId.get(binding.brainSignalNodeId);
     const bodySignal = bodyOutputById.get(binding.bodySignalId);
@@ -285,15 +320,42 @@ export const compileLegacyBrainDefinition = (
     };
   });
 
-  const inputPorts = orderedInputBindings.map(({ node, bodySignal, index }) =>
+  return {
+    inputSignalsByNodeId,
+    outputSignalsByNodeId,
+    bodyInputById,
+    bodyOutputById,
+    orderedInputBindings,
+    orderedOutputBindings,
+  };
+};
+
+export const assertLegacyBrainDefinitionCompilable = (
+  document: LegacyBrainDefinition,
+  body: LegacyBodyDefinition
+): void => {
+  analyzeLegacyCompileBindings(document, body);
+  compileLegacyAgentProgram(document, body);
+};
+
+export const compileLegacyBrainDefinition = (
+  document: LegacyBrainDefinition,
+  body: LegacyBodyDefinition
+): LegacyGraphProgram => {
+  const analysis = analyzeLegacyCompileBindings(document, body);
+  const modelsById = new Map<string, ModelDefinition>(document.models.map((model) => [model.id, model]));
+  const leafNodes = collectLeafNodes(document.root.children);
+  const allSignalNodes = leafNodes.filter((node): node is SignalNode => node.kind === 'signal');
+  const neuronLeafNodes = leafNodes.filter((node): node is NeuronNode => node.kind === 'neuron');
+  const inputPorts = analysis.orderedInputBindings.map(({ node, bodySignal, index }) =>
     createInputPortFromBinding(node, bodySignal, index)
   );
-  const outputPorts = orderedOutputBindings.map(({ node, bodySignal, index }) =>
+  const outputPorts = analysis.orderedOutputBindings.map(({ node, bodySignal, index }) =>
     createOutputPortFromBinding(node, bodySignal, index)
   );
   const neuronNodes = neuronLeafNodes.map((node) => createNeuronRuntimeNode(node, modelsById));
   const signalNodes = allSignalNodes.map(createSignalRuntimeNode);
-  const inputBindings = orderedInputBindings.map<BrainProgramInputBinding>(({ node, index }) => {
+  const inputBindings = analysis.orderedInputBindings.map<BrainProgramInputBinding>(({ node, index }) => {
     const model = modelsById.get(node.modelId);
     if (!model) {
       throw new Error(`Missing model "${node.modelId}" for input signal node "${node.id}".`);
@@ -323,9 +385,7 @@ export const compileLegacyBrainDefinition = (
     targetNode.inputConnections.push(connection);
   }
 
-  const compiledAgentProgram = compileAgentIR(
-    createAgentIRFromLegacyGraph('legacy-graph-bridge', document, body)
-  );
+  const compiledAgentProgram = compileLegacyAgentProgram(document, body);
 
   return {
     legacyGraphIR: document,
@@ -336,7 +396,7 @@ export const compileLegacyBrainDefinition = (
     signalNodes,
     links,
     inputBindings,
-    outputBindings: orderedOutputBindings.map<BrainProgramOutputBinding>(({ node, bodySignal }) => {
+    outputBindings: analysis.orderedOutputBindings.map<BrainProgramOutputBinding>(({ node, bodySignal }) => {
       const model = modelsById.get(node.modelId);
       if (!model) {
         throw new Error(`Missing model "${node.modelId}" for output signal node "${node.id}".`);
@@ -354,5 +414,5 @@ export const compileLegacyBrainDefinition = (
       neurons: new Map(neuronNodes.map((node) => [node.id, node])),
       outputs: new Map(signalNodes.filter((node) => node.direction === 'output').map((node) => [node.id, node])),
     },
-  } as LegacyGraphProgram;
+  } as AgentBackedLegacyBrainProgram;
 };

@@ -1,7 +1,8 @@
 import type { BrainInputChannel, BrainOutputChannel, Position } from '../domain/brain/shared';
 import type { AgentLibraryItem } from '../domain/brain/agent-ir';
+import { AgentValidationError } from '../domain/brain/agent-compiler';
 import type { GraphIRDocument } from '../domain/brain/ir';
-import { createAgentIRFromLegacyGraph } from '../domain/brain/legacy-graph-bridge';
+import { createAgentIRFromLegacyGraphDetailed } from './legacyGraphBridge';
 
 export type LegacyBrainDefinition = GraphIRDocument;
 
@@ -223,18 +224,26 @@ export const createLegacyAgentPackage = (
   }
 ): AgentPackage => {
   const brainPackage = createLegacyBrainPackage(name, definition, options);
-  const agent = createAgentIRFromLegacyGraph(
+  const bridgeResult = createAgentIRFromLegacyGraphDetailed(
     brainPackage.metadata.name,
     brainPackage.definition,
     brainPackage.body,
     brainPackage.layout,
     brainPackage.metadata
   );
+  if (bridgeResult.droppedLinkIds.length > 0) {
+    throw new AgentValidationError(
+      bridgeResult.droppedLinkIds.map((linkId) => ({
+        code: 'runtime-binding-error',
+        message: `Legacy Agent package creation cannot preserve legacy draft link "${linkId}".`,
+      }))
+    );
+  }
 
   return {
     packageVersion: 1,
     metadata: brainPackage.metadata,
-    agent,
+    agent: bridgeResult.agent,
   };
 };
 

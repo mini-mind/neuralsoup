@@ -120,7 +120,7 @@ const areAgentsEquivalent = (left: AgentIR, right: AgentIR): boolean =>
   JSON.stringify(normalizeAgentForCompare(left)) === JSON.stringify(normalizeAgentForCompare(right));
 
 const serializeBrainLibrarySnapshot = (brains: BrainLibraryRecord[]): string =>
-  JSON.stringify(brains.map((brain) => encodeBrainLibraryRecord(brain)));
+  JSON.stringify(brains);
 
 const ROOT_GRAPH_PATH: GraphPathItem[] = [{ id: 'root', label: 'root' }];
 

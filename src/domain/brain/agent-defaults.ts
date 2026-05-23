@@ -10,11 +10,7 @@ import {
 } from './agent-ir';
 
 const INPUT_CHANNELS = ['R', 'G', 'B'] as const;
-const DEFAULT_ROOT_INPUT_ADAPTER_ID = 'input-adapter';
 const DEFAULT_ROOT_CONTAINER_ID = 'core-neuron-group';
-const DEFAULT_ROOT_OUTPUT_ADAPTER_ID = 'output-adapter';
-const DEFAULT_CHILD_INPUT_ADAPTER_ID = 'core-input-adapter';
-const DEFAULT_CHILD_OUTPUT_ADAPTER_ID = 'core-output-adapter';
 
 const DEFAULT_AGENT_LAYOUT_VERSION = 1 as const;
 const DEFAULT_AGENT_VERSION = 1 as const;
@@ -166,44 +162,14 @@ const createDefaultConnections = (visionCells: number): AgentConnection[] => {
 
 const createDefaultLayout = (visionCells: number): AgentLayoutIR => {
   const nodes: AgentLayoutIR['nodes'] = {
-    [DEFAULT_ROOT_INPUT_ADAPTER_ID]: {
-      position: { x: -260, y: 180 },
-    },
     [DEFAULT_ROOT_CONTAINER_ID]: {
       position: { x: 50, y: 200 },
-    },
-    [DEFAULT_ROOT_OUTPUT_ADAPTER_ID]: {
-      position: { x: 320, y: 200 },
-    },
-    [DEFAULT_CHILD_INPUT_ADAPTER_ID]: {
-      position: { x: -180, y: 170 },
-    },
-    [DEFAULT_CHILD_OUTPUT_ADAPTER_ID]: {
-      position: { x: 260, y: 180 },
     },
     'neuron-1': {
       position: { x: 50, y: 150 },
     },
     'neuron-2': {
       position: { x: 50, y: 250 },
-    },
-    'core-input-R': {
-      position: { x: -110, y: 120 },
-    },
-    'core-input-G': {
-      position: { x: -110, y: 190 },
-    },
-    'core-input-B': {
-      position: { x: -110, y: 260 },
-    },
-    'core-output-turn-left': {
-      position: { x: 270, y: 120 },
-    },
-    'core-output-move-forward': {
-      position: { x: 270, y: 190 },
-    },
-    'core-output-turn-right': {
-      position: { x: 270, y: 260 },
     },
     'output-turn-left': {
       position: { x: 320, y: 160 },

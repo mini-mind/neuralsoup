@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  createLegacyAgentPackage,
   createDefaultLegacyBodyDefinition,
   createLegacyBrainLayoutFromDefinition,
   createLegacyBrainPackage,
   getLegacyBodyVisionCellCount,
   isLegacyBrainPackage,
 } from '../../src/compat/legacyBrainPackage';
-import { createDefaultGraphIRDocument } from '../../src/domain/brain/defaults';
+import { createDefaultGraphIRDocument } from '../../src/compat/legacyGraphDefaults';
 
 test('createDefaultLegacyBodyDefinition maps vision cells and motor channels into explicit body signals', () => {
   const body = createDefaultLegacyBodyDefinition(2);
@@ -46,6 +47,23 @@ test('createLegacyBrainPackage wraps legacy GraphIR definition with compat metad
   assert.ok(brainPackage.layout);
   assert.ok(brainPackage.body);
   assert.equal(brainPackage.body?.brainBindings.inputs.length, 6);
+});
+
+test('createLegacyAgentPackage rejects legacy drafts whose lowering drops bridge links', () => {
+  const document = createDefaultGraphIRDocument(1);
+  document.root.links.push({
+    id: 'output-to-neuron',
+    from: { nodeId: 'output-turn-left', portId: 'out' },
+    to: { nodeId: 'neuron-1', portId: 'dendrite' },
+    weight: 1,
+  });
+
+  assert.throws(
+    () => createLegacyAgentPackage('Lossy Agent', document),
+    (error: unknown) =>
+      error instanceof Error &&
+      error.message.includes('Legacy Agent package creation cannot preserve legacy draft link')
+  );
 });
 
 test('isLegacyBrainPackage keeps compat package validation strict instead of backfilling defaults', () => {
