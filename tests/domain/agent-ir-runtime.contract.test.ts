@@ -485,3 +485,48 @@ test('legacy graph bridge reports document-only losses when BodyIR rules cannot 
     )
   );
 });
+
+test('legacy graph bridge reports document-only losses for unconnected BodyIR alias rules that compat getter would otherwise drop', () => {
+  const agent = createRuleDrivenAgent();
+  const bridge = createLegacyGraphBridgeFromAgent({
+    ...agent,
+    body: {
+      ...agent.body,
+      inputRules: [
+        {
+          id: 'unconnected-input-regex-alias',
+          nodeIdPattern: '^sensor-(left|right)$',
+          sourceTemplate: 'vision.G.1',
+          scale: 5,
+        },
+      ],
+      outputRules: [
+        {
+          id: 'unconnected-output-regex-alias',
+          nodeIdPattern: '^effector-(dash|glide)$',
+          targetTemplate: 'action.turn-right',
+          decayPerSecond: 9,
+        },
+      ],
+    },
+    connections: [],
+  });
+
+  assert.deepEqual(bridge.droppedConnectionIds, []);
+  assert.ok(
+    bridge.documentOnlyLosses.some((message) =>
+      message.includes('cannot preserve full BodyIR input rule semantics')
+    )
+  );
+  assert.ok(
+    bridge.documentOnlyLosses.some((message) =>
+      message.includes('cannot preserve full BodyIR output rule semantics')
+    )
+  );
+  assert.ok(
+    bridge.documentOnlyLosses.some((message) => message.includes('sensor-left'))
+  );
+  assert.ok(
+    bridge.documentOnlyLosses.some((message) => message.includes('effector-dash'))
+  );
+});

@@ -21,7 +21,6 @@ import type {
   BrainProgramOutputBinding,
   BrainProgramSignalNode,
   LegacyGraphProgram,
-  LegacyBrainProgram,
   ProgramInputPort,
   ProgramOutputPort,
 } from './program';
@@ -323,7 +322,7 @@ export const compileLegacyBrainDefinition = (
     createAgentIRFromLegacyGraph('legacy-graph-bridge', document, body)
   );
 
-  const legacyProgram = {
+  return {
     legacyGraphIR: document,
     compiledAgentProgram,
     inputPorts,
@@ -350,15 +349,5 @@ export const compileLegacyBrainDefinition = (
       neurons: new Map(neuronNodes.map((node) => [node.id, node])),
       outputs: new Map(signalNodes.filter((node) => node.direction === 'output').map((node) => [node.id, node])),
     },
-  } as LegacyBrainProgram;
-  return Object.defineProperties(legacyProgram, {
-    graphIR: {
-      enumerable: true,
-      get: () => legacyProgram.legacyGraphIR,
-    },
-    agentProgram: {
-      enumerable: true,
-      get: () => legacyProgram.compiledAgentProgram,
-    },
-  }) as LegacyGraphProgram;
+  } as LegacyGraphProgram;
 };

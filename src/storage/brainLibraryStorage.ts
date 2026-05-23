@@ -15,7 +15,6 @@ export const BRAIN_LIBRARY_CORRUPT_STORAGE_KEY = 'neuralsoup.brain-library.v1.co
 export const BRAIN_LIBRARY_STATUS_STORAGE_KEY = 'neuralsoup.brain-library.v1.status';
 
 export interface BrainLibraryRecord {
-  metadata: AgentMetadata;
   agent: AgentIR;
 }
 
@@ -81,7 +80,6 @@ const normalizeAgentRecordShape = (
   );
 
   return {
-    metadata: { ...metadata },
     agent: {
       ...normalizedAgent,
       metadata: { ...metadata },
@@ -240,7 +238,7 @@ const normalizeAgentPackage = (candidate: unknown): AgentPackage | null => {
 
   return normalizeAgentPackageMetadata({
     ...candidate,
-    metadata: normalizedRecord.metadata,
+    metadata: normalizedRecord.agent.metadata,
     agent: normalizedRecord.agent,
   });
 };
@@ -250,12 +248,17 @@ const toBrainLibraryRecord = (candidate: AgentPackage): BrainLibraryRecord =>
     ...candidate.agent.metadata,
   });
 
-export const encodeBrainLibraryRecord = (record: BrainLibraryRecord): AgentPackage => ({
-  packageVersion: 1,
-  ...normalizeAgentRecordShape(record.agent, {
+export const encodeBrainLibraryRecord = (record: BrainLibraryRecord): AgentPackage => {
+  const normalized = normalizeAgentRecordShape(record.agent, {
     ...record.agent.metadata,
-  }),
-});
+  });
+
+  return {
+    packageVersion: 1,
+    metadata: { ...normalized.agent.metadata },
+    agent: normalized.agent,
+  };
+};
 
 export const createBrainLibraryItemFromAgent = (name: string, agent: AgentIR): BrainLibraryRecord => {
   const timestamp = new Date().toISOString();
@@ -282,7 +285,7 @@ export const normalizeImportedAgentPackage = (
 
   const trimmedName = options?.name?.trim();
   const existingIds = new Set(options?.existingIds ?? []);
-  const nextId = existingIds.has(normalized.metadata.id) ? createAgentLibraryId() : normalized.metadata.id;
+  const nextId = existingIds.has(normalized.agent.metadata.id) ? createAgentLibraryId() : normalized.agent.metadata.id;
   return normalizeAgentRecordShape(normalized.agent, {
     ...normalized.agent.metadata,
     id: nextId,
@@ -374,10 +377,6 @@ export const loadBrainLibraryWithStatus = (): BrainLibraryLoadResult => {
       const persistedBrain = parsed.brains[index];
       return (
         JSON.stringify(encodeBrainLibraryRecord(toBrainLibraryRecord(brain))) !== JSON.stringify(persistedBrain) ||
-        brain.metadata.id !== persistedBrain?.metadata?.id ||
-        brain.metadata.name !== persistedBrain?.metadata?.name ||
-        brain.metadata.createdAt !== persistedBrain?.metadata?.createdAt ||
-        brain.metadata.updatedAt !== persistedBrain?.metadata?.updatedAt ||
         brain.agent.metadata.id !== persistedBrain?.agent?.metadata?.id ||
         brain.agent.metadata.name !== persistedBrain?.agent?.metadata?.name ||
         brain.agent.metadata.createdAt !== persistedBrain?.agent?.metadata?.createdAt ||
@@ -429,9 +428,9 @@ export const upsertBrainLibraryItemAgent = (
 ): BrainLibraryRecord[] => {
   const nextUpdatedAt = updatedAt ?? new Date().toISOString();
   return brains.map((brain) =>
-    brain.metadata.id === brainId
+    brain.agent.metadata.id === brainId
       ? normalizeAgentRecordShape(agent, {
-          ...brain.metadata,
+          ...brain.agent.metadata,
           updatedAt: nextUpdatedAt,
         })
       : brain
@@ -444,23 +443,23 @@ export const renameBrainLibraryItem = (
   name: string
 ): BrainLibraryRecord[] =>
   brains.map((brain) => {
-    if (brain.metadata.id !== brainId) {
+    if (brain.agent.metadata.id !== brainId) {
       return brain;
     }
 
     const updatedAt = new Date().toISOString();
     return normalizeAgentRecordShape(brain.agent, {
-      ...brain.metadata,
+      ...brain.agent.metadata,
       name,
       updatedAt,
     });
   });
 
 export const deleteBrainLibraryItem = (brains: BrainLibraryRecord[], brainId: string): BrainLibraryRecord[] =>
-  brains.filter((brain) => brain.metadata.id !== brainId);
+  brains.filter((brain) => brain.agent.metadata.id !== brainId);
 
 export const duplicateBrainLibraryItem = (brains: BrainLibraryRecord[], brainId: string): BrainLibraryRecord[] => {
-  const sourceBrain = brains.find((brain) => brain.metadata.id === brainId);
+  const sourceBrain = brains.find((brain) => brain.agent.metadata.id === brainId);
   if (!sourceBrain) {
     return brains;
   }
@@ -470,9 +469,9 @@ export const duplicateBrainLibraryItem = (brains: BrainLibraryRecord[], brainId:
   return [
     ...brains,
     normalizeAgentRecordShape(sourceBrain.agent, {
-      ...sourceBrain.metadata,
+      ...sourceBrain.agent.metadata,
       id: duplicateId,
-      name: `${sourceBrain.metadata.name} 副本`,
+      name: `${sourceBrain.agent.metadata.name} 副本`,
       createdAt: timestamp,
       updatedAt: timestamp,
     }),

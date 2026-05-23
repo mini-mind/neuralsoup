@@ -904,6 +904,56 @@ const compareCompatBodySemantics = (
   const losses: string[] = [];
   const rebuiltBody = buildBodyIRFromCompatBody(compatBody);
   const visionCellCount = deriveAgentIRVisionCellCount(agent);
+  const buildRepresentativeNodeIdFromPattern = (pattern: string): string | null => {
+    const source = pattern.startsWith('^') ? pattern.slice(1) : pattern;
+    const normalized = source.endsWith('$') ? source.slice(0, -1) : source;
+
+    let result = '';
+    for (let index = 0; index < normalized.length; index += 1) {
+      const token = normalized[index];
+      if (token === '\\') {
+        const escaped = normalized[index + 1];
+        if (!escaped) {
+          return null;
+        }
+        result += escaped === 'd' ? '0' : escaped;
+        index += 1;
+      } else if (token === '[') {
+        const closeIndex = normalized.indexOf(']', index + 1);
+        if (closeIndex === -1) {
+          return null;
+        }
+        const charClass = normalized.slice(index + 1, closeIndex);
+        if (charClass.length === 0) {
+          return null;
+        }
+        result += charClass[0] ?? '';
+        index = closeIndex;
+      } else if (token === '(') {
+        const closeIndex = normalized.indexOf(')', index + 1);
+        if (closeIndex === -1) {
+          return null;
+        }
+        const groupBody = normalized.slice(index + 1, closeIndex);
+        const firstAlternative = groupBody.split('|')[0] ?? '';
+        result += buildRepresentativeNodeIdFromPattern(firstAlternative) ?? '';
+        index = closeIndex;
+      } else if ('+*?'.includes(token)) {
+        continue;
+      } else {
+        result += token;
+      }
+    }
+
+    return result.length > 0 ? result : null;
+  };
+  const buildRuleSampleNodeIds = (
+    rules: BodyIR['inputRules'] | BodyIR['outputRules'],
+    fallbackPrefix: string
+  ): string[] =>
+    rules.map(
+      (rule, index) => buildRepresentativeNodeIdFromPattern(rule.nodeIdPattern) ?? `${fallbackPrefix}-${index}`
+    );
 
   if (getLegacyBodyVisionCellCount(compatBody) !== visionCellCount) {
     losses.push(
@@ -927,6 +977,7 @@ const compareCompatBodySemantics = (
       }
       return endpoints;
     }),
+    ...buildRuleSampleNodeIds(agent.body.inputRules, '__body-input-rule-sample'),
   ]);
   const outputCandidates = new Set<string>([
     'output-turn-left',
@@ -942,6 +993,7 @@ const compareCompatBodySemantics = (
       }
       return endpoints;
     }),
+    ...buildRuleSampleNodeIds(agent.body.outputRules, '__body-output-rule-sample'),
   ]);
 
   const inputMismatches = [...inputCandidates].filter(

@@ -22,6 +22,7 @@ import {
 } from '../../src/domain/brain/compat';
 import type { BodyDefinition as LegacyBodyDefinition } from '../../src/domain/brain/compat';
 import type { AgentIR } from '../../src/domain/brain';
+import type { NeuronNode } from '../../src/domain/brain/ir';
 import {
   deriveAgentIRVisionCellCount,
   withDerivedBodyVisionCellCount,
@@ -1151,4 +1152,75 @@ test('simulation session legacy GraphIR compat getter rejects applied AgentIR bo
       error instanceof Error &&
       error.message.includes('cannot preserve full BodyIR input rule semantics')
   );
+});
+
+test('simulation session legacy GraphIR compat getter preserves explicit neuron initialState.u round-trip', () => {
+  const session = new SimulationSession({
+    visionSystem: new VisionSystem(),
+    agentController: new AgentController(),
+    worldManager: new WorldManager(1600, 1200),
+    collisionDetector: new CollisionDetector(),
+  });
+
+  session.initialize();
+
+  const currentAgent = session.getCurrentAgentIR();
+  const appliedStatus = session.setAgentIR({
+    ...currentAgent,
+    brain: {
+      ...currentAgent.brain,
+      neurons: currentAgent.brain.neurons.map((neuron) =>
+        neuron.id === 'neuron-1'
+          ? {
+              ...neuron,
+              initialState: {
+                v: -62,
+                u: -11,
+              },
+            }
+          : neuron
+      ),
+    },
+  });
+
+  assert.equal(appliedStatus.state, 'applied');
+
+  const document = getCurrentLegacyGraphIRDocument(session);
+  const compatNeuron = getCoreNeuronGroup(document).children.find(
+    (node): node is NeuronNode => node.kind === 'neuron' && node.id === 'neuron-1'
+  );
+
+  assert.ok(compatNeuron);
+  assert.equal(compatNeuron.parameterOverrides?.__agent_initialState_v, -62);
+  assert.equal(compatNeuron.parameterOverrides?.__agent_initialState_u, -11);
+});
+
+test('simulation session legacy GraphIR compat setter reads explicit neuron initialState.u back into AgentIR', () => {
+  const session = new SimulationSession({
+    visionSystem: new VisionSystem(),
+    agentController: new AgentController(),
+    worldManager: new WorldManager(1600, 1200),
+    collisionDetector: new CollisionDetector(),
+  });
+
+  session.initialize();
+
+  const document = createDefaultGraphIRDocument(1);
+  const coreNeuron = getCoreNeuronGroup(document).children.find(
+    (node): node is NeuronNode => node.kind === 'neuron' && node.id === 'neuron-1'
+  );
+  assert.ok(coreNeuron);
+  coreNeuron.parameterOverrides = {
+    ...(coreNeuron.parameterOverrides ?? {}),
+    __agent_initialState_v: -61,
+    __agent_initialState_u: -13,
+  };
+
+  const status = setLegacyGraphIRDocument(session, document);
+  assert.equal(status.state, 'applied');
+
+  const appliedNeuron = session.getCurrentAgentIR().brain.neurons.find((neuron) => neuron.id === 'neuron-1');
+  assert.ok(appliedNeuron);
+  assert.equal(appliedNeuron.initialState.v, -61);
+  assert.equal(appliedNeuron.initialState.u, -13);
 });

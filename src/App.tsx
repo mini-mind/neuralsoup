@@ -139,7 +139,7 @@ const applyBrainRecordToEditorState = (
   options.resetGraphEditorSession();
   options.resetRuntimeForBrainSwitch();
   options.setIsBrainLibraryOpen(true);
-  options.setActiveBrainId(brain.metadata.id);
+  options.setActiveBrainId(brain.agent.metadata.id);
   options.setActiveAgentDocument(brain.agent);
   options.setDraftAgentDocument(brain.agent);
   options.setDraftGraphStatusOverride(null);
@@ -158,7 +158,7 @@ const applyBrainRecordIdentityToCurrentState = (
     setDraftGraphStatusOverride: React.Dispatch<React.SetStateAction<AgentDraftStatus | null>>;
   }
 ): void => {
-  options.setActiveBrainId(brain.metadata.id);
+  options.setActiveBrainId(brain.agent.metadata.id);
   options.setActiveAgentDocument(brain.agent);
   options.setDraftAgentDocument(brain.agent);
   options.setDraftGraphStatusOverride(null);
@@ -482,7 +482,7 @@ const App: React.FC = () => {
       return;
     }
 
-    const selectedBrain = brainLibrary.find((brain) => brain.metadata.id === brainId);
+    const selectedBrain = brainLibrary.find((brain) => brain.agent.metadata.id === brainId);
     if (!selectedBrain) {
       return;
     }
@@ -503,7 +503,7 @@ const App: React.FC = () => {
   const handleImportBrain = useCallback((name: string, payload: unknown) => {
     const nextBrain = normalizeImportedAgentPackage(payload, {
       name,
-      existingIds: brainLibrary.map((brain) => brain.metadata.id),
+      existingIds: brainLibrary.map((brain) => brain.agent.metadata.id),
     });
     if (!nextBrain) {
       throw new Error('导入内容规范化失败。');
@@ -527,7 +527,7 @@ const App: React.FC = () => {
   }, [brainLibrary, confirmUnsavedBrainReplacement, resetGraphEditorSession, resetRuntimeForBrainSwitch]);
 
   const handleExportBrain = useCallback((brainId: string) => {
-    const selectedBrain = brainLibrary.find((brain) => brain.metadata.id === brainId);
+    const selectedBrain = brainLibrary.find((brain) => brain.agent.metadata.id === brainId);
     if (!selectedBrain) {
       return;
     }
@@ -539,7 +539,7 @@ const App: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${selectedBrain.metadata.name || selectedBrain.metadata.id}.json`;
+    link.download = `${selectedBrain.agent.metadata.name || selectedBrain.agent.metadata.id}.json`;
     link.click();
     URL.revokeObjectURL(url);
   }, [brainLibrary]);
@@ -551,7 +551,7 @@ const App: React.FC = () => {
       return;
     }
 
-    const renamedActiveBrain = nextLibrary.find((brain) => brain.metadata.id === brainId);
+    const renamedActiveBrain = nextLibrary.find((brain) => brain.agent.metadata.id === brainId);
     if (!renamedActiveBrain) {
       return;
     }

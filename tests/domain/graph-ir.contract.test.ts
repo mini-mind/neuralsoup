@@ -868,20 +868,12 @@ test('compileLegacyBrainDefinition maps vision input bindings to visualInput cha
   assert.equal(inputBindingIndices.get('vision-B-1'), 5);
 });
 
-test('compileLegacyBrainDefinition exposes readonly compat graph aliases on LegacyGraphProgram', () => {
+test('compileLegacyBrainDefinition exposes legacy-named compat graph program fields', () => {
   const document = createDefaultGraphIRDocument(1);
   const program = compileDefaultBrain(document);
 
   assert.equal(program.legacyGraphIR, document);
-  assert.equal(program.graphIR, document);
-  assert.equal(program.compiledAgentProgram, program.agentProgram);
-
-  const replacementDocument = structuredClone(document);
-  assert.throws(() => {
-    // @ts-expect-error runtime check for readonly compat alias
-    program.graphIR = replacementDocument;
-  });
-  assert.equal(program.legacyGraphIR, document);
+  assert.ok(program.compiledAgentProgram);
 });
 
 test('GraphIR runtime step reads visualInput values using channel-interleaved vision layout', () => {

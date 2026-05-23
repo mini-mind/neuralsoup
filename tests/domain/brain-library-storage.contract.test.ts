@@ -61,7 +61,7 @@ test('Brain Library storage saves and loads v1 envelope payloads', () => {
   const loaded = loadBrainLibraryWithStatus();
   assert.equal(loaded.status.state, 'ok');
   assert.equal(loaded.brains.length, 1);
-  assert.equal(loaded.brains[0].metadata.name, 'Stored Brain');
+  assert.equal(loaded.brains[0].agent.metadata.name, 'Stored Brain');
 });
 
 test('Brain Library storage quarantines corrupted JSON payloads', () => {
@@ -235,8 +235,6 @@ test('Brain Library storage normalizes top-level metadata to agent metadata trut
   const loaded = loadBrainLibraryWithStatus();
 
   assert.equal(loaded.status.state, 'ok');
-  assert.equal(loaded.brains[0].metadata.id, 'agent-level-id');
-  assert.equal(loaded.brains[0].metadata.name, 'Agent Level Name');
   assert.equal(loaded.brains[0].agent.metadata.id, 'agent-level-id');
   assert.equal(loaded.brains[0].agent.metadata.name, 'Agent Level Name');
 
@@ -251,14 +249,12 @@ test('normalizeImportedAgentPackage applies import name and rewrites conflicting
   const brain = createLegacyAgentPackage('Import Source', createDefaultGraphIRDocument(1));
   const normalized = normalizeImportedAgentPackage(brain, {
     name: 'Imported Brain',
-    existingIds: [brain.metadata.id],
+    existingIds: [brain.agent.metadata.id],
   });
 
   assert.ok(normalized);
-  assert.equal(normalized.metadata.name, 'Imported Brain');
   assert.equal(normalized.agent.metadata.name, 'Imported Brain');
-  assert.notEqual(normalized.metadata.id, brain.metadata.id);
-  assert.equal(normalized.metadata.id, normalized.agent.metadata.id);
+  assert.notEqual(normalized.agent.metadata.id, brain.agent.metadata.id);
 });
 
 test('Brain Library export payload can round-trip through import normalization', () => {
@@ -270,7 +266,6 @@ test('Brain Library export payload can round-trip through import normalization',
   });
 
   assert.ok(normalized);
-  assert.equal(normalized.metadata.name, 'Roundtrip Brain');
   assert.equal(normalized.agent.metadata.name, 'Roundtrip Brain');
   assert.equal(deriveAgentIRVisionCellCount(normalized.agent), brain.agent.body.visionCellCount);
   assert.equal('visionCellCount' in JSON.parse(JSON.stringify(exported)).agent.body, false);
@@ -280,11 +275,9 @@ test('renameBrainLibraryItem keeps top-level metadata and agent metadata fully a
   const brain = createLegacyAgentPackage('Rename Source', createDefaultGraphIRDocument(1));
   const record = createBrainLibraryItemFromAgent('Rename Source', brain.agent);
 
-  const [renamed] = renameBrainLibraryItem([record], record.metadata.id, 'Renamed Brain');
+  const [renamed] = renameBrainLibraryItem([record], record.agent.metadata.id, 'Renamed Brain');
   assert.ok(renamed);
-  assert.equal(renamed.metadata.id, renamed.agent.metadata.id);
-  assert.equal(renamed.metadata.name, renamed.agent.metadata.name);
-  assert.equal(renamed.metadata.updatedAt, renamed.agent.metadata.updatedAt);
+  assert.equal(renamed.agent.metadata.name, 'Renamed Brain');
 });
 
 test('upsertBrainLibraryItemAgent keeps top-level metadata and agent metadata fully aligned', () => {
@@ -292,10 +285,7 @@ test('upsertBrainLibraryItemAgent keeps top-level metadata and agent metadata fu
   const record = createBrainLibraryItemFromAgent('Upsert Source', brain.agent);
   const replacement = createBrainLibraryItemFromAgent('Replacement Draft', brain.agent).agent;
 
-  const [updated] = upsertBrainLibraryItemAgent([record], record.metadata.id, replacement, '2026-05-23T04:30:00.000Z');
+  const [updated] = upsertBrainLibraryItemAgent([record], record.agent.metadata.id, replacement, '2026-05-23T04:30:00.000Z');
   assert.ok(updated);
-  assert.equal(updated.metadata.id, updated.agent.metadata.id);
-  assert.equal(updated.metadata.name, updated.agent.metadata.name);
-  assert.equal(updated.metadata.updatedAt, updated.agent.metadata.updatedAt);
-  assert.equal(updated.metadata.updatedAt, '2026-05-23T04:30:00.000Z');
+  assert.equal(updated.agent.metadata.updatedAt, '2026-05-23T04:30:00.000Z');
 });

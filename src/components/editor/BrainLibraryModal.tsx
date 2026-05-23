@@ -73,8 +73,8 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
   };
 
   const startRenamingBrain = (brain: BrainLibraryRecord) => {
-    setRenamingBrainId(brain.metadata.id);
-    setRenamingBrainName(brain.metadata.name);
+    setRenamingBrainId(brain.agent.metadata.id);
+    setRenamingBrainName(brain.agent.metadata.name);
   };
 
   const submitRename = () => {
@@ -95,12 +95,12 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
   };
 
   const deleteBrain = (brain: BrainLibraryRecord) => {
-    if (!window.confirm(`删除 Brain "${brain.metadata.name}"？此操作不能撤销。`)) {
+    if (!window.confirm(`删除 Brain "${brain.agent.metadata.name}"？此操作不能撤销。`)) {
       return;
     }
 
-    onDeleteBrain(brain.metadata.id);
-    if (renamingBrainId === brain.metadata.id) {
+    onDeleteBrain(brain.agent.metadata.id);
+    if (renamingBrainId === brain.agent.metadata.id) {
       setRenamingBrainId(null);
       setRenamingBrainName('');
     }
@@ -140,16 +140,16 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
             ) : (
               brains.map((brain) => (
                 <div
-                  key={brain.metadata.id}
-                  className={`brain-library-item ${brain.metadata.id === activeBrainId ? 'active' : ''}`}
-                  data-testid={`brain-library-item-${brain.metadata.id}`}
+                  key={brain.agent.metadata.id}
+                  className={`brain-library-item ${brain.agent.metadata.id === activeBrainId ? 'active' : ''}`}
+                  data-testid={`brain-library-item-${brain.agent.metadata.id}`}
                 >
                   <div className="brain-library-item-main">
-                    {renamingBrainId === brain.metadata.id ? (
+                    {renamingBrainId === brain.agent.metadata.id ? (
                       <div className="brain-library-rename-row">
                         <input
                           value={renamingBrainName}
-                          data-testid={`brain-library-rename-input-${brain.metadata.id}`}
+                          data-testid={`brain-library-rename-input-${brain.agent.metadata.id}`}
                           onChange={(event) => setRenamingBrainName(event.target.value)}
                           onKeyDown={(event) => {
                             if (event.key === 'Enter') {
@@ -164,7 +164,7 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
                         <button
                           type="button"
                           className="brain-library-small-button"
-                          data-testid={`brain-library-rename-save-${brain.metadata.id}`}
+                          data-testid={`brain-library-rename-save-${brain.agent.metadata.id}`}
                           onClick={submitRename}
                         >
                           保存
@@ -176,11 +176,11 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
                         className="brain-library-item-title"
                         onClick={(event) => {
                           event.stopPropagation();
-                          queueSelectBrain(brain.metadata.id);
+                          queueSelectBrain(brain.agent.metadata.id);
                         }}
                       >
-                        <span>{brain.metadata.name}</span>
-                        <small>{new Date(brain.metadata.updatedAt).toLocaleString()}</small>
+                        <span>{brain.agent.metadata.name}</span>
+                        <small>{new Date(brain.agent.metadata.updatedAt).toLocaleString()}</small>
                       </button>
                     )}
                   </div>
@@ -188,7 +188,7 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
                     <button
                       type="button"
                       className="brain-library-small-button"
-                      data-testid={`brain-library-rename-${brain.metadata.id}`}
+                      data-testid={`brain-library-rename-${brain.agent.metadata.id}`}
                       onClick={(event) => {
                         event.stopPropagation();
                         startRenamingBrain(brain);
@@ -199,10 +199,10 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
                     <button
                       type="button"
                       className="brain-library-small-button"
-                      data-testid={`brain-library-duplicate-${brain.metadata.id}`}
+                      data-testid={`brain-library-duplicate-${brain.agent.metadata.id}`}
                       onClick={(event) => {
                         event.stopPropagation();
-                        onDuplicateBrain(brain.metadata.id);
+                        onDuplicateBrain(brain.agent.metadata.id);
                       }}
                     >
                       复制
@@ -210,10 +210,10 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
                     <button
                       type="button"
                       className="brain-library-small-button"
-                      data-testid={`brain-library-export-${brain.metadata.id}`}
+                      data-testid={`brain-library-export-${brain.agent.metadata.id}`}
                       onClick={(event) => {
                         event.stopPropagation();
-                        onExportBrain(brain.metadata.id);
+                        onExportBrain(brain.agent.metadata.id);
                       }}
                     >
                       导出
@@ -221,7 +221,7 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
                     <button
                       type="button"
                       className="brain-library-small-button danger"
-                      data-testid={`brain-library-delete-${brain.metadata.id}`}
+                      data-testid={`brain-library-delete-${brain.agent.metadata.id}`}
                       onClick={(event) => {
                         event.stopPropagation();
                         deleteBrain(brain);

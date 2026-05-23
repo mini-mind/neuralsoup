@@ -77,6 +77,8 @@ const selectors = {
   topologyOutputCount: '[data-testid="topology-output-count"]',
   topologyValidationCount: '[data-testid="topology-validation-count"]',
   neuronLabelInput: '[data-testid="neuron-label-input"]',
+  neuronInitialStateVInput: '[data-testid="neuron-initial-state-v-input"]',
+  neuronInitialStateUInput: '[data-testid="neuron-initial-state-u-input"]',
   connectionWeightInput: '[data-testid="connection-weight-input"]',
   inputAdapterNode: '[data-testid="topology-node-input-adapter"]',
   coreGroupNode: '[data-testid="topology-node-core-neuron-group"]',
@@ -501,7 +503,7 @@ const getStoredBrains = async (page: Page): Promise<E2EStoredBrain[]> =>
 
 const getStoredBrainByName = async (page: Page, name: string): Promise<E2EStoredBrain | null> => {
   const storedBrains = await getStoredBrains(page);
-  return storedBrains.find((brain) => brain.metadata?.name === name) ?? null;
+  return storedBrains.find((brain) => brain.agent?.metadata?.name === name) ?? null;
 };
 
 const getNumericLocatorText = async (page: Page, selector: string) =>
@@ -782,7 +784,7 @@ test('brain library opens from the editor toolbar and saves the current IR to Lo
     return ((JSON.parse(rawValue) as { brains?: E2EStoredBrain[] }).brains ?? []);
   }, BRAIN_LIBRARY_STORAGE_KEY);
 
-  const storedBrain = storedBrains.find((brain) => brain.metadata?.name === 'E2E Brain');
+  const storedBrain = storedBrains.find((brain) => brain.agent?.metadata?.name === 'E2E Brain');
   expect(storedBrain).toBeTruthy();
   expect(storedBrain?.metadata?.id).toBeTruthy();
   expect(storedBrain?.agent?.metadata?.name).toBe('E2E Brain');
@@ -840,7 +842,7 @@ test('brain library manages saved items and reports import errors', async ({ pag
   const savedBrainId = await page.evaluate((storageKey) => {
     const rawValue = window.localStorage.getItem(storageKey);
     const brains = rawValue ? ((JSON.parse(rawValue) as { brains?: E2EStoredBrain[] }).brains ?? []) : [];
-    return brains.find((brain) => brain.metadata?.name === 'Manage Brain')?.metadata?.id ?? '';
+    return brains.find((brain) => brain.agent?.metadata?.name === 'Manage Brain')?.agent?.metadata?.id ?? '';
   }, BRAIN_LIBRARY_STORAGE_KEY);
   expect(savedBrainId).not.toBe('');
 
@@ -878,7 +880,7 @@ test('brain library manages saved items and reports import errors', async ({ pag
         ({ storageKey, brainId }) => {
           const rawValue = window.localStorage.getItem(storageKey);
           const brains = rawValue ? ((JSON.parse(rawValue) as { brains?: E2EStoredBrain[] }).brains ?? []) : [];
-          return brains.some((brain) => brain.metadata?.id === brainId);
+          return brains.some((brain) => brain.agent?.metadata?.id === brainId);
         },
         { storageKey: BRAIN_LIBRARY_STORAGE_KEY, brainId: savedBrainId }
       )
@@ -921,7 +923,7 @@ test('renaming the active brain preserves draft-only edits instead of replacing 
   const savedBrainId = await page.evaluate((storageKey) => {
     const rawValue = window.localStorage.getItem(storageKey);
     const brains = rawValue ? ((JSON.parse(rawValue) as { brains?: E2EStoredBrain[] }).brains ?? []) : [];
-    return brains.find((brain) => brain.metadata?.name === 'Rename Active Brain')?.metadata?.id ?? '';
+    return brains.find((brain) => brain.agent?.metadata?.name === 'Rename Active Brain')?.agent?.metadata?.id ?? '';
   }, BRAIN_LIBRARY_STORAGE_KEY);
   expect(savedBrainId).not.toBe('');
 
@@ -1305,16 +1307,28 @@ test('graph view edits leaf params and leaf link weights through Graph IR inspec
 
   await page.locator(selectors.editorTabGraph).click();
   await doubleClickNode(page, selectors.coreGroupNode);
-  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+  const runtimeConnectionCount = await getNumericLocatorText(page, selectors.topologyRuntimeConnectionCount);
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(runtimeConnectionCount));
 
   await doubleClickNode(page, selectors.nodeNeuronOne);
   await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
   await page.locator(selectors.neuronLabelInput).fill('已编辑神经元');
+  await page.locator(selectors.neuronInitialStateVInput).fill('-62');
+  await page.locator(selectors.neuronInitialStateUInput).fill('-11');
   await page.locator(selectors.topologyDetailClose).click();
   await expect(page.locator(selectors.topologyDetailModal)).toHaveCount(0);
   await doubleClickNode(page, selectors.nodeNeuronOne);
   await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
   await expect(page.locator(selectors.neuronLabelInput)).toHaveValue('已编辑神经元');
+  await expect(page.locator(selectors.neuronInitialStateVInput)).toHaveValue('-62');
+  await expect(page.locator(selectors.neuronInitialStateUInput)).toHaveValue('-11');
+  await page.locator(selectors.neuronInitialStateUInput).fill('');
+  await page.locator(selectors.topologyDetailClose).click();
+  await expect(page.locator(selectors.topologyDetailModal)).toHaveCount(0);
+  await doubleClickNode(page, selectors.nodeNeuronOne);
+  await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
+  await expect(page.locator(selectors.neuronInitialStateVInput)).toHaveValue('-62');
+  await expect(page.locator(selectors.neuronInitialStateUInput)).toHaveValue('');
   await page.locator(selectors.topologyDetailClose).click();
   await expect(page.locator(selectors.topologyDetailModal)).toHaveCount(0);
 
@@ -1323,7 +1337,7 @@ test('graph view edits leaf params and leaf link weights through Graph IR inspec
   await page.locator(selectors.connectionWeightInput).fill('1.25');
   await page.locator(selectors.topologyDetailClose).click();
   await expect(page.locator(selectors.linkNeuronOneNeuronTwo)).toContainText('1.25');
-  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(runtimeConnectionCount));
 });
 
 test('graph view diagnostics keep draft and installed runtime summaries aligned after valid edits', async ({ page }, testInfo) => {

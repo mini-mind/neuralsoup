@@ -3,7 +3,6 @@ import type {
   BrainContainerNode,
   AgentIR,
 } from '../../domain/brain';
-import type { LiteralValue } from '../../domain/brain/compat';
 import type { Position } from '../../domain/brain/shared';
 import {
   AGENT_GRAPH_CHILD_SCOPE_OFFSET,
@@ -16,6 +15,7 @@ import {
   createNeuronAndConnectInContainer,
   ungroupAgentContainer,
 } from '../editor/graph/agentGraphEditing';
+import type { GraphNodeUpdatePayload } from '../editor/graph/graphNodeUpdate';
 import type { GraphViewNode } from '../editor/graph/graphViewTypes';
 import type { AgentGraphViewIndexes, AgentGraphViewNodeRecord } from '../editor/graph/agentGraphViewModel';
 import { canGraphNodesConnect } from '../editor/graph/graphLinkPolicy';
@@ -892,7 +892,7 @@ export const useGraphEditorCommands = ({
   );
 
   const updateNodeLabelAndParams = useCallback(
-    (nodeId: string, payload: { label: string; parameterOverrides?: Record<string, LiteralValue> }) => {
+    (nodeId: string, payload: GraphNodeUpdatePayload) => {
       setAgent((current) => ({
         ...current,
         brain: {
@@ -912,6 +912,14 @@ export const useGraphEditorCommands = ({
                       ? { threshold: payload.parameterOverrides.threshold }
                       : {}),
                   },
+                  ...(payload.initialState
+                    ? {
+                        initialState: {
+                          v: payload.initialState.v,
+                          ...(typeof payload.initialState.u === 'number' ? { u: payload.initialState.u } : {}),
+                        },
+                      }
+                    : {}),
                 }
               : neuron
           ),

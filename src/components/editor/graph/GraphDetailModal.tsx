@@ -1,7 +1,7 @@
 import React from 'react';
-import type { LiteralValue } from '../../../domain/brain/compat';
 import NeuronDetailEditor from '../../NeuronDetailEditor';
 import ConnectionDetailEditor from '../../ConnectionDetailEditor';
+import type { GraphNodeUpdatePayload } from './graphNodeUpdate';
 import type { DetailModalData } from '../../hooks/useSNNTopologyState';
 import type { AgentGraphViewNodeRecord } from './agentGraphViewModel';
 
@@ -28,7 +28,7 @@ interface GraphDetailModalProps {
     threshold: number;
   } | null;
   onClose: () => void;
-  onUpdateNode: (nodeId: string, payload: { label: string; parameterOverrides?: Record<string, LiteralValue> }) => void;
+  onUpdateNode: (nodeId: string, payload: GraphNodeUpdatePayload) => void;
   onUpdateLink: (linkId: string, weight: number) => void;
 }
 
@@ -80,9 +80,10 @@ const GraphDetailModal: React.FC<GraphDetailModalProps> = ({
               id: activeNode.id,
               label: activeNode.label,
               params: activeNeuronParameters,
+              initialState: activeNode.neuron?.initialState,
             }}
             onUpdate={(updatedNeuron) => {
-              const parameterOverrides: Record<string, LiteralValue> = {
+              const parameterOverrides = {
                 a: updatedNeuron.params.a,
                 b: updatedNeuron.params.b,
                 c: updatedNeuron.params.c,
@@ -92,6 +93,7 @@ const GraphDetailModal: React.FC<GraphDetailModalProps> = ({
               onUpdateNode(activeNode.id, {
                 label: updatedNeuron.label,
                 parameterOverrides,
+                initialState: updatedNeuron.initialState,
               });
             }}
           />
