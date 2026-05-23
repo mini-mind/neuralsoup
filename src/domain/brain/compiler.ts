@@ -13,7 +13,12 @@ import type {
   SignalNode,
   TopologyNode,
 } from './ir';
-import type { BodyDefinition, BodyInputSignal, BodyOutputSignal, BrainDefinition } from './package';
+import type {
+  LegacyBodyDefinition,
+  LegacyBodyInputSignal,
+  LegacyBodyOutputSignal,
+  LegacyBrainDefinition,
+} from './package';
 import type {
   BrainProgramConnection,
   BrainProgramInputBinding,
@@ -60,7 +65,7 @@ const resolveSignalPortId = (
 
 const createInputPortFromBinding = (
   node: SignalNode,
-  bodySignal: BodyInputSignal,
+  bodySignal: LegacyBodyInputSignal,
   index: number
 ): ProgramInputPort => {
   return {
@@ -74,7 +79,7 @@ const createInputPortFromBinding = (
 
 const createOutputPortFromBinding = (
   node: SignalNode,
-  bodySignal: BodyOutputSignal,
+  bodySignal: LegacyBodyOutputSignal,
   index: number
 ): ProgramOutputPort => ({
   id: node.id,
@@ -170,7 +175,7 @@ const collectRootAdapterSignals = (nodes: TopologyNode[]): { inputSignals: Signa
   return { inputSignals, outputSignals };
 };
 
-const resolveInputSignalIndex = (bodySignal: BodyInputSignal): number =>
+const resolveInputSignalIndex = (bodySignal: LegacyBodyInputSignal): number =>
   bodySignal.source.cellIndex * 3 + INPUT_CHANNEL_OFFSET[bodySignal.source.channel];
 
 const createBodySignalIndex = <Signal extends { id: string }>(signals: Signal[]): Map<string, Signal> =>
@@ -187,7 +192,7 @@ const assertNoDuplicateBodySignalIds = (signals: Array<{ id: string }>, scope: s
 };
 
 const assertBodyBindingsTargetRootAdapterSignals = (
-  body: BodyDefinition,
+  body: LegacyBodyDefinition,
   inputSignalsByNodeId: Map<string, SignalNode>,
   outputSignalsByNodeId: Map<string, SignalNode>
 ): void => {
@@ -221,8 +226,8 @@ const assertBodyBindingsTargetRootAdapterSignals = (
 };
 
 export const compileLegacyBrainDefinition = (
-  document: BrainDefinition,
-  body: BodyDefinition
+  document: LegacyBrainDefinition,
+  body: LegacyBodyDefinition
 ): LegacyGraphProgram => {
   const issues = validateGraphIRDocument(document);
   if (issues.length > 0) {

@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDefaultGraphIRDocument, createLegacyAgentPackage } from '../../src/domain/brain/compat';
 import { deriveAgentIRVisionCellCount } from '../../src/domain/brain';
+import { createDefaultGraphIRDocument } from '../../src/domain/brain/defaults';
+import { createLegacyAgentPackage } from '../../src/domain/brain/package';
 import {
   BRAIN_LIBRARY_CORRUPT_STORAGE_KEY,
   BRAIN_LIBRARY_STATUS_STORAGE_KEY,
@@ -78,6 +79,21 @@ test('Brain Library storage quarantines corrupted JSON payloads', () => {
   assert.ok(storage.getItem(BRAIN_LIBRARY_STATUS_STORAGE_KEY));
   assert.equal(loadBrainLibraryWithStatus().status.state, 'recovered');
   assert.ok(storage.getItem(BRAIN_LIBRARY_STATUS_STORAGE_KEY));
+  saveBrainLibrary([]);
+  assert.equal(storage.getItem(BRAIN_LIBRARY_STATUS_STORAGE_KEY), null);
+});
+
+test('Brain Library recovered status survives repeated reads until a successful save clears it', () => {
+  const storage = installMemoryLocalStorage();
+  storage.setItem(BRAIN_LIBRARY_STORAGE_KEY, '{broken');
+
+  const firstLoad = loadBrainLibraryWithStatus();
+  const secondLoad = loadBrainLibraryWithStatus();
+
+  assert.equal(firstLoad.status.state, 'recovered');
+  assert.equal(secondLoad.status.state, 'recovered');
+  assert.ok(storage.getItem(BRAIN_LIBRARY_STATUS_STORAGE_KEY));
+
   saveBrainLibrary([]);
   assert.equal(storage.getItem(BRAIN_LIBRARY_STATUS_STORAGE_KEY), null);
 });
@@ -245,6 +261,35 @@ test('Brain Library storage normalizes top-level metadata to agent metadata trut
   assert.equal(persisted.brains[0].metadata.name, 'Agent Level Name');
 });
 
+test('Brain Library storage accepts payloads without top-level metadata and rewrites compat metadata projection', () => {
+  const storage = installMemoryLocalStorage();
+  const brain = createLegacyAgentPackage('Metadata Optional Brain', createDefaultGraphIRDocument(1));
+  const brainWithoutTopLevelMetadata = {
+    packageVersion: brain.packageVersion,
+    agent: brain.agent,
+  };
+
+  storage.setItem(
+    BRAIN_LIBRARY_STORAGE_KEY,
+    JSON.stringify({
+      storageVersion: 1,
+      savedAt: new Date().toISOString(),
+      brains: [brainWithoutTopLevelMetadata],
+    })
+  );
+
+  const loaded = loadBrainLibraryWithStatus();
+
+  assert.equal(loaded.status.state, 'ok');
+  assert.equal(loaded.brains[0].agent.metadata.name, 'Metadata Optional Brain');
+
+  const persisted = JSON.parse(storage.getItem(BRAIN_LIBRARY_STORAGE_KEY) ?? 'null') as {
+    brains: Array<{ metadata?: { id: string; name: string }; agent: { metadata: { id: string; name: string } } }>;
+  };
+  assert.equal(persisted.brains[0].metadata?.id, persisted.brains[0].agent.metadata.id);
+  assert.equal(persisted.brains[0].metadata?.name, persisted.brains[0].agent.metadata.name);
+});
+
 test('normalizeImportedAgentPackage applies import name and rewrites conflicting ids', () => {
   const brain = createLegacyAgentPackage('Import Source', createDefaultGraphIRDocument(1));
   const normalized = normalizeImportedAgentPackage(brain, {
@@ -255,6 +300,17 @@ test('normalizeImportedAgentPackage applies import name and rewrites conflicting
   assert.ok(normalized);
   assert.equal(normalized.agent.metadata.name, 'Imported Brain');
   assert.notEqual(normalized.agent.metadata.id, brain.agent.metadata.id);
+});
+
+test('normalizeImportedAgentPackage accepts missing top-level metadata when agent metadata is valid', () => {
+  const brain = createLegacyAgentPackage('Import Without Envelope Metadata', createDefaultGraphIRDocument(1));
+  const normalized = normalizeImportedAgentPackage({
+    packageVersion: 1,
+    agent: brain.agent,
+  });
+
+  assert.ok(normalized);
+  assert.equal(normalized.agent.metadata.name, 'Import Without Envelope Metadata');
 });
 
 test('Brain Library export payload can round-trip through import normalization', () => {

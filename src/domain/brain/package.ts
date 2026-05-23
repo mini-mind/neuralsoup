@@ -4,7 +4,6 @@ import type { GraphIRDocument } from './ir';
 import { createAgentIRFromLegacyGraph } from './legacy-graph-bridge';
 
 export type LegacyBrainDefinition = GraphIRDocument;
-export type BrainDefinition = LegacyBrainDefinition;
 
 export interface BrainMetadata {
   id: string;
@@ -37,7 +36,7 @@ export interface BrainLayoutDocument {
   >;
 }
 
-export interface BodyInputSignal {
+export interface LegacyBodyInputSignal {
   id: string;
   source: {
     kind: 'vision-cell';
@@ -47,7 +46,7 @@ export interface BodyInputSignal {
   scale?: number;
 }
 
-export interface BodyOutputSignal {
+export interface LegacyBodyOutputSignal {
   id: string;
   target: {
     kind: 'action-channel';
@@ -56,45 +55,35 @@ export interface BodyOutputSignal {
   decayPerSecond?: number;
 }
 
-export interface BodyInputBinding {
+export interface LegacyBodyInputBinding {
   bodySignalId: string;
   brainSignalNodeId: string;
 }
 
-export interface BodyOutputBinding {
+export interface LegacyBodyOutputBinding {
   brainSignalNodeId: string;
   bodySignalId: string;
 }
 
-export interface BodyDefinition {
+export interface LegacyBodyDefinition {
   version: 1;
-  inputSignals: BodyInputSignal[];
-  outputSignals: BodyOutputSignal[];
+  inputSignals: LegacyBodyInputSignal[];
+  outputSignals: LegacyBodyOutputSignal[];
   brainBindings: {
-    inputs: BodyInputBinding[];
-    outputs: BodyOutputBinding[];
+    inputs: LegacyBodyInputBinding[];
+    outputs: LegacyBodyOutputBinding[];
   };
 }
 
-export interface BrainPackage {
+export interface LegacyBrainPackage {
   packageVersion: 1;
   metadata: BrainMetadata;
-  definition: BrainDefinition;
+  definition: LegacyBrainDefinition;
   layout: BrainLayoutDocument;
-  body: BodyDefinition;
+  body: LegacyBodyDefinition;
 }
 
 export type AgentPackage = AgentLibraryItem;
-
-/**
- * Compat-only legacy GraphIR body schema. Prefer BodyIR on the main domain surface.
- */
-export type LegacyBodyDefinition = BodyDefinition;
-
-/**
- * Compat-only legacy GraphIR package schema. Prefer AgentPackage on the main domain surface.
- */
-export type LegacyBrainPackage = BrainPackage;
 
 const INPUT_CHANNELS: BrainInputChannel[] = ['R', 'G', 'B'];
 const OUTPUT_CHANNELS: BrainOutputChannel[] = ['turn-left', 'move-forward', 'turn-right'];
@@ -145,7 +134,7 @@ export const createLegacyBrainLayoutFromDefinition = (definition: LegacyBrainDef
   };
 };
 
-export const createDefaultLegacyBodyDefinition = (visionCells: number): BodyDefinition => ({
+export const createDefaultLegacyBodyDefinition = (visionCells: number): LegacyBodyDefinition => ({
   version: 1,
   inputSignals: INPUT_CHANNELS.flatMap((channel) =>
     Array.from({ length: visionCells }, (_, cellIndex) => ({
@@ -180,7 +169,7 @@ export const createDefaultLegacyBodyDefinition = (visionCells: number): BodyDefi
   },
 });
 
-export const getLegacyBodyVisionCellCount = (body: BodyDefinition): number =>
+export const getLegacyBodyVisionCellCount = (body: LegacyBodyDefinition): number =>
   body.inputSignals.reduce(
     (maxCellCount, signal) =>
       signal.source.kind === 'vision-cell' ? Math.max(maxCellCount, signal.source.cellIndex + 1) : maxCellCount,
@@ -196,10 +185,10 @@ export const createLegacyBrainPackage = (
     updatedAt?: string;
     description?: string;
     tags?: string[];
-    body?: BodyDefinition;
+    body?: LegacyBodyDefinition;
     layout?: BrainLayoutDocument;
   }
-): BrainPackage => {
+): LegacyBrainPackage => {
   const timestamp = options?.updatedAt ?? new Date().toISOString();
   const createdAt = options?.createdAt ?? timestamp;
   const visionCells = getRootInputAdapterVisionCells(definition);
@@ -229,7 +218,7 @@ export const createLegacyAgentPackage = (
     updatedAt?: string;
     description?: string;
     tags?: string[];
-    body?: BodyDefinition;
+    body?: LegacyBodyDefinition;
     layout?: BrainLayoutDocument;
   }
 ): AgentPackage => {
@@ -249,7 +238,7 @@ export const createLegacyAgentPackage = (
   };
 };
 
-export const isLegacyBrainPackage = (value: unknown): value is BrainPackage => {
+export const isLegacyBrainPackage = (value: unknown): value is LegacyBrainPackage => {
   if (!isObject(value) || value.packageVersion !== 1 || !isObject(value.metadata)) {
     return false;
   }

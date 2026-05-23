@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  createDefaultGraphIRDocument,
   createDefaultLegacyBodyDefinition,
   createLegacyBrainLayoutFromDefinition,
   createLegacyBrainPackage,
   getLegacyBodyVisionCellCount,
   isLegacyBrainPackage,
-} from '../../src/domain/brain/compat';
+} from '../../src/domain/brain/package';
+import { createDefaultGraphIRDocument } from '../../src/domain/brain/defaults';
 
 test('createDefaultLegacyBodyDefinition maps vision cells and motor channels into explicit body signals', () => {
   const body = createDefaultLegacyBodyDefinition(2);
@@ -36,7 +36,7 @@ test('createLegacyBrainLayoutFromDefinition extracts node position and collapsed
   assert.ok(layout.nodes['core-neuron-group']);
 });
 
-test('createLegacyBrainPackage wraps legacy brain definition with metadata, layout, and default body', () => {
+test('createLegacyBrainPackage wraps legacy GraphIR definition with compat metadata, layout, and body', () => {
   const document = createDefaultGraphIRDocument(2);
   const brainPackage = createLegacyBrainPackage('Test Brain', document);
 
@@ -48,7 +48,7 @@ test('createLegacyBrainPackage wraps legacy brain definition with metadata, layo
   assert.equal(brainPackage.body?.brainBindings.inputs.length, 6);
 });
 
-test('isLegacyBrainPackage requires complete package body and layout instead of backfilling compatibility defaults', () => {
+test('isLegacyBrainPackage keeps compat package validation strict instead of backfilling defaults', () => {
   const document = createDefaultGraphIRDocument(1);
   const brainPackage = createLegacyBrainPackage('Strict Brain', document);
 

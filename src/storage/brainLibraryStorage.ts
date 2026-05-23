@@ -43,6 +43,19 @@ export interface BrainLibraryLoadResult {
   status: BrainLibraryLoadStatus;
 }
 
+type AgentPackageLike = {
+  packageVersion?: unknown;
+  metadata?: unknown;
+  agent?: unknown;
+};
+
+type AgentPackageMetadataShape = {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -87,29 +100,27 @@ const normalizeAgentRecordShape = (
   };
 };
 
-export const isAgentPackage = (value: unknown): value is AgentPackage =>
+const isAgentMetadata = (value: unknown): value is AgentPackageMetadataShape =>
   isObject(value) &&
-  value.packageVersion === 1 &&
-  isObject(value.metadata) &&
-  typeof value.metadata.id === 'string' &&
-  typeof value.metadata.name === 'string' &&
-  typeof value.metadata.createdAt === 'string' &&
-  typeof value.metadata.updatedAt === 'string' &&
-  isObject(value.agent) &&
-  value.agent.version === 1 &&
-  isObject(value.agent.metadata) &&
-  typeof value.agent.metadata.id === 'string' &&
-  typeof value.agent.metadata.name === 'string' &&
-  typeof value.agent.metadata.createdAt === 'string' &&
-  typeof value.agent.metadata.updatedAt === 'string' &&
-  isObject(value.agent.body) &&
-  value.agent.body.version === 1 &&
-  (value.agent.body.visionCellCount === undefined ||
-    (typeof value.agent.body.visionCellCount === 'number' &&
-      Number.isFinite(value.agent.body.visionCellCount) &&
-      value.agent.body.visionCellCount >= 0)) &&
-  Array.isArray(value.agent.body.inputRules) &&
-  value.agent.body.inputRules.every(
+  typeof value.id === 'string' &&
+  typeof value.name === 'string' &&
+  typeof value.createdAt === 'string' &&
+  typeof value.updatedAt === 'string';
+
+const hasValidOptionalTopLevelMetadata = (value: unknown): boolean => value === undefined || isAgentMetadata(value);
+
+const hasValidAgentPayload = (agent: unknown): agent is AgentIR =>
+  isObject(agent) &&
+  agent.version === 1 &&
+  isAgentMetadata(agent.metadata) &&
+  isObject(agent.body) &&
+  agent.body.version === 1 &&
+  (agent.body.visionCellCount === undefined ||
+    (typeof agent.body.visionCellCount === 'number' &&
+      Number.isFinite(agent.body.visionCellCount) &&
+      agent.body.visionCellCount >= 0)) &&
+  Array.isArray(agent.body.inputRules) &&
+  agent.body.inputRules.every(
     (rule) =>
       isObject(rule) &&
       typeof rule.id === 'string' &&
@@ -118,8 +129,8 @@ export const isAgentPackage = (value: unknown): value is AgentPackage =>
       typeof rule.scale === 'number' &&
       Number.isFinite(rule.scale)
   ) &&
-  Array.isArray(value.agent.body.outputRules) &&
-  value.agent.body.outputRules.every(
+  Array.isArray(agent.body.outputRules) &&
+  agent.body.outputRules.every(
     (rule) =>
       isObject(rule) &&
       typeof rule.id === 'string' &&
@@ -128,11 +139,11 @@ export const isAgentPackage = (value: unknown): value is AgentPackage =>
       typeof rule.decayPerSecond === 'number' &&
       Number.isFinite(rule.decayPerSecond)
   ) &&
-  isObject(value.agent.brain) &&
-  value.agent.brain.version === 1 &&
-  typeof value.agent.brain.rootContainerId === 'string' &&
-  Array.isArray(value.agent.brain.neurons) &&
-  value.agent.brain.neurons.every(
+  isObject(agent.brain) &&
+  agent.brain.version === 1 &&
+  typeof agent.brain.rootContainerId === 'string' &&
+  Array.isArray(agent.brain.neurons) &&
+  agent.brain.neurons.every(
     (neuron) =>
       isObject(neuron) &&
       typeof neuron.id === 'string' &&
@@ -155,8 +166,8 @@ export const isAgentPackage = (value: unknown): value is AgentPackage =>
       (neuron.initialState.u === undefined ||
         (typeof neuron.initialState.u === 'number' && Number.isFinite(neuron.initialState.u)))
   ) &&
-  Array.isArray(value.agent.brain.containers) &&
-  value.agent.brain.containers.every(
+  Array.isArray(agent.brain.containers) &&
+  agent.brain.containers.every(
     (container) =>
       isObject(container) &&
       typeof container.id === 'string' &&
@@ -169,8 +180,8 @@ export const isAgentPackage = (value: unknown): value is AgentPackage =>
           typeof child.nodeId === 'string'
       )
   ) &&
-  Array.isArray(value.agent.connections) &&
-  value.agent.connections.every(
+  Array.isArray(agent.connections) &&
+  agent.connections.every(
     (connection) =>
       isObject(connection) &&
       typeof connection.id === 'string' &&
@@ -187,13 +198,13 @@ export const isAgentPackage = (value: unknown): value is AgentPackage =>
       (connection.delayMs === undefined ||
         (typeof connection.delayMs === 'number' && Number.isFinite(connection.delayMs)))
   ) &&
-  (value.agent.layout === undefined ||
-    (isObject(value.agent.layout) &&
-      value.agent.layout.version === 1 &&
-      isObject(value.agent.layout.nodes) &&
-      (value.agent.layout.viewportByContainerId === undefined ||
-        (isObject(value.agent.layout.viewportByContainerId) &&
-          Object.values(value.agent.layout.viewportByContainerId).every(
+  (agent.layout === undefined ||
+    (isObject(agent.layout) &&
+      agent.layout.version === 1 &&
+      isObject(agent.layout.nodes) &&
+      (agent.layout.viewportByContainerId === undefined ||
+        (isObject(agent.layout.viewportByContainerId) &&
+          Object.values(agent.layout.viewportByContainerId).every(
             (viewport) =>
               isObject(viewport) &&
               typeof viewport.x === 'number' &&
@@ -203,7 +214,13 @@ export const isAgentPackage = (value: unknown): value is AgentPackage =>
               typeof viewport.scale === 'number' &&
               Number.isFinite(viewport.scale)
           ))))) &&
-  validateAgentIR(value.agent as unknown as AgentIR).length === 0;
+  validateAgentIR(agent as unknown as AgentIR).length === 0;
+
+export const isAgentPackage = (value: unknown): value is AgentPackage =>
+  isObject(value) &&
+  value.packageVersion === 1 &&
+  hasValidOptionalTopLevelMetadata((value as AgentPackageLike).metadata) &&
+  hasValidAgentPayload((value as AgentPackageLike).agent);
 
 const isBrainLibraryStorageEnvelope = (value: unknown): value is BrainLibraryStorageEnvelope =>
   isObject(value) &&

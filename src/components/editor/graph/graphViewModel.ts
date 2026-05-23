@@ -9,8 +9,8 @@ import type {
   RootGraph,
   SignalNode,
   TopologyNode,
-} from '../../../domain/brain/compat';
-import type { GraphIRDocument } from '../../../domain/brain/compat';
+  GraphIRDocument,
+} from '../../../domain/brain/ir';
 import type { Position, IzhikevichNeuronParameters } from '../../../domain/brain/shared';
 import { getGraphLinkCapabilities } from './graphLinkPolicy';
 import type {

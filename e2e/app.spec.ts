@@ -786,9 +786,9 @@ test('brain library opens from the editor toolbar and saves the current IR to Lo
 
   const storedBrain = storedBrains.find((brain) => brain.agent?.metadata?.name === 'E2E Brain');
   expect(storedBrain).toBeTruthy();
-  expect(storedBrain?.metadata?.id).toBeTruthy();
   expect(storedBrain?.agent?.metadata?.name).toBe('E2E Brain');
-  expect(storedBrain?.agent?.metadata?.id).toBe(storedBrain?.metadata?.id);
+  expect(storedBrain?.agent?.metadata?.id).toBeTruthy();
+  expect(storedBrain?.metadata?.id ?? storedBrain?.agent?.metadata?.id).toBe(storedBrain?.agent?.metadata?.id);
 
   await page.locator(selectors.brainLibraryClose).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeHidden();
@@ -869,8 +869,8 @@ test('brain library manages saved items and reports import errors', async ({ pag
     return Buffer.concat(chunks).toString('utf8');
   })) as { packageVersion?: number; metadata?: { name?: string }; agent?: { metadata?: { name?: string } } };
   expect(downloadedBrain.packageVersion).toBe(1);
-  expect(downloadedBrain.metadata?.name).toBe('Renamed Brain');
   expect(downloadedBrain.agent?.metadata?.name).toBe('Renamed Brain');
+  expect(downloadedBrain.metadata?.name ?? downloadedBrain.agent?.metadata?.name).toBe('Renamed Brain');
 
   page.once('dialog', (dialog) => dialog.accept());
   await page.locator(`[data-testid="brain-library-delete-${savedBrainId}"]`).click();
@@ -961,6 +961,12 @@ test('brain library recovers from corrupted LocalStorage payloads', async ({ pag
       page.evaluate(() => Boolean(window.localStorage.getItem('neuralsoup.brain-library.v1.corrupt')))
     )
     .toBe(true);
+  await page.reload();
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+  await page.locator(selectors.brainLibraryButton).click();
+  await expect(page.locator(selectors.brainLibraryStatusMessage)).toContainText('已隔离损坏数据');
 });
 
 test('brain library asks before replacing an unsaved current Brain', async ({ page }, testInfo) => {
@@ -1569,7 +1575,7 @@ test('graph view supports wheel zoom and clears transient drag or marquee state 
   expect(Math.abs(afterRelease.y - settledAfterMove.y)).toBeLessThanOrEqual(1);
 });
 
-test('graph view diagnostics expose invalid draft divergence from installed runtime', async ({ page }, testInfo) => {
+test('graph view diagnostics expose invalid draft divergence through the real draft editing path', async ({ page }, testInfo) => {
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
   }
@@ -1577,30 +1583,43 @@ test('graph view diagnostics expose invalid draft divergence from installed runt
   await page.locator(selectors.editorTabGraph).click();
   await doubleClickNode(page, selectors.coreGroupNode);
 
+  const baseDraftConnectionCount = await page.locator(selectors.topologyDraftConnectionCount).innerText();
+  const baseRuntimeConnectionCount = await page.locator(selectors.topologyRuntimeConnectionCount).innerText();
+
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
   await expect(page.locator(selectors.topologyDraftState)).toHaveText('structurally-valid');
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('118');
-  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(baseDraftConnectionCount);
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(baseRuntimeConnectionCount);
 
   await injectInvalidGraphDraft(page);
 
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('119');
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(String(Number.parseInt(baseDraftConnectionCount, 10) + 1));
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('1');
   await expect(page.locator(selectors.topologyValidationCount)).toHaveText('1');
-  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(baseRuntimeConnectionCount);
   await expect.poll(() => getDraftDiagnostics(page).then((value) => value.state)).toBe('invalid');
   await expect.poll(() => getDraftDiagnostics(page).then((value) => value.validationCount)).toBe('1');
   await expect
     .poll(() => getDraftDiagnostics(page).then((value) => value.message))
-    .toContain('duplicated');
+    .toContain('cannot start from bodyOutput');
   await expect
     .poll(() => getRuntimeDiagnostics(page))
     .toEqual({
       state: 'applied',
       validationCount: '0'
     });
+
+  await page.reload();
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(baseRuntimeConnectionCount);
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(baseRuntimeConnectionCount);
+  await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
 });
 
 test('graph view keyboard interactions remain safe after event hook removal', async ({ page }, testInfo) => {

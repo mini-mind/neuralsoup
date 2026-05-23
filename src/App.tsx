@@ -119,6 +119,9 @@ const normalizeAgentForCompare = (agent: AgentIR): AgentIR => ({
 const areAgentsEquivalent = (left: AgentIR, right: AgentIR): boolean =>
   JSON.stringify(normalizeAgentForCompare(left)) === JSON.stringify(normalizeAgentForCompare(right));
 
+const serializeBrainLibrarySnapshot = (brains: BrainLibraryRecord[]): string =>
+  JSON.stringify(brains.map((brain) => encodeBrainLibraryRecord(brain)));
+
 const ROOT_GRAPH_PATH: GraphPathItem[] = [{ id: 'root', label: 'root' }];
 
 const applyBrainRecordToEditorState = (
@@ -219,12 +222,19 @@ const App: React.FC = () => {
   const graphPathSessionKeyRef = useRef(0);
   const appRef = useRef<HTMLDivElement | null>(null);
   const simulationPanelRef = useRef<HTMLDivElement | null>(null);
+  const persistedBrainLibrarySnapshotRef = useRef(serializeBrainLibrarySnapshot(initialBrainLibraryLoad.brains));
   const installedGraphSummary = agentRuntimeStatus.appliedSummary;
   const hasUnsavedDraftChanges = !areAgentsEquivalent(activeAgentDocument, draftAgentDocument);
 
   useEffect(() => {
+    const nextSnapshot = serializeBrainLibrarySnapshot(brainLibrary);
+    if (persistedBrainLibrarySnapshotRef.current === nextSnapshot) {
+      return;
+    }
+
     try {
       saveBrainLibrary(brainLibrary);
+      persistedBrainLibrarySnapshotRef.current = nextSnapshot;
       setBrainLibraryStatusMessage((currentMessage) =>
         currentMessage?.startsWith('Brain Library 保存失败') ? null : currentMessage
       );
@@ -721,27 +731,32 @@ const App: React.FC = () => {
         if (!firstConnection) {
           return;
         }
-        const invalidAgent: AgentIR = {
-          ...currentAgent,
-          connections: [
-            ...currentAgent.connections,
-            {
-              id: `${firstConnection.id}-invalid-body-output-source`,
-              from: {
-                scope: 'bodyOutput',
-                nodeId: 'output-move-forward',
-                portId: 'out',
+        if (currentAgent.connections.some((connection) => connection.id === `${firstConnection.id}-invalid-body-output-source`)) {
+          return;
+        }
+        handleAgentChange(
+          (draftAgent) => ({
+            ...draftAgent,
+            connections: [
+              ...draftAgent.connections,
+              {
+                id: `${firstConnection.id}-invalid-body-output-source`,
+                from: {
+                  scope: 'bodyOutput',
+                  nodeId: 'output-move-forward',
+                  portId: 'out',
+                },
+                to: {
+                  scope: 'brain',
+                  nodeId: firstConnection.to.scope === 'brain' ? firstConnection.to.nodeId : 'neuron-1',
+                  portId: 'dendrite',
+                },
+                weight: 1,
               },
-              to: {
-                scope: 'brain',
-                nodeId: firstConnection.to.scope === 'brain' ? firstConnection.to.nodeId : 'neuron-1',
-                portId: 'dendrite',
-              },
-              weight: 1,
-            },
-          ],
-        };
-        setDraftGraphStatusOverride(createAgentDraftStatus(invalidAgent));
+            ],
+          }),
+          { installToRuntime: false }
+        );
       },
       getRuntimeActiveNodeIds: () => [...agentRuntimeActivity.activeNodeIds],
       getGraphPathIds: () => graphPath.map((item) => item.id),

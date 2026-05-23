@@ -5,7 +5,7 @@ import type {
   BrainContainerNode,
   BrainNeuronNode,
 } from '../../../domain/brain';
-import type { ModelDefinition } from '../../../domain/brain/compat';
+import type { ModelDefinition } from '../../../domain/brain/ir';
 import type { Position } from '../../../domain/brain/shared';
 import { getGraphLinkCapabilities } from './graphLinkPolicy';
 import type {

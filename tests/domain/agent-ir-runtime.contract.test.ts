@@ -10,7 +10,7 @@ import {
   withVisionCellLayoutMarkers,
   type AgentIR,
 } from '../../src/domain/brain';
-import { createLegacyGraphBridgeFromAgent } from '../../src/domain/brain/compat';
+import { createLegacyGraphBridgeFromAgent } from '../../src/domain/brain/legacy-graph-bridge';
 
 const createRuleDrivenAgent = (): AgentIR =>
   withDerivedBodyVisionCellCount(

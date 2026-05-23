@@ -4,26 +4,26 @@ import {
   GraphIRValidationError,
   collectNeuronNodes,
   collectSignalNodes,
-  compileLegacyBrainDefinition,
-  createDefaultGraphIRDocument,
-  createDefaultLegacyBodyDefinition,
   summarizeGraphIRDocument,
   validateGraphIRDocument,
-  type LegacyBrainProgram,
-} from '../../src/domain/brain/compat';
-import type { GraphIRDocument } from '../../src/domain/brain/compat';
+  type GraphIRDocument,
+} from '../../src/domain/brain/ir';
+import { createDefaultGraphIRDocument } from '../../src/domain/brain/defaults';
+import { compileLegacyBrainDefinition } from '../../src/domain/brain/compiler';
+import { createDefaultLegacyBodyDefinition } from '../../src/domain/brain/package';
+import type { LegacyBrainProgram } from '../../src/domain/brain/program';
 
-const getRootVisionCells = (document: GraphIRDocument) => {
+const getLegacyRootVisionCells = (document: GraphIRDocument) => {
   const inputAdapter = document.root.children.find((node) => node.id === 'input-adapter' && node.kind === 'adapter');
   return inputAdapter?.kind === 'adapter' ? inputAdapter.children.length / 3 : 1;
 };
 
-const compileDefaultBrain = (document: GraphIRDocument) =>
-  compileLegacyBrainDefinition(document, createDefaultLegacyBodyDefinition(getRootVisionCells(document)));
+const compileDefaultLegacyBrain = (document: GraphIRDocument) =>
+  compileLegacyBrainDefinition(document, createDefaultLegacyBodyDefinition(getLegacyRootVisionCells(document)));
 
-test('default GraphIR document compiles into a runtime program with vision-aligned bindings', () => {
+test('legacy GraphIR document compiles into a compat runtime program with vision-aligned bindings', () => {
   const document = createDefaultGraphIRDocument(24);
-  const program: LegacyBrainProgram = compileDefaultBrain(document);
+  const program: LegacyBrainProgram = compileDefaultLegacyBrain(document);
 
   assert.equal(program.inputPorts.length, 72);
   assert.equal(program.outputPorts.length, 3);
@@ -40,7 +40,7 @@ test('default GraphIR document compiles into a runtime program with vision-align
   assert.equal(program.legacyGraphIR, document);
 });
 
-test('default GraphIR summary reflects leaf topology counts', () => {
+test('default legacy GraphIR summary reflects leaf topology counts', () => {
   const document = createDefaultGraphIRDocument(4);
 
   assert.deepEqual(summarizeGraphIRDocument(document), {
@@ -54,7 +54,7 @@ test('default GraphIR summary reflects leaf topology counts', () => {
   assert.equal(collectNeuronNodes(document.root.children).length, 2);
 });
 
-test('validation rejects dangling leaf link node references', () => {
+test('legacy GraphIR validation rejects dangling leaf link node references', () => {
   const document = createDefaultGraphIRDocument(12);
   document.root.links.push({
     id: 'link-missing-target',
@@ -74,7 +74,7 @@ test('validation rejects dangling leaf link node references', () => {
   assert.equal(issues[0]?.code, 'missing-link-node');
 });
 
-test('validation rejects links that target output-only ports', () => {
+test('legacy GraphIR validation rejects links that target output-only ports', () => {
   const document = createDefaultGraphIRDocument(8);
   document.root.links.push({
     id: 'link-invalid-direction',
@@ -90,7 +90,7 @@ test('validation rejects links that target output-only ports', () => {
   });
 
   assert.throws(
-    () => compileDefaultBrain(document),
+    () => compileDefaultLegacyBrain(document),
     (error: unknown) =>
       error instanceof GraphIRValidationError &&
       error.issues.some((issue) => issue.code === 'invalid-link-direction')

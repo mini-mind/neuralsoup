@@ -2,18 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   assertValidGraphIRDocument,
-  compileLegacyBrainDefinition,
-  createLegacyBrainProgramRuntimeState,
-  createDefaultGraphIRDocument,
-  createDefaultLegacyBodyDefinition,
   GraphIRValidationError,
-  reconcileGraphIRDocumentVisionCells,
-  stepLegacyBrainProgram,
-  type GraphIRDocument,
-  type LegacyBrainProgram,
   validateGraphIRDocument,
-} from '../../src/domain/brain/compat';
-import type { BodyDefinition as LegacyBodyDefinition } from '../../src/domain/brain/compat';
+} from '../../src/domain/brain/ir';
+import type { GraphIRDocument } from '../../src/domain/brain/ir';
+import { createDefaultGraphIRDocument, reconcileGraphIRDocumentVisionCells } from '../../src/domain/brain/defaults';
+import { compileLegacyBrainDefinition } from '../../src/domain/brain/compiler';
+import { createDefaultLegacyBodyDefinition, type LegacyBodyDefinition } from '../../src/domain/brain/package';
+import { createLegacyBrainProgramRuntimeState, stepLegacyBrainProgram } from '../../src/domain/brain/step';
+import type { LegacyBrainProgram } from '../../src/domain/brain/program';
 
 const getRootVisionCells = (document: GraphIRDocument) => {
   const inputAdapter = document.root.children.find((node) => node.id === 'input-adapter' && node.kind === 'adapter');
@@ -868,7 +865,7 @@ test('compileLegacyBrainDefinition maps vision input bindings to visualInput cha
   assert.equal(inputBindingIndices.get('vision-B-1'), 5);
 });
 
-test('compileLegacyBrainDefinition exposes legacy-named compat graph program fields', () => {
+test('compileLegacyBrainDefinition exposes legacy-named compat wrapper fields', () => {
   const document = createDefaultGraphIRDocument(1);
   const program = compileDefaultBrain(document);
 
@@ -876,7 +873,7 @@ test('compileLegacyBrainDefinition exposes legacy-named compat graph program fie
   assert.ok(program.compiledAgentProgram);
 });
 
-test('GraphIR runtime step reads visualInput values using channel-interleaved vision layout', () => {
+test('legacy GraphIR compat runtime step reads visualInput values using channel-interleaved vision layout', () => {
   const document = createDefaultGraphIRDocument(2);
   document.root.links = [
     {
@@ -947,7 +944,7 @@ test('output SignalNodes produce action outputs at runtime', () => {
   assert.ok(result.outputs['move-forward'] > 0);
 });
 
-test('GraphIR runtime step exposes active leaf node ids for input, neuron, and output leaves', () => {
+test('legacy GraphIR compat runtime step exposes active leaf node ids for input, neuron, and output leaves', () => {
   const document = createDefaultGraphIRDocument(1);
   const neuronGroup = document.root.children.find((node) => node.id === 'core-neuron-group');
   assert.ok(neuronGroup && neuronGroup.kind === 'neuron-group');
@@ -972,7 +969,7 @@ test('GraphIR runtime step exposes active leaf node ids for input, neuron, and o
   );
 });
 
-test('compileLegacyBrainDefinition rejects invalid body output bindings', () => {
+test('compileLegacyBrainDefinition rejects invalid legacy compat body output bindings', () => {
   const document = createDefaultGraphIRDocument(1);
   const body = createDefaultLegacyBodyDefinition(1);
   body.brainBindings.outputs[0] = {
@@ -986,7 +983,7 @@ test('compileLegacyBrainDefinition rejects invalid body output bindings', () => 
   );
 });
 
-test('compileLegacyBrainDefinition honors legacy compat body bindings that use non-legacy brain signal node ids', () => {
+test('compileLegacyBrainDefinition honors legacy compat body bindings that use AgentIR-native signal node ids', () => {
   const document = createValidGraphIRDocument();
   const body: LegacyBodyDefinition = {
     version: 1,
