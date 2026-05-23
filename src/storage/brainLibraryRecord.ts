@@ -1,9 +1,7 @@
 import {
-  deriveAgentIRVisionCellCount,
   type AgentIR,
   type AgentMetadata,
   validateAgentIR,
-  withDerivedBodyVisionCellCount,
 } from '../domain/brain';
 
 export interface BrainLibraryRecord {
@@ -22,16 +20,13 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 
 const createAgentLibraryId = (): string => `agent-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-const stripLegacyVisionCellCount = (agent: AgentIR): AgentIR => {
-  const legacyVisionCellCount =
-    typeof (agent.body as AgentIR['body'] & { visionCellCount?: unknown }).visionCellCount === 'number'
-      ? Math.max(0, Math.floor((agent.body as AgentIR['body'] & { visionCellCount?: number }).visionCellCount ?? 0))
-      : deriveAgentIRVisionCellCount(agent);
+const normalizeCanonicalVisionCellCount = (agent: AgentIR): AgentIR => {
+  const canonicalVisionCellCount = Math.max(0, Math.floor(agent.body.visionCellCount));
   return {
     ...agent,
     body: {
       ...agent.body,
-      visionCellCount: legacyVisionCellCount,
+      visionCellCount: canonicalVisionCellCount,
     },
   };
 };
@@ -175,13 +170,11 @@ export const normalizeCanonicalBrainLibraryRecord = (
   metadataOverride?: AgentMetadata
 ): BrainLibraryRecord => {
   const metadata = metadataOverride ?? { ...agent.metadata };
-  const normalizedAgent = withDerivedBodyVisionCellCount(
-    stripNonCanonicalLayoutState(
-      stripLegacyVisionCellCount({
-        ...agent,
-        metadata,
-      })
-    )
+  const normalizedAgent = stripNonCanonicalLayoutState(
+    normalizeCanonicalVisionCellCount({
+      ...agent,
+      metadata,
+    })
   );
 
   return {
@@ -203,16 +196,18 @@ export const normalizeImportedBrainLibraryRecord = (
     typeof (agent.body as AgentIR['body'] & { visionCellCount?: unknown }).visionCellCount === 'number'
       ? Math.max(0, Math.floor((agent.body as AgentIR['body'] & { visionCellCount?: number }).visionCellCount ?? 0))
       : 0;
-  const structuredVisionCellCount = deriveAgentIRVisionCellCount(
-    explicitVisionCellCount > 0
-      ? {
-          ...agent,
-          body: {
-            ...agent.body,
-            visionCellCount: explicitVisionCellCount,
-          },
-        }
-      : agent
+  const structuredVisionCellCount = Math.max(
+    0,
+    ...agent.connections.flatMap((connection) => {
+      const fromNodeId = connection.from.scope === 'bodyInput' ? connection.from.nodeId : null;
+      const toNodeId = connection.to.scope === 'bodyInput' ? connection.to.nodeId : null;
+      return [fromNodeId, toNodeId]
+        .filter((nodeId): nodeId is string => nodeId != null)
+        .map((nodeId) => {
+          const match = nodeId.match(/^vision-[RGB]-(\d+)$/);
+          return match ? Number.parseInt(match[1] ?? '-1', 10) + 1 : 0;
+        });
+    })
   );
   const effectiveVisionCellCount =
     Math.max(

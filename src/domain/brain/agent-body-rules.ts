@@ -5,7 +5,6 @@ import type {
   BodyOutputNodeRuntime,
   BodyOutputRule,
 } from './agent-ir';
-import { resolveAgentBodyEndpointIds } from './agent-body-endpoints';
 import type { BrainOutputChannel } from './shared';
 
 export type AgentBodyRuleScope = 'input' | 'output';
@@ -64,12 +63,114 @@ const INPUT_CHANNEL_OFFSET = {
   G: 1,
   B: 2,
 } as const;
+const INPUT_CHANNEL_VALUES = ['R', 'G', 'B'] as const;
+const OUTPUT_CHANNEL_VALUES = ['turn-left', 'move-forward', 'turn-right'] as const;
+
+type SupportedGroupKind = 'channel' | 'cell' | 'action';
+type PatternSegment =
+  | { type: 'literal'; value: string }
+  | { type: 'group'; index: number; kind: SupportedGroupKind };
 
 const applyRuleTemplate = (template: string, match: RegExpExecArray): string =>
   template.replace(/\$(\d+)/g, (_token, rawGroupIndex: string) => {
     const groupIndex = Number.parseInt(rawGroupIndex, 10);
     return match[groupIndex] ?? '';
   });
+
+const appendLiteralSegment = (segments: PatternSegment[], literal: string) => {
+  if (literal.length === 0) {
+    return;
+  }
+
+  const lastSegment = segments[segments.length - 1];
+  if (lastSegment?.type === 'literal') {
+    lastSegment.value += literal;
+    return;
+  }
+
+  segments.push({ type: 'literal', value: literal });
+};
+
+const parseSupportedNodeIdPattern = (pattern: string): PatternSegment[] | null => {
+  const anchoredPattern =
+    pattern.startsWith('^') && pattern.endsWith('$') ? pattern.slice(1, -1) : pattern;
+  const segments: PatternSegment[] = [];
+  let cursor = 0;
+  let groupIndex = 1;
+
+  while (cursor < anchoredPattern.length) {
+    const remaining = anchoredPattern.slice(cursor);
+
+    if (remaining.startsWith('([RGB])')) {
+      segments.push({ type: 'group', index: groupIndex, kind: 'channel' });
+      groupIndex += 1;
+      cursor += '([RGB])'.length;
+      continue;
+    }
+
+    if (remaining.startsWith('(\\\\d+)') || remaining.startsWith('(\\d+)')) {
+      segments.push({ type: 'group', index: groupIndex, kind: 'cell' });
+      groupIndex += 1;
+      cursor += remaining.startsWith('(\\\\d+)') ? '(\\\\d+)'.length : '(\\d+)'.length;
+      continue;
+    }
+
+    if (remaining.startsWith('(turn-left|move-forward|turn-right)')) {
+      segments.push({ type: 'group', index: groupIndex, kind: 'action' });
+      groupIndex += 1;
+      cursor += '(turn-left|move-forward|turn-right)'.length;
+      continue;
+    }
+
+    const current = anchoredPattern[cursor];
+    if (!current) {
+      break;
+    }
+
+    if (current === '\\') {
+      const escaped = anchoredPattern[cursor + 1];
+      if (!escaped) {
+        return null;
+      }
+
+      appendLiteralSegment(segments, escaped);
+      cursor += 2;
+      continue;
+    }
+
+    if ('[]{}+*?|()'.includes(current)) {
+      return null;
+    }
+
+    appendLiteralSegment(segments, current);
+    cursor += 1;
+  }
+
+  return segments;
+};
+
+const buildNodeIdFromSegments = (
+  segments: PatternSegment[],
+  valuesByGroupIndex: Map<number, string>
+): string | null => {
+  let nodeId = '';
+
+  for (const segment of segments) {
+    if (segment.type === 'literal') {
+      nodeId += segment.value;
+      continue;
+    }
+
+    const value = valuesByGroupIndex.get(segment.index);
+    if (value == null) {
+      return null;
+    }
+
+    nodeId += value;
+  }
+
+  return nodeId;
+};
 
 const executeRulePattern = (regex: RegExp, nodeId: string): RegExpExecArray | null => {
   regex.lastIndex = 0;
@@ -128,6 +229,109 @@ const parseBodyOutputTarget = (
     id: nodeId,
     target: match[1] as BrainOutputChannel,
     decayPerSecond,
+  };
+};
+
+const enumerateInputRuleNodeIds = (rule: BodyInputRule, visionCellCount: number): string[] => {
+  const templateMatch = rule.sourceTemplate.match(/^vision\.\$(\d+)\.\$(\d+)$/);
+  const segments = parseSupportedNodeIdPattern(rule.nodeIdPattern);
+  if (!templateMatch || !segments) {
+    return [];
+  }
+
+  const channelGroupIndex = Number.parseInt(templateMatch[1], 10);
+  const cellGroupIndex = Number.parseInt(templateMatch[2], 10);
+  const channelGroup = segments.find(
+    (segment): segment is Extract<PatternSegment, { type: 'group' }> =>
+      segment.type === 'group' && segment.index === channelGroupIndex
+  );
+  const cellGroup = segments.find(
+    (segment): segment is Extract<PatternSegment, { type: 'group' }> =>
+      segment.type === 'group' && segment.index === cellGroupIndex
+  );
+
+  if (channelGroup?.kind !== 'channel' || cellGroup?.kind !== 'cell') {
+    return [];
+  }
+
+  const nodeIds = new Set<string>();
+  for (let cellIndex = 0; cellIndex < visionCellCount; cellIndex += 1) {
+    for (const channel of INPUT_CHANNEL_VALUES) {
+      const nodeId = buildNodeIdFromSegments(
+        segments,
+        new Map([
+          [channelGroupIndex, channel],
+          [cellGroupIndex, String(cellIndex)],
+        ])
+      );
+      if (nodeId) {
+        nodeIds.add(nodeId);
+      }
+    }
+  }
+
+  return [...nodeIds];
+};
+
+const enumerateOutputRuleNodeIds = (rule: BodyOutputRule): string[] => {
+  const templateMatch = rule.targetTemplate.match(/^action\.\$(\d+)$/);
+  const segments = parseSupportedNodeIdPattern(rule.nodeIdPattern);
+  if (!templateMatch || !segments) {
+    return [];
+  }
+
+  const actionGroupIndex = Number.parseInt(templateMatch[1], 10);
+  const actionGroup = segments.find(
+    (segment): segment is Extract<PatternSegment, { type: 'group' }> =>
+      segment.type === 'group' && segment.index === actionGroupIndex
+  );
+  if (actionGroup?.kind !== 'action') {
+    return [];
+  }
+
+  const nodeIds = new Set<string>();
+  for (const action of OUTPUT_CHANNEL_VALUES) {
+    const nodeId = buildNodeIdFromSegments(segments, new Map([[actionGroupIndex, action]]));
+    if (nodeId) {
+      nodeIds.add(nodeId);
+    }
+  }
+
+  return [...nodeIds];
+};
+
+const collectEndpointIdsFromConnections = (agent: AgentIR, scope: 'bodyInput' | 'bodyOutput'): Set<string> => {
+  const endpointIds = new Set<string>();
+  for (const connection of agent.connections) {
+    if (connection.from.scope === scope) {
+      endpointIds.add(connection.from.nodeId);
+    }
+    if (connection.to.scope === scope) {
+      endpointIds.add(connection.to.nodeId);
+    }
+  }
+
+  return endpointIds;
+};
+
+export interface AgentBodyEndpointIds {
+  bodyInputNodeIds: string[];
+  bodyOutputNodeIds: string[];
+}
+
+export const resolveAgentBodyEndpointIds = (agent: AgentIR): AgentBodyEndpointIds => {
+  const bodyInputNodeIds = new Set<string>([
+    ...collectEndpointIdsFromConnections(agent, 'bodyInput'),
+    ...agent.body.inputRules.flatMap((rule) => enumerateInputRuleNodeIds(rule, agent.body.visionCellCount)),
+  ]);
+  const bodyOutputNodeIds = new Set<string>([
+    ...collectEndpointIdsFromConnections(agent, 'bodyOutput'),
+    ...agent.body.outputRules.flatMap((rule) => enumerateOutputRuleNodeIds(rule)),
+  ]);
+
+  return {
+    bodyInputNodeIds: [...bodyInputNodeIds].sort(),
+    bodyOutputNodeIds: [...bodyOutputNodeIds].sort(),
   };
 };
 

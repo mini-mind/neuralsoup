@@ -1,5 +1,4 @@
 import {
-  withDerivedBodyVisionCellCount,
   type AgentConnection,
   type AgentIR,
   type AgentLayoutIR,
@@ -210,7 +209,7 @@ export const createDefaultAgentIR = (
       ? crypto.randomUUID()
       : `agent-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-  return withDerivedBodyVisionCellCount({
+  return {
     version: DEFAULT_AGENT_VERSION,
     metadata: createAgentMetadata(name, timestamp, idSource),
     body: {
@@ -220,5 +219,5 @@ export const createDefaultAgentIR = (
     brain: createDefaultBrainIR(),
     connections: createDefaultConnections(normalizedVisionCells),
     layout: createDefaultLayout(normalizedVisionCells),
-  });
+  };
 };

@@ -10,7 +10,7 @@ export type GraphInteractionState =
     }
   | {
       type: 'surface-pressing';
-      surfaceTarget: 'canvas' | 'link';
+      surfaceTarget: 'canvas';
       startClient: GraphPoint;
       startScene: GraphPoint;
     }

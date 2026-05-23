@@ -511,13 +511,6 @@ export const buildLegacyGraphViewModel = ({
     }),
   ];
 
-  const viewNodeById = new Map<string, GraphViewNode>();
-  for (const node of nodes) {
-    if (!viewNodeById.has(node.id)) {
-      viewNodeById.set(node.id, node);
-    }
-    viewNodeById.set(node.viewId, node);
-  }
   const viewNodeByRefId = new Map<string, GraphViewNode>();
   for (const node of nodes) {
     if (node.expansionParentId && viewNodeByRefId.has(node.refNodeId)) {
@@ -587,6 +580,15 @@ export const buildLegacyGraphViewModel = ({
     }
   }
 
+  const viewNodeByViewId = new Map<string, GraphViewNode>();
+  const visibleNodeByRefId = new Map<string, GraphViewNode>();
+  for (const node of nodes) {
+    viewNodeByViewId.set(node.viewId, node);
+    if (!visibleNodeByRefId.has(node.refNodeId)) {
+      visibleNodeByRefId.set(node.refNodeId, node);
+    }
+  }
+
   return {
     indexes,
     breadcrumbs,
@@ -597,7 +599,8 @@ export const buildLegacyGraphViewModel = ({
     scopeKey,
     localLeafIds,
     nodes,
-    viewNodeById,
+    viewNodeByViewId,
+    visibleNodeByRefId,
     links,
     activeViewNodeIds,
     modelById,

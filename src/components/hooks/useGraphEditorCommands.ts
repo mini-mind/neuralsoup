@@ -104,11 +104,11 @@ const clampPositionInsideExpandedParent = (position: GraphPoint, viewNode: Graph
 const toStoredPositionForViewNode = (
   position: GraphPoint,
   viewNode: GraphViewNode,
-  viewNodeById: Map<string, GraphViewNode>,
+  viewNodeByViewId: Map<string, GraphViewNode>,
   scope: 'root' | 'child'
 ): Position => {
   if (viewNode.expansionParentId) {
-    const parentNode = viewNodeById.get(viewNode.expansionParentId);
+    const parentNode = viewNodeByViewId.get(viewNode.expansionParentId);
     if (parentNode) {
       const clampedPosition = clampPositionInsideExpandedParent(position, viewNode, parentNode);
       return toRoundedPosition({
@@ -255,7 +255,8 @@ interface GraphEditorCommandDependencies {
   navigationPath: string[];
   indexes: AgentGraphViewIndexes;
   localLeafIds: Set<string>;
-  viewNodeById: Map<string, GraphViewNode>;
+  viewNodeByViewId: Map<string, GraphViewNode>;
+  visibleNodeByRefId: Map<string, GraphViewNode>;
   selectionState: GraphSelectionState;
   draftNodePositions: NodePositionDraftMap;
   links: GraphViewLink[];
@@ -277,7 +278,8 @@ export const useGraphEditorCommands = ({
   navigationPath,
   indexes,
   localLeafIds,
-  viewNodeById,
+  viewNodeByViewId,
+  visibleNodeByRefId,
   selectionState,
   draftNodePositions,
   links,
@@ -292,7 +294,7 @@ export const useGraphEditorCommands = ({
 }: GraphEditorCommandDependencies) => {
   const connectSourceNodesToTarget = useCallback(
     (sourceNodeIds: string[], targetNodeId: string) => {
-      const targetViewNode = viewNodeById.get(targetNodeId);
+      const targetViewNode = viewNodeByViewId.get(targetNodeId);
       if (!targetViewNode) {
         return;
       }
@@ -309,7 +311,7 @@ export const useGraphEditorCommands = ({
       const timestamp = Date.now();
 
       for (const sourceNodeId of uniqueSourceNodeIds) {
-        const sourceViewNode = viewNodeById.get(sourceNodeId);
+        const sourceViewNode = viewNodeByViewId.get(sourceNodeId);
         if (!sourceViewNode) {
           continue;
         }
@@ -374,7 +376,7 @@ export const useGraphEditorCommands = ({
 
       scheduleFocusLink(resolvedLinkIds.at(-1) ?? null);
     },
-    [currentScope, indexes.linkById, indexes.nodeById, localLeafIds, scheduleFocusLink, setAgent, viewNodeById]
+    [currentScope, indexes.linkById, indexes.nodeById, localLeafIds, scheduleFocusLink, setAgent, viewNodeByViewId]
   );
 
   const updateNodePositionsInDraft = useCallback(
@@ -386,17 +388,17 @@ export const useGraphEditorCommands = ({
       setDraftNodePositions((currentDrafts) => {
         const nextDrafts = { ...currentDrafts };
         for (const update of updates) {
-          const viewNode = viewNodeById.get(update.nodeId);
+          const viewNode = viewNodeByViewId.get(update.nodeId);
           if (!viewNode || viewNode.proxy) {
             continue;
           }
 
-          nextDrafts[viewNode.refNodeId] = toStoredPositionForViewNode(update, viewNode, viewNodeById, currentScope);
+          nextDrafts[viewNode.refNodeId] = toStoredPositionForViewNode(update, viewNode, viewNodeByViewId, currentScope);
         }
         return nextDrafts;
       });
     },
-    [currentScope, setDraftNodePositions, viewNodeById]
+    [currentScope, setDraftNodePositions, viewNodeByViewId]
   );
 
   const commitNodeDraftPositions = useCallback(
@@ -433,12 +435,12 @@ export const useGraphEditorCommands = ({
 
       const positions: NodePositionDraftMap = {};
       for (const update of updates) {
-        const viewNode = viewNodeById.get(update.nodeId);
+        const viewNode = viewNodeByViewId.get(update.nodeId);
         if (!viewNode || viewNode.proxy) {
           continue;
         }
 
-        positions[viewNode.refNodeId] = toStoredPositionForViewNode(update, viewNode, viewNodeById, currentScope);
+        positions[viewNode.refNodeId] = toStoredPositionForViewNode(update, viewNode, viewNodeByViewId, currentScope);
       }
 
       if (Object.keys(positions).length === 0) {
@@ -447,7 +449,7 @@ export const useGraphEditorCommands = ({
 
       commitNodeDraftPositions(positions);
     },
-    [commitNodeDraftPositions, currentScope, viewNodeById]
+    [commitNodeDraftPositions, currentScope, viewNodeByViewId]
   );
 
   const removeSelected = useCallback(() => {
@@ -473,7 +475,7 @@ export const useGraphEditorCommands = ({
     }
 
     const selectedViewNodes = selectionState.nodeIds
-      .map((nodeId) => viewNodeById.get(nodeId))
+      .map((nodeId) => viewNodeByViewId.get(nodeId))
       .filter((node): node is GraphViewNode => node != null)
       .filter((node) => !node.proxy);
     if (selectedViewNodes.length === 0) {
@@ -548,7 +550,7 @@ export const useGraphEditorCommands = ({
     navigationPath,
     selectionState,
     setAgent,
-    viewNodeById,
+    viewNodeByViewId,
   ]);
 
   const addNeuronAt = useCallback(
@@ -698,7 +700,7 @@ export const useGraphEditorCommands = ({
       const timestamp = Date.now();
 
       for (const sourceNodeId of uniqueSourceNodeIds) {
-        const sourceViewNode = viewNodeById.get(sourceNodeId);
+        const sourceViewNode = viewNodeByViewId.get(sourceNodeId);
         if (!sourceViewNode) {
           continue;
         }
@@ -772,7 +774,7 @@ export const useGraphEditorCommands = ({
       scheduleFocusNode,
       scheduleFocusLink,
       setAgent,
-      viewNodeById,
+      viewNodeByViewId,
     ]
   );
 
@@ -781,14 +783,14 @@ export const useGraphEditorCommands = ({
       return;
     }
 
-    const selectedNodeIdSet = new Set(selectionState.nodeIds.map((nodeId) => viewNodeById.get(nodeId)?.refNodeId ?? nodeId));
+    const selectedNodeIdSet = new Set(selectionState.nodeIds.map((nodeId) => viewNodeByViewId.get(nodeId)?.refNodeId ?? nodeId));
     const selectedChildren = currentChildren.filter((child) => selectedNodeIdSet.has(child.refNodeId));
     if (selectedChildren.length < 2) {
       return;
     }
 
     const selectedViewNodes = selectedChildren
-      .map((child) => viewNodeById.get(child.id) ?? viewNodeById.get(child.refNodeId))
+      .map((child) => visibleNodeByRefId.get(child.refNodeId))
       .filter((node): node is GraphViewNode => node != null && !node.proxy);
     if (selectedViewNodes.length !== selectedChildren.length) {
       return;
@@ -812,7 +814,7 @@ export const useGraphEditorCommands = ({
         nextGroupPosition: toStoredPosition({ x: minX, y: minY }, currentScope),
         childPositionsById: Object.fromEntries(
           selectedChildren.map((child) => {
-            const viewNode = viewNodeById.get(child.id) ?? viewNodeById.get(child.refNodeId);
+            const viewNode = visibleNodeByRefId.get(child.refNodeId);
             return [
               child.refNodeId,
               viewNode
@@ -842,7 +844,7 @@ export const useGraphEditorCommands = ({
     scheduleFocusNode,
     selectionState.nodeIds,
     setAgent,
-    viewNodeById,
+    visibleNodeByRefId,
   ]);
 
   const ungroupNode = useCallback(
@@ -883,7 +885,7 @@ export const useGraphEditorCommands = ({
 
   const toggleGroupExpanded = useCallback(
     (nodeId: string) => {
-      const viewNode = viewNodeById.get(nodeId);
+      const viewNode = viewNodeByViewId.get(nodeId);
       const layoutNodeId = viewNode?.refNodeId ?? nodeId;
       setAgent(
         (current) =>
@@ -897,7 +899,7 @@ export const useGraphEditorCommands = ({
       clearSelectionRect();
       clearDraftNodePositions();
     },
-    [clearDraftNodePositions, clearSelection, clearSelectionRect, setAgent, viewNodeById]
+    [clearDraftNodePositions, clearSelection, clearSelectionRect, setAgent, viewNodeByViewId]
   );
 
   const updateNodeLabelAndParams = useCallback(

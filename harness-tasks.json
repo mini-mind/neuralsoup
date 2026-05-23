@@ -705,15 +705,15 @@
     {
       "id": "task-017",
       "title": "BodyIR 真源收口：移除 canonical AgentIR 对 visionCellCount/layout marker 的语义依赖并下沉 compat getter",
-      "status": "pending",
+      "status": "in_progress",
       "priority": "P1",
       "depends_on": [
         "task-015",
         "task-016"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "max_attempts": 3,
-      "started_at_commit": null,
+      "started_at_commit": "a114598",
       "validation": {
         "command": "npm run type-check && npm run test:domain && npm run test:compat && npm run test:e2e -- --grep \"brain library|graph view\"",
         "timeout_seconds": 1200
@@ -724,21 +724,26 @@
       "error_log": [
         "Canonical AgentIR still derives body coverage semantics from visionCellCount compat accessors and persisted layout markers, so layout is not yet a pure presentation layer and BodyIR is not fully self-describing."
       ],
-      "checkpoints": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-23T15:05:00Z",
+          "message": "Closed the first half of BodyIR truth-source cleanup by removing production defaults/reconcile/storage main-path dependence on deriveAgentIRVisionCellCount and withDerivedBodyVisionCellCount; legacy sparse-coverage recovery now stays on explicit compat/import normalization paths."
+        }
+      ],
       "completed_at": null
     },
     {
       "id": "task-018",
       "title": "Body endpoint authority 收口：统一 compile、validate、preview 与 GraphView 的 endpoint expansion/binding 解释器",
-      "status": "pending",
+      "status": "completed",
       "priority": "P1",
       "depends_on": [
         "task-014",
         "task-017"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "max_attempts": 3,
-      "started_at_commit": null,
+      "started_at_commit": "a114598",
       "validation": {
         "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"graph view|body\"",
         "timeout_seconds": 1200
@@ -746,23 +751,26 @@
       "on_failure": {
         "cleanup": null
       },
-      "error_log": [
-        "GraphView still uses a limited body endpoint projection path distinct from compile/runtime regex semantics, leaving compile, validate, preview, and UI with multiple competing interpreters."
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-23T13:05:00Z",
+          "message": "Unified body endpoint authority by moving proactive endpoint expansion onto the canonical body-rule resolver, deleting the separate endpoint enumerator module, aligning GraphView and preview to the same domain path, and adding a contract test that locks GraphView endpoint projection to preview endpoint ids."
+        }
       ],
-      "checkpoints": [],
-      "completed_at": null
+      "completed_at": "2026-05-23T13:05:00Z"
     },
     {
       "id": "task-019",
       "title": "GraphView session state 收口：清理 viewport 双真源并统一 expanded child 的 viewId/refId 交互语义",
-      "status": "pending",
+      "status": "completed",
       "priority": "P2",
       "depends_on": [
         "task-016"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "max_attempts": 3,
-      "started_at_commit": null,
+      "started_at_commit": "a114598",
       "validation": {
         "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"graph view\"",
         "timeout_seconds": 1200
@@ -770,13 +778,20 @@
       "on_failure": {
         "cleanup": null
       },
-      "error_log": [
-        "GraphView still carries structural session-state debt around multiple viewport writers and mixed viewId/refNodeId handling for expanded children, even though the current graph-view suite is green."
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-23T13:45:00Z",
+          "message": "Closed the expanded-child identity half of GraphView session-state cleanup by replacing the overloaded viewNodeById alias map with explicit viewNodeByViewId and visibleNodeByRefId indexes across canonical and compat view-models, state hooks, command paths, and contracts."
+        },
+        {
+          "at": "2026-05-23T14:20:00Z",
+          "message": "Closed viewport ownership by moving scope-init and resize compensation policy out of canvas assembly into topology state, preserving per-scope viewport memory, and locking it with a GraphView navigation/resize Playwright contract."
+        }
       ],
-      "checkpoints": [],
-      "completed_at": null
+      "completed_at": "2026-05-23T14:20:00Z"
     }
   ],
   "session_count": 9,
-  "last_session": "2026-05-23T12:09:01Z"
+  "last_session": "2026-05-23T15:05:00Z"
 }

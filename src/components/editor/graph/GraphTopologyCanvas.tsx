@@ -348,6 +348,8 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
                 data-testid={`topology-link-${link.id}`}
                 data-topology-link="true"
                 data-topology-link-id={link.id}
+                data-topology-link-from-node-id={link.fromNodeId}
+                data-topology-link-to-node-id={link.toNodeId}
                 onClick={(event) => {
                   event.stopPropagation();
                   if (link.aggregate && link.inspectable) {

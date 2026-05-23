@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { AgentIR } from '../../src/domain/brain';
+import { buildAgentBodyRulePreviewModel, type AgentIR } from '../../src/domain/brain';
 import { buildAgentGraphViewModel } from '../../src/components/editor/graph/agentGraphViewModel';
 
 const createTestAgent = (): AgentIR => ({
@@ -93,7 +93,7 @@ const createTestAgent = (): AgentIR => ({
   },
 });
 
-test('agent graph view expanded children are addressable by both id and viewId', () => {
+test('agent graph view expanded children expose separate viewId and refId indexes', () => {
   const agent = createTestAgent();
   const viewModel = buildAgentGraphViewModel({
     agent,
@@ -104,8 +104,8 @@ test('agent graph view expanded children are addressable by both id and viewId',
 
   const expandedChild = viewModel.nodes.find((node) => node.viewId === 'expanded-group::neuron-1');
   assert.ok(expandedChild);
-  assert.equal(viewModel.viewNodeById.get('neuron-1'), expandedChild);
-  assert.equal(viewModel.viewNodeById.get('expanded-group::neuron-1'), expandedChild);
+  assert.equal(viewModel.viewNodeByViewId.get('expanded-group::neuron-1'), expandedChild);
+  assert.equal(viewModel.visibleNodeByRefId.get('neuron-1'), expandedChild);
 });
 
 test('agent graph view expanded children use viewId for active highlights', () => {
@@ -284,4 +284,48 @@ test('agent graph root scope uses the canonical rootContainerId as the top-level
   assert.ok(rootBrainNode);
   assert.equal(rootBrainNode.id, agent.brain.rootContainerId);
   assert.equal(rootBrainNode.rootContainer, true);
+});
+
+test('agent graph view and body preview share the same canonical endpoint expansion', () => {
+  const agent = createTestAgent();
+  agent.body.inputRules = [
+    {
+      id: 'sensor-inputs',
+      nodeIdPattern: '^sensor-([RGB])-(\\d+)$',
+      sourceTemplate: 'vision.$1.$2',
+      scale: 1,
+    },
+  ];
+  agent.body.outputRules = [
+    {
+      id: 'effector-outputs',
+      nodeIdPattern: '^effector-(turn-left|move-forward|turn-right)$',
+      targetTemplate: 'action.$1',
+      decayPerSecond: 2,
+    },
+  ];
+  agent.body.visionCellCount = 2;
+
+  const preview = buildAgentBodyRulePreviewModel(agent);
+  const inputScopeView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: ['input-adapter'],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+  });
+  const outputScopeView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: ['output-adapter'],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+  });
+
+  assert.deepEqual(
+    inputScopeView.nodes.map((node) => node.refNodeId).sort(),
+    [...preview.input.endpointNodeIds].sort()
+  );
+  assert.deepEqual(
+    outputScopeView.nodes.map((node) => node.refNodeId).sort(),
+    [...preview.output.endpointNodeIds].sort()
+  );
 });

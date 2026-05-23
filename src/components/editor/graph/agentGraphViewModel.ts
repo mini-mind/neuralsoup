@@ -826,18 +826,21 @@ export const buildAgentGraphViewModel = ({
     }
   }
 
-  const viewNodeById = new Map<string, GraphViewNode>();
+  const viewNodeByViewId = new Map<string, GraphViewNode>();
+  const visibleNodeByRefId = new Map<string, GraphViewNode>();
   for (const node of nodes) {
-    viewNodeById.set(node.id, node);
-    viewNodeById.set(node.viewId, node);
+    viewNodeByViewId.set(node.viewId, node);
+    if (!visibleNodeByRefId.has(node.refNodeId)) {
+      visibleNodeByRefId.set(node.refNodeId, node);
+    }
   }
   const localLeafIds = new Set(nodes.filter((node) => node.local && node.leaf && !node.proxy).map((node) => node.refNodeId));
   const nodeIdsInView = new Set(nodes.map((node) => node.id));
   const links: GraphViewLink[] = [...aggregateLinks, ...boundaryAggregateLinks]
     .filter((link) => nodeIdsInView.has(link.fromNodeId) && nodeIdsInView.has(link.toNodeId))
     .map((link) => {
-      const fromViewNode = viewNodeById.get(link.fromNodeId);
-      const toViewNode = viewNodeById.get(link.toNodeId);
+      const fromViewNode = visibleNodeByRefId.get(link.fromNodeId);
+      const toViewNode = visibleNodeByRefId.get(link.toNodeId);
       const isDirectLeafLink = link.count === 1 && Boolean(fromViewNode?.leaf && toViewNode?.leaf);
       const connectionId = link.leafLinkIds[0] ?? `aggregate:${link.fromNodeId}:${link.toNodeId}`;
       const connection = isDirectLeafLink
@@ -864,8 +867,8 @@ export const buildAgentGraphViewModel = ({
         id: `aggregate:${link.fromNodeId}:${link.toNodeId}`,
         fromNodeId: link.fromNodeId,
         toNodeId: link.toNodeId,
-        fromRefNodeId: viewNodeById.get(link.fromNodeId)?.refNodeId ?? link.fromNodeId,
-        toRefNodeId: viewNodeById.get(link.toNodeId)?.refNodeId ?? link.toNodeId,
+        fromRefNodeId: visibleNodeByRefId.get(link.fromNodeId)?.refNodeId ?? link.fromNodeId,
+        toRefNodeId: visibleNodeByRefId.get(link.toNodeId)?.refNodeId ?? link.toNodeId,
         weight: link.totalWeight,
         count: link.count,
         aggregate: true,
@@ -903,7 +906,8 @@ export const buildAgentGraphViewModel = ({
     scopeKey,
     localLeafIds,
     nodes,
-    viewNodeById,
+    viewNodeByViewId,
+    visibleNodeByRefId,
     links,
     activeViewNodeIds,
     modelById: new Map(DEFAULT_MODELS.map((model) => [model.id, model])),

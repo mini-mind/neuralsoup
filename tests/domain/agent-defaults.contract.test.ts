@@ -1,12 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDefaultAgentIR, deriveAgentIRVisionCellCount, summarizeAgentIR, validateAgentIR } from '../../src/domain/brain';
+import { createDefaultAgentIR, summarizeAgentIR, validateAgentIR } from '../../src/domain/brain';
 
 test('default AgentIR seed is valid and exposes vision-aligned body and runtime counts', () => {
   const agent = createDefaultAgentIR(4, 'Seed Agent');
 
   assert.equal(agent.metadata.name, 'Seed Agent');
-  assert.equal(deriveAgentIRVisionCellCount(agent), 4);
   assert.equal(agent.body.visionCellCount, 4);
   assert.deepEqual(
     agent.body.inputRules.map((rule) => rule.id),

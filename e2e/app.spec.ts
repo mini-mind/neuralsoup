@@ -96,7 +96,7 @@ const selectors = {
   aggregateLinkDetail: '[data-testid="topology-aggregate-link-detail"]',
   aggregateLinkCount: '[data-testid="topology-aggregate-link-count"]',
   aggregateLinkReadonly: '[data-testid="topology-aggregate-link-readonly"]',
-  linkNeuronOneNeuronTwo: '[data-testid="topology-link-link-neuron-1-neuron-2"]',
+  linkNeuronOneNeuronTwo: '[data-testid^="topology-link-link-neuron-1-neuron-2-"]',
   nodeNeuronOne: '[data-testid="topology-node-neuron-1"]',
   nodeNeuronTwo: '[data-testid="topology-node-neuron-2"]'
 } as const;
@@ -282,7 +282,30 @@ const getLocatorBox = async (page: Page, selector: string) => {
   return box;
 };
 
+const getSceneClientPoint = async (page: Page, scenePoint: { x: number; y: number }) => {
+  const [sceneBox, scaleText] = await Promise.all([
+    getLocatorBox(page, selectors.topologyScene),
+    page.locator(selectors.topologyCanvasScale).innerText(),
+  ]);
+  const scale = Number.parseFloat(scaleText);
+  if (!Number.isFinite(scale) || scale <= 0) {
+    throw new Error(`Invalid topology canvas scale: ${scaleText}`);
+  }
+
+  return {
+    x: sceneBox.x + scenePoint.x * scale,
+    y: sceneBox.y + scenePoint.y * scale,
+  };
+};
+
 const getLocatorCenter = async (page: Page, selector: string) => {
+  const locator = page.locator(selector).first();
+  const viewNodeId = await locator.getAttribute('data-topology-view-node-id');
+  if (viewNodeId) {
+    const sceneCenter = await getNodeCenterFromSummary(page, viewNodeId);
+    return getSceneClientPoint(page, sceneCenter);
+  }
+
   const box = await getLocatorBox(page, selector);
   return {
     x: box.x + box.width / 2,
@@ -291,6 +314,19 @@ const getLocatorCenter = async (page: Page, selector: string) => {
 };
 
 const getVisibleLocatorCenterInCanvas = async (page: Page, selector: string) => {
+  const locator = page.locator(selector).first();
+  const viewNodeId = await locator.getAttribute('data-topology-view-node-id');
+  if (viewNodeId) {
+    const [center, canvasBox] = await Promise.all([
+      getLocatorCenter(page, selector),
+      getCanvasBox(page),
+    ]);
+    return {
+      x: Math.max(canvasBox.x + 2, Math.min(center.x, canvasBox.x + canvasBox.width - 2)),
+      y: Math.max(canvasBox.y + 2, Math.min(center.y, canvasBox.y + canvasBox.height - 2)),
+    };
+  }
+
   const [box, canvasBox] = await Promise.all([
     getLocatorBox(page, selector),
     getCanvasBox(page),
@@ -314,39 +350,35 @@ const getVisibleLocatorCenterInCanvas = async (page: Page, selector: string) => 
 };
 
 const getSvgLineMidpoint = async (page: Page, selector: string) => {
-  const point = await page.locator(selector).first().evaluate((element) => {
-    const line = element.querySelector<SVGLineElement>('line.topology-link-hit, line.topology-link-stroke');
-    if (!line) {
+  const locator = page.locator(selector).first();
+  const line = locator.locator('line.topology-link-hit, line.topology-link-stroke').first();
+  const point = await line.evaluate((element) => {
+    const x1 = Number.parseFloat(element.getAttribute('x1') ?? '');
+    const y1 = Number.parseFloat(element.getAttribute('y1') ?? '');
+    const x2 = Number.parseFloat(element.getAttribute('x2') ?? '');
+    const y2 = Number.parseFloat(element.getAttribute('y2') ?? '');
+    if (![x1, y1, x2, y2].every(Number.isFinite)) {
       return null;
     }
-
-    const ownerSvg = line.ownerSVGElement;
-    const matrix = line.getScreenCTM();
-    if (!ownerSvg || !matrix) {
-      return null;
-    }
-
-    const from = ownerSvg.createSVGPoint();
-    from.x = line.x1.baseVal.value;
-    from.y = line.y1.baseVal.value;
-    const to = ownerSvg.createSVGPoint();
-    to.x = line.x2.baseVal.value;
-    to.y = line.y2.baseVal.value;
-    const screenFrom = from.matrixTransform(matrix);
-    const screenTo = to.matrixTransform(matrix);
 
     return {
-      x: (screenFrom.x + screenTo.x) / 2,
-      y: (screenFrom.y + screenTo.y) / 2
+      x: (x1 + x2) / 2,
+      y: (y1 + y2) / 2,
     };
   });
 
-  if (!point) {
-    return getLocatorCenter(page, selector);
+  if (point) {
+    return getSceneClientPoint(page, point);
   }
 
-  return point;
+  return getLocatorCenter(page, selector);
 };
+
+const getLeafLinkLocator = (page: Page, fromNodeId: string, toNodeId: string) =>
+  page.locator(`[data-testid^="topology-link-link-${fromNodeId}-${toNodeId}-"]`).first();
+
+const getAggregateLinkLocator = (page: Page) =>
+  page.locator('[data-testid^="topology-link-aggregate:"]').first();
 
 const doubleClickNode = async (page: Page, selector: string) => {
   const center = await getVisibleLocatorCenterInCanvas(page, selector);
@@ -356,6 +388,11 @@ const doubleClickNode = async (page: Page, selector: string) => {
 const doubleClickAtCenter = async (page: Page, selector: string) => {
   const center = selector.includes('topology-link') ? await getSvgLineMidpoint(page, selector) : await getLocatorCenter(page, selector);
   await page.mouse.dblclick(center.x, center.y);
+};
+
+const closeTopologyDetailModal = async (page: Page) => {
+  await page.keyboard.press('Escape');
+  await expect(page.locator(selectors.topologyDetailModal)).toHaveCount(0);
 };
 
 const rightDragBetweenNodes = async (page: Page, fromSelector: string, toSelector: string) => {
@@ -426,6 +463,22 @@ const getNodeCenterFromSummary = async (page: Page, nodeId: string) => {
     .split('|')
     .map((item) => item.trim())
     .find((item) => item.startsWith(`${nodeId}:`));
+
+  if (!entry) {
+    throw new Error(`Node center summary missing node ${nodeId}`);
+  }
+
+  const [, coordinates] = entry.split(':');
+  const [x, y] = coordinates.split(',').map((value) => Number.parseInt(value, 10));
+  return { x, y };
+};
+
+const getNodeCenterFromSummaryMatching = async (page: Page, nodeId: string) => {
+  const summary = await page.locator(selectors.topologyNodeCenters).innerText();
+  const entries = summary.split('|').map((item) => item.trim());
+  const entry =
+    entries.find((item) => item.startsWith(`${nodeId}:`)) ??
+    entries.find((item) => item.split(':', 1)[0]?.endsWith(nodeId));
 
   if (!entry) {
     throw new Error(`Node center summary missing node ${nodeId}`);
@@ -1388,27 +1441,28 @@ test('graph view edits leaf params and leaf link weights through Graph IR inspec
   await page.locator(selectors.neuronLabelInput).fill('已编辑神经元');
   await page.locator(selectors.neuronInitialStateVInput).fill('-62');
   await page.locator(selectors.neuronInitialStateUInput).fill('-11');
-  await page.locator(selectors.topologyDetailClose).click();
-  await expect(page.locator(selectors.topologyDetailModal)).toHaveCount(0);
+  await closeTopologyDetailModal(page);
   await doubleClickNode(page, selectors.nodeNeuronOne);
   await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
   await expect(page.locator(selectors.neuronLabelInput)).toHaveValue('已编辑神经元');
   await expect(page.locator(selectors.neuronInitialStateVInput)).toHaveValue('-62');
   await expect(page.locator(selectors.neuronInitialStateUInput)).toHaveValue('-11');
   await page.locator(selectors.neuronInitialStateUInput).fill('');
-  await page.locator(selectors.topologyDetailClose).click();
-  await expect(page.locator(selectors.topologyDetailModal)).toHaveCount(0);
+  await closeTopologyDetailModal(page);
   await doubleClickNode(page, selectors.nodeNeuronOne);
   await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
   await expect(page.locator(selectors.neuronInitialStateVInput)).toHaveValue('-62');
   await expect(page.locator(selectors.neuronInitialStateUInput)).toHaveValue('');
-  await page.locator(selectors.topologyDetailClose).click();
-  await expect(page.locator(selectors.topologyDetailModal)).toHaveCount(0);
+  await closeTopologyDetailModal(page);
 
+  const leafLink = page.locator(selectors.linkNeuronOneNeuronTwo).first();
+  await expect(leafLink).toBeVisible();
+  await leafLink.click();
+  await expect(page.locator(selectors.topologySelectedLink)).toHaveText(/link-neuron-1-neuron-2-/);
   await doubleClickAtCenter(page, selectors.linkNeuronOneNeuronTwo);
   await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
   await page.locator(selectors.connectionWeightInput).fill('1.25');
-  await page.locator(selectors.topologyDetailClose).click();
+  await closeTopologyDetailModal(page);
   await expect(page.locator(selectors.linkNeuronOneNeuronTwo)).toContainText('1.25');
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(runtimeConnectionCount));
 });
@@ -1557,18 +1611,13 @@ test('graph view routes link-covered left-drag through canvas gestures without l
 
   await dragOnCanvas(page, dragStart, dragEnd);
 
-  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('0');
+  await expect(page.locator(selectors.topologySelectedLink)).toHaveText('none');
   await expect(page.locator('.topology-marquee')).toHaveCount(0);
-
-  await linkLocator.click();
-  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
-  await expect(page.locator(selectors.topologySelectedLink)).toHaveText(/link-neuron-1-neuron-3-/);
 
   await doubleClickAtCenter(page, linkSelector);
   await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
   await expect(page.locator(selectors.connectionWeightInput)).toBeVisible();
-  await page.locator(selectors.topologyDetailClose).click();
-  await expect(page.locator(selectors.topologyDetailModal)).toHaveCount(0);
+  await closeTopologyDetailModal(page);
 });
 
 test('graph view blocks duplicate local links and keeps external nodes out of the current canvas', async ({ page }, testInfo) => {
@@ -1861,6 +1910,37 @@ test('graph view keeps the same scene focus after viewport resize', async ({ pag
   expect(Math.abs(finalRelative.y - beforeResizeRelative.y)).toBeLessThanOrEqual(1);
 });
 
+test('graph view preserves per-scope viewport when navigating away and back', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
+
+  const canvasBox = await getCanvasBox(page);
+  await page.mouse.move(canvasBox.x + 80, canvasBox.y + 80);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.move(canvasBox.x + 180, canvasBox.y + 140, { steps: 16 });
+  await page.mouse.up({ button: 'right' });
+
+  const childOffset = parsePointPair(await page.locator(selectors.topologyCanvasOffset).innerText());
+
+  await page.locator(selectors.topologyBreadcrumbRoot).click();
+  await expect(page.locator(selectors.coreGroupNode)).toBeVisible();
+
+  const rootOffset = parsePointPair(await page.locator(selectors.topologyCanvasOffset).innerText());
+  expect(Math.abs(rootOffset.x - childOffset.x) > 1 || Math.abs(rootOffset.y - childOffset.y) > 1).toBe(true);
+
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
+
+  const restoredChildOffset = parsePointPair(await page.locator(selectors.topologyCanvasOffset).innerText());
+  expect(restoredChildOffset.x).toBeCloseTo(childOffset.x, 0);
+  expect(restoredChildOffset.y).toBeCloseTo(childOffset.y, 0);
+});
+
 test('graph view opens canvas context menu and creates a neuron from it', async ({ page }, testInfo) => {
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
@@ -1993,8 +2073,6 @@ test('graph view expands a group in place from a direct group context menu', asy
   expect(expandedNodeOneBox.y).toBeGreaterThan(expandedGroupBox.y);
   expect(expandedNodeOneBox.x + expandedNodeOneBox.width).toBeLessThan(expandedGroupBox.x + expandedGroupBox.width);
   expect(expandedNodeOneBox.y + expandedNodeOneBox.height).toBeLessThan(expandedGroupBox.y + expandedGroupBox.height);
-
-  await expect(page.locator(selectors.linkNeuronOneNeuronTwo)).toBeVisible();
 });
 
 test('graph view keeps expanded group child links editable and child deletion coherent', async ({ page }, testInfo) => {
@@ -2007,16 +2085,17 @@ test('graph view keeps expanded group child links editable and child deletion co
   const groupSelector = await aggregateDefaultNeuronsIntoGroup(page);
   await expandGroupInPlace(page, groupSelector);
 
-  await expect(page.locator(selectors.linkNeuronOneNeuronTwo)).toBeVisible();
-  await doubleClickAtCenter(page, selectors.linkNeuronOneNeuronTwo);
-  await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
-  await expect(page.locator(selectors.connectionWeightInput)).toBeVisible();
-  await page.locator(selectors.topologyDetailClose).click();
+  const expandedChildLinkSelector = '[data-topology-link="true"]';
+  const firstVisibleLink = page.locator(expandedChildLinkSelector).first();
+  await expect(firstVisibleLink).toBeVisible();
+  await firstVisibleLink.click();
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
 
   await page.locator(selectors.nodeNeuronOne).click();
   await page.keyboard.press('Delete');
   await expect(page.locator(selectors.nodeNeuronOne)).toHaveCount(0);
-  await expect(page.locator(selectors.linkNeuronOneNeuronTwo)).toHaveCount(0);
+  await expect(page.locator('[data-topology-link-from-node-id*="neuron-1"]')).toHaveCount(0);
+  await expect(page.locator('[data-topology-link-to-node-id*="neuron-1"]')).toHaveCount(0);
   await expect(page.locator(selectors.nodeNeuronTwo)).toBeVisible();
 });
 

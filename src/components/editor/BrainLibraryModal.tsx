@@ -50,12 +50,6 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
     return null;
   }
 
-  const queueSelectBrain = (brainId: string) => {
-    window.setTimeout(() => {
-      onSelectBrain(brainId);
-    }, 0);
-  };
-
   const handleImportFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -176,7 +170,7 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
                         className="brain-library-item-title"
                         onClick={(event) => {
                           event.stopPropagation();
-                          queueSelectBrain(brain.agent.metadata.id);
+                          onSelectBrain(brain.agent.metadata.id);
                         }}
                       >
                         <span>{brain.agent.metadata.name}</span>

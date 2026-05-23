@@ -277,7 +277,7 @@ export const useGraphInteractionOrchestrator = ({
   );
 
   const beginSurfacePressing = useCallback(
-    (surfaceTarget: 'canvas' | 'link', clientPoint: GraphPoint) => {
+    (surfaceTarget: 'canvas', clientPoint: GraphPoint) => {
       closeContextMenu();
       focusSurface();
       const startScene = getScenePoint(clientPoint);
@@ -493,12 +493,6 @@ export const useGraphInteractionOrchestrator = ({
       if (currentInteraction.type === 'surface-pressing') {
         const nextClient = { x: event.clientX, y: event.clientY };
         if (!hasMovedPastThreshold(currentInteraction.startClient, nextClient)) {
-          return;
-        }
-
-        if (currentInteraction.surfaceTarget === 'link') {
-          clearSelection();
-          setInteractionState(null);
           return;
         }
 
@@ -758,7 +752,8 @@ export const useGraphInteractionOrchestrator = ({
           return;
         }
 
-        beginSurfacePressing(hitLink ? 'link' : 'canvas', clientPoint);
+        void hitLink;
+        beginSurfacePressing('canvas', clientPoint);
       }
     },
     [

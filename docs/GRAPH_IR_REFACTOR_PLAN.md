@@ -29,16 +29,16 @@ export interface AgentIR {
 
 `BodyIR` 只保存规则，规则是真源。运行时或编辑器可按规则展开出实际 body input/output 节点，但展开结果不作为第二真源保存。
 
-当前实现中，`body.visionCellCount` 仍是兼容访问器，而不是持久化字段：
+当前实现中，`body.visionCellCount` 已是 canonical 持久化字段：
 
-- 不作为持久化字段写出。
-- 运行时由 `AgentIR.connections` 与 `AgentLayoutIR` 中的 body vision markers 推导。
-- 旧存储载荷若仍带该字段，只在导入归一化时用于恢复稀疏 vision coverage，然后立即收口回推导语义。
-- 当前核心 domain 仍保留 legacy fallback 读取路径；后续需要继续下沉到 import/migration 边界，避免 AgentIR 域内长期保留双真源语义。
+- 默认 seed、storage normalization、summary、runtime install 和编辑器都直接读写该字段。
+- legacy 载荷若缺少该字段，只在 compat/import 归一化时结合结构证据补齐，然后写回 canonical `BodyIR.visionCellCount`。
+- domain 仍保留少量 legacy fallback 读取路径，用于显式 compat 边界和旧载荷迁移；后续仍应继续下沉，避免 AgentIR 域内长期保留双真源语义。
 
 ```ts
 export interface BodyIR {
   version: 1;
+  visionCellCount: number;
   inputRules: BodyInputRule[];
   outputRules: BodyOutputRule[];
 }
@@ -71,7 +71,7 @@ export interface BodyOutputRule {
 - 输入 `sourceTemplate` 目前必须解析成 `vision.<channel>.<cellIndex>`。
 - 输出 `targetTemplate` 目前必须解析成 `action.<turn-left|move-forward|turn-right>`。
 - 更通用的 source/target registry 仍是后续重构项，尚未完成下沉。
-- GraphView 对“未连线 body endpoint 的主动枚举”目前也只支持这套受限 grammar；它还不是 compile 同级的通用 regex 投影器。
+- GraphView/preview 当前已经与 domain 规则解析链共用同一套 endpoint authority，但“主动枚举未连线 endpoint”仍受限于这套 host grammar，并不是完全通用的 world DSL。
 
 示例：
 
@@ -230,14 +230,12 @@ compat 约束：
 
 ## 当前实现迁移
 
-当前实现仍是过渡结构：
+当前实现仍有兼容残留，但生产主路径已经完成以下切换：
 
-- `BrainPackage` 需要替换为 `AgentIR`。
-- `BodyDefinition` 需要替换为规则真源 `BodyIR`。
-- `GraphIRDocument` 需要替换为纯 `BrainIR`。
-- `AdapterNode` 和 `SignalNode` 需要从 brain topology 中移除。
-- `LeafLink` 需要替换为 `AgentConnection`。
-- `position`、`collapsed` 已进入 `AgentLayoutIR`；`expanded`、`size` 和 viewport 不再作为 canonical schema 目标。
+- 持久化与运行主结构已经是 `AgentIR`，不是旧的 `BrainPackage / BodyDefinition / LeafLink` 组合。
+- `GraphView` 直接编辑 `AgentIR.brain`、`AgentIR.connections` 与 `AgentIR.layout`，body signal node 不再作为 brain topology 真源持久化。
+- `position`、`collapsed` 已进入 `AgentLayoutIR`；`expanded`、`size` 和 viewport 保持 session/computed state，不再作为 canonical schema 目标。
+- legacy `GraphIRDocument`、legacy package envelope 和相关桥接器仍存在，但仅应视为 compat surface，而不是当前生产真源。
 
 当前 Brain Library 的真实边界如下：
 
@@ -250,15 +248,16 @@ compat 约束：
 
 - 内存主态与编辑主态都以 `agent.metadata` 为身份真源。
 - “保存当前 Brain”会原子切换当前编辑/运行 Agent 到新建库条目的 `AgentIR`，避免当前 Agent 与库条目身份漂移。
-- `AgentPackage` 仍作为外部兼容 envelope 保留，但 legacy package helper 已显式下沉到 compat/legacy 命名。
+- legacy package/helper 仍有一部分类型面残留在 domain exports；运行主路径已切到 `AgentIR`，但目录/API 边界尚未完全收口。
 
 ## 当前剩余缺口
 
 当前实现与冻结设计相比，仍有以下明确缺口：
 
 - `BodyIR` 已进入 schema、compiler、runtime、storage，并具备生产可用的规则编辑、endpoint 投影预览和可见 validation。
-- GraphView 对 body endpoint 的主动投影仍是受限 grammar，不等同于 compile 级 regex 语义。
+- body endpoint 的主动投影与 preview/GraphView 已共用同一 authority；当前剩余限制在于 host grammar 仍是受限集合，而不是多套解释器并存。
 - GraphView 的 viewport/scale、expanded 和 size 仍是 session/computed state；若未来需要跨会话恢复，应以新 schema 单独设计，而不是复活旧字段。
+- compat bridge、legacy type export 与部分 migration 命名仍残留在 domain/storage/runtime 周边；它们不是主路径真源，但仍是后续收口对象。
 
 ## 验收边界
 

@@ -239,8 +239,8 @@ test('legacy graph view expanded group projects child leaf links as editable dir
   });
 
   assert.deepEqual(viewModel.nodes.map((node) => node.id), ['expanded-group', 'neuron-1', 'neuron-2']);
-  assert.equal(viewModel.viewNodeById.get('neuron-1')?.x, 390);
-  assert.equal(viewModel.viewNodeById.get('neuron-1')?.expansionOffsetX, 30);
+  assert.equal(viewModel.visibleNodeByRefId.get('neuron-1')?.x, 390);
+  assert.equal(viewModel.visibleNodeByRefId.get('neuron-1')?.expansionOffsetX, 30);
   assert.deepEqual(viewModel.links, [
     {
       id: 'link-neuron-1-neuron-2',
@@ -302,10 +302,10 @@ test('legacy graph view expanded group draft move carries children without mutat
     runtimeActiveNodeIds: [],
   });
 
-  assert.equal(after.viewNodeById.get('expanded-group')!.x - before.viewNodeById.get('expanded-group')!.x, 72);
-  assert.equal(after.viewNodeById.get('expanded-group')!.y - before.viewNodeById.get('expanded-group')!.y, 38);
-  assert.equal(after.viewNodeById.get('neuron-1')!.x - before.viewNodeById.get('neuron-1')!.x, 72);
-  assert.equal(after.viewNodeById.get('neuron-1')!.y - before.viewNodeById.get('neuron-1')!.y, 38);
-  assert.equal(after.viewNodeById.get('neuron-1')!.expansionOffsetX, 30);
-  assert.equal(after.viewNodeById.get('neuron-1')!.expansionOffsetY, 30);
+  assert.equal(after.visibleNodeByRefId.get('expanded-group')!.x - before.visibleNodeByRefId.get('expanded-group')!.x, 72);
+  assert.equal(after.visibleNodeByRefId.get('expanded-group')!.y - before.visibleNodeByRefId.get('expanded-group')!.y, 38);
+  assert.equal(after.visibleNodeByRefId.get('neuron-1')!.x - before.visibleNodeByRefId.get('neuron-1')!.x, 72);
+  assert.equal(after.visibleNodeByRefId.get('neuron-1')!.y - before.visibleNodeByRefId.get('neuron-1')!.y, 38);
+  assert.equal(after.visibleNodeByRefId.get('neuron-1')!.expansionOffsetX, 30);
+  assert.equal(after.visibleNodeByRefId.get('neuron-1')!.expansionOffsetY, 30);
 });

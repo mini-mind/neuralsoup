@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { GraphViewNode } from './graphViewTypes';
 import { projectGraphScene, type GraphSceneNode } from './graphSceneProjection';
 import { useGraphViewSessionController } from './interaction/useGraphViewSessionController';
-import type { GraphCanvasViewport } from '../../hooks/useSNNTopologyState';
+import type {
+  GraphCanvasViewport,
+  GraphCanvasViewportMetrics,
+} from '../../hooks/useSNNTopologyState';
 import { getNodeCenter, NODE_PLACEMENT_MARGIN } from './tools/canvasGeometry';
 import { isEditableOrInteractiveTarget } from './isEditableOrInteractiveTarget';
 
@@ -18,6 +21,12 @@ interface GraphCanvasAssemblyOptions {
   canAggregateSelection: boolean;
   canvasViewport: GraphCanvasViewport;
   setCanvasOffset: (offset: GraphCanvasViewport) => void;
+  syncCanvasViewportForScope: (payload: {
+    scopeKey: string;
+    recommendedViewport: GraphCanvasViewport;
+    metrics: GraphCanvasViewportMetrics;
+    isActive: boolean;
+  }) => void;
   canvasScale: number;
   setCanvasScale: (nextScale: number) => void;
   beginSelectionRect: (point: { x: number; y: number }) => void;
@@ -48,6 +57,7 @@ export const useGraphCanvasAssembly = ({
   canAggregateSelection,
   canvasViewport,
   setCanvasOffset,
+  syncCanvasViewportForScope,
   canvasScale,
   setCanvasScale,
   beginSelectionRect,
@@ -72,9 +82,6 @@ export const useGraphCanvasAssembly = ({
     [height, nodes, width]
   );
   const sceneOriginRef = useRef(scene.origin);
-  const scopeKeyRef = useRef<string | null>(null);
-  const initializedViewportScopeKeyRef = useRef<string | null>(null);
-  const viewportMetricsRef = useRef<{ width: number; height: number; originX: number; originY: number } | null>(null);
 
   useEffect(() => {
     sceneOriginRef.current = scene.origin;
@@ -121,25 +128,6 @@ export const useGraphCanvasAssembly = ({
   }, [currentScope, getInitialViewportX, height, scene.list, scene.size.height, scene.size.width, width]);
 
   useEffect(() => {
-    if (width <= 1 || height <= 1) {
-      return;
-    }
-
-    if (initializedViewportScopeKeyRef.current === scopeKey) {
-      return;
-    }
-
-    setCanvasOffset(initialViewport);
-    initializedViewportScopeKeyRef.current = scopeKey;
-    viewportMetricsRef.current = {
-      width,
-      height,
-      originX: scene.origin.x,
-      originY: scene.origin.y,
-    };
-  }, [height, initialViewport, scene.origin.x, scene.origin.y, scopeKey, setCanvasOffset, width]);
-
-  useEffect(() => {
     const surface = surfaceRef.current;
     if (!surface) {
       return;
@@ -154,53 +142,22 @@ export const useGraphCanvasAssembly = ({
   }, [scopeKey, surfaceRef]);
 
   useEffect(() => {
-    const nextMetrics = {
-      width,
-      height,
-      originX: scene.origin.x,
-      originY: scene.origin.y,
-    };
-    const previousScopeKey = scopeKeyRef.current;
-    scopeKeyRef.current = scopeKey;
-    if (previousScopeKey !== scopeKey) {
-      initializedViewportScopeKeyRef.current = null;
-      viewportMetricsRef.current = nextMetrics;
+    if (width <= 1 || height <= 1) {
       return;
     }
 
-    const previousMetrics = viewportMetricsRef.current;
-    if (!previousMetrics) {
-      viewportMetricsRef.current = nextMetrics;
-      return;
-    }
-
-    // Ignore the bootstrap resize from the placeholder 1x1 viewport to the
-    // first measured panel size; otherwise the canvas is incorrectly re-centered.
-    if (previousMetrics.width <= 1 || previousMetrics.height <= 1) {
-      viewportMetricsRef.current = nextMetrics;
-      return;
-    }
-
-    if (!isActive) {
-      viewportMetricsRef.current = nextMetrics;
-      return;
-    }
-
-    const deltaX =
-      (width - previousMetrics.width) / 2 + (scene.origin.x - previousMetrics.originX) * canvasScale;
-    const deltaY =
-      (height - previousMetrics.height) / 2 + (scene.origin.y - previousMetrics.originY) * canvasScale;
-    if (deltaX === 0 && deltaY === 0) {
-      viewportMetricsRef.current = nextMetrics;
-      return;
-    }
-
-    setCanvasOffset({
-      x: canvasViewport.x + deltaX,
-      y: canvasViewport.y + deltaY,
+    syncCanvasViewportForScope({
+      scopeKey,
+      recommendedViewport: initialViewport,
+      metrics: {
+        width,
+        height,
+        originX: scene.origin.x,
+        originY: scene.origin.y,
+      },
+      isActive,
     });
-    viewportMetricsRef.current = nextMetrics;
-  }, [canvasScale, canvasViewport.x, canvasViewport.y, height, isActive, scene.origin.x, scene.origin.y, scopeKey, setCanvasOffset, width]);
+  }, [height, initialViewport, isActive, scene.origin.x, scene.origin.y, scopeKey, syncCanvasViewportForScope, width]);
 
   useEffect(() => {
     const surface = surfaceRef.current;
