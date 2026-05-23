@@ -45,7 +45,8 @@ e2e/                      # Playwright 端到端测试
 - 左侧游戏区域负责仿真运行、奖励/FPS 展示和智能体观察。
 - 右侧编辑区顶部在 `Settings` 与 `GraphView` 之间切换。
 - `Settings` 内包含智能体参数和键盘覆盖说明。
-- `GraphView` 当前处于从 `GraphIRDocument` 兼容视图向 `AgentIR` 真源迁移的过程中：已由 `AgentIR` 驱动草稿与脑库主状态，编辑器内部仍保留部分 legacy topology 兼容层。
+- `GraphView` 生产主路径已经以 `AgentIR` 为真源；legacy `GraphIRDocument` 仅保留在显式 compat 边界。
+- `GraphView` 当前只持久化节点位置和分组折叠状态；画布视角、缩放、选择和弹窗等交互状态仍是会话态。
 - 空格用于开始/继续或暂停仿真，输入控件聚焦时不会触发全局快捷键。
 
 ## 文档

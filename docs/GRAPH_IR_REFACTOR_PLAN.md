@@ -186,30 +186,21 @@ export interface AgentConnection {
 export interface AgentLayoutIR {
   version: 1;
   nodes: Record<string, AgentLayoutNodeState>;
-  viewportByContainerId?: Record<string, AgentLayoutViewport>;
 }
 
 export interface AgentLayoutNodeState {
   position?: { x: number; y: number };
-  size?: { width: number; height: number };
   collapsed?: boolean;
-  expanded?: boolean;
-}
-
-export interface AgentLayoutViewport {
-  x: number;
-  y: number;
-  scale: number;
 }
 ```
 
-layout 只影响 GraphView 展示，不参与 runtime 编译。`viewportByContainerId` 用于恢复不同层级画布的平移和缩放状态；`size` 用于保存展开容器或自定义节点尺寸。
+layout 只影响 GraphView 展示，不参与 runtime 编译。
 
 当前真实状态：
 
-- `position` 与 `collapsed` 已进入主编辑路径并会持久化。
-- `viewportByContainerId` 尚未落盘，当前 viewport/scale 仍停留在 React session state。
-- `size` / `expanded` 仍主要是视图计算态，不是稳定持久化真源。
+- `position` 与 `collapsed` 是 `AgentLayoutIR` 的唯一持久真源。
+- viewport/scale 仍停留在 React session state，不进入 canonical `AgentIR`。
+- `size` / `expanded` 是视图计算态，不是稳定持久化真源。
 
 ## 编译边界
 
@@ -246,7 +237,7 @@ compat 约束：
 - `GraphIRDocument` 需要替换为纯 `BrainIR`。
 - `AdapterNode` 和 `SignalNode` 需要从 brain topology 中移除。
 - `LeafLink` 需要替换为 `AgentConnection`。
-- `position`、`collapsed`、`expanded`、`size` 和 viewport 需要从 topology/UI 临时状态移入 `AgentLayoutIR`。
+- `position`、`collapsed` 已进入 `AgentLayoutIR`；`expanded`、`size` 和 viewport 不再作为 canonical schema 目标。
 
 当前 Brain Library 的真实边界如下：
 
@@ -265,10 +256,9 @@ compat 约束：
 
 当前实现与冻结设计相比，仍有以下明确缺口：
 
-- `BodyIR` 已进入 schema、compiler、runtime、storage，但生产 UI 还没有真正的 BodyIR 编辑器；signal leaf 仍是只读投影。
-- validation 已存在于 domain/runtime，但用户侧仍主要停留在隐藏诊断探针，尚未形成可见、可定位、可修复的问题面板。
+- `BodyIR` 已进入 schema、compiler、runtime、storage，并具备生产可用的规则编辑、endpoint 投影预览和可见 validation。
 - GraphView 对 body endpoint 的主动投影仍是受限 grammar，不等同于 compile 级 regex 语义。
-- `viewportByContainerId`、`size`、`expanded` 仍未完成“是否持久化”为真的最终收口。
+- GraphView 的 viewport/scale、expanded 和 size 仍是 session/computed state；若未来需要跨会话恢复，应以新 schema 单独设计，而不是复活旧字段。
 
 ## 验收边界
 

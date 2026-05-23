@@ -79,21 +79,12 @@ export interface AgentConnection {
 
 export interface AgentLayoutNodeState {
   position?: Position;
-  size?: { width: number; height: number };
   collapsed?: boolean;
-  expanded?: boolean;
-}
-
-export interface AgentLayoutViewport {
-  x: number;
-  y: number;
-  scale: number;
 }
 
 export interface AgentLayoutIR {
   version: 1;
   nodes: Record<string, AgentLayoutNodeState>;
-  viewportByContainerId?: Record<string, AgentLayoutViewport>;
 }
 
 export interface AgentIR {

@@ -638,7 +638,7 @@
     {
       "id": "task-015",
       "title": "Compat 输入面收口：下沉 Brain Library legacy LocalStorage/package 兼容并移除 AgentIR 核心的 visionCellCount fallback",
-      "status": "in_progress",
+      "status": "completed",
       "priority": "P1",
       "depends_on": [
         "task-008",
@@ -661,21 +661,25 @@
         {
           "at": "2026-05-23T11:08:47Z",
           "message": "Stage audit scoped task-015 precisely: startup loadBrainLibraryWithStatus still accepts legacy storage envelopes, normalizeImportedBrainExchange still accepts legacy AgentPackage on the default import path, and deriveAgentIRVisionCellCount still defaults to the deprecated visionCellCount fallback in core domain helpers."
+        },
+        {
+          "at": "2026-05-23T19:45:00Z",
+          "message": "Production startup/import paths are now canonical-only, explicit legacy storage/package acceptance lives under compat helpers, core deriveAgentIRVisionCellCount defaults to structured truth only, and the stage was revalidated with npm run type-check, npm run test:domain, targeted compat tests, and Playwright brain-library coverage."
         }
       ],
-      "completed_at": null
+      "completed_at": "2026-05-23T19:45:00Z"
     },
     {
       "id": "task-016",
       "title": "Layout 真源收口：决定并实现 viewportByContainerId/size/expanded 的持久化或从 schema 删除",
-      "status": "pending",
+      "status": "in_progress",
       "priority": "P2",
       "depends_on": [
         "task-014"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "max_attempts": 3,
-      "started_at_commit": null,
+      "started_at_commit": "working-tree",
       "validation": {
         "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"graph view\"",
         "timeout_seconds": 900
@@ -686,7 +690,12 @@
       "error_log": [
         "AgentLayoutIR schema/document still advertise viewportByContainerId, size, and expanded, but current product behavior only persists position/collapsed while the rest remain session or computed state."
       ],
-      "checkpoints": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-23T20:05:00Z",
+          "message": "Stage audit confirmed production AgentIR layout truth only persists position/collapsed, while viewport/size/expanded remain session or computed state; implementation is now aligning schema, canonical storage validation, docs, and task tracking to that reality."
+        }
+      ],
       "completed_at": null
     }
   ],

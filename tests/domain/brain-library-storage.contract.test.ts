@@ -10,6 +10,7 @@ import {
 } from '../../src/storage/brainLibraryStorage';
 import {
   createBrainLibraryItemFromAgent,
+  isValidBrainLibraryAgentPayload,
   renameBrainLibraryItem,
   upsertBrainLibraryItemAgent,
 } from '../../src/storage/brainLibraryRecord';
@@ -160,6 +161,19 @@ test('Brain Library storage rewrites canonical records into normalized AgentIR s
 
   delete (rawStoredRecord.agent.layout?.nodes ?? {})['__body-vision-cell-0'];
   delete (rawStoredRecord.agent.layout?.nodes ?? {})['__body-vision-cell-1'];
+  rawStoredRecord.agent.layout ??= { version: 1, nodes: {} };
+  (rawStoredRecord.agent.layout.nodes as Record<string, Record<string, unknown>>)['neuron-1'] = {
+    ...((rawStoredRecord.agent.layout.nodes as Record<string, Record<string, unknown>>)['neuron-1'] ?? {}),
+    position: { x: 50, y: 150 },
+    collapsed: false,
+    size: { width: 999, height: 777 },
+    expanded: true,
+  };
+  (rawStoredRecord.agent.layout as typeof rawStoredRecord.agent.layout & {
+    viewportByContainerId?: Record<string, { x: number; y: number; scale: number }>;
+  }).viewportByContainerId = {
+    root: { x: 12, y: 34, scale: 1.5 },
+  };
 
   storage.setItem(
     BRAIN_LIBRARY_STORAGE_KEY,
@@ -176,10 +190,37 @@ test('Brain Library storage rewrites canonical records into normalized AgentIR s
   assert.equal(loaded.brains.length, 1);
 
   const persisted = JSON.parse(storage.getItem(BRAIN_LIBRARY_STORAGE_KEY) ?? 'null') as {
-    brains: Array<{ agent: { layout?: { nodes?: Record<string, unknown> } } }>;
+    brains: Array<{ agent: { layout?: { nodes?: Record<string, Record<string, unknown>>; viewportByContainerId?: unknown } } }>;
   };
   assert.ok(persisted.brains[0]?.agent.layout?.nodes?.['__body-vision-cell-0']);
   assert.ok(persisted.brains[0]?.agent.layout?.nodes?.['__body-vision-cell-1']);
+  assert.equal('size' in (persisted.brains[0]?.agent.layout?.nodes?.['neuron-1'] ?? {}), false);
+  assert.equal('expanded' in (persisted.brains[0]?.agent.layout?.nodes?.['neuron-1'] ?? {}), false);
+  assert.equal('viewportByContainerId' in (persisted.brains[0]?.agent.layout ?? {}), false);
+});
+
+test('canonical Brain Library normalization strips legacy layout viewport fields from the main path', () => {
+  const agent = createDefaultAgentIR(1, 'Layout Payload Validation');
+  const candidate = {
+    ...agent,
+    layout: {
+      version: 1,
+      nodes: {
+        ...(agent.layout?.nodes ?? {}),
+      },
+      viewportByContainerId: {
+        root: { x: 10, y: 20, scale: 1.2 },
+      },
+    },
+  } as typeof agent & {
+    layout: typeof agent.layout & {
+      viewportByContainerId: Record<string, { x: number; y: number; scale: number }>;
+    };
+  };
+
+  assert.equal(isValidBrainLibraryAgentPayload(candidate), true);
+  const normalized = createBrainLibraryItemFromAgent('Normalized Layout', candidate);
+  assert.equal('viewportByContainerId' in (normalized.agent.layout ?? {}), false);
 });
 
 test('Brain Library canonical record storage rewrites leaked legacy body visionCellCount on canonical payload load', () => {

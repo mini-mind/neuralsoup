@@ -506,7 +506,7 @@ export const useSNNTopologyState = ({
         return null;
       }
 
-      if (node.navigable) {
+      if (node.navigable && node.kind !== 'adapter') {
         return 'navigate';
       }
 

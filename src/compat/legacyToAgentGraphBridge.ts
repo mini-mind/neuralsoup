@@ -434,23 +434,13 @@ const buildAgentLayoutFromLegacy = (
   for (const [nodeId, state] of Object.entries(graphLayout.nodes)) {
     nodes[nodeId] = {
       position: clonePosition(state.position),
-      size: state.size ? { ...state.size } : undefined,
       collapsed: state.collapsed,
-      expanded: state.collapsed === false ? true : undefined,
     };
   }
 
   return {
     version: 1,
     nodes,
-    viewportByContainerId: graphLayout.viewportByContainerId
-      ? Object.fromEntries(
-          Object.entries(graphLayout.viewportByContainerId).map(([containerId, viewport]) => [
-            containerId,
-            { ...viewport },
-          ])
-        )
-      : undefined,
   };
 };
 

@@ -89,9 +89,7 @@ const createContainerNodeFromAgent = (
     id: container.id,
     label: container.label ?? container.id,
     position,
-    collapsed:
-      agent.layout?.nodes[container.id]?.collapsed ??
-      (agent.layout?.nodes[container.id]?.expanded === true ? false : undefined),
+    collapsed: agent.layout?.nodes[container.id]?.collapsed,
     children,
   };
 };
@@ -370,11 +368,7 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
     return {
       ...node,
       position: agent.layout?.nodes[node.id]?.position ?? node.position,
-      collapsed:
-        'collapsed' in node
-          ? agent.layout?.nodes[node.id]?.collapsed ??
-            (agent.layout?.nodes[node.id]?.expanded === true ? false : node.collapsed)
-          : undefined,
+      collapsed: 'collapsed' in node ? agent.layout?.nodes[node.id]?.collapsed ?? node.collapsed : undefined,
     };
   });
 
@@ -527,19 +521,9 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
         {
           position: clonePosition(state.position),
           collapsed: state.collapsed,
-          size: state.size ? { ...state.size } : undefined,
-          expanded: state.expanded,
         },
       ])
     ),
-    viewportByContainerId: agent.layout?.viewportByContainerId
-      ? Object.fromEntries(
-          Object.entries(agent.layout.viewportByContainerId).map(([containerId, viewport]) => [
-            containerId,
-            { ...viewport },
-          ])
-        )
-      : undefined,
   };
 
   if (
@@ -552,13 +536,6 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
     )
   ) {
     documentOnlyLosses.push('Legacy GraphIR document-only getter cannot preserve BodyIR scale/decay semantics.');
-  }
-
-  if (
-    Object.values(agent.layout?.nodes ?? {}).some((node) => node.size !== undefined) ||
-    agent.layout?.viewportByContainerId
-  ) {
-    documentOnlyLosses.push('Legacy GraphIR document-only getter cannot preserve AgentLayout size/viewport semantics.');
   }
 
   return {

@@ -33,6 +33,28 @@ const stripLegacyVisionCellCount = (agent: AgentIR): AgentIR => {
   };
 };
 
+const stripNonCanonicalLayoutState = (agent: AgentIR): AgentIR => {
+  if (!agent.layout) {
+    return agent;
+  }
+
+  return {
+    ...agent,
+    layout: {
+      version: 1,
+      nodes: Object.fromEntries(
+        Object.entries(agent.layout.nodes).map(([nodeId, state]) => [
+          nodeId,
+          {
+            position: state.position ? { ...state.position } : undefined,
+            collapsed: state.collapsed,
+          },
+        ])
+      ),
+    },
+  };
+};
+
 export const isAgentMetadata = (value: unknown): value is AgentMetadataShape =>
   isObject(value) &&
   typeof value.id === 'string' &&
@@ -161,19 +183,7 @@ export const isValidBrainLibraryAgentPayload = (
   (agent.layout === undefined ||
     (isObject(agent.layout) &&
       agent.layout.version === 1 &&
-      isObject(agent.layout.nodes) &&
-      (agent.layout.viewportByContainerId === undefined ||
-        (isObject(agent.layout.viewportByContainerId) &&
-          Object.values(agent.layout.viewportByContainerId).every(
-            (viewport) =>
-              isObject(viewport) &&
-              typeof viewport.x === 'number' &&
-              Number.isFinite(viewport.x) &&
-              typeof viewport.y === 'number' &&
-              Number.isFinite(viewport.y) &&
-              typeof viewport.scale === 'number' &&
-              Number.isFinite(viewport.scale)
-          ))))) &&
+      isObject(agent.layout.nodes))) &&
   validateAgentIR(agent as unknown as AgentIR).length === 0;
 
 export const isBrainLibraryStoredRecord = (value: unknown): value is BrainLibraryRecord =>
@@ -190,10 +200,12 @@ export const normalizeCanonicalBrainLibraryRecord = (
   const normalizedVisionCellCount = deriveAgentIRVisionCellCount(agent);
   const normalizedAgent = withDerivedBodyVisionCellCount(
     withVisionCellLayoutMarkers(
-      stripLegacyVisionCellCount({
-        ...agent,
-        metadata,
-      }),
+      stripNonCanonicalLayoutState(
+        stripLegacyVisionCellCount({
+          ...agent,
+          metadata,
+        })
+      ),
       normalizedVisionCellCount
     )
   );

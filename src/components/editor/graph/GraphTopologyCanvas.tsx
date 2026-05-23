@@ -451,8 +451,12 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
               onMouseDown={(event) => onNodeMouseDown(event, node.viewId)}
               onContextMenu={onNodeContextMenu}
               onDoubleClick={(event) => {
-                event.stopPropagation();
                 const action = getNodeDoubleClickAction(node.viewId);
+                if (!action) {
+                  return;
+                }
+
+                event.stopPropagation();
                 if (action === 'navigate') {
                   onNavigateToNode(node.viewId);
                   return;
