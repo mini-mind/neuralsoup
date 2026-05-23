@@ -47,6 +47,8 @@ interface UseSNNTopologyStateOptions {
 
 export interface GraphDocumentChangeOptions {
   installToRuntime?: boolean;
+  commitToCurrentDocument?: boolean;
+  persistActiveBrain?: boolean;
 }
 
 const getScopeBaseViewport = (scope: 'root' | 'child'): GraphPoint =>

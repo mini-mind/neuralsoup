@@ -312,6 +312,14 @@
         {
           "at": "2026-05-23T18:40:00Z",
           "message": "IR main-path naming cleanup landed: default AgentIR BodyIR rule ids were renamed from legacy-* to neutral vision-inputs/motor-outputs, the unused src/types/graphIRRuntime.ts compat alias surface was removed, and regression coverage remained green in npm run type-check, npm run test:domain, and npm run test:compat."
+        },
+        {
+          "at": "2026-05-23T22:40:00Z",
+          "message": "GraphView main-path P0 cleanup phase 1 landed: App now separates current editor AgentIR from installed runtime AgentIR, graph layout/group/collapse edits can commit to the current document and active brain without implicitly reinstalling runtime, test-only draft injectors were narrowed back to pure draft mutations, and targeted brain-library plus graph diagnostics/leaf-link e2e coverage passed."
+        },
+        {
+          "at": "2026-05-23T23:10:00Z",
+          "message": "GraphView main-path P0 cleanup phase 2 landed: body adapter/signal visibility no longer derives only from current connections, a new domain body-endpoint enumerator resolves canonical BodyIR-derived input/output node ids for the editor, and domain contracts now prove unconnected body endpoints remain visible in GraphView. Revalidated with npm run type-check, npm run test:domain, and targeted graph-view/brain-library Playwright flows."
         }
       ],
       "completed_at": null
@@ -564,6 +572,10 @@
       {
         "at": "2026-05-23T20:40:00Z",
         "message": "Split brain-library persistence from import/export exchange codecs: canonical BrainLibraryRecord normalization now lives outside LocalStorage I/O, the default file format switched to an AgentIR-native neuralsoup-agent envelope while explicit legacy AgentPackage export remains available as compat surface, compat session export/audit APIs were separated from the import setter, and validation passed with npm run type-check, npm run test:domain, npm run test:compat, and npm run test:e2e -- --grep \"brain library\"."
+      },
+      {
+        "at": "2026-05-23T22:10:00Z",
+        "message": "Storage boundary cleanup continued: brainLibraryStorage no longer reuses the general exchange normalizer on the canonical LocalStorage read path, legacy LocalStorage migration was narrowed to an internal storage upgrader, legacy package migration assertions moved from tests/domain into tests/compat, and brain-library e2e now explicitly rejects leaked top-level metadata/packageVersion in canonical storage while still covering the default neuralsoup-agent export/import contract."
       }
     ],
     "completed_at": null

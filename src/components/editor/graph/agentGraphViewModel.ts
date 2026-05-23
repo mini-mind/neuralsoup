@@ -5,6 +5,7 @@ import type {
   BrainContainerNode,
   BrainNeuronNode,
 } from '../../../domain/brain';
+import { resolveAgentBodyEndpointIds } from '../../../domain/brain';
 import type { ModelDefinition } from '../../../domain/brain/ir';
 import type { Position } from '../../../domain/brain/shared';
 import { getGraphLinkCapabilities } from './graphLinkPolicy';
@@ -261,17 +262,6 @@ const getLayoutPosition = (
   );
 };
 
-const collectBodyEndpointIds = (agent: AgentIR, scope: 'bodyInput' | 'bodyOutput'): string[] => {
-  const endpointIds = new Set<string>();
-  for (const connection of agent.connections) {
-    const endpoint = connection.from.scope === scope ? connection.from : connection.to.scope === scope ? connection.to : null;
-    if (endpoint) {
-      endpointIds.add(endpoint.nodeId);
-    }
-  }
-  return [...endpointIds].sort();
-};
-
 const getPathPrefixForContainer = (containerId: string, rootContainerId: string) =>
   containerId === rootContainerId ? [ROOT_BRAIN_GROUP_ID] : [containerId];
 
@@ -283,8 +273,7 @@ const buildIndexes = (agent: AgentIR): AgentGraphViewIndexes => {
   const linkById = new Map(agent.connections.map((connection) => [connection.id, connection]));
   const endpointByViewNodeId = new Map<string, AgentConnectionEndpoint>();
 
-  const bodyInputIds = collectBodyEndpointIds(agent, 'bodyInput');
-  const bodyOutputIds = collectBodyEndpointIds(agent, 'bodyOutput');
+  const { bodyInputNodeIds: bodyInputIds, bodyOutputNodeIds: bodyOutputIds } = resolveAgentBodyEndpointIds(agent);
 
   const rootChildren: AgentGraphViewNodeRecord[] = [];
 

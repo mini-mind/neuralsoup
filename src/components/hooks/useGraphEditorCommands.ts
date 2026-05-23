@@ -414,7 +414,7 @@ export const useGraphEditorCommands = ({
           }));
         }
         return nextAgent;
-      }, { installToRuntime: false });
+      }, { installToRuntime: false, commitToCurrentDocument: true, persistActiveBrain: true });
       setDraftNodePositions({});
     },
     [draftNodePositions, setAgent, setDraftNodePositions]
@@ -816,7 +816,7 @@ export const useGraphEditorCommands = ({
           })
         ),
       });
-    }, { installToRuntime: false });
+    }, { installToRuntime: false, commitToCurrentDocument: true, persistActiveBrain: true });
     scheduleFocusNode(nextGroupId);
     closeDetailModal();
     clearSelectionRect();
@@ -854,7 +854,7 @@ export const useGraphEditorCommands = ({
         }
 
         return ungroupAgentContainer(current, currentContainerId, targetGroup.refNodeId);
-      }, { installToRuntime: false });
+      }, { installToRuntime: false, commitToCurrentDocument: true, persistActiveBrain: true });
       clearSelection();
       closeDetailModal();
       clearSelectionRect();
@@ -882,7 +882,7 @@ export const useGraphEditorCommands = ({
             ...layoutNode,
             collapsed: layoutNode.collapsed === false ? true : false,
           })),
-        { installToRuntime: false }
+        { installToRuntime: false, commitToCurrentDocument: true, persistActiveBrain: true }
       );
       clearSelection();
       clearSelectionRect();

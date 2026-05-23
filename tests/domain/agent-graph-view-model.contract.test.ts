@@ -129,3 +129,76 @@ test('agent graph root brain child scope does not inject orphan adapter proxy no
   assert.equal(viewModel.nodes.some((node) => node.id === 'core-input-adapter'), false);
   assert.equal(viewModel.nodes.some((node) => node.id === 'core-output-adapter'), false);
 });
+
+test('agent graph root scope exposes canonical body endpoints even before any connection references them', () => {
+  const agent = createTestAgent();
+  agent.body.inputRules = [
+    {
+      id: 'vision-inputs',
+      nodeIdPattern: '^vision-([RGB])-(\\d+)$',
+      sourceTemplate: 'vision.$1.$2',
+      scale: 1,
+    },
+  ];
+  agent.body.outputRules = [
+    {
+      id: 'motor-outputs',
+      nodeIdPattern: '^output-(turn-left|move-forward|turn-right)$',
+      targetTemplate: 'action.$1',
+      decayPerSecond: 4,
+    },
+  ];
+  agent.layout = {
+    version: 1,
+    nodes: {
+      ...agent.layout?.nodes,
+      'vision-R-0': { position: { x: 0, y: 0 } },
+      'vision-G-0': { position: { x: 0, y: 24 } },
+      'vision-B-0': { position: { x: 0, y: 48 } },
+      'output-turn-left': { position: { x: 320, y: 0 } },
+      'output-move-forward': { position: { x: 320, y: 24 } },
+      'output-turn-right': { position: { x: 320, y: 48 } },
+    },
+  };
+  agent.connections = [
+    {
+      id: 'connection-1',
+      from: { scope: 'brain', nodeId: 'neuron-1' },
+      to: { scope: 'brain', nodeId: 'neuron-2' },
+      weight: 0.5,
+    },
+  ];
+
+  const rootView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+  });
+  const inputAdapter = rootView.nodes.find((node) => node.id === 'input-adapter');
+  const outputAdapter = rootView.nodes.find((node) => node.id === 'output-adapter');
+  assert.ok(inputAdapter);
+  assert.ok(outputAdapter);
+
+  const inputScopeView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: ['input-adapter'],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+  });
+  const outputScopeView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: ['output-adapter'],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+  });
+
+  assert.deepEqual(
+    new Set(inputScopeView.nodes.map((node) => node.id)),
+    new Set(['vision-R-0', 'vision-G-0', 'vision-B-0'])
+  );
+  assert.deepEqual(
+    new Set(outputScopeView.nodes.map((node) => node.id)),
+    new Set(['output-turn-left', 'output-move-forward', 'output-turn-right'])
+  );
+});

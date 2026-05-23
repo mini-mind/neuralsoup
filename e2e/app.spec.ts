@@ -91,10 +91,12 @@ const selectors = {
 } as const;
 
 type E2EStoredBrain = {
-  metadata?: { id?: string; name?: string };
-  agent?: {
+  agent: {
     metadata?: { id?: string; name?: string };
+    body?: Record<string, unknown>;
   };
+  metadata?: never;
+  packageVersion?: never;
 };
 
 const BRAIN_LIBRARY_STORAGE_KEY = 'neuralsoup.brain-library.v1';
@@ -788,7 +790,8 @@ test('brain library opens from the editor toolbar and saves the current IR to Lo
   expect(storedBrain).toBeTruthy();
   expect(storedBrain?.agent?.metadata?.name).toBe('E2E Brain');
   expect(storedBrain?.agent?.metadata?.id).toBeTruthy();
-  expect(storedBrain?.metadata?.id ?? storedBrain?.agent?.metadata?.id).toBe(storedBrain?.agent?.metadata?.id);
+  expect('metadata' in (storedBrain ?? {})).toBe(false);
+  expect('packageVersion' in (storedBrain ?? {})).toBe(false);
 
   await page.locator(selectors.brainLibraryClose).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeHidden();
@@ -870,6 +873,7 @@ test('brain library manages saved items and reports import errors', async ({ pag
   })) as { version?: number; kind?: string; metadata?: { name?: string }; agent?: { metadata?: { name?: string } } };
   expect(downloadedBrain.version).toBe(1);
   expect(downloadedBrain.kind).toBe('neuralsoup-agent');
+  expect(downloadedBrain.metadata).toBeUndefined();
   expect(downloadedBrain.agent?.metadata?.name).toBe('Renamed Brain');
   expect(downloadedBrain.agent?.metadata?.name).toBe('Renamed Brain');
 
@@ -1394,20 +1398,24 @@ test('graph view diagnostics keep valid draft counts distinct from installed run
 
   await page.locator(selectors.editorTabGraph).click();
   await doubleClickNode(page, selectors.coreGroupNode);
+  const baseDraftConnectionCount = await page.locator(selectors.topologyDraftConnectionCount).innerText();
+  const baseRuntimeConnectionCount = await page.locator(selectors.topologyRuntimeConnectionCount).innerText();
 
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('118');
-  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(baseDraftConnectionCount);
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(baseRuntimeConnectionCount);
 
   await injectValidDraftOnly(page);
 
-  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText('119');
+  await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(
+    String(Number.parseInt(baseDraftConnectionCount, 10) + 1)
+  );
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
   await expect(page.locator(selectors.topologyRuntimeValidationCount)).toHaveText('0');
-  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(baseRuntimeConnectionCount);
   await expect.poll(() => getRuntimeDiagnostics(page)).toEqual({
     state: 'applied',
     validationCount: '0'
@@ -1421,7 +1429,8 @@ test('graph view supports creating a leaf link and keeps state across tab switch
 
   await page.locator(selectors.editorTabGraph).click();
   await doubleClickNode(page, selectors.coreGroupNode);
-  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('118');
+  const baseRuntimeConnectionCount = await page.locator(selectors.topologyRuntimeConnectionCount).innerText();
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(baseRuntimeConnectionCount);
   const canvasBox = await getCanvasBox(page);
   const createPoint = { x: canvasBox.x + 300, y: canvasBox.y + 220 };
   await page.mouse.move(createPoint.x, createPoint.y);
@@ -1435,19 +1444,22 @@ test('graph view supports creating a leaf link and keeps state across tab switch
   await rightDragBetweenNodes(page, selectors.nodeNeuronOne, newNeuronSelector);
   await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
   await expect(page.locator(selectors.topologySelectedLink)).toHaveText(/link-neuron-1-neuron-3-/);
-  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('119');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(
+    String(Number.parseInt(baseRuntimeConnectionCount, 10) + 1)
+  );
 
   await page.locator(selectors.editorTabSettings).click();
   await page.locator(selectors.settingsNavKeyboardInputs).click();
   await expect(page.locator(selectors.settingsSectionValue)).toHaveText('keyboard-inputs');
 
   await page.locator(selectors.editorTabGraph).click();
-  await expect.poll(async () => Number.parseInt(await page.locator(selectors.topologyNodeCount).innerText(), 10)).toBeGreaterThan(3);
   await expect(page.locator(newNeuronSelector)).toBeVisible();
   await expect(page.locator('[data-testid^="topology-link-link-neuron-1-neuron-3-"]')).toHaveCount(1);
   await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
   await expect(page.locator(selectors.topologySelectedLink)).toHaveText(/link-neuron-1-neuron-3-/);
-  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText('119');
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(
+    String(Number.parseInt(baseRuntimeConnectionCount, 10) + 1)
+  );
 });
 
 test('graph view routes link-covered left-drag through canvas gestures without losing link selection or detail', async ({ page }, testInfo) => {

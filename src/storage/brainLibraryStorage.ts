@@ -1,9 +1,11 @@
+import type { AgentIR } from '../domain/brain';
 import {
   isBrainLibraryStoredRecord,
   normalizeCanonicalBrainLibraryRecord,
+  normalizeImportedBrainLibraryRecord,
   type BrainLibraryRecord,
 } from './brainLibraryRecord';
-import { isLegacyAgentPackage, normalizeImportedBrainExchange } from './brainLibraryExchange';
+import { isLegacyAgentPackage } from './brainLibraryExchange';
 
 export const BRAIN_LIBRARY_STORAGE_KEY = 'neuralsoup.brain-library.v1';
 export const BRAIN_LIBRARY_CORRUPT_STORAGE_KEY = 'neuralsoup.brain-library.v1.corrupt';
@@ -52,6 +54,30 @@ const isLegacyBrainLibraryStorageEnvelope = (
   typeof value.savedAt === 'string' &&
   Array.isArray(value.brains) &&
   value.brains.every(isLegacyAgentPackage);
+
+type LegacyStorageAgentWithOptionalVisionCellCount = AgentIR & {
+  body: AgentIR['body'] & {
+    visionCellCount?: unknown;
+  };
+};
+
+const normalizeLegacyStoredBrainRecord = (value: unknown): BrainLibraryRecord | null => {
+  if (!isLegacyAgentPackage(value)) {
+    return null;
+  }
+
+  const legacyAgent = (value as { agent: LegacyStorageAgentWithOptionalVisionCellCount }).agent;
+  const legacyVisionCellCount = (() => {
+    const candidate = legacyAgent.body.visionCellCount;
+    return typeof candidate === 'number' && Number.isFinite(candidate)
+      ? Math.max(0, Math.floor(candidate))
+      : null;
+  })();
+
+  return normalizeImportedBrainLibraryRecord(legacyAgent, undefined, {
+    legacyVisionCellCount,
+  });
+};
 
 const createStorageEnvelope = (brains: BrainLibraryRecord[]): BrainLibraryStorageEnvelope => ({
   storageVersion: 1,
@@ -143,7 +169,7 @@ export const loadBrainLibraryWithStatus = (): BrainLibraryLoadResult => {
 
     if (isLegacyBrainLibraryStorageEnvelope(parsed)) {
       const records = parsed.brains
-        .map((brain) => normalizeImportedBrainExchange(brain))
+        .map((brain) => normalizeLegacyStoredBrainRecord(brain))
         .filter((brain): brain is BrainLibraryRecord => brain !== null);
       saveBrainLibrary(records);
       return {

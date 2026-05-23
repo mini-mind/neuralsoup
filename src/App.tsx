@@ -135,7 +135,8 @@ const applyBrainRecordToEditorState = (
     resetRuntimeForBrainSwitch: () => void;
     setIsBrainLibraryOpen: React.Dispatch<React.SetStateAction<boolean>>;
     setActiveBrainId: React.Dispatch<React.SetStateAction<string | null>>;
-    setActiveAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
+    setCurrentAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
+    setInstalledAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
     setDraftAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
     setDraftGraphStatusOverride: React.Dispatch<React.SetStateAction<AgentDraftStatus | null>>;
     setAgentParameters: React.Dispatch<React.SetStateAction<AgentParameters>>;
@@ -147,7 +148,8 @@ const applyBrainRecordToEditorState = (
   options.resetRuntimeForBrainSwitch();
   options.setIsBrainLibraryOpen(true);
   options.setActiveBrainId(brain.agent.metadata.id);
-  options.setActiveAgentDocument(brain.agent);
+  options.setCurrentAgentDocument(brain.agent);
+  options.setInstalledAgentDocument(brain.agent);
   options.setDraftAgentDocument(brain.agent);
   options.setDraftGraphStatusOverride(null);
   options.setAgentParameters((current) =>
@@ -160,13 +162,15 @@ const applyBrainRecordIdentityToCurrentState = (
   brain: BrainLibraryRecord,
   options: {
     setActiveBrainId: React.Dispatch<React.SetStateAction<string | null>>;
-    setActiveAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
+    setCurrentAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
+    setInstalledAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
     setDraftAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
     setDraftGraphStatusOverride: React.Dispatch<React.SetStateAction<AgentDraftStatus | null>>;
   }
 ): void => {
   options.setActiveBrainId(brain.agent.metadata.id);
-  options.setActiveAgentDocument(brain.agent);
+  options.setCurrentAgentDocument(brain.agent);
+  options.setInstalledAgentDocument(brain.agent);
   options.setDraftAgentDocument(brain.agent);
   options.setDraftGraphStatusOverride(null);
 };
@@ -179,7 +183,8 @@ const App: React.FC = () => {
   const [requestedLifecycleState, setRequestedLifecycleState] = useState<SimulationLifecycleState>('idle');
   const [resetToken, setResetToken] = useState(0);
   const [stats, setStats] = useState<SimulationState['stats']>(INITIAL_STATS);
-  const [activeAgentDocument, setActiveAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
+  const [currentAgentDocument, setCurrentAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
+  const [installedAgentDocument, setInstalledAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
   const [draftAgentDocument, setDraftAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
   const [draftGraphStatusOverride, setDraftGraphStatusOverride] = useState<AgentDraftStatus | null>(null);
   const [agentRuntimeStatus, setAgentRuntimeStatus] = useState<AgentRuntimeStatus>(() =>
@@ -221,14 +226,14 @@ const App: React.FC = () => {
     () => draftGraphStatusOverride ?? createAgentDraftStatus(draftAgentDocument),
     [draftAgentDocument, draftGraphStatusOverride]
   );
-  const activeAgentDocumentRef = useRef(activeAgentDocument);
+  const currentAgentDocumentRef = useRef(currentAgentDocument);
   const graphPathNavigateRef = useRef<(pathId: string) => void>(() => {});
   const graphPathSessionKeyRef = useRef(0);
   const appRef = useRef<HTMLDivElement | null>(null);
   const simulationPanelRef = useRef<HTMLDivElement | null>(null);
   const persistedBrainLibrarySnapshotRef = useRef(serializeBrainLibrarySnapshot(initialBrainLibraryLoad.brains));
   const installedGraphSummary = agentRuntimeStatus.appliedSummary;
-  const hasUnsavedDraftChanges = !areAgentsEquivalent(activeAgentDocument, draftAgentDocument);
+  const hasUnsavedDraftChanges = !areAgentsEquivalent(currentAgentDocument, draftAgentDocument);
 
   useEffect(() => {
     const nextSnapshot = serializeBrainLibrarySnapshot(brainLibrary);
@@ -328,10 +333,12 @@ const App: React.FC = () => {
   const commitEditedAgentDocument = useCallback(
     (
       nextAgentDocument: AgentIR,
-      installToRuntime: boolean = true,
-      persistActiveBrain: boolean = true
+      options?: GraphDocumentChangeOptions
     ) => {
       const nextUpdatedAt = new Date().toISOString();
+      const shouldCommitToCurrentDocument = options?.commitToCurrentDocument !== false;
+      const shouldInstallToRuntime = options?.installToRuntime !== false;
+      const shouldPersistActiveBrain = options?.persistActiveBrain ?? shouldCommitToCurrentDocument;
       const normalizedAgentDocument: AgentIR = {
         ...nextAgentDocument,
         metadata: {
@@ -341,11 +348,14 @@ const App: React.FC = () => {
       };
       setDraftGraphStatusOverride(null);
       setDraftAgentDocument(normalizedAgentDocument);
-      if (installToRuntime) {
-        setActiveAgentDocument(normalizedAgentDocument);
+      if (shouldCommitToCurrentDocument) {
+        setCurrentAgentDocument(normalizedAgentDocument);
+      }
+      if (shouldInstallToRuntime) {
+        setInstalledAgentDocument(normalizedAgentDocument);
       }
       setBrainLibrary((currentLibrary) =>
-        persistActiveBrain && activeBrainId
+        shouldPersistActiveBrain && activeBrainId
           ? upsertBrainLibraryItemAgent(
               currentLibrary,
               activeBrainId,
@@ -395,8 +405,8 @@ const App: React.FC = () => {
   }, [draftAgentDocument]);
 
   useEffect(() => {
-    activeAgentDocumentRef.current = activeAgentDocument;
-  }, [activeAgentDocument]);
+    currentAgentDocumentRef.current = currentAgentDocument;
+  }, [currentAgentDocument]);
 
   const handleAgentChange = useCallback((
     updater: (current: AgentIR) => AgentIR,
@@ -408,8 +418,7 @@ const App: React.FC = () => {
       return;
     }
 
-    const shouldInstallToRuntime = options?.installToRuntime !== false;
-    commitEditedAgentDocument(nextAgentDocument, shouldInstallToRuntime, shouldInstallToRuntime);
+    commitEditedAgentDocument(nextAgentDocument, options);
   }, [commitEditedAgentDocument]);
 
   const handleAgentParametersApply = useCallback((params: AgentParameters) => {
@@ -477,7 +486,8 @@ const App: React.FC = () => {
     setIsBrainLibraryOpen(true);
     applyBrainRecordIdentityToCurrentState(nextBrain, {
       setActiveBrainId,
-      setActiveAgentDocument,
+      setCurrentAgentDocument,
+      setInstalledAgentDocument,
       setDraftAgentDocument,
       setDraftGraphStatusOverride,
     });
@@ -506,7 +516,8 @@ const App: React.FC = () => {
       resetRuntimeForBrainSwitch,
       setIsBrainLibraryOpen,
       setActiveBrainId,
-      setActiveAgentDocument,
+      setCurrentAgentDocument,
+      setInstalledAgentDocument,
       setDraftAgentDocument,
       setDraftGraphStatusOverride,
       setAgentParameters,
@@ -532,7 +543,8 @@ const App: React.FC = () => {
       resetRuntimeForBrainSwitch,
       setIsBrainLibraryOpen,
       setActiveBrainId,
-      setActiveAgentDocument,
+      setCurrentAgentDocument,
+      setInstalledAgentDocument,
       setDraftAgentDocument,
       setDraftGraphStatusOverride,
       setAgentParameters,
@@ -570,7 +582,11 @@ const App: React.FC = () => {
       return;
     }
 
-    setActiveAgentDocument((currentAgent) => ({
+    setCurrentAgentDocument((currentAgent) => ({
+      ...currentAgent,
+      metadata: { ...renamedActiveBrain.agent.metadata },
+    }));
+    setInstalledAgentDocument((currentAgent) => ({
       ...currentAgent,
       metadata: { ...renamedActiveBrain.agent.metadata },
     }));
@@ -726,7 +742,7 @@ const App: React.FC = () => {
               },
             ],
           }),
-          { installToRuntime: false }
+          { installToRuntime: false, commitToCurrentDocument: false, persistActiveBrain: false }
         );
       },
       injectInvalidGraphDraft: () => {
@@ -759,12 +775,12 @@ const App: React.FC = () => {
               },
             ],
           }),
-          { installToRuntime: false }
+          { installToRuntime: false, commitToCurrentDocument: false, persistActiveBrain: false }
         );
       },
       getRuntimeActiveNodeIds: () => [...agentRuntimeActivity.activeNodeIds],
       getGraphPathIds: () => graphPath.map((item) => item.id),
-      getActiveAgentId: () => activeAgentDocumentRef.current.metadata.id,
+      getActiveAgentId: () => currentAgentDocumentRef.current.metadata.id,
       getDraftAgentId: () => draftAgentDocumentRef.current.metadata.id,
     };
 
@@ -789,7 +805,7 @@ const App: React.FC = () => {
           width={canvasWidth}
           height={canvasHeight}
           controlMode={'snn' as Extract<SimulationControlMode, 'keyboard' | 'snn'>}
-          agentDocument={activeAgentDocument}
+          agentDocument={installedAgentDocument}
           agentParameters={agentParameters}
           requestedLifecycleState={requestedLifecycleState}
           resetToken={resetToken}
