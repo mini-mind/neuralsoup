@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AgentController } from '../../src/engine/AgentController';
-import { createLegacyBrainController, updateLegacyBrainAgent } from '../../src/engine/AgentControllerCompat';
+import { createLegacyBrainController, updateLegacyBrainAgent } from '../../src/compat/legacyBrainController';
 import { VisionSystem } from '../../src/engine/VisionSystem';
 import { WorldManager } from '../../src/engine/WorldManager';
 import { CollisionDetector } from '../../src/engine/CollisionDetector';
@@ -9,19 +9,19 @@ import { SimulationSession } from '../../src/runtime/SimulationSession';
 import {
   getCurrentLegacyGraphIRDocument,
   setLegacyGraphIRDocument,
-} from '../../src/runtime/SimulationSessionCompat';
+} from '../../src/compat/legacySimulationSession';
 import {
   deriveAgentIRVisionCellCount,
   withDerivedBodyVisionCellCount,
   withVisionCellLayoutMarkers,
   type AgentIR,
 } from '../../src/domain/brain';
-import { compileLegacyBrainDefinition } from '../../src/domain/brain/compiler';
+import { compileLegacyBrainDefinition } from '../../src/compat/legacyBrainCompiler';
 import { createDefaultGraphIRDocument } from '../../src/domain/brain/defaults';
 import { summarizeGraphIRDocument, type GraphIRDocument, type NeuronNode } from '../../src/domain/brain/ir';
-import { createDefaultLegacyBodyDefinition, type LegacyBodyDefinition } from '../../src/domain/brain/package';
-import type { LegacyBrainProgram } from '../../src/domain/brain/program';
-import { createLegacyBrainProgramRuntimeState, stepLegacyBrainProgram } from '../../src/domain/brain/step';
+import { createDefaultLegacyBodyDefinition, type LegacyBodyDefinition } from '../../src/compat/legacyBrainPackage';
+import type { LegacyBrainProgram } from '../../src/compat/legacyBrainProgram';
+import { createLegacyBrainProgramRuntimeState, stepLegacyBrainProgram } from '../../src/compat/legacyBrainStep';
 import type { Agent } from '../../src/types/simulation';
 
 function createAgent(overrides: Partial<Agent> = {}): Agent {

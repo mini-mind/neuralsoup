@@ -1,6 +1,6 @@
-import type { BrainOutputChannel, IzhikevichNeuronRuntimeState } from './shared';
-import type { LegacyBrainProgram } from './program';
-import { createAgentProgramRuntimeState, stepAgentProgram, type AgentProgramRuntimeState } from './agent-step';
+import type { BrainOutputChannel, IzhikevichNeuronRuntimeState } from '../domain/brain/shared';
+import type { LegacyBrainProgram } from '../compat/legacyBrainProgram';
+import { createAgentProgramRuntimeState, stepAgentProgram, type AgentProgramRuntimeState } from '../domain/brain/agent-step';
 
 export interface BrainProgramRuntimeState {
   neurons: Map<string, IzhikevichNeuronRuntimeState>;

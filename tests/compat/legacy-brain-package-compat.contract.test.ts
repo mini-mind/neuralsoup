@@ -6,7 +6,7 @@ import {
   createLegacyBrainPackage,
   getLegacyBodyVisionCellCount,
   isLegacyBrainPackage,
-} from '../../src/domain/brain/package';
+} from '../../src/compat/legacyBrainPackage';
 import { createDefaultGraphIRDocument } from '../../src/domain/brain/defaults';
 
 test('createDefaultLegacyBodyDefinition maps vision cells and motor channels into explicit body signals', () => {

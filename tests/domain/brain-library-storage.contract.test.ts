@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { deriveAgentIRVisionCellCount } from '../../src/domain/brain';
 import { createDefaultGraphIRDocument } from '../../src/domain/brain/defaults';
-import { createLegacyAgentPackage } from '../../src/domain/brain/package';
+import { createLegacyAgentPackage } from '../../src/compat/legacyBrainPackage';
 import {
   BRAIN_LIBRARY_CORRUPT_STORAGE_KEY,
   BRAIN_LIBRARY_STATUS_STORAGE_KEY,

@@ -1,6 +1,6 @@
-import type { GraphIRDocument, LeafLink, ModelDefinition } from './ir';
-import type { BrainInputChannel, BrainOutputChannel, IzhikevichNeuronParameters } from './shared';
-import type { AgentProgram } from './agent-program';
+import type { GraphIRDocument, LeafLink, ModelDefinition } from '../domain/brain/ir';
+import type { BrainInputChannel, BrainOutputChannel, IzhikevichNeuronParameters } from '../domain/brain/shared';
+import type { AgentProgram } from '../domain/brain/agent-program';
 
 export interface ProgramInputPort {
   id: string;

@@ -2,9 +2,9 @@ import {
   collectLeafNodes,
   GraphIRValidationError,
   validateGraphIRDocument,
-} from './ir';
-import { compileAgentIR } from './agent-compiler';
-import { createAgentIRFromLegacyGraph } from './legacy-graph-bridge';
+} from '../domain/brain/ir';
+import { compileAgentIR } from '../domain/brain/agent-compiler';
+import { createAgentIRFromLegacyGraph } from '../domain/brain/legacy-graph-bridge';
 import type {
   LeafLink,
   LiteralValue,
@@ -12,13 +12,13 @@ import type {
   NeuronNode,
   SignalNode,
   TopologyNode,
-} from './ir';
+} from '../domain/brain/ir';
 import type {
   LegacyBodyDefinition,
   LegacyBodyInputSignal,
   LegacyBodyOutputSignal,
   LegacyBrainDefinition,
-} from './package';
+} from '../compat/legacyBrainPackage';
 import type {
   BrainProgramConnection,
   BrainProgramInputBinding,
@@ -28,8 +28,8 @@ import type {
   LegacyGraphProgram,
   ProgramInputPort,
   ProgramOutputPort,
-} from './program';
-import type { BrainInputChannel } from './shared';
+} from '../compat/legacyBrainProgram';
+import type { BrainInputChannel } from '../domain/brain/shared';
 
 const INPUT_CHANNEL_OFFSET = {
   R: 0,

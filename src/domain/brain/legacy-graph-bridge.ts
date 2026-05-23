@@ -28,7 +28,7 @@ import {
   getLegacyBodyVisionCellCount,
   type LegacyBodyDefinition,
   type BrainLayoutDocument,
-} from './package';
+} from '../../compat/legacyBrainPackage';
 import { createDefaultGraphIRDocument } from './defaults';
 
 const DEFAULT_NEURON_PARAMS: IzhikevichNeuronParameters = {

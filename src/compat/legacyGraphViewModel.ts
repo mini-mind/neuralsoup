@@ -10,9 +10,9 @@ import type {
   SignalNode,
   TopologyNode,
   GraphIRDocument,
-} from '../../../domain/brain/ir';
-import type { Position, IzhikevichNeuronParameters } from '../../../domain/brain/shared';
-import { getGraphLinkCapabilities } from './graphLinkPolicy';
+} from '../domain/brain/ir';
+import type { Position, IzhikevichNeuronParameters } from '../domain/brain/shared';
+import { getGraphLinkCapabilities } from '../components/editor/graph/graphLinkPolicy';
 import type {
   GraphBreadcrumbItem,
   GraphTopologyIndexes,
@@ -20,7 +20,7 @@ import type {
   GraphViewModel,
   GraphViewNode,
   NodePositionDraftMap,
-} from './graphViewTypes';
+} from '../components/editor/graph/graphViewTypes';
 
 export const CHILD_SCOPE_OFFSET = {
   x: 260,

@@ -7,10 +7,10 @@ import {
 } from '../../src/domain/brain/ir';
 import type { GraphIRDocument } from '../../src/domain/brain/ir';
 import { createDefaultGraphIRDocument, reconcileGraphIRDocumentVisionCells } from '../../src/domain/brain/defaults';
-import { compileLegacyBrainDefinition } from '../../src/domain/brain/compiler';
-import { createDefaultLegacyBodyDefinition, type LegacyBodyDefinition } from '../../src/domain/brain/package';
-import { createLegacyBrainProgramRuntimeState, stepLegacyBrainProgram } from '../../src/domain/brain/step';
-import type { LegacyBrainProgram } from '../../src/domain/brain/program';
+import { compileLegacyBrainDefinition } from '../../src/compat/legacyBrainCompiler';
+import { createDefaultLegacyBodyDefinition, type LegacyBodyDefinition } from '../../src/compat/legacyBrainPackage';
+import { createLegacyBrainProgramRuntimeState, stepLegacyBrainProgram } from '../../src/compat/legacyBrainStep';
+import type { LegacyBrainProgram } from '../../src/compat/legacyBrainProgram';
 
 const getRootVisionCells = (document: GraphIRDocument) => {
   const inputAdapter = document.root.children.find((node) => node.id === 'input-adapter' && node.kind === 'adapter');

@@ -3,7 +3,7 @@ import {
   deriveAgentIRVisionCellCount,
   type AgentValidationIssue,
 } from '../domain/brain';
-import { compileLegacyBrainDefinition } from '../domain/brain/compiler';
+import { compileLegacyBrainDefinition } from '../compat/legacyBrainCompiler';
 import {
   createAgentIRFromLegacyGraphDetailed,
   createLegacyGraphBridgeFromAgent,
@@ -14,9 +14,9 @@ import {
   validateGraphIRDocument,
   type GraphIRDocument,
 } from '../domain/brain/ir';
-import type { LegacyBodyDefinition } from '../domain/brain/package';
+import type { LegacyBodyDefinition } from '../compat/legacyBrainPackage';
 import type { AgentRuntimeStatus } from '../types/agentRuntime';
-import { SimulationSession } from './SimulationSession';
+import { SimulationSession } from '../runtime/SimulationSession';
 
 const LEGACY_VISION_INPUT_PATTERN = /^vision-[RGB]-(\d+)$/;
 

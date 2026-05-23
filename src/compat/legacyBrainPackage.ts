@@ -1,7 +1,7 @@
-import type { BrainInputChannel, BrainOutputChannel, Position } from './shared';
-import type { AgentLibraryItem } from './agent-ir';
-import type { GraphIRDocument } from './ir';
-import { createAgentIRFromLegacyGraph } from './legacy-graph-bridge';
+import type { BrainInputChannel, BrainOutputChannel, Position } from '../domain/brain/shared';
+import type { AgentLibraryItem } from '../domain/brain/agent-ir';
+import type { GraphIRDocument } from '../domain/brain/ir';
+import { createAgentIRFromLegacyGraph } from '../domain/brain/legacy-graph-bridge';
 
 export type LegacyBrainDefinition = GraphIRDocument;
 

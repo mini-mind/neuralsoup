@@ -1,11 +1,11 @@
 import { Agent } from '../types/simulation';
-import type { KeyboardInputState } from './AgentController';
+import type { KeyboardInputState } from '../engine/AgentController';
 import {
   createLegacyBrainProgramRuntimeState,
   stepLegacyBrainProgram,
   type LegacyBrainProgramRuntimeState,
-} from '../domain/brain/step';
-import type { LegacyGraphProgram } from '../domain/brain/program';
+} from '../compat/legacyBrainStep';
+import type { LegacyGraphProgram } from '../compat/legacyBrainProgram';
 
 const applyLegacyAction = (agent: Agent, output: number[], deltaTime: number): void => {
   const [turnLeft, moveForward, turnRight] = output;
