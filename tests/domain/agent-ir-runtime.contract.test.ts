@@ -98,7 +98,7 @@ test('compileAgentIR resolves BodyIR regex rules into runtime ports instead of r
       id: 'sensor-G-2',
       source: 'vision.G.2',
       worldPort: 'vision',
-      index: 7,
+      cellIndex: 2,
       scale: 2,
     }
   );
@@ -124,8 +124,9 @@ test('compileAgentIR resolves BodyIR regex rules into runtime ports instead of r
 test('stepAgentProgram consumes rule-resolved input ports and activates rule-resolved output ports', () => {
   const program = compileAgentIR(createRuleDrivenAgent(), WORLD_REGISTRY);
   const runtimeState = createAgentProgramRuntimeState(program);
-  const sensoryInputs = new Array(9).fill(0);
-  sensoryInputs[7] = 0.5;
+  const sensoryInputs: Record<string, number> = {
+    'vision.G.2': 0.5,
+  };
 
   const result = stepAgentProgram(program, sensoryInputs, runtimeState, 1, 1);
 

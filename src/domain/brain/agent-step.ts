@@ -1,6 +1,8 @@
 import type { IzhikevichNeuronRuntimeState } from './shared';
 import type { AgentProgram } from './agent-program';
 
+export type AgentWorldInputSignalMap = Record<string, number>;
+
 export interface AgentProgramRuntimeState {
   neurons: Map<string, IzhikevichNeuronRuntimeState>;
   bodyOutputs: Map<string, number>;
@@ -40,7 +42,7 @@ export const createAgentProgramRuntimeState = (program: AgentProgram): AgentProg
 
 export const stepAgentProgram = (
   program: AgentProgram,
-  sensoryInputs: number[],
+  sensoryInputs: AgentWorldInputSignalMap,
   previousState: AgentProgramRuntimeState,
   deltaTime: number,
   timestamp: number
@@ -55,7 +57,7 @@ export const stepAgentProgram = (
       return 0;
     }
 
-    const rawValue = sensoryInputs[inputNode.visualInputIndex] ?? 0;
+    const rawValue = sensoryInputs[inputNode.source] ?? 0;
     const scaledValue = rawValue * inputNode.scale;
     if (Math.abs(scaledValue) > ACTIVE_SIGNAL_EPSILON) {
       activeLeafNodeIds.add(nodeId);

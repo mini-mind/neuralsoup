@@ -5,7 +5,7 @@ import { VisionSystem } from '../../src/engine/VisionSystem';
 import { WorldManager } from '../../src/engine/WorldManager';
 import { CollisionDetector } from '../../src/engine/CollisionDetector';
 import { SimulationSession } from '../../src/runtime/SimulationSession';
-import { createDefaultWorldActionOutputAdapter } from '../../src/domain/world';
+import { createDefaultWorldActionOutputAdapter, type WorldControlCommand } from '../../src/domain/world';
 import { compileAgentIR, createAgentProgramRuntimeState, createDefaultWorldRegistry, stepAgentProgram } from '../../src/domain/brain';
 import type { AgentRuntimeStatus } from '../../src/types/agentRuntime';
 import type { Agent } from '../../src/types/simulation';
@@ -176,7 +176,11 @@ test('default world action adapter consumes normalized action.* runtime targets'
   const program = compileAgentIR(session.getCurrentAgentIR(), WORLD_REGISTRY);
   const result = stepAgentProgram(
     program,
-    new Array(mainAgent.visualInput.length).fill(1),
+    Object.fromEntries(mainAgent.visionCells.flatMap((_cell, cellIndex) => [
+      [`vision.R.${cellIndex}`, 1],
+      [`vision.G.${cellIndex}`, 1],
+      [`vision.B.${cellIndex}`, 1],
+    ])) as Record<string, number>,
     createAgentProgramRuntimeState(program),
     1,
     1
@@ -212,7 +216,7 @@ test('agent controller consumes runtime outputs through the injected world actio
   const controller = new AgentController({
     resolve(outputSignals) {
       adapterCalls.push(outputSignals.map((signal) => ({ ...signal })));
-      return [0, 1, 0];
+      return [{ kind: 'move-forward', value: 1 }] as WorldControlCommand[];
     },
   });
   const session = createSimulationSession(controller);
@@ -290,7 +294,11 @@ test('default world action adapter maps supported action targets into the expect
         value: 1,
       },
     ]),
-    [0.25, 0.75, 0.5]
+    [
+      { kind: 'turn-left', value: 0.25 },
+      { kind: 'move-forward', value: 0.75 },
+      { kind: 'turn-right', value: 0.5 },
+    ] satisfies WorldControlCommand[]
   );
 });
 

@@ -105,7 +105,7 @@ export interface BodyInputNodeRuntime {
   id: string;
   source: string;
   worldPort: string;
-  visualInputIndex: number;
+  cellIndex?: number;
   scale: number;
 }
 
@@ -149,7 +149,7 @@ export const resolveBodyInputVisionCellIndex = (
 
   const source = applyRuleTemplate(matches[0].rule.sourceTemplate, matches[0].match);
   const binding = registry.resolveInputBinding(source);
-  return binding?.runtimeIndex != null ? Math.floor(binding.runtimeIndex / 3) : null;
+  return binding?.cellIndex ?? null;
 };
 
 export const withVisionCellCount = (

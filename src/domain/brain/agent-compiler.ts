@@ -361,12 +361,12 @@ export const compileAgentIR = (agent: AgentIR, registry: WorldRegistry): AgentPr
     agent,
     summary,
     inputPorts: [...bodyInputsById.values()]
-      .sort((left, right) => left.visualInputIndex - right.visualInputIndex || left.id.localeCompare(right.id))
+      .sort((left, right) => left.source.localeCompare(right.source) || left.id.localeCompare(right.id))
       .map((node) => ({
         id: node.id,
         source: node.source,
         worldPort: node.worldPort,
-        index: node.visualInputIndex,
+        cellIndex: node.cellIndex,
         scale: node.scale,
       })),
     outputPorts: [...bodyOutputsById.values()]

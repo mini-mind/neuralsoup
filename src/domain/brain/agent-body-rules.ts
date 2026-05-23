@@ -96,14 +96,14 @@ const parseBodyInputSource = (
   scale: number
 ): BodyInputNodeRuntime | null => {
   const binding = registry.resolveInputBinding(source);
-  if (!binding || binding.runtimeIndex == null) {
+  if (!binding) {
     return null;
   }
   return {
     id: nodeId,
     source: binding.source,
     worldPort: binding.worldPort,
-    visualInputIndex: binding.runtimeIndex,
+    cellIndex: binding.cellIndex,
     scale,
   };
 };

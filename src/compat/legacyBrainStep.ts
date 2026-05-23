@@ -3,7 +3,12 @@ import {
   getLegacyBrainProgramRuntimePayload,
   type LegacyBrainProgram,
 } from '../compat/legacyBrainProgram';
-import { createAgentProgramRuntimeState, stepAgentProgram, type AgentProgramRuntimeState } from '../domain/brain/agent-step';
+import {
+  createAgentProgramRuntimeState,
+  stepAgentProgram,
+  type AgentProgramRuntimeState,
+  type AgentWorldInputSignalMap,
+} from '../domain/brain/agent-step';
 
 export interface BrainProgramRuntimeState {
   neurons: Map<string, IzhikevichNeuronRuntimeState>;
@@ -33,6 +38,20 @@ const toCompatOutputs = (outputsByTarget: Record<string, number>): Record<BrainO
   'turn-right': outputsByTarget['action.turn-right'] ?? outputsByTarget['turn-right'] ?? 0,
 });
 
+const toAgentWorldInputs = (program: LegacyBrainProgram, sensoryInputs: number[]): AgentWorldInputSignalMap => {
+  const inputsBySource: AgentWorldInputSignalMap = {};
+
+  for (const inputPort of getLegacyBrainProgramRuntimePayload(program).inputPorts) {
+    const legacyBinding = program.inputBindings.find((binding) => binding.nodeId === inputPort.id);
+    if (!legacyBinding) {
+      continue;
+    }
+    inputsBySource[inputPort.source] = sensoryInputs[legacyBinding.index] ?? 0;
+  }
+
+  return inputsBySource;
+};
+
 const buildCompatSignalSnapshotFromAgentRuntime = (
   program: LegacyBrainProgram,
   sensoryInputs: number[],
@@ -50,6 +69,22 @@ const buildCompatSignalSnapshotFromAgentRuntime = (
   }
 
   return nextSignals;
+};
+
+const buildCompatActiveLeafNodeIds = (
+  program: LegacyBrainProgram,
+  sensoryInputs: number[],
+  agentRuntimeState: AgentProgramRuntimeState
+): string[] => {
+  const activeNodeIds = new Set(agentRuntimeState.activeLeafNodeIds);
+
+  for (const binding of program.inputBindings) {
+    if ((sensoryInputs[binding.index] ?? 0) !== 0) {
+      activeNodeIds.add(binding.nodeId);
+    }
+  }
+
+  return [...activeNodeIds];
 };
 
 export const createLegacyBrainProgramRuntimeState = (
@@ -84,7 +119,7 @@ export const stepLegacyBrainProgram = (
   const compiledAgentProgram = getLegacyBrainProgramRuntimePayload(program);
   const agentResult = stepAgentProgram(
     compiledAgentProgram,
-    sensoryInputs,
+    toAgentWorldInputs(program, sensoryInputs),
     previousState.agentRuntimeState ?? createAgentProgramRuntimeState(compiledAgentProgram),
     deltaTimeSeconds,
     timestamp
@@ -99,7 +134,11 @@ export const stepLegacyBrainProgram = (
         agentResult.runtimeState
       ),
       agentRuntimeState: agentResult.runtimeState,
-      activeLeafNodeIds: agentResult.runtimeState.activeLeafNodeIds,
+      activeLeafNodeIds: buildCompatActiveLeafNodeIds(
+        program,
+        sensoryInputs,
+        agentResult.runtimeState
+      ),
     },
     outputs: toCompatOutputs(agentResult.outputsByTarget),
   };

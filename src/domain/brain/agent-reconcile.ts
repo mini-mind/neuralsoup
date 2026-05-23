@@ -22,12 +22,12 @@ const reconcileConnectionsForVisionCells = (
 
   return connections.filter((connection) => {
     const fromBinding = connection.from.scope === 'bodyInput' ? inputBindings.get(connection.from.nodeId) : null;
-    if (fromBinding && Math.floor(fromBinding.visualInputIndex / 3) >= visionCells) {
+    if (fromBinding?.cellIndex != null && fromBinding.cellIndex >= visionCells) {
       return false;
     }
 
     const toBinding = connection.to.scope === 'bodyInput' ? inputBindings.get(connection.to.nodeId) : null;
-    if (toBinding && Math.floor(toBinding.visualInputIndex / 3) >= visionCells) {
+    if (toBinding?.cellIndex != null && toBinding.cellIndex >= visionCells) {
       return false;
     }
 

@@ -3,7 +3,7 @@ import type { BodyIR, BodyInputRule, BodyOutputRule } from './agent-ir';
 export interface WorldInputBinding {
   source: string;
   worldPort: string;
-  runtimeIndex?: number;
+  cellIndex?: number;
 }
 
 export interface WorldOutputBinding {
@@ -29,19 +29,13 @@ export interface WorldRegistry {
 }
 
 const BODY_INPUT_SOURCE_PATTERN = /^vision\.([RGB])\.(\d+)$/;
-const BODY_OUTPUT_TARGET_PATTERN = /^action\.(turn-left|move-forward|turn-right)$/;
-const INPUT_CHANNEL_OFFSET = {
-  R: 0,
-  G: 1,
-  B: 2,
-} as const;
+const BODY_OUTPUT_TARGET_PATTERN = /^action\.([a-z0-9-]+)$/;
 const INPUT_CHANNEL_VALUES = ['R', 'G', 'B'] as const;
-const OUTPUT_CHANNEL_VALUES = ['turn-left', 'move-forward', 'turn-right'] as const;
 
-type SupportedGroupKind = 'channel' | 'cell' | 'action';
+type SupportedGroupKind = 'channel' | 'cell' | 'alternatives';
 type PatternSegment =
   | { type: 'literal'; value: string }
-  | { type: 'group'; index: number; kind: SupportedGroupKind };
+  | { type: 'group'; index: number; kind: SupportedGroupKind; values?: string[] };
 
 const appendLiteralSegment = (segments: PatternSegment[], literal: string) => {
   if (literal.length === 0) {
@@ -81,16 +75,28 @@ const parseSupportedNodeIdPattern = (pattern: string): PatternSegment[] | null =
       continue;
     }
 
-    if (remaining.startsWith('(turn-left|move-forward|turn-right)')) {
-      segments.push({ type: 'group', index: groupIndex, kind: 'action' });
-      groupIndex += 1;
-      cursor += '(turn-left|move-forward|turn-right)'.length;
-      continue;
-    }
-
     const current = anchoredPattern[cursor];
     if (!current) {
       break;
+    }
+
+    if (current === '(') {
+      const closingIndex = anchoredPattern.indexOf(')', cursor);
+      if (closingIndex < 0) {
+        return null;
+      }
+      const groupBody = anchoredPattern.slice(cursor + 1, closingIndex);
+      if (groupBody.length === 0) {
+        return null;
+      }
+      const values = groupBody.split('|');
+      if (values.some((value) => value.length === 0 || value.includes('\\'))) {
+        return null;
+      }
+      segments.push({ type: 'group', index: groupIndex, kind: 'alternatives', values });
+      groupIndex += 1;
+      cursor = closingIndex + 1;
+      continue;
     }
 
     if (current === '\\') {
@@ -191,12 +197,12 @@ const enumerateActionOutputNodeIds = (rule: BodyOutputRule): string[] => {
     (segment): segment is Extract<PatternSegment, { type: 'group' }> =>
       segment.type === 'group' && segment.index === actionGroupIndex
   );
-  if (actionGroup?.kind !== 'action') {
+  if (actionGroup?.kind !== 'alternatives' || !actionGroup.values?.length) {
     return [];
   }
 
   const nodeIds = new Set<string>();
-  for (const action of OUTPUT_CHANNEL_VALUES) {
+  for (const action of actionGroup.values) {
     const nodeId = buildNodeIdFromSegments(segments, new Map([[actionGroupIndex, action]]));
     if (nodeId) {
       nodeIds.add(nodeId);
@@ -216,12 +222,11 @@ export const createDefaultWorldRegistry = (): WorldRegistry => ({
       return null;
     }
 
-    const channel = match[1] as keyof typeof INPUT_CHANNEL_OFFSET;
     const cellIndex = Number.parseInt(match[2], 10);
     return {
-      source: `vision.${channel}.${cellIndex}`,
+      source: `vision.${match[1]}.${cellIndex}`,
       worldPort: 'vision',
-      runtimeIndex: cellIndex * 3 + INPUT_CHANNEL_OFFSET[channel],
+      cellIndex,
     };
   },
   resolveOutputBinding: (target) => {

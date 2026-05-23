@@ -1,4 +1,3 @@
-export type WorldActionVector = [number, number, number];
 export interface WorldOutputSignal {
   id: string;
   target: string;
@@ -7,39 +6,38 @@ export interface WorldOutputSignal {
   value: number;
 }
 
-export interface WorldActionOutputAdapter {
-  resolve(outputSignals: WorldOutputSignal[]): WorldActionVector;
+export interface WorldControlCommand {
+  kind: string;
+  value: number;
 }
 
-const ACTION_TARGET_TO_INDEX = {
-  'action.turn-left': 0,
-  'action.move-forward': 1,
-  'action.turn-right': 2,
-} as const satisfies Record<string, 0 | 1 | 2>;
+export interface WorldActionOutputAdapter {
+  resolve(outputSignals: WorldOutputSignal[]): WorldControlCommand[];
+}
 
-type SupportedActionTarget = keyof typeof ACTION_TARGET_TO_INDEX;
-
-const isSupportedActionTarget = (target: string): target is SupportedActionTarget =>
-  target in ACTION_TARGET_TO_INDEX;
+const ACTION_TARGET_TO_COMMAND_KIND: Record<string, string> = {
+  'action.turn-left': 'turn-left',
+  'action.move-forward': 'move-forward',
+  'action.turn-right': 'turn-right',
+};
 
 export const createDefaultWorldActionOutputAdapter = (): WorldActionOutputAdapter => ({
   resolve(outputSignals) {
-    const actionVector: WorldActionVector = [0, 0, 0];
+    const commandsByKind = new Map<string, number>();
 
     for (const signal of outputSignals) {
       if (signal.worldPort !== 'action') {
         continue;
       }
 
-      const target = signal.normalizedTarget;
-      if (!isSupportedActionTarget(target)) {
+      const commandKind = ACTION_TARGET_TO_COMMAND_KIND[signal.normalizedTarget];
+      if (!commandKind) {
         continue;
       }
 
-      const actionIndex = ACTION_TARGET_TO_INDEX[target];
-      actionVector[actionIndex] = signal.value;
+      commandsByKind.set(commandKind, signal.value);
     }
 
-    return actionVector;
+    return [...commandsByKind.entries()].map(([kind, value]) => ({ kind, value }));
   },
 });

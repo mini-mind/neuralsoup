@@ -6,11 +6,13 @@
 import { Agent } from '../types/simulation';
 import {
   type SimulationControlMode,
+  type WorldControlCommand,
   type WorldActionOutputAdapter,
 } from '../domain/world';
 import {
   createAgentProgramRuntimeState,
   stepAgentProgram,
+  type AgentWorldInputSignalMap,
   type AgentProgram,
   type AgentProgramRuntimeState,
 } from '../domain/brain';
@@ -84,7 +86,7 @@ export class AgentController {
     deltaTime: number,
     keyboardInputs: [number, number, number]
   ): void {
-    this.applyAction(agent, keyboardInputs, deltaTime);
+    this.applyLegacyActionVector(agent, keyboardInputs, deltaTime);
   }
 
   /**
@@ -103,19 +105,20 @@ export class AgentController {
 
     const hasKeyboardInput = keyboardInputs[0] > 0 || keyboardInputs[1] > 0 || keyboardInputs[2] > 0;
     if (hasKeyboardInput) {
-      this.applyAction(agent, keyboardInputs, deltaTime);
+      this.applyLegacyActionVector(agent, keyboardInputs, deltaTime);
       return;
     }
 
+    const sensoryInputs = this.createWorldInputSignalMap(agent);
     const result = stepAgentProgram(
       agentProgram,
-      agent.visualInput,
+      sensoryInputs,
       agentRuntimeState,
       deltaTime,
       Date.now()
     );
     this.agentRuntimeStates.set(agent.id, result.runtimeState);
-    this.applyAction(agent, this.actionOutputAdapter.resolve(result.outputSignals), deltaTime);
+    this.applyCommands(agent, this.actionOutputAdapter.resolve(result.outputSignals), deltaTime);
   }
 
   /**
@@ -147,11 +150,51 @@ export class AgentController {
     return [turnLeft, moveForward, turnRight];
   }
 
+  private createWorldInputSignalMap(agent: Agent): AgentWorldInputSignalMap {
+    const sensoryInputs: AgentWorldInputSignalMap = {};
+    const expectedVisualInputLength = agent.visionCells.length * 3;
+    const hasLegacyVisualInput =
+      agent.visualInput.length > 0 &&
+      (agent.visionCells.length === 0 || agent.visualInput.length !== expectedVisualInputLength);
+
+    if (hasLegacyVisualInput) {
+      const visualCellCount = Math.floor(agent.visualInput.length / 3);
+      for (let cellIndex = 0; cellIndex < visualCellCount; cellIndex += 1) {
+        const baseIndex = cellIndex * 3;
+        sensoryInputs[`vision.R.${cellIndex}`] = agent.visualInput[baseIndex] ?? 0;
+        sensoryInputs[`vision.G.${cellIndex}`] = agent.visualInput[baseIndex + 1] ?? 0;
+        sensoryInputs[`vision.B.${cellIndex}`] = agent.visualInput[baseIndex + 2] ?? 0;
+      }
+      return sensoryInputs;
+    }
+
+    for (const [cellIndex, cell] of agent.visionCells.entries()) {
+      sensoryInputs[`vision.R.${cellIndex}`] = cell.color.r;
+      sensoryInputs[`vision.G.${cellIndex}`] = cell.color.g;
+      sensoryInputs[`vision.B.${cellIndex}`] = cell.color.b;
+    }
+    return sensoryInputs;
+  }
+
+  private applyLegacyActionVector(agent: Agent, output: [number, number, number], deltaTime: number): void {
+    this.applyCommands(
+      agent,
+      [
+        { kind: 'turn-left', value: output[0] },
+        { kind: 'move-forward', value: output[1] },
+        { kind: 'turn-right', value: output[2] },
+      ],
+      deltaTime
+    );
+  }
+
   /**
    * 应用动作到智能体
    */
-  private applyAction(agent: Agent, output: number[], deltaTime: number): void {
-    const [turnLeft, moveForward, turnRight] = output;
+  private applyCommands(agent: Agent, commands: WorldControlCommand[], deltaTime: number): void {
+    const turnLeft = commands.find((command) => command.kind === 'turn-left')?.value ?? 0;
+    const moveForward = commands.find((command) => command.kind === 'move-forward')?.value ?? 0;
+    const turnRight = commands.find((command) => command.kind === 'turn-right')?.value ?? 0;
     
     // 转向
     const turnSpeed = 3.0;
