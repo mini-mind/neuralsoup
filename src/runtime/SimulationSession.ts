@@ -251,10 +251,6 @@ export class SimulationSession {
     return this.state;
   }
 
-  public getMutableState(): WorldState {
-    return this.state;
-  }
-
   private getEffectiveControlMode(agent: Agent): SimulationControlMode {
     return agent.id === this.config.mainAgentId ? this.currentControlMode : 'random';
   }

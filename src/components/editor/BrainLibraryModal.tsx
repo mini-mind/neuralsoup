@@ -1,4 +1,4 @@
-import React, { useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import type { BrainLibraryRecord } from '../../storage/brainLibraryStorage';
 
 interface BrainLibraryModalProps {
@@ -45,6 +45,24 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
   const [renamingBrainId, setRenamingBrainId] = useState<string | null>(null);
   const [renamingBrainName, setRenamingBrainName] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setRenamingBrainId(null);
+      setRenamingBrainName('');
+      setErrorMessage(null);
+      setIsImporting(false);
+      return;
+    }
+
+    setNewBrainName('当前 Brain');
+    setImportName('导入 Brain');
+    setRenamingBrainId(null);
+    setRenamingBrainName('');
+    setErrorMessage(null);
+    setIsImporting(false);
+  }, [isOpen]);
 
   if (!isOpen) {
     return null;
@@ -53,18 +71,24 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
   const handleImportFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget;
     const file = input.files?.[0];
-    if (!file) {
+    const resolvedImportName = importName || file?.name.replace(/\.json$/i, '') || '导入 Brain';
+    if (!file || isImporting) {
       return;
     }
 
+    setIsImporting(true);
+    input.disabled = true;
+
     try {
       const text = await file.text();
-      await onImportBrain(importName || file.name.replace(/\.json$/i, ''), parseImportedBrainPackage(text));
+      await onImportBrain(resolvedImportName, parseImportedBrainPackage(text));
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '导入失败');
     } finally {
       input.value = '';
+      input.disabled = false;
+      setIsImporting(false);
     }
   };
 
@@ -170,6 +194,7 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
                       <button
                         type="button"
                         className="brain-library-item-title"
+                        data-testid={`brain-library-select-${brain.agent.metadata.id}`}
                         onClick={(event) => {
                           event.stopPropagation();
                           onSelectBrain(brain.agent.metadata.id);
@@ -272,9 +297,10 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
             type="button"
             className="brain-library-secondary"
             data-testid="brain-library-import-trigger"
+            disabled={isImporting}
             onClick={() => importFileInputRef.current?.click()}
           >
-            导入 JSON
+            {isImporting ? '导入中...' : '导入 JSON'}
           </button>
         </div>
 

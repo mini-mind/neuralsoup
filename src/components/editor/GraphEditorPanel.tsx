@@ -7,20 +7,20 @@ import type { GraphPathItem } from './types';
 interface GraphEditorPanelProps {
   isActive: boolean;
   agent: AgentIR;
-  graphSessionKey: number;
+  graphSessionToken: string;
   visionCells: number;
   runtimeStatus: AgentRuntimeStatus;
   draftStatus: AgentDraftStatus;
   runtimeActivity: AgentRuntimeActivitySnapshot;
   onAgentChange: (updater: (current: AgentIR) => AgentIR) => void;
-  onGraphPathChange: (graphPath: GraphPathItem[], sourceSessionKey: number) => void;
-  onGraphPathNavigateRegister: (navigate: (pathId: string) => void, sourceSessionKey: number) => void;
+  onGraphPathChange: (graphPath: GraphPathItem[], sourceSessionToken: string) => void;
+  onGraphPathNavigateRegister: (navigate: (pathId: string) => void, sourceSessionToken: string) => void;
 }
 
 const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
   isActive,
   agent,
-  graphSessionKey,
+  graphSessionToken,
   visionCells,
   runtimeStatus,
   draftStatus,
@@ -74,7 +74,7 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
         width={Math.max(viewport.width, 1)}
         height={Math.max(viewport.height, 1)}
         agent={agent}
-        graphSessionKey={graphSessionKey}
+        graphSessionToken={graphSessionToken}
         visionCells={visionCells}
         onAgentChange={onAgentChange}
         onGraphPathChange={onGraphPathChange}

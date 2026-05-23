@@ -60,7 +60,7 @@ export interface GraphNodePositionUpdate extends GraphPoint {
 
 interface UseSNNTopologyStateOptions {
   agent: AgentIR;
-  graphSessionKey?: number;
+  graphSessionToken?: string;
   runtimeActiveNodeIds?: string[];
   onAgentChange?: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
 }
@@ -79,7 +79,7 @@ const areStringArraysEqual = (left: string[], right: string[]) =>
 
 export const useSNNTopologyState = ({
   agent,
-  graphSessionKey = 0,
+  graphSessionToken = 'default',
   runtimeActiveNodeIds = [],
   onAgentChange,
 }: UseSNNTopologyStateOptions) => {
@@ -103,7 +103,7 @@ export const useSNNTopologyState = ({
     setPendingFocusLinkId,
   } = useGraphEditorSessionState();
   const scopeSessionRef = useRef<string | null>(null);
-  const editorSessionKeyRef = useRef(graphSessionKey);
+  const editorSessionTokenRef = useRef(graphSessionToken);
   const activeCanvasScopeKeyRef = useRef<string | null>(null);
   const viewportStateByScopeKeyRef = useRef<
     Map<string, { viewport: GraphCanvasViewport; metrics: GraphCanvasViewportMetrics | null }>
@@ -263,18 +263,18 @@ export const useSNNTopologyState = ({
   }, [setPendingFocusLinkId]);
 
   useEffect(() => {
-    if (editorSessionKeyRef.current === graphSessionKey) {
+    if (editorSessionTokenRef.current === graphSessionToken) {
       return;
     }
 
-    editorSessionKeyRef.current = graphSessionKey;
+    editorSessionTokenRef.current = graphSessionToken;
     activeCanvasScopeKeyRef.current = null;
     viewportStateByScopeKeyRef.current = new Map();
     setNavigationPath([]);
     clearTransientState();
     setCanvasViewport({ x: 0, y: 0 });
     setCanvasScale(1);
-  }, [clearTransientState, graphSessionKey, setCanvasScale, setCanvasViewport]);
+  }, [clearTransientState, graphSessionToken, setCanvasScale, setCanvasViewport]);
 
   useEffect(() => {
     if (hasValidNavigationPath) {

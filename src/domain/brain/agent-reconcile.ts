@@ -1,33 +1,37 @@
-import {
-  resolveBodyInputVisionCellIndex,
-  withVisionCellCount,
-  type AgentConnection,
-  type AgentIR,
-  type BodyInputRule,
-} from './agent-ir';
+import { withVisionCellCount, type AgentConnection, type AgentIR, type BodyInputRule } from './agent-ir';
+import { resolveAgentBodyInputRuleBindings } from './agent-body-rules';
 
 const reconcileConnectionsForVisionCells = (
   connections: AgentConnection[],
   visionCells: number,
   inputRules: BodyInputRule[]
-): AgentConnection[] =>
-  connections.filter((connection) => {
+): AgentConnection[] => {
+  const referencedInputNodeIds = new Set<string>();
+  for (const connection of connections) {
     if (connection.from.scope === 'bodyInput') {
-      const cellIndex = resolveBodyInputVisionCellIndex(connection.from.nodeId, inputRules);
-      if (cellIndex != null && cellIndex >= visionCells) {
-        return false;
-      }
+      referencedInputNodeIds.add(connection.from.nodeId);
+    }
+    if (connection.to.scope === 'bodyInput') {
+      referencedInputNodeIds.add(connection.to.nodeId);
+    }
+  }
+
+  const inputBindings = resolveAgentBodyInputRuleBindings(inputRules, referencedInputNodeIds).nodesById;
+
+  return connections.filter((connection) => {
+    const fromBinding = connection.from.scope === 'bodyInput' ? inputBindings.get(connection.from.nodeId) : null;
+    if (fromBinding && Math.floor(fromBinding.visualInputIndex / 3) >= visionCells) {
+      return false;
     }
 
-    if (connection.to.scope === 'bodyInput') {
-      const cellIndex = resolveBodyInputVisionCellIndex(connection.to.nodeId, inputRules);
-      if (cellIndex != null && cellIndex >= visionCells) {
-        return false;
-      }
+    const toBinding = connection.to.scope === 'bodyInput' ? inputBindings.get(connection.to.nodeId) : null;
+    if (toBinding && Math.floor(toBinding.visualInputIndex / 3) >= visionCells) {
+      return false;
     }
 
     return true;
   });
+};
 
 export const reconcileAgentIRVisionCells = (
   agent: AgentIR,

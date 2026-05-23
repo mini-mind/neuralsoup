@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {
   assertValidGraphIRDocument,
   validateGraphIRDocument,
-} from '../../src/domain/brain/ir';
-import type { GraphIRDocument } from '../../src/domain/brain/ir';
+} from '../../src/compat/legacyGraphIR';
+import type { GraphIRDocument } from '../../src/compat/legacyGraphIR';
 import {
   createDefaultGraphIRDocument,
   reconcileGraphIRDocumentVisionCells,

@@ -1,5 +1,5 @@
 import type { BrainInputChannel, BrainOutputChannel, Position } from '../domain/brain/shared';
-import type { AgentLibraryItem } from '../domain/brain/agent-ir';
+import type { AgentIR, AgentMetadata } from '../domain/brain/agent-ir';
 import { AgentValidationError } from '../domain/brain/agent-compiler';
 import type { GraphIRDocument } from '../domain/brain/ir';
 import { createAgentIRFromLegacyGraphDetailed } from './legacyGraphBridge';
@@ -84,7 +84,11 @@ export interface LegacyBrainPackage {
   body: LegacyBodyDefinition;
 }
 
-export type AgentPackage = AgentLibraryItem;
+export interface AgentPackage {
+  packageVersion: 1;
+  metadata: AgentMetadata;
+  agent: AgentIR;
+}
 
 const INPUT_CHANNELS: BrainInputChannel[] = ['R', 'G', 'B'];
 const OUTPUT_CHANNELS: BrainOutputChannel[] = ['turn-left', 'move-forward', 'turn-right'];

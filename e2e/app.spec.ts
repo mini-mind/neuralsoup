@@ -385,6 +385,9 @@ const getAggregateLinkLocator = (page: Page) =>
     .locator('g.topology-link.is-aggregate[data-topology-link-from-node-id][data-topology-link-to-node-id]')
     .first();
 
+const getBrainLibrarySelectButton = (page: Page, brainId: string) =>
+  page.locator(`[data-testid="brain-library-select-${brainId}"]`);
+
 const doubleClickNode = async (page: Page, selector: string) => {
   const center = await getVisibleLocatorCenterInCanvas(page, selector);
   await page.mouse.dblclick(center.x, center.y);
@@ -534,8 +537,14 @@ const injectValidDraftOnly = async (page: Page) => {
 const getActiveAgentId = async (page: Page) =>
   page.evaluate(() => window.__NEURALSOUP_TEST_API__?.getActiveAgentId() ?? null);
 
+const getActiveBrainId = async (page: Page) =>
+  page.evaluate(() => window.__NEURALSOUP_TEST_API__?.getActiveBrainId() ?? null);
+
 const getDraftAgentId = async (page: Page) =>
   page.evaluate(() => window.__NEURALSOUP_TEST_API__?.getDraftAgentId() ?? null);
+
+const getGraphPathIds = async (page: Page) =>
+  page.evaluate(() => window.__NEURALSOUP_TEST_API__?.getGraphPathIds() ?? []);
 
 const dispatchCanvasMouseSequence = async (
   page: Page,
@@ -747,6 +756,26 @@ test('space toggles simulation lifecycle globally but is ignored in editable con
   await expect(page.locator(selectors.runState)).toHaveText('paused');
 });
 
+test('space does not toggle simulation lifecycle while the brain library modal is open', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await expect(page.locator(selectors.runState)).toHaveText('idle');
+  await page.keyboard.press('Space');
+  await expect(page.locator(selectors.runState)).toHaveText('running');
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  await page.keyboard.press('Space');
+  await expect(page.locator(selectors.runState)).toHaveText('running');
+
+  await page.locator(selectors.brainLibraryClose).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toHaveCount(0);
+  await page.keyboard.press('Space');
+  await expect(page.locator(selectors.runState)).toHaveText('paused');
+});
+
 test('reset keeps the existing renderer instance interactive and restartable', async ({ page }, testInfo) => {
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
@@ -913,7 +942,7 @@ test('brain library opens from the editor toolbar and saves the current IR to Lo
   page.once('dialog', async (dialog) => {
     throw new Error(`保存当前 Brain 后不应立即出现未保存确认，但收到: ${dialog.message()}`);
   });
-  await page.locator(selectors.brainLibraryList).getByText('E2E Brain').click();
+  await getBrainLibrarySelectButton(page, storedBrain!.agent.metadata!.id!).click();
   await expect(page.locator(selectors.visionCellsValue)).toHaveText('24');
 
   await page.locator(selectors.brainLibraryClose).click();
@@ -942,7 +971,7 @@ test('brain library opens from the editor toolbar and saves the current IR to Lo
   await page.locator(selectors.brainLibraryButton).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
   page.once('dialog', (dialog) => dialog.accept());
-  await page.locator(selectors.brainLibraryList).getByText('E2E Brain').click();
+  await getBrainLibrarySelectButton(page, storedBrain!.agent.metadata!.id!).click();
   await expect(page.locator(selectors.visionCellsValue)).toHaveText('24');
 });
 
@@ -1054,8 +1083,12 @@ test('renaming the active brain preserves draft-only edits instead of replacing 
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(baseRuntimeConnectionCount));
   await expect
     .poll(async () => {
-      const [activeId, draftId] = await Promise.all([getActiveAgentId(page), getDraftAgentId(page)]);
-      return activeId && draftId && activeId === draftId;
+      const [activeAgentId, activeBrainId, draftId] = await Promise.all([
+        getActiveAgentId(page),
+        getActiveBrainId(page),
+        getDraftAgentId(page),
+      ]);
+      return Boolean(activeAgentId && activeBrainId && draftId && activeAgentId === activeBrainId && activeBrainId === draftId);
     })
     .toBe(true);
 });
@@ -1105,11 +1138,13 @@ test('brain library asks before replacing an unsaved current Brain', async ({ pa
   await page.locator(selectors.brainLibraryButton).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
 
+  const savedBrain = await getStoredBrainByName(page, 'Saved Brain');
+  expect(savedBrain).toBeTruthy();
   page.once('dialog', async (dialog) => {
     expect(dialog.message()).toContain('尚未保存');
     await dialog.dismiss();
   });
-  await page.locator(selectors.brainLibraryList).getByText('Saved Brain').click();
+  await getBrainLibrarySelectButton(page, savedBrain!.agent.metadata!.id!).click();
   await expect(page.locator(selectors.editorTabValue)).toHaveText('graph');
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
 });
@@ -1139,13 +1174,54 @@ test('brain switch resets lifecycle stats and runtime activity before installing
   await expect(page.locator(selectors.runState)).toHaveText('running');
 
   await page.locator(selectors.brainLibraryButton).click();
+  const switchBrain = await getStoredBrainByName(page, 'Switch Brain');
+  expect(switchBrain).toBeTruthy();
   page.once('dialog', (dialog) => dialog.accept());
-  await page.locator(selectors.brainLibraryList).getByText('Switch Brain').click();
+  await getBrainLibrarySelectButton(page, switchBrain!.agent.metadata!.id!).click();
 
   await expect(page.locator(selectors.runState)).toHaveText('idle');
   await expect(page.locator('[data-testid="fps-value"]')).toHaveText('0.0');
   await expect(page.locator('[data-testid="topology-runtime-active-node-count"]')).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
+});
+
+test('brain switch resets graph view path to root and replaces prior scoped session state', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await saveCurrentBrainToLibrary(page, 'Graph Reset Brain');
+  await page.locator(selectors.brainLibraryClose).click();
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
+  await expect.poll(async () => getGraphPathIds(page)).toEqual(['root', 'root-container']);
+
+  await page.reload();
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect.poll(async () => getGraphPathIds(page)).toEqual(['root', 'root-container']);
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  const graphResetBrain = await getStoredBrainByName(page, 'Graph Reset Brain');
+  expect(graphResetBrain).toBeTruthy();
+  page.once('dialog', (dialog) => dialog.accept());
+  await getBrainLibrarySelectButton(page, graphResetBrain!.agent.metadata!.id!).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  await page.locator(selectors.brainLibraryClose).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toHaveCount(0);
+
+  await expect.poll(async () => getGraphPathIds(page)).toEqual(['root']);
+  await expect(page.locator(selectors.topologyNodeCount)).toHaveText('3');
+  await expect(page.locator(selectors.nodeNeuronOne)).toHaveCount(0);
+  await expect(page.locator(selectors.coreGroupNode)).toBeVisible();
 });
 
 test('brain library preserves draft-only expanded group state across later saved edits', async ({ page }, testInfo) => {
@@ -1180,8 +1256,10 @@ test('brain library preserves draft-only expanded group state across later saved
 
   await page.locator(selectors.brainLibraryButton).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  const draftLayoutBrain = await getStoredBrainByName(page, 'Draft Layout Brain');
+  expect(draftLayoutBrain).toBeTruthy();
   page.once('dialog', (dialog) => dialog.accept());
-  await page.locator(selectors.brainLibraryList).getByText('Draft Layout Brain').click();
+  await getBrainLibrarySelectButton(page, draftLayoutBrain!.agent.metadata!.id!).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
   await page.locator(selectors.brainLibraryClose).evaluate((button: HTMLButtonElement) => button.click());
   await expect(page.locator(selectors.brainLibraryModal)).toHaveCount(0);
@@ -1214,12 +1292,14 @@ test('brain library confirms before replacing a saved brain with draft-only chan
 
   await page.locator(selectors.brainLibraryButton).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  const otherBrain = await getStoredBrainByName(page, 'Other Brain');
+  expect(otherBrain).toBeTruthy();
 
   page.once('dialog', async (dialog) => {
     expect(dialog.message()).toContain('未安装的草稿改动');
     await dialog.dismiss();
   });
-  await page.locator(selectors.brainLibraryList).getByText('Other Brain').click();
+  await getBrainLibrarySelectButton(page, otherBrain!.agent.metadata!.id!).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
   await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(
     String(baseDraftConnectionCount + 1)
@@ -1254,10 +1334,50 @@ test('brain library confirms before replacing a saved brain with draft-only chan
     expect(dialog.message()).toContain('未安装的草稿改动');
     await dialog.accept();
   });
-  await page.locator(selectors.brainLibraryList).getByText('Other Brain').click();
+  await getBrainLibrarySelectButton(page, otherBrain!.agent.metadata!.id!).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
   await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(String(baseDraftConnectionCount));
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(baseRuntimeConnectionCount));
+});
+
+test('brain import resets graph view path to root and installs the imported session identity', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
+  await expect.poll(async () => getGraphPathIds(page)).toEqual(['root', 'root-container']);
+
+  const importedAgent = createDefaultAgentIR(24);
+  importedAgent.metadata.name = 'Imported Reset Brain';
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.setInputFiles(selectors.brainLibraryImportFile, {
+    name: 'imported-reset-brain.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(
+      JSON.stringify({
+        version: 1,
+        kind: 'neuralsoup-agent',
+        agent: importedAgent,
+      })
+    ),
+  });
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  await page.locator(selectors.brainLibraryClose).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toHaveCount(0);
+
+  await expect.poll(async () => getGraphPathIds(page)).toEqual(['root']);
+  await expect(page.locator(selectors.topologyNodeCount)).toHaveText('3');
+  await expect(page.locator(selectors.nodeNeuronOne)).toHaveCount(0);
+  await expect(page.locator(selectors.coreGroupNode)).toBeVisible();
+  await expect(page.locator(selectors.visionCellsValue)).toHaveText('24');
+  await expect.poll(async () => getActiveBrainId(page)).toBe(importedAgent.metadata.id);
+  await expect.poll(async () => getActiveAgentId(page)).toBe(importedAgent.metadata.id);
 });
 
 test('applying agent parameters persists the current brain library layout instead of reverting to an older snapshot', async ({ page }, testInfo) => {
@@ -1303,8 +1423,10 @@ test('applying agent parameters persists the current brain library layout instea
 
   await page.locator(selectors.brainLibraryButton).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  const appliedParamsBrain = await getStoredBrainByName(page, 'Applied Params Brain');
+  expect(appliedParamsBrain).toBeTruthy();
   page.once('dialog', (dialog) => dialog.accept());
-  await page.locator(selectors.brainLibraryList).getByText('Applied Params Brain').click();
+  await getBrainLibrarySelectButton(page, appliedParamsBrain!.agent.metadata!.id!).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
   await page.locator(selectors.brainLibraryClose).evaluate((button: HTMLButtonElement) => button.click());
   await expect(page.locator(selectors.brainLibraryModal)).toHaveCount(0);

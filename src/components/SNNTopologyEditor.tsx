@@ -14,11 +14,11 @@ interface SNNTopologyEditorProps {
   width: number;
   height: number;
   agent: AgentIR;
-  graphSessionKey: number;
+  graphSessionToken: string;
   visionCells?: number;
   onAgentChange?: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
-  onGraphPathChange?: (graphPath: GraphPathItem[], sourceSessionKey: number) => void;
-  onGraphPathNavigateRegister?: (navigate: (pathId: string) => void, sourceSessionKey: number) => void;
+  onGraphPathChange?: (graphPath: GraphPathItem[], sourceSessionToken: string) => void;
+  onGraphPathNavigateRegister?: (navigate: (pathId: string) => void, sourceSessionToken: string) => void;
   runtimeStatus: AgentRuntimeStatus;
   draftStatus: AgentDraftStatus;
   runtimeActivity: AgentRuntimeActivitySnapshot;
@@ -29,7 +29,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   width,
   height,
   agent,
-  graphSessionKey,
+  graphSessionToken,
   visionCells = 36,
   onAgentChange,
   onGraphPathChange,
@@ -41,7 +41,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
 }) => {
   const state = useSNNTopologyState({
     agent,
-    graphSessionKey,
+    graphSessionToken,
     runtimeActiveNodeIds: runtimeActivity.activeNodeIds,
     onAgentChange,
   });
@@ -167,17 +167,17 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   useEffect(() => {
     onGraphPathChange?.(
       breadcrumbs.map((item) => ({ id: item.id, label: item.label })),
-      graphSessionKey
+      graphSessionToken
     );
-  }, [breadcrumbs, graphSessionKey, onGraphPathChange]);
+  }, [breadcrumbs, graphSessionToken, onGraphPathChange]);
 
   useEffect(() => {
     if (!onGraphPathNavigateRegister) {
       return;
     }
 
-    onGraphPathNavigateRegister(navigateToBreadcrumb, graphSessionKey);
-  }, [graphSessionKey, navigateToBreadcrumb, onGraphPathNavigateRegister]);
+    onGraphPathNavigateRegister(navigateToBreadcrumb, graphSessionToken);
+  }, [graphSessionToken, navigateToBreadcrumb, onGraphPathNavigateRegister]);
 
   return (
     <div className="snn-topology-editor" data-testid="topology-editor">

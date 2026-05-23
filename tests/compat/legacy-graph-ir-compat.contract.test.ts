@@ -4,8 +4,8 @@ import {
   assertValidGraphIRDocument,
   GraphIRValidationError,
   validateGraphIRDocument,
-} from '../../src/domain/brain/ir';
-import type { GraphIRDocument } from '../../src/domain/brain/ir';
+} from '../../src/compat/legacyGraphIR';
+import type { GraphIRDocument } from '../../src/compat/legacyGraphIR';
 
 const createValidGraphIRDocument = (): GraphIRDocument => ({
   version: 1,

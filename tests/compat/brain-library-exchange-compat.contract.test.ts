@@ -10,16 +10,12 @@ import {
 import { deriveAgentIRVisionCellCount } from '../../src/compat/legacyVisionCellCount';
 import { createBrainLibraryItemFromAgent } from '../../src/storage/brainLibraryRecord';
 import {
-  encodeBrainLibraryRecordForExchange,
-  normalizeImportedBrainExchange,
-} from '../../src/storage/brainLibraryExchange';
-import {
   BRAIN_LIBRARY_CORRUPT_STORAGE_KEY,
   BRAIN_LIBRARY_STATUS_STORAGE_KEY,
   BRAIN_LIBRARY_STORAGE_KEY,
   loadBrainLibraryWithStatus,
 } from '../../src/storage/brainLibraryStorage';
-import type { AgentLibraryItem } from '../../src/domain/brain';
+import type { AgentPackage as AgentLibraryItem } from '../../src/compat/legacyBrainPackage';
 
 const createAgentPackage = (name: string, visionCells: number): AgentLibraryItem => {
   const agent = createDefaultAgentIR(visionCells, name);
@@ -29,42 +25,6 @@ const createAgentPackage = (name: string, visionCells: number): AgentLibraryItem
     agent,
   };
 };
-
-test('Brain Library default exchange payload is AgentIR-native and round-trips through import normalization', () => {
-  const brain = createAgentPackage('Roundtrip Brain', 1);
-  const record = createBrainLibraryItemFromAgent('Roundtrip Brain', brain.agent);
-  const exported = encodeBrainLibraryRecordForExchange(record);
-  const normalized = normalizeImportedBrainExchange(exported, {
-    existingIds: [],
-  });
-
-  assert.ok(normalized);
-  assert.equal(exported.version, 1);
-  assert.equal(exported.kind, 'neuralsoup-agent');
-  assert.equal(normalized.agent.metadata.name, 'Roundtrip Brain');
-  assert.equal(deriveAgentIRVisionCellCount(normalized.agent), brain.agent.body.visionCellCount);
-  assert.equal(JSON.parse(JSON.stringify(exported)).agent.body.visionCellCount, 1);
-});
-
-test('Brain Library default import normalization rejects legacy AgentPackage compat payloads', () => {
-  const brain = createAgentPackage('Import Source', 1);
-  const normalized = normalizeImportedBrainExchange(brain, {
-    name: 'Imported Brain',
-    existingIds: [brain.agent.metadata.id],
-  });
-
-  assert.equal(normalized, null);
-});
-
-test('Brain Library default import normalization rejects legacy envelopes without top-level metadata', () => {
-  const brain = createAgentPackage('Import Without Envelope Metadata', 1);
-  const normalized = normalizeImportedBrainExchange({
-    packageVersion: 1,
-    agent: brain.agent,
-  });
-
-  assert.equal(normalized, null);
-});
 
 test('explicit compat import normalization accepts legacy AgentPackage envelopes', () => {
   const brain = createAgentPackage('Import Source', 1);

@@ -114,7 +114,7 @@ test('simulation session keeps main-agent runtime status aligned across mode swi
   assert.equal(session.isMainAgentBrainProgramConfigured(), true);
   let runtimeStatus: AgentRuntimeStatus = session.getAgentRuntimeStatus();
   assert.equal(runtimeStatus.state, 'applied');
-  assert.equal(runtimeStatus.appliedSummary.inputSignalCount, mainAgent.visionCells.length * 3 + 3);
+  assert.equal(runtimeStatus.appliedSummary.inputSignalCount, mainAgent.visionCells.length * 3);
 
   session.setControlMode('keyboard');
   session.updateAgentParameters({ visionCells: 24 });
@@ -122,7 +122,7 @@ test('simulation session keeps main-agent runtime status aligned across mode swi
   runtimeStatus = session.getAgentRuntimeStatus();
   assert.equal(runtimeStatus.state, 'applied');
   assert.deepEqual(runtimeStatus.appliedSummary, {
-    inputSignalCount: 75,
+    inputSignalCount: 72,
     outputSignalCount: 3,
     neuronCount: 2,
     leafLinkCount: 76,
@@ -133,7 +133,7 @@ test('simulation session keeps main-agent runtime status aligned across mode swi
   assert.equal(mainAgent.visionCells.length, 18);
   runtimeStatus = session.getAgentRuntimeStatus();
   assert.equal(runtimeStatus.state, 'applied');
-  assert.equal(runtimeStatus.appliedSummary.inputSignalCount, 57);
+  assert.equal(runtimeStatus.appliedSummary.inputSignalCount, 54);
 
   const agent = createAgent({
     id: mainAgent.id,

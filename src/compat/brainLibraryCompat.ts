@@ -1,4 +1,5 @@
-import type { AgentIR, AgentLibraryItem, AgentMetadata } from '../domain/brain';
+import type { AgentIR, AgentMetadata } from '../domain/brain';
+import type { AgentPackage as AgentLibraryItem } from './legacyBrainPackage';
 import {
   createBrainLibraryItemFromAgent,
   isAgentMetadata,

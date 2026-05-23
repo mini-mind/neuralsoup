@@ -18,8 +18,11 @@ import {
 } from '../domain/brain/ir';
 import { createDefaultLegacyBodyDefinition, type LegacyBodyDefinition } from '../compat/legacyBrainPackage';
 import type { AgentRuntimeStatus } from '../types/agentRuntime';
-import { SimulationSession } from '../runtime/SimulationSession';
 import { deriveAgentIRVisionCellCount } from './legacyVisionCellCount';
+import {
+  getLegacySimulationSessionAdapter,
+  type LegacySimulationSessionCompatTarget,
+} from '../runtime/legacySimulationSessionAdapter';
 
 const LEGACY_VISION_INPUT_PATTERN = /^vision-[RGB]-(\d+)$/;
 
@@ -35,14 +38,17 @@ const toAgentValidationIssues = (issues: GraphIRValidationIssue[]): AgentValidat
   }));
 
 const createInvalidCompatStatus = (
-  session: SimulationSession,
+  target: LegacySimulationSessionCompatTarget,
   issues: AgentValidationIssue[]
-): AgentRuntimeStatus => ({
-  state: 'invalid',
-  appliedSummary: session.getAgentRuntimeStatus().appliedSummary,
-  issues,
-  message: issues.map((issue) => issue.message).join(' | '),
-});
+): AgentRuntimeStatus => {
+  const session = getLegacySimulationSessionAdapter(target);
+  return {
+    state: 'invalid',
+    appliedSummary: session.getAppliedAgentSummary(),
+    issues,
+    message: issues.map((issue) => issue.message).join(' | '),
+  };
+};
 
 const createCompatLinkLossIssues = (
   linkIds: string[],
@@ -135,18 +141,18 @@ const auditLegacyGraphIRDocumentOnlyImport = (document: GraphIRDocument): AgentV
 };
 
 export const inspectLegacyGraphIRExport = (
-  session: SimulationSession
+  target: LegacySimulationSessionCompatTarget
 ): { compatBridge: LegacyGraphBridgeResult; issues: AgentValidationIssue[] } =>
-  createLegacyCompatSinkAudit(session.getCurrentAgentIR());
+  createLegacyCompatSinkAudit(getLegacySimulationSessionAdapter(target).getCurrentAgentIR());
 
 export const setLegacyGraphIRDocument = (
-  session: SimulationSession,
+  target: LegacySimulationSessionCompatTarget,
   document: GraphIRDocument,
   body?: LegacyBodyDefinition
 ): AgentRuntimeStatus => {
-  const mainAgent = session.getMainAgent();
+  const session = getLegacySimulationSessionAdapter(target);
   const currentAgent = session.getCurrentAgentIR();
-  const visionCells = mainAgent?.visionCells.length ?? session.getVisionCellCount();
+  const visionCells = session.getAvailableVisionCellCount();
   const inputAdapter = document.root.children.find((node) => node.id === 'input-adapter' && node.kind === 'adapter');
   const resolvedBody =
     body ??
@@ -162,7 +168,7 @@ export const setLegacyGraphIRDocument = (
   );
   if (bridgeResult.droppedLinkIds.length > 0) {
     return createInvalidCompatStatus(
-      session,
+      target,
       createCompatLinkLossIssues(
         bridgeResult.droppedLinkIds,
         'Legacy GraphIR compat setter cannot preserve draft link'
@@ -173,7 +179,7 @@ export const setLegacyGraphIRDocument = (
     ? auditLegacyCompatImport(document, resolvedBody)
     : auditLegacyGraphIRDocumentOnlyImport(document);
   if (importIssues.length > 0) {
-    return createInvalidCompatStatus(session, importIssues);
+    return createInvalidCompatStatus(target, importIssues);
   }
   const outOfRangeConnections = bridgeResult.agent.connections.filter((connection) => {
     if (connection.from.scope !== 'bodyInput') {
@@ -185,7 +191,7 @@ export const setLegacyGraphIRDocument = (
 
   if (outOfRangeConnections.length > 0) {
     return createInvalidCompatStatus(
-      session,
+      target,
       outOfRangeConnections.map((connection) => ({
         code: 'runtime-binding-error',
         message: `Legacy GraphIR compat setter requires vision cell ${connection.from.nodeId}, but session only has ${visionCells} cells.`,
@@ -196,7 +202,7 @@ export const setLegacyGraphIRDocument = (
   const nextAgent = bridgeResult.agent;
   const requiredVisionCells = deriveAgentIRVisionCellCount(nextAgent);
   if (requiredVisionCells > visionCells) {
-    return createInvalidCompatStatus(session, [
+    return createInvalidCompatStatus(target, [
       {
         code: 'runtime-binding-error',
         message: `Legacy GraphIR compat setter requires ${requiredVisionCells} vision cells, but session only has ${visionCells} cells.`,
@@ -204,12 +210,17 @@ export const setLegacyGraphIRDocument = (
     ]);
   }
 
+  const exportAudit = createLegacyCompatSinkAudit(nextAgent);
+  if (exportAudit.issues.length > 0) {
+    return createInvalidCompatStatus(session, exportAudit.issues);
+  }
+
   return session.setAgentIR(nextAgent);
 };
 
-export const exportLegacyGraphIRDocument = (session: SimulationSession): GraphIRDocument =>
+export const exportLegacyGraphIRDocument = (target: LegacySimulationSessionCompatTarget): GraphIRDocument =>
   (() => {
-    const { compatBridge, issues } = inspectLegacyGraphIRExport(session);
+    const { compatBridge, issues } = inspectLegacyGraphIRExport(target);
 
     if (issues.length > 0) {
       throw new AgentValidationError(issues);

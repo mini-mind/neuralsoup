@@ -7,7 +7,7 @@ import {
   summarizeGraphIRDocument,
   validateGraphIRDocument,
   type GraphIRDocument,
-} from '../../src/domain/brain/ir';
+} from '../../src/compat/legacyGraphIR';
 import { createDefaultGraphIRDocument } from '../../src/compat/legacyGraphDefaults';
 import { compileLegacyBrainDefinition } from '../../src/compat/legacyBrainCompiler';
 import { createDefaultLegacyBodyDefinition } from '../../src/compat/legacyBrainPackage';

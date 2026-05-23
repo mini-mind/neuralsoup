@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createDefaultGraphIRDocument } from '../../src/compat/legacyGraphDefaults';
-import type { GraphIRDocument } from '../../src/domain/brain/ir';
+import type { GraphIRDocument } from '../../src/compat/legacyGraphIR';
 import { compileLegacyBrainDefinition } from '../../src/compat/legacyBrainCompiler';
 import { createDefaultLegacyBodyDefinition, type LegacyBodyDefinition } from '../../src/compat/legacyBrainPackage';
 import { createLegacyBrainProgramRuntimeState, stepLegacyBrainProgram } from '../../src/compat/legacyBrainStep';
