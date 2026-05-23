@@ -20,17 +20,21 @@ import SettingsPanel from './components/editor/SettingsPanel';
 import type { AgentParameters, EditorTab, GraphPathItem, SettingsSection } from './components/editor/types';
 import type { GraphDocumentChangeOptions } from './components/hooks/useSNNTopologyState';
 import {
+  loadBrainLibraryWithStatus,
+  saveBrainLibrary,
+} from './storage/brainLibraryStorage';
+import {
   type BrainLibraryRecord,
   createBrainLibraryItemFromAgent,
   deleteBrainLibraryItem,
   duplicateBrainLibraryItem,
-  encodeBrainLibraryRecord,
-  loadBrainLibraryWithStatus,
-  normalizeImportedAgentPackage,
   renameBrainLibraryItem,
-  saveBrainLibrary,
   upsertBrainLibraryItemAgent,
-} from './storage/brainLibraryStorage';
+} from './storage/brainLibraryRecord';
+import {
+  encodeBrainLibraryRecordForExchange,
+  normalizeImportedBrainExchange,
+} from './storage/brainLibraryExchange';
 import './App.css';
 
 declare global {
@@ -511,7 +515,7 @@ const App: React.FC = () => {
   }, [brainLibrary, confirmUnsavedBrainReplacement, resetGraphEditorSession, resetRuntimeForBrainSwitch]);
 
   const handleImportBrain = useCallback((name: string, payload: unknown) => {
-    const nextBrain = normalizeImportedAgentPackage(payload, {
+    const nextBrain = normalizeImportedBrainExchange(payload, {
       name,
       existingIds: brainLibrary.map((brain) => brain.agent.metadata.id),
     });
@@ -542,7 +546,7 @@ const App: React.FC = () => {
       return;
     }
 
-    const exportedPackage = encodeBrainLibraryRecord(selectedBrain);
+    const exportedPackage = encodeBrainLibraryRecordForExchange(selectedBrain);
     const blob = new Blob([JSON.stringify(exportedPackage, null, 2)], {
       type: 'application/json',
     });

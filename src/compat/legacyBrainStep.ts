@@ -1,7 +1,9 @@
 import type { BrainOutputChannel, IzhikevichNeuronRuntimeState } from '../domain/brain/shared';
-import type { LegacyBrainProgram } from '../compat/legacyBrainProgram';
+import {
+  getLegacyBrainProgramRuntimePayload,
+  type LegacyBrainProgram,
+} from '../compat/legacyBrainProgram';
 import { createAgentProgramRuntimeState, stepAgentProgram, type AgentProgramRuntimeState } from '../domain/brain/agent-step';
-import type { AgentProgram } from '../domain/brain/agent-program';
 
 export interface BrainProgramRuntimeState {
   neurons: Map<string, IzhikevichNeuronRuntimeState>;
@@ -17,10 +19,6 @@ export interface BrainProgramStepResult {
 
 export type LegacyBrainProgramRuntimeState = BrainProgramRuntimeState;
 export type LegacyBrainProgramStepResult = BrainProgramStepResult;
-
-type AgentBackedLegacyBrainProgram = LegacyBrainProgram & {
-  compiledAgentProgram: AgentProgram;
-};
 
 const DEFAULT_RUNTIME_STATE = (): IzhikevichNeuronRuntimeState => ({
   v: -65,
@@ -48,18 +46,10 @@ const buildCompatSignalSnapshotFromAgentRuntime = (
   return nextSignals;
 };
 
-const getCompiledAgentProgram = (program: LegacyBrainProgram): AgentProgram => {
-  const candidate = program as Partial<AgentBackedLegacyBrainProgram>;
-  if (!candidate.compiledAgentProgram) {
-    throw new Error('LegacyBrainProgram is missing the compiled Agent runtime payload.');
-  }
-  return candidate.compiledAgentProgram;
-};
-
 export const createLegacyBrainProgramRuntimeState = (
   program: LegacyBrainProgram
 ): BrainProgramRuntimeState => {
-  const compiledAgentProgram = getCompiledAgentProgram(program);
+  const compiledAgentProgram = getLegacyBrainProgramRuntimePayload(program);
   const agentRuntimeState = createAgentProgramRuntimeState(compiledAgentProgram);
   return {
     neurons: new Map(
@@ -85,7 +75,7 @@ export const stepLegacyBrainProgram = (
   deltaTimeSeconds: number,
   timestamp: number = Date.now()
 ): BrainProgramStepResult => {
-  const compiledAgentProgram = getCompiledAgentProgram(program);
+  const compiledAgentProgram = getLegacyBrainProgramRuntimePayload(program);
   const agentResult = stepAgentProgram(
     compiledAgentProgram,
     sensoryInputs,

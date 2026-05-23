@@ -186,9 +186,10 @@ test('compileLegacyBrainDefinition exposes legacy-named compat wrapper fields', 
   const document = createDefaultGraphIRDocument(1);
   const program = compileDefaultBrain(document);
 
-  assert.equal(program.legacyGraphIR, document);
   assert.equal(program.inputBindings.length, 3);
   assert.equal(program.outputBindings.length, 3);
+  assert.equal('compiledAgentProgram' in (program as LegacyBrainProgram & Record<string, unknown>), false);
+  assert.equal('legacyGraphIR' in (program as LegacyBrainProgram & Record<string, unknown>), false);
 });
 
 test('legacy GraphIR compat runtime step reads visualInput values using channel-interleaved vision layout', () => {

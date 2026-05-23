@@ -1,5 +1,6 @@
-import type { GraphIRDocument, LeafLink, ModelDefinition } from '../domain/brain/ir';
+import type { LeafLink, ModelDefinition } from '../domain/brain/ir';
 import type { BrainInputChannel, BrainOutputChannel, IzhikevichNeuronParameters } from '../domain/brain/shared';
+import type { AgentProgram } from '../domain/brain/agent-program';
 
 export interface ProgramInputPort {
   id: string;
@@ -64,7 +65,6 @@ export interface BrainProgramSignalNode {
 }
 
 export interface LegacyBrainProgram {
-  legacyGraphIR: GraphIRDocument;
   inputPorts: ProgramInputPort[];
   neuronNodes: BrainProgramNeuronNode[];
   outputPorts: ProgramOutputPort[];
@@ -76,3 +76,22 @@ export interface LegacyBrainProgram {
   nodeIndex: BrainProgramNodeIndex;
 }
 export type LegacyGraphProgram = LegacyBrainProgram;
+
+const compiledAgentProgramByLegacyProgram = new WeakMap<LegacyBrainProgram, AgentProgram>();
+
+export const attachLegacyBrainProgramRuntimePayload = (
+  program: LegacyBrainProgram,
+  compiledAgentProgram: AgentProgram
+): LegacyBrainProgram => {
+  compiledAgentProgramByLegacyProgram.set(program, compiledAgentProgram);
+  return program;
+};
+
+export const getLegacyBrainProgramRuntimePayload = (program: LegacyBrainProgram): AgentProgram => {
+  const compiledAgentProgram = compiledAgentProgramByLegacyProgram.get(program);
+  if (!compiledAgentProgram) {
+    throw new Error('LegacyBrainProgram is missing the compiled Agent runtime payload.');
+  }
+
+  return compiledAgentProgram;
+};

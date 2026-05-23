@@ -16,8 +16,8 @@ const DEFAULT_AGENT_LAYOUT_VERSION = 1 as const;
 const DEFAULT_AGENT_VERSION = 1 as const;
 const DEFAULT_BODY_VERSION = 1 as const;
 const DEFAULT_BRAIN_VERSION = 1 as const;
-const DEFAULT_VISION_INPUT_RULE_ID = 'legacy-vision-inputs';
-const DEFAULT_MOTOR_OUTPUT_RULE_ID = 'legacy-motor-outputs';
+const DEFAULT_VISION_INPUT_RULE_ID = 'vision-inputs';
+const DEFAULT_MOTOR_OUTPUT_RULE_ID = 'motor-outputs';
 
 const createAgentMetadata = (
   name: string,

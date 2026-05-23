@@ -37,7 +37,8 @@ test('legacy GraphIR document compiles into a compat runtime program with vision
     program.outputBindings.map((binding) => binding.channel),
     ['turn-left', 'move-forward', 'turn-right']
   );
-  assert.equal(program.legacyGraphIR, document);
+  assert.equal('compiledAgentProgram' in (program as LegacyBrainProgram & Record<string, unknown>), false);
+  assert.equal('legacyGraphIR' in (program as LegacyBrainProgram & Record<string, unknown>), false);
 });
 
 test('compileLegacyBrainDefinition rejects legacy drafts whose lowering drops bridge links', () => {

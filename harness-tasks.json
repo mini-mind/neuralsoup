@@ -1,0 +1,574 @@
+{
+  "version": 2,
+  "created": "2026-05-12T12:40:00Z",
+  "session_config": {
+    "concurrency_mode": "exclusive",
+    "max_tasks_per_session": 20,
+    "max_sessions": 50
+  },
+  "tasks": [
+    {
+      "id": "task-001",
+      "title": "Brain IR design: finalize persisted Brain package schema, model/topology/adapters semantics, validation, and migration boundaries",
+      "status": "completed",
+      "priority": "P1",
+      "depends_on": [],
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain",
+        "timeout_seconds": 300
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-22T09:00:36Z",
+          "message": "Implemented BrainPackage, explicit BodyDefinition runtime binding, strict package-only storage/import, body-aware runtime switching, and current-state design docs."
+        }
+      ],
+      "completed_at": "2026-05-22T09:00:36Z"
+    },
+    {
+      "id": "task-002",
+      "title": "Brain Library product semantics: add rename, delete, duplicate, dirty-state prompts, and import error detail flows",
+      "status": "completed",
+      "priority": "P2",
+      "depends_on": [
+        "task-001"
+      ],
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "validation": {
+        "command": "npm run type-check && npm run test:e2e -- --grep \"brain library\"",
+        "timeout_seconds": 300
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-22T09:06:35Z",
+          "message": "Added Brain Library rename, delete, duplicate, unsaved replacement confirmation, import parse errors, and e2e coverage."
+        }
+      ],
+      "completed_at": "2026-05-22T09:06:35Z"
+    },
+    {
+      "id": "task-003",
+      "title": "Brain persistence hardening: add schema versioning, migration path, corrupted storage recovery, and LocalStorage capacity handling",
+      "status": "completed",
+      "priority": "P2",
+      "depends_on": [
+        "task-001"
+      ],
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain",
+        "timeout_seconds": 300
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-22T09:16:12Z",
+          "message": "Added Brain Library storage envelope versioning, strict non-migration recovery, corrupt payload quarantine, status surfacing, and capacity error reporting."
+        }
+      ],
+      "completed_at": "2026-05-22T09:16:12Z"
+    },
+    {
+      "id": "task-004",
+      "title": "Brain runtime switching boundary: define and implement pause/reset/stat/activity behavior when switching active Brain IR",
+      "status": "completed",
+      "priority": "P1",
+      "depends_on": [
+        "task-001"
+      ],
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"brain library|simulation lifecycle\"",
+        "timeout_seconds": 420
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-22T09:20:02Z",
+          "message": "Defined Brain switch as a runtime replacement boundary that stops lifecycle, resets stats/world, clears runtime activity, and installs selected/imported Brain."
+        }
+      ],
+      "completed_at": "2026-05-22T09:20:02Z"
+    },
+    {
+      "id": "task-005",
+      "title": "Brain Library coverage: add import, export, active Brain switching, GraphView sync, and runtime sync tests",
+      "status": "completed",
+      "priority": "P2",
+      "depends_on": [
+        "task-002",
+        "task-004"
+      ],
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "validation": {
+        "command": "npm run type-check && npm run test:e2e -- --grep \"brain library\"",
+        "timeout_seconds": 420
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-22T09:22:43Z",
+          "message": "Closed Brain Library coverage gaps for export content, successful import, active Brain switching, body sync, GraphView sync, and runtime activity reset."
+        }
+      ],
+      "completed_at": "2026-05-22T09:22:43Z"
+    },
+    {
+      "id": "task-006",
+      "title": "GraphView maturity backlog: close nested expansion, measured menu bounds, complex gesture conflicts, performance, and ComfyUI parity gaps",
+      "status": "completed",
+      "priority": "P1",
+      "depends_on": [],
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"graph view\"",
+        "timeout_seconds": 900
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-22T09:53:46Z",
+          "message": "Closed GraphView validation findings: reliable SVG link hit targets, link-covered drag routing, narrow-screen child-scope focus, stable drag/pan e2e assertions, and default child adapter layout avoiding link occlusion."
+        }
+      ],
+      "completed_at": "2026-05-22T09:53:46Z"
+    },
+    {
+      "id": "task-007",
+      "title": "Runtime AgentIR cutover: make AgentIR the installed execution source in session/engine/canvas and align domain tests to frozen body semantics",
+      "status": "completed",
+      "priority": "P0",
+      "depends_on": [
+        "task-001"
+      ],
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "abebebf",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain",
+        "timeout_seconds": 420
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-22T15:57:53Z",
+          "message": "Switched runtime installation path to compileAgentIR/AgentProgram, updated SimulationCanvas to feed AgentIR directly, preserved GraphIR only as compatibility/status surface, and aligned runtime-domain tests with frozen body output semantics."
+        }
+      ],
+      "completed_at": "2026-05-22T15:57:53Z"
+    },
+    {
+      "id": "task-008",
+      "title": "GraphView AgentIR cutover: make editor/view-model/commands directly read and write AgentIR.brain, AgentIR.connections, and AgentIR.layout",
+      "status": "in_progress",
+      "priority": "P0",
+      "depends_on": [
+        "task-007"
+      ],
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "10dafc1",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"graph view|brain library\"",
+        "timeout_seconds": 900
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-22T19:17:02.240Z",
+          "message": "Started AgentIR editor truth cutover: App draft source now anchored on AgentIR, Brain Library normal load/save path preserves AgentPackage without legacy round-trip, and active-brain persistence now updates stored AgentIR directly."
+        },
+        {
+          "at": "2026-05-23T00:00:00Z",
+          "message": "Cross-review confirmed remaining cutover debt: App draft/runtime diagnostics now moved closer to AgentIR truth and default App seed now uses createDefaultAgentIR, but runtime compat APIs, session dual-source state, and storage/import/export package boundary are still open."
+        },
+        {
+          "at": "2026-05-23T01:35:00Z",
+          "message": "Cross-review confirmed GraphView runtime/editor main path is AgentIR-native; remaining task-008 debt is now mostly top-level compat surface and Brain Library contract exposure rather than editor interaction state."
+        },
+        {
+          "at": "2026-05-23T11:10:00Z",
+          "message": "Removed legacy GraphIR construction from createDefaultAgentIR, introduced AgentIR-native summary typing, preserved default node ids/layout contracts, and revalidated with npm run type-check plus npm run test:domain."
+        },
+        {
+          "at": "2026-05-23T11:50:00Z",
+          "message": "Cross-review P1 fixes landed: SimulationSession.setAgentIR no longer requires legacy GraphIR round-trip prevalidation, Brain Library export now emits the same AgentPackage contract that import/storage accept, and regression coverage passed in npm run type-check, npm run test:domain, and targeted brain-library Playwright flows."
+        },
+        {
+          "at": "2026-05-23T12:30:00Z",
+          "message": "Runtime/UI production status surface now uses AgentRuntimeStatus, AgentDraftStatus, and AgentRuntimeActivitySnapshot while preserving GraphIR-named aliases only as compat shims; session/engine/react chains were updated and revalidated with npm run type-check, npm run test:domain, and targeted brain-library Playwright coverage."
+        },
+        {
+          "at": "2026-05-23T13:20:00Z",
+          "message": "Further compat shrink completed: production imports now resolve through src/types/agentRuntime.ts, unprefixed GraphIR runtime/session aliases were removed from public production APIs, storage main path no longer exposes legacy BrainPackage validation or GraphIR-based write helpers, and validation passed with npm run type-check plus npm run test:domain."
+        },
+        {
+          "at": "2026-05-23T13:50:00Z",
+          "message": "Agent validation contract is now available on the main domain path via AgentValidationIssue and AgentValidationError; runtime status types no longer import GraphIRValidationIssue through compat, and the updated domain/runtime path revalidated with npm run type-check plus npm run test:domain."
+        },
+        {
+          "at": "2026-05-23T04:15:00Z",
+          "message": "Cross-review P0/P1 fixes landed: legacy GraphIR compat setter now rejects drafts that would require silent vision-cell reconcile, compat getter/setter now fail on BodyIR rule loss instead of pretending round-trip success, Brain Library current-save now atomically switches editor/runtime identity to the saved record, and BodyIR visionCellCount has been demoted to a non-persisted compat accessor with storage migration coverage. Revalidated with npm run type-check and npm run test:domain."
+        },
+        {
+          "at": "2026-05-23T05:10:45Z",
+          "message": "Graph editor neuron inspector now edits AgentIR initialState.v/u directly, preserving empty u as runtime-derived instead of forcing zero; UI writeback lands through the existing AgentIR graph command path and revalidated with npm run type-check plus npm run test:domain."
+        },
+        {
+          "at": "2026-05-23T05:17:41Z",
+          "message": "Cross-review follow-up closed two P2 issues in the neuron inspector path: invalid initialState input is now explicitly non-committing and reverts to the last valid value on blur, and graph-node update payload typing was narrowed to a graph-local numeric contract instead of pulling LiteralValue from compat into shared editor types. Revalidated with npm run type-check, npm run test:domain, and targeted Playwright coverage for graph inspector edits."
+        },
+        {
+          "at": "2026-05-23T14:35:00Z",
+          "message": "GraphView production path no longer imports compat ModelDefinition types; graph view model/types now reference Graph IR model typing directly, shrinking one remaining AgentIR-editor compat type leak while keeping validation green."
+        },
+        {
+          "at": "2026-05-23T15:05:00Z",
+          "message": "Invalid draft diagnostics coverage now exercises the real AgentIR draft editing path instead of a status-only injection shim: test API mutates draft AgentIR through handleAgentChange with installToRuntime=false, Playwright asserts draft/runtime divergence plus post-reload runtime cleanliness, and targeted e2e passed in both renderer modes."
+        },
+        {
+          "at": "2026-05-23T15:35:00Z",
+          "message": "Legacy graph view model no longer imports GraphIR types through domain/brain/compat; src/components/editor/graph/graphViewModel now binds directly to domain/brain/ir types, removing another production compat-barrel leak."
+        },
+        {
+          "at": "2026-05-23T17:20:00Z",
+          "message": "Cross-review-guided compat surface shrink completed: legacy graph view model moved out of production editor tree into src/compat, legacy brain controller moved out of src/engine into src/compat, and legacy package/body/layout helpers moved out of core domain/brain into src/compat with all remaining callers rewired. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+        },
+        {
+          "at": "2026-05-23T14:30:00Z",
+          "message": "Lowered legacyGraphBridge fully into src/compat, removed its domain-path production references, split legacy bridge/compiler runtime contracts out of tests/domain into tests/compat, and revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+        },
+        {
+          "at": "2026-05-23T15:10:00Z",
+          "message": "Removed compat-only bridge layout nodes from createDefaultAgentIR so the default AgentIR main path now persists only real body/brain/layout state, added a domain contract to lock that boundary, and revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+        },
+        {
+          "at": "2026-05-23T16:10:00Z",
+          "message": "Brain Library LocalStorage main path now persists record-shaped storage entries instead of AgentPackage envelopes, legacy package envelopes were restricted to import/export compatibility, App snapshot comparison now follows record truth, and legacy visionCellCount absorption was narrowed to import migration paths. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+        },
+        {
+          "at": "2026-05-23T17:00:00Z",
+          "message": "Lowered legacy GraphIR defaults out of src/domain into src/compat/legacyGraphDefaults, removed the domain defaults file, kept AgentIR defaults as the only domain default entry, and further tightened Brain Library canonical storage so legacy visionCellCount survives only through explicit legacy migration paths. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+        },
+        {
+          "at": "2026-05-23T17:40:00Z",
+          "message": "Further P2 cleanup completed: canonical Brain Library storage no longer accepts legacy visionCellCount on the main record path, leaked legacy fields are forced back through the explicit migration path, and domain tests now consume legacy GraphIR fixtures through a test helper instead of importing compat defaults directly. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+        },
+        {
+          "at": "2026-05-23T07:01:36Z",
+          "message": "Compat bridge cleanup stage landed: split legacyGraphBridge into shared, legacy-to-agent, and agent-to-legacy modules without behavior change; domain and compat regression suites remained green."
+        },
+        {
+          "at": "2026-05-23T07:13:47Z",
+          "message": "Closed compat bridge silent-loss leaks: legacyBrainPackage and legacyBrainCompiler now fail explicitly on dropped legacy->AgentIR links, legacySimulationSession sink audit was extracted into a dedicated helper, and coverage was added with type-check/domain/compat suites green."
+        },
+        {
+          "at": "2026-05-23T07:27:37Z",
+          "message": "Moved compat default GraphIR seed/reconcile assertions out of domain tests into compat tests, deleted the zero-value legacyGraphTestFixtures helper, and revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+        },
+        {
+          "at": "2026-05-23T07:33:43Z",
+          "message": "Shrank legacy runtime public surface: LegacyBrainProgram no longer exposes compiledAgentProgram in its public interface, compat step/compiler now consume the agent-backed executor through internal payload typing, and compat tests were rewritten to assert legacy-visible bindings/behavior instead of AgentProgram internals."
+        },
+        {
+          "at": "2026-05-23T18:40:00Z",
+          "message": "IR main-path naming cleanup landed: default AgentIR BodyIR rule ids were renamed from legacy-* to neutral vision-inputs/motor-outputs, the unused src/types/graphIRRuntime.ts compat alias surface was removed, and regression coverage remained green in npm run type-check, npm run test:domain, and npm run test:compat."
+        }
+      ],
+      "completed_at": null
+    },
+    {
+      "id": "task-009",
+      "title": "Runtime compat 收口：移除 session/engine 内部 GraphIR 双真源并将 legacy GraphIR API 下沉为 compat-only",
+      "status": "in_progress",
+      "priority": "P1",
+      "depends_on": [
+        "task-008"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain",
+        "timeout_seconds": 600
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-23T00:20:00Z",
+          "message": "Runtime compat phase 1 completed: App/runtime main path stays AgentIR-first, session vision-cell reconcile no longer reconstructs AgentIR from compat GraphIR/body state, and explicit legacy GraphIR alias APIs were introduced with regression coverage."
+        },
+        {
+          "at": "2026-05-23T01:35:00Z",
+          "message": "Runtime compat phase 2 completed: SimulationSession no longer stores mutable GraphIR/body twin state, legacy GraphIR setters now normalize through AgentIR and compat getters bridge on demand, and domain tests were updated to assert AgentIR truth instead of legacy object identity."
+        },
+        {
+          "at": "2026-05-23T04:15:00Z",
+          "message": "Runtime compat hardening closed the remaining silent-loss path: compat setter now rejects out-of-range vision drafts before reconcile and compat getter/setter both surface BodyIR rule losses as invalid instead of silently rewriting through legacy GraphIR/body defaults."
+        },
+        {
+          "at": "2026-05-23T05:10:45Z",
+          "message": "Legacy compat getter no longer silently drops unconnected BodyIR alias rules during AgentIR -> GraphIR projection: bridge semantics now sample explicit rule coverage and fail with documentOnlyLosses when compat cannot preserve those aliases; added domain coverage for alias-loss detection and explicit initialState.u round-trip."
+        },
+        {
+          "at": "2026-05-23T05:17:41Z",
+          "message": "Cross-review follow-up hardened compat getter loss detection for unconnected regex-shaped BodyIR aliases, not just literal node-id aliases, and added symmetric domain contracts for AgentIR -> compat GraphIR plus compat setter -> AgentIR initialState.u round-trip. Revalidated with npm run type-check and npm run test:domain."
+        },
+      {
+        "at": "2026-05-23T18:05:00Z",
+        "message": "Legacy executable compat stack was fully pulled out of core production trees: legacy compiler/program/step moved from src/domain/brain into src/compat, SimulationSessionCompat moved from src/runtime into src/compat, and all remaining tests/compat callers were rewired. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+      },
+      {
+        "at": "2026-05-23T19:20:00Z",
+        "message": "Cross-review-guided compat surface shrink continued: LegacyBrainProgram no longer exposes compiledAgentProgram or legacyGraphIR on its public/runtime object shape, compat runtime payload is now carried through an internal WeakMap, and legacy runtime tests were tightened to assert compat behavior without requiring those internal fields. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+      },
+      {
+        "at": "2026-05-23T20:05:00Z",
+        "message": "Compat session contract was split: legacy GraphIR setter now validates import-side GraphIR/body correctness and session constraints without requiring future legacy-export fidelity, while legacy export/audit is exposed explicitly via exportLegacyGraphIRDocument/inspectLegacyGraphIRExport. Compat contracts were updated so lossy BodyIR rules can still install into AgentIR but fail explicit legacy export. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+      }
+    ],
+    "completed_at": null
+  },
+    {
+      "id": "task-010",
+      "title": "持久化边界收口：统一 Brain Library 的导入导出与 LocalStorage 契约，并消除 package metadata 双真源",
+      "status": "in_progress",
+      "priority": "P1",
+      "depends_on": [
+        "task-008"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"brain library\"",
+        "timeout_seconds": 900
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-23T00:40:00Z",
+          "message": "Storage boundary phase 1 completed: Brain Library now normalizes AgentPackage metadata to agent.metadata truth on load/import, createBrainLibraryItemFromAgent uses one canonical metadata object, and storage contract coverage now catches metadata drift."
+        },
+        {
+          "at": "2026-05-23T02:05:00Z",
+          "message": "Storage boundary phase 2 completed: Brain Library main/UI state now uses BrainLibraryRecord instead of exposing AgentPackage envelope directly, save/load persist via v1 codec at the storage edge, import modal accepts unknown payloads, and brain-library e2e/domain coverage still passes after the contract shrink."
+        },
+        {
+          "at": "2026-05-23T04:15:00Z",
+          "message": "Storage boundary hardening demoted body.visionCellCount to import-only compat recovery, stopped writing it back out in serialized AgentPackage payloads, and made save-current switch the active editor/runtime AgentIR to the newly created library record to remove identity drift."
+        },
+        {
+          "at": "2026-05-23T04:37:45Z",
+          "message": "Cross-review P0/P1 fixes landed in App orchestration: saving current Brain now atomically aligns active/draft identity to the new library record, renaming the active Brain preserves draft-only edits by updating metadata in place, and Playwright coverage now asserts both identity-sync and rename-with-draft preservation. Revalidated with npm run type-check, npm run test:domain, and npm run test:e2e -- --grep \"brain library\"."
+        },
+        {
+          "at": "2026-05-23T05:27:56Z",
+          "message": "Removed BrainLibraryRecord top-level metadata as an internal source of truth: App, BrainLibraryModal, storage helpers, unit tests, and brain-library e2e now use agent.metadata for in-memory identity while exported AgentPackage still mirrors top-level metadata only at the codec boundary. Revalidated with npm run type-check, npm run test:domain, and npm run test:e2e -- --grep \"brain library\"."
+        },
+      {
+        "at": "2026-05-23T14:35:00Z",
+        "message": "Cross-review P1 fixes landed: App now de-duplicates initial Brain Library persistence so recovered/corrupt storage status survives reload until a real save, storage/import now validate AgentPackage by agent.metadata truth while treating top-level metadata as optional compat projection, and domain plus brain-library Playwright coverage were expanded and passed."
+      },
+      {
+        "at": "2026-05-23T19:05:00Z",
+        "message": "Storage canonical-load self-healing now actually rewrites non-normalized but valid record payloads instead of comparing normalized records against themselves, and a domain contract now proves load-time rewrite restores missing layout vision markers before re-persist. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+      }
+    ],
+    "completed_at": null
+  },
+    {
+      "id": "task-011",
+      "title": "Compat 表面瘦身：隔离 legacy graph compiler/bridge/storage API，避免继续从顶层 domain surface 暴露",
+      "status": "completed",
+      "priority": "P2",
+      "depends_on": [
+        "task-009",
+        "task-010"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain",
+        "timeout_seconds": 600
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-23T02:05:00Z",
+          "message": "Cross-review locked task-011 scope: GraphView main path is already AgentIR-native; remaining work is to split domain/brain barrel into AgentIR-first surface and explicit GraphIR compat surface, then move tests/importers accordingly."
+        },
+        {
+          "at": "2026-05-23T02:29:52.026Z",
+          "message": "Production src path no longer imports through domain/brain/compat.ts; runtime/engine and AgentIR editor types now use explicit modules or main domain exports, and compat.ts was narrowed from wildcard barrel to explicit legacy exports."
+        },
+        {
+          "at": "2026-05-23T02:36:15.670Z",
+          "message": "Legacy GraphIR compat API was removed from SimulationSession/SimulationEngine core public methods and moved into explicit compat helpers; tests now call runtime compat helpers directly, while production src remains AgentIR-first and no longer imports compat.ts."
+        },
+        {
+          "at": "2026-05-23T02:39:47.388Z",
+          "message": "AgentIR validation contract now uses independent AgentValidationIssue/Error types, GraphIRRuntime aliases live only in compat types, production src no longer imports compat.ts, and legacy GraphIR runtime/session access lives behind explicit compat helpers. Verified with npm run type-check and npm run test:domain."
+        },
+        {
+          "at": "2026-05-23T17:20:00Z",
+          "message": "Cross-review-guided compat surface shrink completed: legacy graph view model moved out of production editor tree into src/compat, legacy brain controller moved out of src/engine into src/compat, and legacy package/body/layout helpers moved out of core domain/brain into src/compat with all remaining callers rewired. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+        },
+        {
+          "at": "2026-05-23T18:05:00Z",
+          "message": "Legacy executable compat stack was fully pulled out of core production trees: legacy compiler/program/step moved from src/domain/brain into src/compat, SimulationSessionCompat moved from src/runtime into src/compat, and all remaining tests/compat callers were rewired. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+        }
+      ],
+      "completed_at": "2026-05-23T02:39:47.388Z"
+    },
+    {
+      "id": "task-012",
+      "title": "Compat 执行栈下沉：将 AgentController 中 BrainProgram 双栈与 legacy stepping 收拢到 compat-only 边界",
+      "status": "completed",
+      "priority": "P1",
+      "depends_on": [
+        "task-011"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain",
+        "timeout_seconds": 600
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-23T02:44:50.951Z",
+          "message": "AgentController core no longer stores BrainProgram/BrainProgramRuntimeState or exposes install/getter APIs; legacy BrainProgram install/step/state now live in AgentControllerCompat, and the only remaining direct caller was migrated in domain control tests. Local validation passed with npm run type-check and npm run test:domain; pending cross-review findings."
+        },
+        {
+          "at": "2026-05-23T02:50:21.848Z",
+          "message": "Addressed cross-review findings: AgentController no longer imports compat helper or exposes compat-only action/cleanup hooks, SimulationEngineCompat and engine compat-only public methods were removed, and legacy BrainProgram control now uses an independent compat helper instead of re-entering core controller state. Revalidated with npm run type-check and npm run test:domain; awaiting fresh cross-review."
+        },
+        {
+          "at": "2026-05-23T02:58:15.703Z",
+          "message": "Cross-review findings closed: AgentController/SimulationEngine no longer expose compat-driven backdoors, SimulationSession compat backdoors were removed, compat tests were narrowed to truthful bridge semantics, and validation passed with npm run type-check plus npm run test:domain."
+        }
+      ],
+      "completed_at": "2026-05-23T02:58:15.703Z"
+    },
+    {
+      "id": "task-013",
+      "title": "Compat 运行时命名收口：移除 BrainProgram/stepBrainProgram 对 AgentProgram 的命名倒挂与双真源残留",
+      "status": "in_progress",
+      "priority": "P2",
+      "depends_on": [
+        "task-012"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain",
+        "timeout_seconds": 600
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-23T02:58:58.901Z",
+          "message": "Scoped compat runtime naming debt: BrainProgram/stepBrainProgram remain compat-only surfaces used by SimulationSessionCompat, AgentControllerCompat, and legacy GraphIR tests; production AgentIR/session/engine path is already clean. Legacy GraphIR getter test was corrected to assert truthful bridge semantics, and current validation still passes with npm run type-check plus npm run test:domain."
+        },
+        {
+          "at": "2026-05-23T04:15:00Z",
+          "message": "Compat naming debt remains open, but the adjacent bridge/runtime lossiness findings are now covered by explicit invalid statuses and new domain contracts; further task-013 work can focus on remaining BrainProgram alias retirement instead of hidden dual-source behavior."
+        },
+        {
+          "at": "2026-05-23T15:05:00Z",
+          "message": "Compat naming cleanup continued in tests: brain/control/graph-ir/brain-package assertions now use more explicit legacy-compat wording, graph-view model tests no longer import ModelDefinition through compat, and the remaining debt is concentrated in file-level contract naming plus broader compat test segregation."
+        },
+        {
+          "at": "2026-05-23T15:35:00Z",
+          "message": "Compat contract segregation advanced: pure legacy/compat tests moved from tests/domain into tests/compat with a dedicated npm run test:compat lane, several misleading compat test titles were clarified, and tests/domain now better represents AgentIR-first domain contracts."
+        },
+        {
+          "at": "2026-05-23T16:00:00Z",
+          "message": "Compat surface shrink continued: tests/domain now imports several legacy bridge/compiler/runtime helpers directly from explicit modules instead of domain/brain/compat, pure compat contracts live under tests/compat with their own test lane, and validation stayed green with npm run type-check plus npm run test:domain and npm run test:compat."
+        },
+        {
+          "at": "2026-05-23T16:20:00Z",
+          "message": "Retired the domain/brain/compat barrel entirely: remaining tests were rewired to explicit modules, compat-only contracts continue under tests/compat, and deleting compat.ts still passed npm run type-check plus npm run test:domain and npm run test:compat."
+        },
+        {
+          "at": "2026-05-23T17:20:00Z",
+          "message": "Cross-review-guided compat surface shrink completed: legacy graph view model moved out of production editor tree into src/compat, legacy brain controller moved out of src/engine into src/compat, and legacy package/body/layout helpers moved out of core domain/brain into src/compat with all remaining callers rewired. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+        },
+      {
+        "at": "2026-05-23T18:05:00Z",
+        "message": "Legacy executable compat stack was fully pulled out of core production trees: legacy compiler/program/step moved from src/domain/brain into src/compat, SimulationSessionCompat moved from src/runtime into src/compat, and all remaining tests/compat callers were rewired. Revalidated with npm run type-check, npm run test:domain, and npm run test:compat."
+      },
+      {
+        "at": "2026-05-23T19:20:00Z",
+        "message": "Compat runtime naming/surface cleanup advanced: default AgentIR body rule ids were renamed to neutral vision-inputs/motor-outputs, the unused graphIRRuntime alias module was removed, and LegacyBrainProgram no longer leaks internal AgentProgram payload or source GraphIR object identity on its public shape."
+      },
+      {
+        "at": "2026-05-23T20:40:00Z",
+        "message": "Split brain-library persistence from import/export exchange codecs: canonical BrainLibraryRecord normalization now lives outside LocalStorage I/O, the default file format switched to an AgentIR-native neuralsoup-agent envelope while explicit legacy AgentPackage export remains available as compat surface, compat session export/audit APIs were separated from the import setter, and validation passed with npm run type-check, npm run test:domain, npm run test:compat, and npm run test:e2e -- --grep \"brain library\"."
+      }
+    ],
+    "completed_at": null
+  }
+  ],
+  "session_count": 9,
+  "last_session": "2026-05-23T20:40:00Z"
+}

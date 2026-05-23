@@ -867,10 +867,11 @@ test('brain library manages saved items and reports import errors', async ({ pag
     }
 
     return Buffer.concat(chunks).toString('utf8');
-  })) as { packageVersion?: number; metadata?: { name?: string }; agent?: { metadata?: { name?: string } } };
-  expect(downloadedBrain.packageVersion).toBe(1);
+  })) as { version?: number; kind?: string; metadata?: { name?: string }; agent?: { metadata?: { name?: string } } };
+  expect(downloadedBrain.version).toBe(1);
+  expect(downloadedBrain.kind).toBe('neuralsoup-agent');
   expect(downloadedBrain.agent?.metadata?.name).toBe('Renamed Brain');
-  expect(downloadedBrain.metadata?.name ?? downloadedBrain.agent?.metadata?.name).toBe('Renamed Brain');
+  expect(downloadedBrain.agent?.metadata?.name).toBe('Renamed Brain');
 
   page.once('dialog', (dialog) => dialog.accept());
   await page.locator(`[data-testid="brain-library-delete-${savedBrainId}"]`).click();
@@ -1118,7 +1119,13 @@ test('brain library confirms before replacing a saved brain with draft-only chan
   await page.setInputFiles(selectors.brainLibraryImportFile, {
     name: 'saved-brain.json',
     mimeType: 'application/json',
-    buffer: Buffer.from(JSON.stringify(savedBrain)),
+    buffer: Buffer.from(
+      JSON.stringify({
+        version: 1,
+        kind: 'neuralsoup-agent',
+        agent: savedBrain?.agent,
+      })
+    ),
   });
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
   await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(

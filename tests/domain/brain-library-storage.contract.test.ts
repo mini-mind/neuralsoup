@@ -5,14 +5,14 @@ import {
   BRAIN_LIBRARY_CORRUPT_STORAGE_KEY,
   BRAIN_LIBRARY_STATUS_STORAGE_KEY,
   BRAIN_LIBRARY_STORAGE_KEY,
-  createBrainLibraryItemFromAgent,
-  encodeBrainLibraryRecord,
   loadBrainLibraryWithStatus,
-  normalizeImportedAgentPackage,
-  renameBrainLibraryItem,
   saveBrainLibrary,
-  upsertBrainLibraryItemAgent,
 } from '../../src/storage/brainLibraryStorage';
+import {
+  createBrainLibraryItemFromAgent,
+  renameBrainLibraryItem,
+  upsertBrainLibraryItemAgent,
+} from '../../src/storage/brainLibraryRecord';
 import type { AgentLibraryItem } from '../../src/domain/brain';
 
 class MemoryStorage {
@@ -199,6 +199,35 @@ test('Brain Library storage migrates legacy AgentPackage payloads missing body v
   assert.equal('visionCellCount' in persisted.brains[0].agent.body, false);
 });
 
+test('Brain Library storage rewrites canonical records into normalized AgentIR shape on load', () => {
+  const storage = installMemoryLocalStorage();
+  const agent = createDefaultAgentIR(2, 'Canonical Rewrite');
+  const rawStoredRecord = structuredClone({ agent });
+
+  delete (rawStoredRecord.agent.layout?.nodes ?? {})['__body-vision-cell-0'];
+  delete (rawStoredRecord.agent.layout?.nodes ?? {})['__body-vision-cell-1'];
+
+  storage.setItem(
+    BRAIN_LIBRARY_STORAGE_KEY,
+    JSON.stringify({
+      storageVersion: 1,
+      savedAt: new Date().toISOString(),
+      brains: [rawStoredRecord],
+    })
+  );
+
+  const loaded = loadBrainLibraryWithStatus();
+
+  assert.equal(loaded.status.state, 'ok');
+  assert.equal(loaded.brains.length, 1);
+
+  const persisted = JSON.parse(storage.getItem(BRAIN_LIBRARY_STORAGE_KEY) ?? 'null') as {
+    brains: Array<{ agent: { layout?: { nodes?: Record<string, unknown> } } }>;
+  };
+  assert.ok(persisted.brains[0]?.agent.layout?.nodes?.['__body-vision-cell-0']);
+  assert.ok(persisted.brains[0]?.agent.layout?.nodes?.['__body-vision-cell-1']);
+});
+
 test('Brain Library storage preserves sparse legacy vision-cell counts without writing body visionCellCount', () => {
   const storage = installMemoryLocalStorage();
   const brain = createAgentPackage('Sparse Legacy Agent', 36);
@@ -333,43 +362,6 @@ test('Brain Library storage accepts payloads without top-level metadata and rewr
   assert.equal(persisted.brains[0].metadata, undefined);
   assert.equal(persisted.brains[0].agent.metadata.id, loaded.brains[0].agent.metadata.id);
   assert.equal(persisted.brains[0].agent.metadata.name, loaded.brains[0].agent.metadata.name);
-});
-
-test('normalizeImportedAgentPackage applies import name and rewrites conflicting ids', () => {
-  const brain = createAgentPackage('Import Source', 1);
-  const normalized = normalizeImportedAgentPackage(brain, {
-    name: 'Imported Brain',
-    existingIds: [brain.agent.metadata.id],
-  });
-
-  assert.ok(normalized);
-  assert.equal(normalized.agent.metadata.name, 'Imported Brain');
-  assert.notEqual(normalized.agent.metadata.id, brain.agent.metadata.id);
-});
-
-test('normalizeImportedAgentPackage accepts missing top-level metadata when agent metadata is valid', () => {
-  const brain = createAgentPackage('Import Without Envelope Metadata', 1);
-  const normalized = normalizeImportedAgentPackage({
-    packageVersion: 1,
-    agent: brain.agent,
-  });
-
-  assert.ok(normalized);
-  assert.equal(normalized.agent.metadata.name, 'Import Without Envelope Metadata');
-});
-
-test('Brain Library export payload can round-trip through import normalization', () => {
-  const brain = createAgentPackage('Roundtrip Brain', 1);
-  const record = createBrainLibraryItemFromAgent('Roundtrip Brain', brain.agent);
-  const exported = encodeBrainLibraryRecord(record);
-  const normalized = normalizeImportedAgentPackage(exported, {
-    existingIds: [],
-  });
-
-  assert.ok(normalized);
-  assert.equal(normalized.agent.metadata.name, 'Roundtrip Brain');
-  assert.equal(deriveAgentIRVisionCellCount(normalized.agent), brain.agent.body.visionCellCount);
-  assert.equal('visionCellCount' in JSON.parse(JSON.stringify(exported)).agent.body, false);
 });
 
 test('renameBrainLibraryItem keeps top-level metadata and agent metadata fully aligned', () => {

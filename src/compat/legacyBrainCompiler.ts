@@ -22,7 +22,6 @@ import type {
 import type {
   BrainProgramConnection,
   BrainProgramInputBinding,
-  LegacyBrainProgram,
   BrainProgramNeuronNode,
   BrainProgramOutputBinding,
   BrainProgramSignalNode,
@@ -30,7 +29,7 @@ import type {
   ProgramInputPort,
   ProgramOutputPort,
 } from '../compat/legacyBrainProgram';
-import type { AgentProgram } from '../domain/brain/agent-program';
+import { attachLegacyBrainProgramRuntimePayload } from '../compat/legacyBrainProgram';
 import type { BrainInputChannel } from '../domain/brain/shared';
 
 const INPUT_CHANNEL_OFFSET = {
@@ -244,10 +243,6 @@ const compileLegacyAgentProgram = (
   return compileAgentIR(bridgeResult.agent);
 };
 
-type AgentBackedLegacyBrainProgram = LegacyBrainProgram & {
-  compiledAgentProgram: AgentProgram;
-};
-
 interface LegacyCompileAnalysis {
   inputSignalsByNodeId: Map<string, SignalNode>;
   outputSignalsByNodeId: Map<string, SignalNode>;
@@ -387,9 +382,7 @@ export const compileLegacyBrainDefinition = (
 
   const compiledAgentProgram = compileLegacyAgentProgram(document, body);
 
-  return {
-    legacyGraphIR: document,
-    compiledAgentProgram,
+  const program: LegacyGraphProgram = {
     inputPorts,
     neuronNodes,
     outputPorts,
@@ -414,5 +407,7 @@ export const compileLegacyBrainDefinition = (
       neurons: new Map(neuronNodes.map((node) => [node.id, node])),
       outputs: new Map(signalNodes.filter((node) => node.direction === 'output').map((node) => [node.id, node])),
     },
-  } as AgentBackedLegacyBrainProgram;
+  };
+
+  return attachLegacyBrainProgramRuntimePayload(program, compiledAgentProgram);
 };

@@ -17,7 +17,7 @@ import {
   validateGraphIRDocument,
   type GraphIRDocument,
 } from '../domain/brain/ir';
-import type { LegacyBodyDefinition } from '../compat/legacyBrainPackage';
+import { createDefaultLegacyBodyDefinition, type LegacyBodyDefinition } from '../compat/legacyBrainPackage';
 import type { AgentRuntimeStatus } from '../types/agentRuntime';
 import { SimulationSession } from '../runtime/SimulationSession';
 
@@ -103,6 +103,37 @@ const createLegacyCompatSinkAudit = (
   };
 };
 
+const auditLegacyCompatImport = (
+  document: GraphIRDocument,
+  body: LegacyBodyDefinition
+): AgentValidationIssue[] => {
+  const graphIssues = validateGraphIRDocument(document);
+  if (graphIssues.length > 0) {
+    return toAgentValidationIssues(graphIssues);
+  }
+
+  try {
+    assertLegacyBrainDefinitionCompilable(document, body);
+    return [];
+  } catch (error) {
+    if (error instanceof GraphIRValidationError || error instanceof AgentValidationError) {
+      return error instanceof GraphIRValidationError ? toAgentValidationIssues(error.issues) : error.issues;
+    }
+
+    return [
+      {
+        code: 'runtime-binding-error',
+        message: error instanceof Error ? error.message : 'Unknown GraphIR runtime binding failure.',
+      },
+    ];
+  }
+};
+
+export const inspectLegacyGraphIRExport = (
+  session: SimulationSession
+): { compatBridge: LegacyGraphBridgeResult; issues: AgentValidationIssue[] } =>
+  createLegacyCompatSinkAudit(session.getCurrentAgentIR());
+
 export const setLegacyGraphIRDocument = (
   session: SimulationSession,
   document: GraphIRDocument,
@@ -111,6 +142,12 @@ export const setLegacyGraphIRDocument = (
   const mainAgent = session.getMainAgent();
   const currentAgent = session.getCurrentAgentIR();
   const visionCells = mainAgent?.visionCells.length ?? session.getVisionCellCount();
+  const inputAdapter = document.root.children.find((node) => node.id === 'input-adapter' && node.kind === 'adapter');
+  const resolvedBody =
+    body ??
+    createDefaultLegacyBodyDefinition(
+      inputAdapter?.kind === 'adapter' ? Math.max(1, inputAdapter.children.length / 3) : 1
+    );
   const bridgeResult = createAgentIRFromLegacyGraphDetailed(
     currentAgent.metadata.name,
     document,
@@ -126,6 +163,10 @@ export const setLegacyGraphIRDocument = (
         'Legacy GraphIR compat setter cannot preserve draft link'
       )
     );
+  }
+  const importIssues = auditLegacyCompatImport(document, resolvedBody);
+  if (importIssues.length > 0) {
+    return createInvalidCompatStatus(session, importIssues);
   }
   const outOfRangeConnections = bridgeResult.agent.connections.filter((connection) => {
     if (connection.from.scope !== 'bodyInput') {
@@ -156,17 +197,12 @@ export const setLegacyGraphIRDocument = (
     ]);
   }
 
-  const sinkIssues = createLegacyCompatSinkAudit(nextAgent).issues;
-  if (sinkIssues.length > 0) {
-    return createInvalidCompatStatus(session, sinkIssues);
-  }
-
   return session.setAgentIR(nextAgent);
 };
 
-export const getCurrentLegacyGraphIRDocument = (session: SimulationSession): GraphIRDocument =>
+export const exportLegacyGraphIRDocument = (session: SimulationSession): GraphIRDocument =>
   (() => {
-    const { compatBridge, issues } = createLegacyCompatSinkAudit(session.getCurrentAgentIR());
+    const { compatBridge, issues } = inspectLegacyGraphIRExport(session);
 
     if (issues.length > 0) {
       throw new AgentValidationError(issues);

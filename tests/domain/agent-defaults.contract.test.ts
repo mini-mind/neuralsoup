@@ -7,6 +7,14 @@ test('default AgentIR seed is valid and exposes vision-aligned body and runtime 
 
   assert.equal(agent.metadata.name, 'Seed Agent');
   assert.equal(deriveAgentIRVisionCellCount(agent), 4);
+  assert.deepEqual(
+    agent.body.inputRules.map((rule) => rule.id),
+    ['vision-inputs']
+  );
+  assert.deepEqual(
+    agent.body.outputRules.map((rule) => rule.id),
+    ['motor-outputs']
+  );
   assert.deepEqual(validateAgentIR(agent), []);
   assert.deepEqual(summarizeAgentIR(agent), {
     inputSignalCount: 15,

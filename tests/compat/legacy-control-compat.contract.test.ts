@@ -6,7 +6,8 @@ import { WorldManager } from '../../src/engine/WorldManager';
 import { CollisionDetector } from '../../src/engine/CollisionDetector';
 import { SimulationSession } from '../../src/runtime/SimulationSession';
 import {
-  getCurrentLegacyGraphIRDocument,
+  exportLegacyGraphIRDocument,
+  inspectLegacyGraphIRExport,
   setLegacyGraphIRDocument,
 } from '../../src/compat/legacySimulationSession';
 import {
@@ -305,9 +306,10 @@ test('legacy GraphIR compilation remains a compat wrapper over compiled Agent ru
   const document = createDefaultGraphIRDocument(1);
   const program: LegacyBrainProgram = compileDefaultBrain(document);
 
-  assert.equal(program.legacyGraphIR, document);
   assert.equal(program.inputBindings.length, 3);
   assert.equal(program.outputBindings.length, 3);
+  assert.equal('legacyGraphIR' in (program as LegacyBrainProgram & Record<string, unknown>), false);
+  assert.equal('compiledAgentProgram' in (program as LegacyBrainProgram & Record<string, unknown>), false);
 });
 
 test('simulation session legacy GraphIR compat setter rejects invalid drafts without dropping the last applied AgentIR', () => {
@@ -479,7 +481,7 @@ test('simulation session keeps applied legacy GraphIR compat state coherent when
 
   session.updateAgentParameters({ visionCells: 1 });
 
-  assert.equal(summarizeGraphIRDocument(getCurrentLegacyGraphIRDocument(session)).inputSignalCount, 6);
+  assert.equal(summarizeGraphIRDocument(exportLegacyGraphIRDocument(session)).inputSignalCount, 6);
   assert.equal(session.getCurrentAgentIR().connections.length, 1);
   assert.equal(session.getCurrentAgentIR().connections[0]?.from.nodeId, 'vision-R-0');
   assert.equal(session.getCurrentAgentIR().connections[0]?.to.nodeId, 'neuron-1');
@@ -503,14 +505,14 @@ test('simulation session keeps legacy GraphIR compat state aligned across mode s
   session.setControlMode('snn');
   assert.equal(session.isMainAgentBrainProgramConfigured(), true);
   assert.equal(
-    summarizeGraphIRDocument(getCurrentLegacyGraphIRDocument(session)).inputSignalCount,
+    summarizeGraphIRDocument(exportLegacyGraphIRDocument(session)).inputSignalCount,
     mainAgent.visionCells.length * 3 + 3
   );
 
   session.setControlMode('keyboard');
   session.updateAgentParameters({ visionCells: 24 });
   assert.equal(mainAgent.visionCells.length, 24);
-  assert.deepEqual(summarizeGraphIRDocument(getCurrentLegacyGraphIRDocument(session)), {
+  assert.deepEqual(summarizeGraphIRDocument(exportLegacyGraphIRDocument(session)), {
     inputSignalCount: 75,
     outputSignalCount: 6,
     neuronCount: 2,
@@ -520,7 +522,7 @@ test('simulation session keeps legacy GraphIR compat state aligned across mode s
   session.setControlMode('snn');
   session.updateAgentParameters({ visionCells: 18 });
   assert.equal(mainAgent.visionCells.length, 18);
-  assert.equal(summarizeGraphIRDocument(getCurrentLegacyGraphIRDocument(session)).inputSignalCount, 57);
+  assert.equal(summarizeGraphIRDocument(exportLegacyGraphIRDocument(session)).inputSignalCount, 57);
 
   const agent = createAgent({
     id: mainAgent.id,
@@ -576,13 +578,13 @@ test('simulation session preserves custom legacy GraphIR compat leaf links acros
   assert.equal(session.getCurrentAgentIR().connections[0]?.to.scope, 'bodyOutput');
 
   session.updateAgentParameters({ visionCells: 1 });
-  assert.equal(summarizeGraphIRDocument(getCurrentLegacyGraphIRDocument(session)).inputSignalCount, 6);
+  assert.equal(summarizeGraphIRDocument(exportLegacyGraphIRDocument(session)).inputSignalCount, 6);
   assert.equal(session.getCurrentAgentIR().connections.length, 1);
   assert.equal(session.getCurrentAgentIR().connections[0]?.weight, 2);
 
   session.reset();
   assert.equal(session.getMainAgentControlMode(), 'keyboard');
-  assert.equal(summarizeGraphIRDocument(getCurrentLegacyGraphIRDocument(session)).inputSignalCount, 6);
+  assert.equal(summarizeGraphIRDocument(exportLegacyGraphIRDocument(session)).inputSignalCount, 6);
   assert.equal(session.getCurrentAgentIR().connections.length, 1);
   assert.equal(session.getCurrentAgentIR().connections[0]?.weight, 2);
 });
@@ -859,7 +861,7 @@ test('simulation session legacy GraphIR compat getter preserves the applied brid
   ];
 
   const legacyNamedStatus = setLegacyGraphIRDocument(session, document);
-  const legacyNamedDocument = getCurrentLegacyGraphIRDocument(session);
+  const legacyNamedDocument = exportLegacyGraphIRDocument(session);
 
   assert.equal(legacyNamedStatus.state, 'applied');
   assert.ok(
@@ -985,7 +987,7 @@ test('simulation session legacy GraphIR compat setter rejects drafts that would 
   assert.equal(session.getCurrentAgentIR().connections[0]?.from.nodeId, 'vision-R-0');
 });
 
-test('simulation session legacy GraphIR compat setter rejects custom body bindings that cannot round-trip through compat getter', () => {
+test('simulation session legacy GraphIR compat setter accepts custom body bindings even when compat export cannot round-trip them', () => {
   const session = new SimulationSession({
     visionSystem: new VisionSystem(),
     agentController: new AgentController(),
@@ -1036,10 +1038,18 @@ test('simulation session legacy GraphIR compat setter rejects custom body bindin
   };
 
   const status = setLegacyGraphIRDocument(session, document, body);
-  assert.equal(status.state, 'invalid');
+  assert.equal(status.state, 'applied');
+  const exportAudit = inspectLegacyGraphIRExport(session);
   assert.ok(
-    status.message?.includes('cannot preserve full BodyIR input rule semantics') ||
-      status.message?.includes('cannot preserve full BodyIR output rule semantics')
+    exportAudit.issues.some((issue) => issue.message.includes('cannot preserve full BodyIR input rule semantics')) ||
+      exportAudit.issues.some((issue) => issue.message.includes('cannot preserve full BodyIR output rule semantics'))
+  );
+  assert.throws(
+    () => exportLegacyGraphIRDocument(session),
+    (error: unknown) =>
+      error instanceof Error &&
+      (error.message.includes('cannot preserve full BodyIR input rule semantics') ||
+        error.message.includes('cannot preserve full BodyIR output rule semantics'))
   );
 });
 
@@ -1105,7 +1115,7 @@ test('simulation session legacy GraphIR compat getter rejects applied AgentIR bo
 
   assert.equal(status.state, 'applied');
   assert.throws(
-    () => getCurrentLegacyGraphIRDocument(session),
+    () => exportLegacyGraphIRDocument(session),
     (error: unknown) =>
       error instanceof Error &&
       error.message.includes('cannot preserve full BodyIR input rule semantics')
@@ -1143,7 +1153,7 @@ test('simulation session legacy GraphIR compat getter preserves explicit neuron 
 
   assert.equal(appliedStatus.state, 'applied');
 
-  const document = getCurrentLegacyGraphIRDocument(session);
+  const document = exportLegacyGraphIRDocument(session);
   const compatNeuron = getCoreNeuronGroup(document).children.find(
     (node): node is NeuronNode => node.kind === 'neuron' && node.id === 'neuron-1'
   );
