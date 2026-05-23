@@ -100,9 +100,12 @@ const auditLegacyCompatBridge = (compatBridge: LegacyGraphBridgeResult): AgentVa
 };
 
 const createLegacyCompatSinkAudit = (
-  agent: ReturnType<typeof createAgentIRFromLegacyGraphDetailed>['agent']
+  agent: ReturnType<typeof createAgentIRFromLegacyGraphDetailed>['agent'],
+  availableVisionCellCount?: number
 ): { compatBridge: LegacyGraphBridgeResult; issues: AgentValidationIssue[] } => {
-  const compatBridge = createLegacyGraphBridgeFromAgent(agent);
+  const compatBridge = createLegacyGraphBridgeFromAgent(agent, {
+    visionCellCount: availableVisionCellCount,
+  });
   return {
     compatBridge,
     issues: auditLegacyCompatBridge(compatBridge),
@@ -143,7 +146,10 @@ const auditLegacyGraphIRDocumentOnlyImport = (document: GraphIRDocument): AgentV
 export const inspectLegacyGraphIRExport = (
   target: LegacySimulationSessionCompatTarget
 ): { compatBridge: LegacyGraphBridgeResult; issues: AgentValidationIssue[] } =>
-  createLegacyCompatSinkAudit(getLegacySimulationSessionAdapter(target).getCurrentAgentIR());
+  createLegacyCompatSinkAudit(
+    getLegacySimulationSessionAdapter(target).getCurrentAgentIR(),
+    getLegacySimulationSessionAdapter(target).getAvailableVisionCellCount()
+  );
 
 export const setLegacyGraphIRDocument = (
   target: LegacySimulationSessionCompatTarget,
@@ -210,7 +216,7 @@ export const setLegacyGraphIRDocument = (
     ]);
   }
 
-  const exportAudit = createLegacyCompatSinkAudit(nextAgent);
+  const exportAudit = createLegacyCompatSinkAudit(nextAgent, visionCells);
   if (exportAudit.issues.length > 0) {
     return createInvalidCompatStatus(session, exportAudit.issues);
   }

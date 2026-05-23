@@ -23,24 +23,22 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 
 const createAgentLibraryId = (): string => `agent-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-const normalizeCanonicalVisionCellCount = (agent: AgentIR): AgentIR => {
-  const canonicalVisionCellCount = Math.max(0, Math.floor(agent.body.visionCellCount));
-  return {
+const stripNonCanonicalLayoutState = (agent: AgentIR): AgentIR => {
+  const nextAgent: AgentIR = {
     ...agent,
     body: {
-      ...agent.body,
-      visionCellCount: canonicalVisionCellCount,
+      version: 1,
+      inputRules: [...agent.body.inputRules],
+      outputRules: [...agent.body.outputRules],
     },
   };
-};
 
-const stripNonCanonicalLayoutState = (agent: AgentIR): AgentIR => {
   if (!agent.layout) {
-    return agent;
+    return nextAgent;
   }
 
   return {
-    ...agent,
+    ...nextAgent,
     layout: {
       version: 1,
       nodes: Object.fromEntries(
@@ -63,11 +61,6 @@ export const isAgentMetadata = (value: unknown): value is AgentMetadataShape =>
   typeof value.createdAt === 'string' &&
   typeof value.updatedAt === 'string';
 
-const hasAcceptableBodyVisionCellCount = (body: Record<string, unknown>): boolean =>
-  typeof body.visionCellCount === 'number' &&
-  Number.isFinite(body.visionCellCount) &&
-  body.visionCellCount >= 0;
-
 export const isValidBrainLibraryAgentPayload = (
   agent: unknown
 ): agent is AgentIR =>
@@ -76,7 +69,6 @@ export const isValidBrainLibraryAgentPayload = (
   isAgentMetadata(agent.metadata) &&
   isObject(agent.body) &&
   agent.body.version === 1 &&
-  hasAcceptableBodyVisionCellCount(agent.body) &&
   Array.isArray(agent.body.inputRules) &&
   agent.body.inputRules.every(
     (rule) =>
@@ -174,10 +166,10 @@ export const normalizeCanonicalBrainLibraryRecord = (
 ): BrainLibraryRecord => {
   const metadata = metadataOverride ?? { ...agent.metadata };
   const normalizedAgent = stripNonCanonicalLayoutState(
-    normalizeCanonicalVisionCellCount({
+    {
       ...agent,
       metadata,
-    })
+    }
   );
 
   return {

@@ -175,11 +175,11 @@ const resolveBodyOutputSemantic = (body: BodyIR, nodeId: string): string => {
 
 const compareCompatBodySemantics = (
   agent: AgentIR,
-  compatBody: LegacyBodyDefinition
+  compatBody: LegacyBodyDefinition,
+  visionCellCount: number
 ): string[] => {
   const losses: string[] = [];
   const rebuiltBody = buildBodyIRFromCompatBody(compatBody);
-  const visionCellCount = deriveAgentIRVisionCellCount(agent);
   const buildRepresentativeNodeIdFromPattern = (pattern: string): string | null => {
     const source = pattern.startsWith('^') ? pattern.slice(1) : pattern;
     const normalized = source.endsWith('$') ? source.slice(0, -1) : source;
@@ -293,7 +293,10 @@ const compareCompatBodySemantics = (
   return losses;
 };
 
-export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBridgeResult => {
+export const createLegacyGraphBridgeFromAgent = (
+  agent: AgentIR,
+  options?: { visionCellCount?: number }
+): LegacyGraphBridgeResult => {
   const visionCellIds = new Set<number>();
   for (const connection of agent.connections) {
     if (connection.from.scope !== 'bodyInput') {
@@ -307,14 +310,14 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
     visionCellIds.add(Number.parseInt(match[2], 10));
   }
 
-  const visionCells = Math.max(
+  const visionCells = options?.visionCellCount ?? Math.max(
     deriveAgentIRVisionCellCount(agent),
     visionCellIds.size > 0 ? Math.max(...visionCellIds) + 1 : 0,
     1
   );
   const nextDocument = createDefaultGraphIRDocument(visionCells);
   const nextBody = buildCompatBodyFromAgent(agent, visionCells);
-  const documentOnlyLosses = compareCompatBodySemantics(agent, nextBody);
+  const documentOnlyLosses = compareCompatBodySemantics(agent, nextBody, visionCells);
   const defaultRootGroup = nextDocument.root.children.find(
     (node): node is NeuronGroupNode => node.kind === 'neuron-group' && node.id === LEGACY_ROOT_GROUP_ID
   );

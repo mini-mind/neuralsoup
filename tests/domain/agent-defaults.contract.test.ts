@@ -9,7 +9,6 @@ test('vision-action host seed AgentIR is valid and exposes vision-aligned body a
   const agent = createVisionActionSeedAgentIR(4, 'Seed Agent');
 
   assert.equal(agent.metadata.name, 'Seed Agent');
-  assert.equal(agent.body.visionCellCount, 4);
   assert.deepEqual(
     agent.body.inputRules.map((rule) => rule.id),
     ['vision-inputs']
@@ -19,7 +18,7 @@ test('vision-action host seed AgentIR is valid and exposes vision-aligned body a
     ['motor-outputs']
   );
   assert.deepEqual(validateAgentIR(agent, WORLD_REGISTRY), []);
-  assert.deepEqual(summarizeAgentIR(agent, WORLD_REGISTRY), {
+  assert.deepEqual(summarizeAgentIR(agent, WORLD_REGISTRY, 4), {
     inputSignalCount: 12,
     outputSignalCount: 3,
     neuronCount: 2,

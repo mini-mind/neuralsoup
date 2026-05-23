@@ -16,7 +16,6 @@ const createTestAgent = (): AgentIR => ({
   },
   body: {
     version: 1,
-    visionCellCount: 0,
     inputRules: [],
     outputRules: [],
   },
@@ -157,7 +156,6 @@ test('agent graph root brain child scope projects boundary adapters without prox
       decayPerSecond: 4,
     },
   ];
-  agent.body.visionCellCount = 1;
   agent.connections = [
     ...agent.connections,
     {
@@ -191,6 +189,7 @@ test('agent graph root brain child scope projects boundary adapters without prox
     navigationPath: [agent.brain.rootContainerId],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    projectedVisionCellCount: 1,
     worldRegistry: WORLD_REGISTRY,
   });
 
@@ -221,7 +220,6 @@ test('agent graph root scope exposes canonical body endpoints even before any co
       decayPerSecond: 4,
     },
   ];
-  agent.body.visionCellCount = 1;
   agent.layout = {
     version: 1,
     nodes: {
@@ -248,6 +246,7 @@ test('agent graph root scope exposes canonical body endpoints even before any co
     navigationPath: [],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    projectedVisionCellCount: 1,
     worldRegistry: WORLD_REGISTRY,
   });
   const inputAdapter = rootView.nodes.find((node) => node.id === 'input-adapter');
@@ -265,6 +264,7 @@ test('agent graph root scope exposes canonical body endpoints even before any co
     navigationPath: ['input-adapter'],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    projectedVisionCellCount: 1,
     worldRegistry: WORLD_REGISTRY,
   });
   const outputScopeView = buildAgentGraphViewModel({
@@ -272,6 +272,7 @@ test('agent graph root scope exposes canonical body endpoints even before any co
     navigationPath: ['output-adapter'],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    projectedVisionCellCount: 1,
     worldRegistry: WORLD_REGISTRY,
   });
 
@@ -303,7 +304,6 @@ test('agent graph root adapters report installed counts from compiled runtime tr
       decayPerSecond: 4,
     },
   ];
-  agent.body.visionCellCount = 1;
   agent.connections = [
     ...agent.connections,
     {
@@ -325,6 +325,7 @@ test('agent graph root adapters report installed counts from compiled runtime tr
     navigationPath: [],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    projectedVisionCellCount: 1,
     worldRegistry: WORLD_REGISTRY,
   });
 
@@ -372,14 +373,15 @@ test('agent graph view and body preview share the same canonical endpoint expans
       decayPerSecond: 2,
     },
   ];
-  agent.body.visionCellCount = 2;
+  const projectedVisionCellCount = 2;
 
-  const preview = buildAgentBodyRulePreviewModel(agent, WORLD_REGISTRY);
+  const preview = buildAgentBodyRulePreviewModel(agent, WORLD_REGISTRY, projectedVisionCellCount);
   const inputScopeView = buildAgentGraphViewModel({
     agent,
     navigationPath: ['input-adapter'],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    projectedVisionCellCount,
     worldRegistry: WORLD_REGISTRY,
   });
   const outputScopeView = buildAgentGraphViewModel({
@@ -387,6 +389,7 @@ test('agent graph view and body preview share the same canonical endpoint expans
     navigationPath: ['output-adapter'],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    projectedVisionCellCount,
     worldRegistry: WORLD_REGISTRY,
   });
 
@@ -418,7 +421,7 @@ test('agent graph view marks canonical-only body endpoints that are not installe
       decayPerSecond: 2,
     },
   ];
-  agent.body.visionCellCount = 1;
+  const projectedVisionCellCount = 1;
   agent.connections = [
     {
       id: 'sensor-link',
@@ -433,6 +436,7 @@ test('agent graph view marks canonical-only body endpoints that are not installe
     navigationPath: ['input-adapter'],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    projectedVisionCellCount,
     worldRegistry: WORLD_REGISTRY,
   });
 

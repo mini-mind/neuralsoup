@@ -5,13 +5,11 @@ import { WorldManager } from '../engine/WorldManager';
 import {
   AgentValidationError,
   compileAgentIR,
-  reconcileAgentIRVisionCells,
   summarizeCompiledAgentProgram,
   type AgentValidationIssue,
   type AgentIR,
   type WorldRegistry,
 } from '../domain/brain';
-import { createVisionActionSeedAgentIR } from '../host';
 import type { Agent, SimulationState, World } from '../types/simulation';
 import type { AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../types/agentRuntime';
 import {
@@ -31,6 +29,8 @@ export interface SimulationSessionDependencies {
   worldManager: WorldManager;
   collisionDetector: CollisionDetector;
   worldRegistry: WorldRegistry;
+  createInitialAgentIR: (visionCells: number) => AgentIR;
+  reconcileAgentIRToWorld: (agent: AgentIR, visionCells: number) => AgentIR;
 }
 
 export interface SimulationSessionOptions {
@@ -50,10 +50,13 @@ export class SimulationSession {
   private readonly worldManager: WorldManager;
   private readonly collisionDetector: CollisionDetector;
   private readonly worldRegistry: WorldRegistry;
+  private readonly createInitialAgentIR: (visionCells: number) => AgentIR;
+  private readonly reconcileAgentIRToWorld: (agent: AgentIR, visionCells: number) => AgentIR;
   private readonly config: WorldConfig;
 
   private currentControlMode: SimulationControlMode;
   private currentAgentIR: AgentIR;
+  private appliedAgentIR: AgentIR;
   private agentRuntimeStatus: AgentRuntimeStatus;
   private lastAppliedSummary: AgentRuntimeStatus['appliedSummary'];
   private keyboardInputState: SimulationSessionInputState = {
@@ -72,13 +75,16 @@ export class SimulationSession {
     this.worldManager = dependencies.worldManager;
     this.collisionDetector = dependencies.collisionDetector;
     this.worldRegistry = dependencies.worldRegistry;
+    this.createInitialAgentIR = dependencies.createInitialAgentIR;
+    this.reconcileAgentIRToWorld = dependencies.reconcileAgentIRToWorld;
     this.config = createWorldConfig({
       width: this.worldManager.width,
       height: this.worldManager.height,
       ...options.world
     });
     this.currentControlMode = options.initialControlMode ?? 'keyboard';
-    this.currentAgentIR = createVisionActionSeedAgentIR(this.visionSystem.getVisionCells(), '默认 Agent');
+    this.currentAgentIR = this.createInitialAgentIR(this.visionSystem.getVisionCells());
+    this.appliedAgentIR = this.currentAgentIR;
     this.agentRuntimeStatus = this.createAppliedAgentRuntimeStatus(this.currentAgentIR);
     this.lastAppliedSummary = this.agentRuntimeStatus.appliedSummary;
     this.state = createEmptyWorldState(this.config, this.worldManager.getWorldBounds());
@@ -179,7 +185,8 @@ export class SimulationSession {
     const mainAgent = this.getMainAgent();
 
     try {
-      const compiledProgram = this.applyAgentIR(agent, mainAgent);
+      const appliedAgent = mainAgent ? this.reconcileAgentIRToWorld(agent, mainAgent.visionCells.length) : agent;
+      const compiledProgram = this.applyCompiledAgentIR(agent, appliedAgent, mainAgent);
       return this.setAppliedAgentRuntimeStatusFromProgram(compiledProgram);
     } catch (error) {
       if (error instanceof AgentValidationError) {
@@ -207,6 +214,10 @@ export class SimulationSession {
 
   public getCurrentAgentIR(): AgentIR {
     return this.currentAgentIR;
+  }
+
+  public getAppliedAgentIR(): AgentIR {
+    return this.appliedAgentIR;
   }
 
   public getVisionCellCount(): number {
@@ -266,22 +277,24 @@ export class SimulationSession {
       return;
     }
 
-    const nextAgent = reconcileAgentIRVisionCells(this.currentAgentIR, mainAgent.visionCells.length, this.worldRegistry);
-    const compiledProgram = this.applyAgentIR(nextAgent, mainAgent);
+    const nextAppliedAgent = this.reconcileAgentIRToWorld(this.currentAgentIR, mainAgent.visionCells.length);
+    const compiledProgram = this.applyCompiledAgentIR(this.currentAgentIR, nextAppliedAgent, mainAgent);
     this.setAppliedAgentRuntimeStatusFromProgram(compiledProgram);
   }
 
-  private applyAgentIR(
-    agent: AgentIR,
+  private applyCompiledAgentIR(
+    canonicalAgent: AgentIR,
+    appliedAgent: AgentIR,
     mainAgent: Agent | null
   ): ReturnType<typeof compileAgentIR> {
-    const compiledProgram = compileAgentIR(agent, this.worldRegistry);
+    const compiledProgram = compileAgentIR(appliedAgent, this.worldRegistry);
 
     if (mainAgent) {
       this.agentController.installAgentProgram(mainAgent.id, compiledProgram);
     }
 
-    this.currentAgentIR = agent;
+    this.currentAgentIR = canonicalAgent;
+    this.appliedAgentIR = appliedAgent;
     return compiledProgram;
   }
 

@@ -13,13 +13,11 @@ import { WorldManager } from './WorldManager';
 import { CollisionDetector } from './CollisionDetector';
 import { SimulationSession } from '../runtime/SimulationSession';
 import { type SimulationControlMode } from '../domain/world';
-import type { AgentIR, WorldRegistry } from '../domain/brain';
+import type { AgentIR } from '../domain/brain';
 import type { AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../types/agentRuntime';
 import {
-  createVisionActionCommandApplier,
-  createVisionActionInputSignalProvider,
-  createVisionActionOutputAdapter,
-  VISION_ACTION_MOVEMENT_BINDINGS,
+  VISION_ACTION_HOST_PROFILE,
+  type HostRuntimeProfile,
 } from '../host';
 
 export type SimulationLifecycleState = 'idle' | 'running' | 'paused';
@@ -59,7 +57,7 @@ export class SimulationEngine {
 
   constructor(
     app: PIXI.Application,
-    worldRegistry: WorldRegistry,
+    hostProfile: HostRuntimeProfile = VISION_ACTION_HOST_PROFILE,
     initialWidth: number = 1600,
     initialHeight: number = 1200
   ) {
@@ -67,10 +65,10 @@ export class SimulationEngine {
     this.renderer = new WorldRenderer(app);
     this.visionSystem = new VisionSystem();
     this.agentController = new AgentController(
-      createVisionActionOutputAdapter(),
-      createVisionActionInputSignalProvider(),
-      createVisionActionCommandApplier(),
-      VISION_ACTION_MOVEMENT_BINDINGS
+      hostProfile.createOutputAdapter(),
+      hostProfile.createInputSignalProvider(),
+      hostProfile.createCommandApplier(),
+      hostProfile.movementBindings
     );
     this.worldManager = new WorldManager(initialWidth, initialHeight);
     this.collisionDetector = new CollisionDetector();
@@ -80,7 +78,9 @@ export class SimulationEngine {
         agentController: this.agentController,
         worldManager: this.worldManager,
         collisionDetector: this.collisionDetector,
-        worldRegistry,
+        worldRegistry: hostProfile.worldRegistry,
+        createInitialAgentIR: (visionCells) => hostProfile.createSeedAgentIR(visionCells, '默认 Agent'),
+        reconcileAgentIRToWorld: hostProfile.reconcileAgentIR,
       },
       {
         world: {

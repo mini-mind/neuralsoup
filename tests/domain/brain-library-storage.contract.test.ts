@@ -56,7 +56,7 @@ test('Brain Library storage saves and loads v1 record payloads', () => {
   assert.equal(JSON.parse(rawValue).storageVersion, 1);
   assert.equal('packageVersion' in JSON.parse(rawValue).brains[0], false);
   assert.equal('metadata' in JSON.parse(rawValue).brains[0], false);
-  assert.equal(JSON.parse(rawValue).brains[0].agent.body.visionCellCount, 1);
+  assert.equal('visionCellCount' in JSON.parse(rawValue).brains[0].agent.body, false);
 
   const loaded = loadBrainLibraryWithStatus();
   assert.equal(loaded.status.state, 'ok');
@@ -203,7 +203,7 @@ test('Brain Library storage rewrites canonical records into normalized AgentIR s
   const persisted = JSON.parse(storage.getItem(BRAIN_LIBRARY_STORAGE_KEY) ?? 'null') as {
     brains: Array<{ agent: { layout?: { nodes?: Record<string, Record<string, unknown>>; viewportByContainerId?: unknown } } }>;
   };
-  assert.equal((persisted.brains[0] as { agent: { body: { visionCellCount: number } } }).agent.body.visionCellCount, 2);
+  assert.equal('visionCellCount' in ((persisted.brains[0] as { agent: { body: Record<string, unknown> } }).agent.body), false);
   assert.equal('size' in (persisted.brains[0]?.agent.layout?.nodes?.['neuron-1'] ?? {}), false);
   assert.equal('expanded' in (persisted.brains[0]?.agent.layout?.nodes?.['neuron-1'] ?? {}), false);
   assert.equal('viewportByContainerId' in (persisted.brains[0]?.agent.layout ?? {}), false);
@@ -233,9 +233,16 @@ test('canonical Brain Library normalization strips legacy layout viewport fields
   assert.equal('viewportByContainerId' in (normalized.agent.layout ?? {}), false);
 });
 
-test('Brain Library canonical record storage rewrites leaked legacy body visionCellCount on canonical payload load', () => {
+test('Brain Library canonical record storage strips leaked legacy body visionCellCount on canonical payload load', () => {
   const storage = installMemoryLocalStorage();
   const brain = createVisionActionSeedAgentIR(2, 'Canonical Legacy Leak');
+  const leakedBrain = {
+    ...brain,
+    body: {
+      ...brain.body,
+      visionCellCount: 2,
+    },
+  };
 
   storage.setItem(
     BRAIN_LIBRARY_STORAGE_KEY,
@@ -244,7 +251,7 @@ test('Brain Library canonical record storage rewrites leaked legacy body visionC
       savedAt: new Date().toISOString(),
       brains: [
         {
-          agent: brain,
+          agent: leakedBrain,
         },
       ],
     })
@@ -259,7 +266,7 @@ test('Brain Library canonical record storage rewrites leaked legacy body visionC
   };
   assert.equal('packageVersion' in persisted.brains[0], false);
   assert.equal('metadata' in persisted.brains[0], false);
-  assert.equal(persisted.brains[0].agent.body.visionCellCount, 2);
+  assert.equal('visionCellCount' in persisted.brains[0].agent.body, false);
 });
 
 test('renameBrainLibraryItem updates canonical agent metadata only once', () => {

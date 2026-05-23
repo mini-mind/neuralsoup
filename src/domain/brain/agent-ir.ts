@@ -26,7 +26,6 @@ export interface BodyOutputRule {
 
 export interface BodyIR {
   version: 1;
-  visionCellCount: number;
   inputRules: BodyInputRule[];
   outputRules: BodyOutputRule[];
 }
@@ -105,7 +104,6 @@ export interface BodyInputNodeRuntime {
   id: string;
   source: string;
   worldPort: string;
-  cellIndex?: number;
   scale: number;
 }
 
@@ -116,11 +114,6 @@ export interface BodyOutputNodeRuntime {
   worldPort: string;
   decayPerSecond: number;
 }
-
-const normalizeVisionCellCount = (value: unknown): number | null =>
-  typeof value === 'number' && Number.isFinite(value) && value >= 0
-    ? Math.max(0, Math.floor(value))
-    : null;
 
 const applyRuleTemplate = (template: string, match: RegExpExecArray): string =>
   template.replace(/\$(\d+)/g, (_token, rawGroupIndex: string) => {
@@ -150,19 +143,4 @@ export const resolveBodyInputVisionCellIndex = (
   const source = applyRuleTemplate(matches[0].rule.sourceTemplate, matches[0].match);
   const binding = registry.resolveInputBinding(source);
   return binding?.cellIndex ?? null;
-};
-
-export const withVisionCellCount = (
-  agent: AgentIR,
-  visionCellCount: number
-): AgentIR => {
-  const normalizedVisionCellCount = Math.max(0, Math.floor(visionCellCount));
-
-  return {
-    ...agent,
-    body: {
-      ...agent.body,
-      visionCellCount: normalizeVisionCellCount(normalizedVisionCellCount) ?? 0,
-    },
-  };
 };

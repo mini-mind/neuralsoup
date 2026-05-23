@@ -4,8 +4,12 @@ import { resolveAgentBodyEndpointIds } from './agent-body-rules';
 import { compileAgentIR } from './agent-compiler';
 import type { WorldRegistry } from './world-registry';
 
-export const summarizeAgentIR = (agent: AgentIR, registry: WorldRegistry): AgentIRSummary => {
-  const endpointIds = resolveAgentBodyEndpointIds(agent, registry);
+export const summarizeAgentIR = (
+  agent: AgentIR,
+  registry: WorldRegistry,
+  projectedVisionCellCount?: number
+): AgentIRSummary => {
+  const endpointIds = resolveAgentBodyEndpointIds(agent, registry, projectedVisionCellCount);
 
   return {
     inputSignalCount: endpointIds.bodyInputNodeIds.length,

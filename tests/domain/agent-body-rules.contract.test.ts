@@ -20,7 +20,6 @@ const createRuleDrivenAgent = (): AgentIR =>
     },
     body: {
       version: 1,
-      visionCellCount: 3,
       inputRules: [
         {
           id: 'vision-cells',
@@ -87,7 +86,7 @@ const createRuleDrivenAgent = (): AgentIR =>
   });
 
 test('buildAgentBodyRulePreviewModel projects input and output endpoint previews by rule', () => {
-  const preview = buildAgentBodyRulePreviewModel(createRuleDrivenAgent(), WORLD_REGISTRY);
+  const preview = buildAgentBodyRulePreviewModel(createRuleDrivenAgent(), WORLD_REGISTRY, 3);
 
   assert.deepEqual(preview.input.previewsByRuleId['vision-cells'], [
     { nodeId: 'sensor-B-0', resolved: 'vision.B.0' },
@@ -109,7 +108,7 @@ test('buildAgentBodyRulePreviewModel projects input and output endpoint previews
 });
 
 test('buildAgentBodyRulePreviewModel enumerates canonical vision coverage without layout markers', () => {
-  const preview = buildAgentBodyRulePreviewModel(createRuleDrivenAgent(), WORLD_REGISTRY);
+  const preview = buildAgentBodyRulePreviewModel(createRuleDrivenAgent(), WORLD_REGISTRY, 3);
 
   assert.equal(preview.input.endpointNodeIds.includes('sensor-R-0'), true);
   assert.equal(preview.input.endpointNodeIds.includes('sensor-G-1'), true);
@@ -121,7 +120,6 @@ test('buildAgentBodyRulePreviewModel summarizes compile errors from invalid rege
     ...createRuleDrivenAgent(),
     body: {
       version: 1,
-      visionCellCount: createRuleDrivenAgent().body.visionCellCount,
       inputRules: [
         {
           id: 'broken-input-regex',
@@ -147,7 +145,7 @@ test('buildAgentBodyRulePreviewModel summarizes compile errors from invalid rege
     },
   };
 
-  const preview = buildAgentBodyRulePreviewModel(invalidAgent, WORLD_REGISTRY);
+  const preview = buildAgentBodyRulePreviewModel(invalidAgent, WORLD_REGISTRY, 3);
 
   assert.equal(
     preview.issues.some(
@@ -296,7 +294,7 @@ test('buildAgentBodyRulePreviewModel summarizes conflicts and unmatched endpoint
 
 test('compiled body endpoint projection only includes referenced endpoints while canonical preview keeps full coverage', () => {
   const agent = createRuleDrivenAgent();
-  const preview = buildAgentBodyRulePreviewModel(agent, WORLD_REGISTRY);
+  const preview = buildAgentBodyRulePreviewModel(agent, WORLD_REGISTRY, 3);
   const compiledEndpointIds = resolveCompiledAgentBodyEndpointIds(agent, WORLD_REGISTRY);
 
   assert.deepEqual(

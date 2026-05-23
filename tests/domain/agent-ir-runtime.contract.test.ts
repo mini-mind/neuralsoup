@@ -22,7 +22,6 @@ const createRuleDrivenAgent = (): AgentIR =>
     },
     body: {
       version: 1,
-      visionCellCount: 3,
       inputRules: [
         {
           id: 'vision-cells',
@@ -91,14 +90,13 @@ const createRuleDrivenAgent = (): AgentIR =>
 test('compileAgentIR resolves BodyIR regex rules into runtime ports instead of relying on legacy node ids', () => {
   const program = compileAgentIR(createRuleDrivenAgent(), WORLD_REGISTRY);
 
-  assert.equal(program.inputPorts.length, 9);
+  assert.equal(program.inputPorts.length, 1);
   assert.deepEqual(
     program.inputPorts.find((port) => port.id === 'sensor-G-2'),
     {
       id: 'sensor-G-2',
       source: 'vision.G.2',
       worldPort: 'vision',
-      cellIndex: 2,
       scale: 2,
     }
   );
@@ -114,7 +112,7 @@ test('compileAgentIR resolves BodyIR regex rules into runtime ports instead of r
     }
   );
   assert.deepEqual(program.summary, {
-    inputSignalCount: 9,
+    inputSignalCount: 1,
     outputSignalCount: 3,
     neuronCount: 1,
     leafLinkCount: 2,

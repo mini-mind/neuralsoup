@@ -2,13 +2,12 @@ import React, { useState, useCallback, useEffect, useMemo, useRef, type CSSPrope
 import SimulationCanvas from './components/SimulationCanvas';
 import {
   buildAgentBodyRulePreviewModel,
-  reconcileAgentIRVisionCells,
   resolveCompiledAgentBodyEndpointIds,
   summarizeAgentIR,
   validateAgentIR,
   type AgentIR,
 } from './domain/brain';
-import { createVisionActionSeedAgentIR, createVisionActionWorldRegistry } from './host';
+import { VISION_ACTION_HOST_PROFILE } from './host';
 import type { SimulationControlMode } from './domain/world';
 import type { SimulationLifecycleState } from './engine/SimulationEngine';
 import type { AgentDraftStatus, AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from './types/agentRuntime';
@@ -85,7 +84,8 @@ const clampSplitRatio = (containerSize: number, ratio: number): number => {
   const maxRatio = (containerSize - MIN_PANEL_SIZE - SPLIT_DIVIDER_SIZE) / containerSize;
   return clamp(ratio, minRatio, maxRatio);
 };
-const DEFAULT_WORLD_REGISTRY = createVisionActionWorldRegistry();
+const DEFAULT_HOST_PROFILE = VISION_ACTION_HOST_PROFILE;
+const DEFAULT_WORLD_REGISTRY = DEFAULT_HOST_PROFILE.worldRegistry;
 
 const createInitialAgentRuntimeStatus = (agent: AgentIR): AgentRuntimeStatus => ({
   state: 'applied',
@@ -154,11 +154,9 @@ const applyBrainRecordToEditorState = (
     setDraftAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
     setDraftBodyDocument: React.Dispatch<React.SetStateAction<AgentIR['body']>>;
     setDraftGraphStatusOverride: React.Dispatch<React.SetStateAction<AgentDraftStatus | null>>;
-    setAgentParameters: React.Dispatch<React.SetStateAction<AgentParameters>>;
     setEditorTab: React.Dispatch<React.SetStateAction<EditorTab>>;
   }
 ): void => {
-  const bodyVisionCells = brain.agent.body.visionCellCount;
   options.resetRuntimeForBrainSwitch();
   options.setIsBrainLibraryOpen(true);
   options.setActiveBrainId(brain.agent.metadata.id);
@@ -167,9 +165,6 @@ const applyBrainRecordToEditorState = (
   options.setDraftAgentDocument(brain.agent);
   options.setDraftBodyDocument(brain.agent.body);
   options.setDraftGraphStatusOverride(null);
-  options.setAgentParameters((current) =>
-    current.visionCells === bodyVisionCells ? current : { ...current, visionCells: bodyVisionCells }
-  );
   options.setEditorTab((currentTab) => (currentTab === 'graph' ? 'graph' : currentTab));
 };
 
@@ -194,7 +189,7 @@ const applyBrainRecordIdentityToCurrentState = (
 
 const App: React.FC = () => {
   const initialBrainLibraryLoad = useRef(loadBrainLibraryWithStatus()).current;
-  const initialAgentDocument = createVisionActionSeedAgentIR(36, '当前 Agent');
+  const initialAgentDocument = DEFAULT_HOST_PROFILE.createSeedAgentIR(36, '当前 Agent');
   const isE2ETestMode = import.meta.env.MODE === 'test' || import.meta.env.VITE_E2E === 'true';
   const [runState, setRunState] = useState<SimulationLifecycleState>('idle');
   const [requestedLifecycleState, setRequestedLifecycleState] = useState<SimulationLifecycleState>('idle');
@@ -241,6 +236,7 @@ const App: React.FC = () => {
   const requestedLifecycleStateRef = useRef<SimulationLifecycleState>('idle');
   const draftAgentDocumentRef = useRef(draftAgentDocument);
   const draftBodyDocumentRef = useRef(draftBodyDocument);
+  const draftProjectedVisionCellCount = draftAgentParameters.visionCells;
   const bodyPreviewAgent = useMemo<AgentIR>(
     () => ({
       ...draftAgentDocument,
@@ -273,8 +269,8 @@ const App: React.FC = () => {
   const hasUnsavedDraftChanges =
     hasDraftEditingChanges || hasPendingRuntimeInstall || bodyDraftStatus.hasChanges;
   const bodyRulePreviewModel = useMemo(
-    () => buildAgentBodyRulePreviewModel(bodyPreviewAgent, DEFAULT_WORLD_REGISTRY),
-    [bodyPreviewAgent]
+    () => buildAgentBodyRulePreviewModel(bodyPreviewAgent, DEFAULT_WORLD_REGISTRY, draftProjectedVisionCellCount),
+    [bodyPreviewAgent, draftProjectedVisionCellCount]
   );
   const bodyRulePreview = useMemo<BodyIRPreviewData>(() => {
     const inputRuleById = new Map(draftBodyDocument.inputRules.map((rule, index) => [rule.id, { rule, index }]));
@@ -301,12 +297,12 @@ const App: React.FC = () => {
     const compiledEndpointIds = resolveCompiledAgentBodyEndpointIds(bodyPreviewAgent, DEFAULT_WORLD_REGISTRY);
 
     return {
-      canonicalSummary: `canonical coverage ${draftBodyDocument.visionCellCount} cells；输入 endpoint ${bodyRulePreviewModel.input.endpointNodeIds.length} 个，输出 endpoint ${bodyRulePreviewModel.output.endpointNodeIds.length} 个。`,
+      canonicalSummary: `host projected coverage ${draftProjectedVisionCellCount} cells；输入 endpoint ${bodyRulePreviewModel.input.endpointNodeIds.length} 个，输出 endpoint ${bodyRulePreviewModel.output.endpointNodeIds.length} 个。`,
       compiledSummary: `compiled runtime shape：输入 endpoint ${compiledEndpointIds.bodyInputNodeIds.length} 个，输出 endpoint ${compiledEndpointIds.bodyOutputNodeIds.length} 个。`,
       inputMatches,
       outputMatches,
     };
-  }, [bodyRulePreviewModel, draftBodyDocument, bodyPreviewAgent]);
+  }, [bodyRulePreviewModel, bodyPreviewAgent, draftProjectedVisionCellCount]);
   const bodyRuleValidation = useMemo<BodyIRValidationMessage[]>(() => {
     const inputRuleIndexById = new Map(draftBodyDocument.inputRules.map((rule, index) => [rule.id, index]));
     const outputRuleIndexById = new Map(draftBodyDocument.outputRules.map((rule, index) => [rule.id, index]));
@@ -577,65 +573,32 @@ const App: React.FC = () => {
 
   const handleAgentParametersApply = useCallback((params: AgentParameters) => {
     setAgentParameters((current) => (areAgentParametersEqual(current, params) ? current : params));
-    setDraftBodyDocument((currentBody) =>
-      currentBody.visionCellCount === params.visionCells
-        ? currentBody
-        : {
-            ...currentBody,
-            visionCellCount: params.visionCells,
-          }
-    );
     handleAgentChange(
-      (currentAgent) => reconcileAgentIRVisionCells(currentAgent, params.visionCells, DEFAULT_WORLD_REGISTRY),
+      (currentAgent) => DEFAULT_HOST_PROFILE.reconcileAgentIR(currentAgent, params.visionCells),
       GRAPH_SEMANTIC_CHANGE
     );
   }, [handleAgentChange]);
 
   const handleDraftAgentParametersChange = useCallback<React.Dispatch<React.SetStateAction<AgentParameters>>>((value) => {
-    setDraftAgentParameters((current) => {
-      const next = typeof value === 'function' ? value(current) : value;
-      setDraftBodyDocument((currentBody) =>
-        currentBody.visionCellCount === next.visionCells
-          ? currentBody
-          : {
-              ...currentBody,
-              visionCellCount: next.visionCells,
-            }
-      );
-      return next;
-    });
+    setDraftAgentParameters((current) => (typeof value === 'function' ? value(current) : value));
   }, []);
 
   const handleBodyApply = useCallback(() => {
-    setAgentParameters((current) =>
-      current.visionCells === draftBodyDocument.visionCellCount
-        ? current
-        : { ...current, visionCells: draftBodyDocument.visionCellCount }
-    );
     handleAgentChange(
       (currentAgent) =>
-        reconcileAgentIRVisionCells(
+        DEFAULT_HOST_PROFILE.reconcileAgentIR(
           {
             ...currentAgent,
             body: draftBodyDocument,
           },
-          draftBodyDocument.visionCellCount,
-          DEFAULT_WORLD_REGISTRY
+          agentParameters.visionCells
         ),
       GRAPH_SEMANTIC_CHANGE
     );
-  }, [draftBodyDocument, handleAgentChange]);
+  }, [agentParameters.visionCells, draftBodyDocument, handleAgentChange]);
 
   const handleBodyReset = useCallback(() => {
     setDraftBodyDocument(draftAgentDocumentRef.current.body);
-    setDraftAgentParameters((current) =>
-      current.visionCells === draftAgentDocumentRef.current.body.visionCellCount
-        ? current
-        : {
-            ...current,
-            visionCells: draftAgentDocumentRef.current.body.visionCellCount,
-          }
-    );
   }, []);
 
   const handleAgentRuntimeStatusChange = useCallback((nextStatus: AgentRuntimeStatus) => {
@@ -738,7 +701,6 @@ const App: React.FC = () => {
       setDraftAgentDocument,
       setDraftBodyDocument,
       setDraftGraphStatusOverride,
-      setAgentParameters,
       setEditorTab,
     });
   }, [brainLibrary, confirmUnsavedBrainReplacement, resetRuntimeForBrainSwitch]);
@@ -765,7 +727,6 @@ const App: React.FC = () => {
       setDraftAgentDocument,
       setDraftBodyDocument,
       setDraftGraphStatusOverride,
-      setAgentParameters,
       setEditorTab,
     });
   }, [brainLibrary, confirmUnsavedBrainReplacement, resetRuntimeForBrainSwitch]);
@@ -820,7 +781,7 @@ const App: React.FC = () => {
       return;
     }
 
-    const fallbackAgent = createVisionActionSeedAgentIR(agentParameters.visionCells, '当前 Agent');
+    const fallbackAgent = DEFAULT_HOST_PROFILE.createSeedAgentIR(agentParameters.visionCells, '当前 Agent');
     setActiveBrainId(null);
     setCurrentAgentDocument(fallbackAgent);
     setRuntimeInstallRequest(fallbackAgent);
@@ -1036,7 +997,7 @@ const App: React.FC = () => {
         <SimulationCanvas
           width={canvasWidth}
           height={canvasHeight}
-          worldRegistry={DEFAULT_WORLD_REGISTRY}
+          hostProfile={DEFAULT_HOST_PROFILE}
           controlMode={'snn' as Extract<SimulationControlMode, 'keyboard' | 'snn'>}
           runtimeInstallRequest={runtimeInstallRequest}
           agentParameters={agentParameters}
@@ -1109,7 +1070,7 @@ const App: React.FC = () => {
             isActive={editorTab === 'graph'}
             agent={bodyPreviewAgent}
             graphSessionToken={graphEditorSessionToken}
-            visionCells={bodyPreviewAgent.body.visionCellCount}
+            visionCells={draftProjectedVisionCellCount}
             installedSummary={installedGraphSummary}
             worldRegistry={DEFAULT_WORLD_REGISTRY}
             runtimeStatus={agentRuntimeStatus}
@@ -1128,6 +1089,7 @@ const App: React.FC = () => {
               draftAgentParameters={draftAgentParameters}
               body={draftAgentDocument.body}
               draftBody={draftBodyDocument}
+              projectedVisionCellCount={draftProjectedVisionCellCount}
               settingsSection={settingsSection}
               bodyDraftStatus={bodyDraftStatus}
               bodyRulePreview={bodyRulePreview}
@@ -1135,15 +1097,7 @@ const App: React.FC = () => {
               onSettingsSectionChange={setSettingsSection}
               onDraftAgentParametersChange={handleDraftAgentParametersChange}
               onDraftBodyChange={(updater) => {
-                setDraftBodyDocument((currentBody) => {
-                  const nextBody = updater(currentBody);
-                  setDraftAgentParameters((current) =>
-                    current.visionCells === nextBody.visionCellCount
-                      ? current
-                      : { ...current, visionCells: nextBody.visionCellCount }
-                  );
-                  return nextBody;
-                });
+                setDraftBodyDocument((currentBody) => updater(currentBody));
               }}
               onApplyAgentParameters={applyDraftAgentParameters}
               onApplyBody={handleBodyApply}

@@ -12,6 +12,7 @@ export interface LegacySimulationSessionAdapter {
 
 export interface LegacySimulationSessionAdapterRawSession {
   getCurrentAgentIR(): AgentIR;
+  getAppliedAgentIR(): AgentIR;
   getAgentRuntimeStatus(): AgentRuntimeStatus;
   getMainAgent(): Agent | null;
   getVisionCellCount(): number;
@@ -37,7 +38,7 @@ const isLegacySimulationSessionAdapter = (
 export const createLegacySimulationSessionAdapter = (
   session: LegacySimulationSessionAdapterRawSession
 ): LegacySimulationSessionAdapter => ({
-  getCurrentAgentIR: () => session.getCurrentAgentIR(),
+  getCurrentAgentIR: () => session.getAppliedAgentIR(),
   getAppliedAgentSummary: () => session.getAgentRuntimeStatus().appliedSummary,
   getAvailableVisionCellCount: () => session.getMainAgent()?.visionCells.length ?? session.getVisionCellCount(),
   setAgentIR: (agent) => session.setAgentIR(agent),

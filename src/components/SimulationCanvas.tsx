@@ -1,7 +1,8 @@
 import React, { useCallback, useRef, useEffect, useState } from 'react';
 import * as PIXI from '../engine/pixi';
-import type { AgentIR, WorldRegistry } from '../domain/brain';
+import type { AgentIR } from '../domain/brain';
 import { SimulationEngine, type SimulationLifecycleState } from '../engine/SimulationEngine';
+import type { HostRuntimeProfile } from '../host';
 import type { SimulationControlMode } from '../domain/world';
 import type { SimulationState } from '../types/simulation';
 import type { AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../types/agentRuntime';
@@ -21,7 +22,7 @@ interface SimulationCanvasProps {
   resetToken: number;
   width: number;
   height: number;
-  worldRegistry: WorldRegistry;
+  hostProfile: HostRuntimeProfile;
 }
 
 const KEYBOARD_CONTROL_KEYS = ['w', 'a', 'd', 'arrowup', 'arrowleft', 'arrowright'] as const;
@@ -48,7 +49,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   resetToken,
   width,
   height,
-  worldRegistry
+  hostProfile
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<SimulationEngine | null>(null);
@@ -143,7 +144,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
         const fixedWorldWidth = 3000;
         const fixedWorldHeight = 3000;
-        newEngine = new SimulationEngine(newApp, worldRegistry, fixedWorldWidth, fixedWorldHeight);
+        newEngine = new SimulationEngine(newApp, hostProfile, fixedWorldWidth, fixedWorldHeight);
         newEngine.onStatsUpdate = onStatsUpdate;
         newEngine.onLifecycleChange = onLifecycleChange;
         newEngine.onAgentRuntimeStatusChange = onAgentRuntimeStatusChange;
@@ -185,7 +186,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         });
       }
     };
-  }, [onAgentParametersChange, onAgentRuntimeActivityChange, onAgentRuntimeStatusChange, onLifecycleChange, onStatsUpdate, worldRegistry]);
+  }, [hostProfile, onAgentParametersChange, onAgentRuntimeActivityChange, onAgentRuntimeStatusChange, onLifecycleChange, onStatsUpdate]);
 
   useEffect(() => {
     if (!appRef.current) {

@@ -21,7 +21,6 @@ const createRuleDrivenAgent = (): AgentIR =>
         },
         body: {
           version: 1,
-          visionCellCount: 3,
           inputRules: [
             {
               id: 'vision-cells',
@@ -234,7 +233,6 @@ test('legacy graph bridge marks unbridgeable body endpoints as dropped connectio
     ...createRuleDrivenAgent(),
     body: {
       ...createRuleDrivenAgent().body,
-      visionCellCount: createRuleDrivenAgent().body.visionCellCount,
       inputRules: [
         {
           id: 'non-legacy-input',
@@ -254,7 +252,6 @@ test('legacy graph bridge reports document-only losses when BodyIR rules cannot 
     ...createRuleDrivenAgent(),
     body: {
       ...createRuleDrivenAgent().body,
-      visionCellCount: createRuleDrivenAgent().body.visionCellCount,
       inputRules: [
         {
           id: 'custom-input-a',
@@ -319,7 +316,6 @@ test('legacy graph bridge reports document-only losses for unconnected BodyIR al
     ...agent,
     body: {
       ...agent.body,
-      visionCellCount: agent.body.visionCellCount,
       inputRules: [
         {
           id: 'unconnected-input-regex-alias',

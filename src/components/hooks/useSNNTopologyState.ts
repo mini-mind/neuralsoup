@@ -69,6 +69,7 @@ export interface GraphNodePositionUpdate extends GraphPoint {
 interface UseSNNTopologyStateOptions {
   agent: AgentIR;
   worldRegistry: WorldRegistry;
+  projectedVisionCellCount?: number;
   graphSessionToken?: string;
   runtimeActiveNodeIds?: string[];
   onAgentChange?: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
@@ -89,6 +90,7 @@ const areStringArraysEqual = (left: string[], right: string[]) =>
 export const useSNNTopologyState = ({
   agent,
   worldRegistry,
+  projectedVisionCellCount,
   graphSessionToken = 'default',
   runtimeActiveNodeIds = [],
   onAgentChange,
@@ -134,9 +136,10 @@ export const useSNNTopologyState = ({
         navigationPath,
         draftNodePositions,
         runtimeActiveNodeIds,
+        projectedVisionCellCount,
         worldRegistry,
       }),
-    [agent, draftNodePositions, navigationPath, runtimeActiveNodeIds, worldRegistry]
+    [agent, draftNodePositions, navigationPath, projectedVisionCellCount, runtimeActiveNodeIds, worldRegistry]
   );
   const {
     breadcrumbs,

@@ -7,7 +7,6 @@ import type {
   BrainIR,
   BrainNeuronNode,
 } from '../domain/brain/agent-ir';
-import { withVisionCellCount } from '../domain/brain/agent-ir';
 import type {
   GraphIRDocument,
   LeafLink,
@@ -17,7 +16,6 @@ import type {
 import {
   createLegacyBrainLayoutFromDefinition,
   createDefaultLegacyBodyDefinition,
-  getLegacyBodyVisionCellCount,
   type LegacyBodyDefinition,
   type BrainLayoutDocument,
 } from './legacyBrainPackage';
@@ -36,15 +34,7 @@ import {
   getNeuronInitialState,
   getNeuronParams,
 } from './legacyGraphBridgeShared';
-import { withDerivedBodyVisionCellCount } from './legacyVisionCellCount';
-
-const deriveLegacyDocumentVisionCellCount = (document: GraphIRDocument): number =>
-  Math.max(
-    0,
-    ...collectSignalNodes(document.root.children)
-      .filter((signal) => INPUT_CHANNEL_PATTERN.test(signal.id))
-      .map((signal) => Number.parseInt(signal.id.match(INPUT_CHANNEL_PATTERN)?.[2] ?? '-1', 10) + 1)
-  );
+import { withVisionCellLayoutMarkers } from './legacyVisionCellCount';
 
 const buildBrainNeuronsFromLegacy = (document: GraphIRDocument): BrainNeuronNode[] =>
   collectNeuronNodes(document.root.children).map((node) => {
@@ -467,20 +457,24 @@ export const createAgentIRFromLegacyGraphDetailed = (
   const connectionBuildResult = body
     ? buildAgentConnectionsFromCompatBody(document, resolvedBody)
     : buildAgentConnectionsFromLegacy(document);
+  const explicitVisionCellCount = Math.max(
+    0,
+    ...collectSignalNodes(document.root.children)
+      .filter((signal) => INPUT_CHANNEL_PATTERN.test(signal.id))
+      .map((signal) => Number.parseInt(signal.id.match(INPUT_CHANNEL_PATTERN)?.[2] ?? '-1', 10) + 1)
+  );
 
   return {
-    agent: withDerivedBodyVisionCellCount(
-      withVisionCellCount(
-        {
-          version: 1,
-          metadata,
-          body: agentBody,
-          brain,
-          connections: connectionBuildResult.connections,
-          layout: buildAgentLayoutFromLegacy(document, layout),
-        },
-        Math.max(0, body ? getLegacyBodyVisionCellCount(resolvedBody) : deriveLegacyDocumentVisionCellCount(document))
-      )
+    agent: withVisionCellLayoutMarkers(
+      {
+        version: 1,
+        metadata,
+        body: agentBody,
+        brain,
+        connections: connectionBuildResult.connections,
+        layout: buildAgentLayoutFromLegacy(document, layout),
+      },
+      explicitVisionCellCount
     ),
     droppedLinkIds: connectionBuildResult.droppedLinkIds,
   };

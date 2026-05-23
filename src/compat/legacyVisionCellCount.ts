@@ -1,8 +1,9 @@
 import { createVisionActionWorldRegistry } from '../host';
 import type { AgentIR } from '../domain/brain/agent-ir';
-import { resolveBodyInputVisionCellIndex, withVisionCellCount } from '../domain/brain/agent-ir';
+import { resolveBodyInputVisionCellIndex } from '../domain/brain/agent-ir';
 
 const VISION_LAYOUT_MARKER_PATTERN = /^__body-vision-cell-(\d+)$/;
+const VISION_LAYOUT_NODE_PATTERN = /^vision-[RGB]-(\d+)$/;
 const DEFAULT_WORLD_REGISTRY = createVisionActionWorldRegistry();
 
 type LegacyBodyIR = AgentIR['body'] & {
@@ -15,11 +16,6 @@ const normalizeVisionCellCount = (value: unknown): number | null =>
     : null;
 
 const deriveLegacyAgentIRVisionCellCount = (agent: AgentIR): number => {
-  const canonicalVisionCellCount = normalizeVisionCellCount((agent.body as LegacyBodyIR).visionCellCount);
-  if (canonicalVisionCellCount != null) {
-    return canonicalVisionCellCount;
-  }
-
   let maxCellIndex = -1;
 
   for (const connection of agent.connections) {
@@ -48,10 +44,15 @@ const deriveLegacyAgentIRVisionCellCount = (agent: AgentIR): number => {
 
   for (const nodeId of Object.keys(agent.layout?.nodes ?? {})) {
     const match = nodeId.match(VISION_LAYOUT_MARKER_PATTERN);
-    if (!match) {
+    if (match) {
+      maxCellIndex = Math.max(maxCellIndex, Number.parseInt(match[1], 10));
       continue;
     }
-    maxCellIndex = Math.max(maxCellIndex, Number.parseInt(match[1], 10));
+
+    const signalMatch = nodeId.match(VISION_LAYOUT_NODE_PATTERN);
+    if (signalMatch) {
+      maxCellIndex = Math.max(maxCellIndex, Number.parseInt(signalMatch[1], 10));
+    }
   }
 
   return maxCellIndex + 1;
@@ -69,17 +70,38 @@ export const parseVisionCellLayoutMarkerIndex = (nodeId: string): number | null 
 };
 
 export const deriveAgentIRVisionCellCount = (agent: AgentIR): number =>
-  normalizeVisionCellCount((agent.body as LegacyBodyIR).visionCellCount) ?? deriveLegacyAgentIRVisionCellCount(agent);
+  Math.max(
+    deriveLegacyAgentIRVisionCellCount(agent),
+    normalizeVisionCellCount((agent.body as LegacyBodyIR).visionCellCount) ?? 0
+  );
 
 export const withDerivedBodyVisionCellCount = (agent: AgentIR): AgentIR => {
+  const derivedVisionCellCount = deriveLegacyAgentIRVisionCellCount(agent);
   return {
     ...agent,
     body: {
       ...agent.body,
-      visionCellCount: deriveLegacyAgentIRVisionCellCount(agent),
-    },
+      ...(derivedVisionCellCount > 0 ? { visionCellCount: derivedVisionCellCount } : {}),
+    } as AgentIR['body'],
   };
 };
 
-export const withVisionCellLayoutMarkers = (agent: AgentIR, visionCellCount: number): AgentIR =>
-  withVisionCellCount(agent, visionCellCount);
+export const withVisionCellLayoutMarkers = (agent: AgentIR, visionCellCount: number): AgentIR => {
+  const normalizedVisionCellCount = Math.max(0, Math.floor(visionCellCount));
+  const nextNodes = { ...(agent.layout?.nodes ?? {}) };
+
+  for (let cellIndex = 0; cellIndex < normalizedVisionCellCount; cellIndex += 1) {
+    const markerId = createVisionCellLayoutMarkerId(cellIndex);
+    if (!nextNodes[markerId]) {
+      nextNodes[markerId] = {};
+    }
+  }
+
+  return {
+    ...agent,
+    layout: {
+      version: 1,
+      nodes: nextNodes,
+    },
+  };
+};

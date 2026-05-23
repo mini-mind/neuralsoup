@@ -366,7 +366,6 @@ export const compileAgentIR = (agent: AgentIR, registry: WorldRegistry): AgentPr
         id: node.id,
         source: node.source,
         worldPort: node.worldPort,
-        cellIndex: node.cellIndex,
         scale: node.scale,
       })),
     outputPorts: [...bodyOutputsById.values()]

@@ -5,7 +5,6 @@ export interface AgentProgramInputPort {
   id: string;
   source: string;
   worldPort: string;
-  cellIndex?: number;
   scale: number;
 }
 

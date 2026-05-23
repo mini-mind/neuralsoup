@@ -85,7 +85,7 @@ test('explicit compat storage loader preserves sparse legacy vision-cell counts 
   });
   assert.ok(loaded);
   assert.equal(deriveAgentIRVisionCellCount(loaded[0].agent), 36);
-  assert.equal(JSON.parse(JSON.stringify(loaded[0])).agent.body.visionCellCount, 36);
+  assert.equal('visionCellCount' in JSON.parse(JSON.stringify(loaded[0])).agent.body, false);
 });
 
 test('explicit compat storage loader preserves explicit legacy body visionCellCount when structural evidence is sparse', () => {
@@ -106,7 +106,7 @@ test('explicit compat storage loader preserves explicit legacy body visionCellCo
   });
 
   assert.ok(loaded);
-  assert.equal(loaded[0]?.agent.body.visionCellCount, 36);
+  assert.equal('visionCellCount' in (loaded[0]?.agent.body ?? {}), false);
   assert.equal(deriveAgentIRVisionCellCount(loaded[0]!.agent), 36);
 });
 

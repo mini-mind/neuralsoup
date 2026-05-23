@@ -14,6 +14,7 @@ interface SettingsPanelProps {
   draftAgentParameters: AgentParameters;
   body: BodyIR;
   draftBody: BodyIR;
+  projectedVisionCellCount: number;
   settingsSection: SettingsSection;
   bodyDraftStatus: BodyIRDraftStatus;
   bodyRulePreview?: BodyIRPreviewData;
@@ -32,6 +33,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   draftAgentParameters,
   body: _body,
   draftBody,
+  projectedVisionCellCount,
   settingsSection,
   bodyDraftStatus,
   bodyRulePreview,
@@ -286,6 +288,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             ? (
                 <BodyIRSettingsSection
                   body={draftBody}
+                  projectedVisionCellCount={projectedVisionCellCount}
                   hasBodyDraftChanges={bodyDraftStatus.hasChanges}
                   onBodyChange={onDraftBodyChange}
                   validation={bodyRuleValidation}

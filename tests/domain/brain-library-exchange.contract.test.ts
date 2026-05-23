@@ -28,8 +28,8 @@ test('Brain Library default exchange payload is AgentIR-native and round-trips t
   assert.equal(exported.version, 1);
   assert.equal(exported.kind, 'neuralsoup-agent');
   assert.equal(normalized.agent.metadata.name, 'Roundtrip Brain');
-  assert.equal(normalized.agent.body.visionCellCount, brain.agent.body.visionCellCount);
-  assert.equal(JSON.parse(JSON.stringify(exported)).agent.body.visionCellCount, 1);
+  assert.equal('visionCellCount' in normalized.agent.body, false);
+  assert.equal('visionCellCount' in JSON.parse(JSON.stringify(exported)).agent.body, false);
 });
 
 test('Brain Library default import normalization rejects legacy AgentPackage compat payloads', () => {

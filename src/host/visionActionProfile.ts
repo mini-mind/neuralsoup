@@ -1,3 +1,7 @@
+import {
+  reconcileAgentIRVisionCells,
+  type WorldRegistry,
+} from '../domain/brain';
 import type {
   AgentConnection,
   AgentIR,
@@ -5,13 +9,15 @@ import type {
   AgentMetadata,
   BodyIR,
   BrainIR,
-  WorldRegistry,
 } from '../domain/brain';
 import {
   createDefaultWorldActionOutputAdapter,
   createMovementWorldControlCommandApplier,
   createVisionCellWorldInputSignalProvider,
   type MovementWorldControlBindings,
+  type WorldActionOutputAdapter,
+  type WorldControlCommandApplier,
+  type WorldInputSignalProvider,
 } from '../domain/world';
 
 const INPUT_CHANNELS = ['R', 'G', 'B'] as const;
@@ -21,6 +27,16 @@ export const VISION_ACTION_MOVEMENT_BINDINGS: MovementWorldControlBindings = {
   moveForward: 'move-forward',
   turnRight: 'turn-right',
 };
+
+export interface HostRuntimeProfile {
+  worldRegistry: WorldRegistry;
+  movementBindings: MovementWorldControlBindings;
+  createSeedAgentIR: (visionCells: number, name?: string) => AgentIR;
+  reconcileAgentIR: (agent: AgentIR, visionCells: number) => AgentIR;
+  createInputSignalProvider: () => WorldInputSignalProvider;
+  createOutputAdapter: () => WorldActionOutputAdapter;
+  createCommandApplier: () => WorldControlCommandApplier;
+}
 
 const DEFAULT_AGENT_LAYOUT_VERSION = 1 as const;
 const DEFAULT_AGENT_VERSION = 1 as const;
@@ -61,7 +77,7 @@ export const createVisionActionWorldRegistry = (): WorldRegistry => {
         worldPort: 'action',
       };
     },
-    enumerateInputNodeIds: (rule, body) => {
+    enumerateInputNodeIds: (rule, projectedVisionCellCount) => {
       const templateMatch = rule.sourceTemplate.match(/^vision\.\$(\d+)\.\$(\d+)$/);
       if (!templateMatch) {
         return [];
@@ -82,7 +98,7 @@ export const createVisionActionWorldRegistry = (): WorldRegistry => {
       }
 
       const nodeIds = new Set<string>();
-      for (let cellIndex = 0; cellIndex < body.visionCellCount; cellIndex += 1) {
+      for (let cellIndex = 0; cellIndex < projectedVisionCellCount; cellIndex += 1) {
         for (const channel of INPUT_CHANNELS) {
           const nodeId = anchoredPattern
             .replace('([RGB])', channel)
@@ -127,7 +143,6 @@ const createAgentMetadata = (
 
 const createDefaultBodyIR = (): BodyIR => ({
   version: DEFAULT_BODY_VERSION,
-  visionCellCount: 36,
   inputRules: [
     {
       id: DEFAULT_VISION_INPUT_RULE_ID,
@@ -309,10 +324,7 @@ export const createVisionActionSeedAgentIR = (
   return {
     version: DEFAULT_AGENT_VERSION,
     metadata: createAgentMetadata(name, timestamp, idSource),
-    body: {
-      ...createDefaultBodyIR(),
-      visionCellCount: normalizedVisionCells,
-    },
+    body: createDefaultBodyIR(),
     brain: createDefaultBrainIR(),
     connections: createDefaultConnections(normalizedVisionCells),
     layout: createDefaultLayout(normalizedVisionCells),
@@ -325,3 +337,19 @@ export const createVisionActionOutputAdapter = createDefaultWorldActionOutputAda
 
 export const createVisionActionCommandApplier = () =>
   createMovementWorldControlCommandApplier(VISION_ACTION_MOVEMENT_BINDINGS);
+
+export const createVisionActionHostProfile = (): HostRuntimeProfile => {
+  const worldRegistry = createVisionActionWorldRegistry();
+
+  return {
+    worldRegistry,
+    movementBindings: VISION_ACTION_MOVEMENT_BINDINGS,
+    createSeedAgentIR: (visionCells, name = '当前 Agent') => createVisionActionSeedAgentIR(visionCells, name),
+    reconcileAgentIR: (agent, visionCells) => reconcileAgentIRVisionCells(agent, visionCells, worldRegistry),
+    createInputSignalProvider: createVisionActionInputSignalProvider,
+    createOutputAdapter: createVisionActionOutputAdapter,
+    createCommandApplier: createVisionActionCommandApplier,
+  };
+};
+
+export const VISION_ACTION_HOST_PROFILE = createVisionActionHostProfile();

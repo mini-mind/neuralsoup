@@ -1,5 +1,6 @@
 import type { AgentIR, AgentMetadata } from '../domain/brain';
 import type { AgentPackage as AgentLibraryItem } from './legacyBrainPackage';
+import { withVisionCellLayoutMarkers } from './legacyVisionCellCount';
 import {
   createBrainLibraryItemFromAgent,
   isAgentMetadata,
@@ -67,13 +68,7 @@ const normalizeImportedBrainLibraryRecord = (
     structuredVisionCellCount,
     options?.legacyVisionCellCount != null ? Math.max(0, Math.floor(options.legacyVisionCellCount)) : 0
   );
-  const nextAgent = {
-    ...agent,
-    body: {
-      ...agent.body,
-      visionCellCount: effectiveVisionCellCount,
-    },
-  };
+  const nextAgent = withVisionCellLayoutMarkers(agent, effectiveVisionCellCount);
 
   return normalizeCanonicalBrainLibraryRecord(nextAgent, metadataOverride);
 };
@@ -94,12 +89,16 @@ const isValidLegacyAgentPayload = (agent: unknown): agent is AgentIR => {
       ...(agent as Record<string, unknown>),
       body: {
         ...candidateBody,
-        visionCellCount: 0,
       },
     });
   }
 
-  return isValidBrainLibraryAgentPayload(agent);
+  return isValidBrainLibraryAgentPayload({
+    ...(agent as Record<string, unknown>),
+    body: {
+      ...candidateBody,
+    },
+  });
 };
 
 export const isLegacyAgentPackage = (value: unknown): value is AgentLibraryItem =>

@@ -103,7 +103,6 @@ const parseBodyInputSource = (
     id: nodeId,
     source: binding.source,
     worldPort: binding.worldPort,
-    cellIndex: binding.cellIndex,
     scale,
   };
 };
@@ -133,24 +132,17 @@ const enumerateInputRuleNodeIds = (
   rule: BodyInputRule,
   visionCellCount: number
 ): string[] => {
-  return registry.enumerateInputNodeIds(rule, {
-    version: 1,
-    visionCellCount,
-    inputRules: [],
-    outputRules: [],
-  });
+  return registry.enumerateInputNodeIds(rule, visionCellCount);
 };
+
+const resolveProjectedVisionCellCount = (projectedVisionCellCount?: number): number =>
+  projectedVisionCellCount == null ? 0 : Math.max(0, Math.floor(projectedVisionCellCount));
 
 const enumerateOutputRuleNodeIds = (
   registry: Pick<WorldRegistry, 'enumerateOutputNodeIds'>,
   rule: BodyOutputRule
 ): string[] => {
-  return registry.enumerateOutputNodeIds(rule, {
-    version: 1,
-    visionCellCount: 0,
-    inputRules: [],
-    outputRules: [],
-  });
+  return registry.enumerateOutputNodeIds(rule);
 };
 
 const collectEndpointIdsFromConnections = (agent: AgentIR, scope: 'bodyInput' | 'bodyOutput'): Set<string> => {
@@ -184,10 +176,15 @@ export interface AgentBodyEndpointResolution {
   endpointIds: AgentBodyEndpointIds;
 }
 
-export const resolveAgentBodyEndpointIds = (agent: AgentIR, registry: WorldRegistry): AgentBodyEndpointIds => {
+export const resolveAgentBodyEndpointIds = (
+  agent: AgentIR,
+  registry: WorldRegistry,
+  projectedVisionCellCount?: number
+): AgentBodyEndpointIds => {
+  const visionCellCount = resolveProjectedVisionCellCount(projectedVisionCellCount);
   const bodyInputNodeIds = new Set<string>([
     ...collectEndpointIdsFromConnections(agent, 'bodyInput'),
-    ...agent.body.inputRules.flatMap((rule) => enumerateInputRuleNodeIds(registry, rule, agent.body.visionCellCount)),
+    ...agent.body.inputRules.flatMap((rule) => enumerateInputRuleNodeIds(registry, rule, visionCellCount)),
   ]);
   const bodyOutputNodeIds = new Set<string>([
     ...collectEndpointIdsFromConnections(agent, 'bodyOutput'),
@@ -456,19 +453,23 @@ export const resolveAgentBodyOutputRuleBindings = (
   nodeIds: Iterable<string>
 ): BodyRuleResolution<BodyOutputNodeRuntime> => resolveBodyOutputRules(registry, rules, nodeIds);
 
-export const buildAgentBodyRulePreviewModel = (agent: AgentIR, registry: WorldRegistry): AgentBodyRulePreviewModel => {
-  const resolution = resolveAgentBodyEndpointResolution(agent, registry);
-  const input = resolveBodyInputRules(registry, agent.body.inputRules, resolution.endpointIds.bodyInputNodeIds);
-  const output = resolveBodyOutputRules(registry, agent.body.outputRules, resolution.endpointIds.bodyOutputNodeIds);
+export const buildAgentBodyRulePreviewModel = (
+  agent: AgentIR,
+  registry: WorldRegistry,
+  projectedVisionCellCount?: number
+): AgentBodyRulePreviewModel => {
+  const endpointIds = resolveAgentBodyEndpointIds(agent, registry, projectedVisionCellCount);
+  const input = resolveBodyInputRules(registry, agent.body.inputRules, endpointIds.bodyInputNodeIds);
+  const output = resolveBodyOutputRules(registry, agent.body.outputRules, endpointIds.bodyOutputNodeIds);
 
   return {
     input: {
-      endpointNodeIds: [...resolution.endpointIds.bodyInputNodeIds],
+      endpointNodeIds: [...endpointIds.bodyInputNodeIds],
       rules: input.rules,
       previewsByRuleId: buildPreviewRecord(input.rules),
     },
     output: {
-      endpointNodeIds: [...resolution.endpointIds.bodyOutputNodeIds],
+      endpointNodeIds: [...endpointIds.bodyOutputNodeIds],
       rules: output.rules,
       previewsByRuleId: buildPreviewRecord(output.rules),
     },

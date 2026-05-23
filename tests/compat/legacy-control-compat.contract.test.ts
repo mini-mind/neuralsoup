@@ -17,6 +17,8 @@ import {
   type AgentIR,
 } from '../../src/domain/brain';
 import {
+  VISION_ACTION_HOST_PROFILE,
+  createVisionActionSeedAgentIR,
   createVisionActionCommandApplier,
   createVisionActionOutputAdapter,
   createVisionActionWorldRegistry,
@@ -52,6 +54,8 @@ const createSimulationSession = (
     worldManager: new WorldManager(1600, 1200),
     collisionDetector: new CollisionDetector(),
     worldRegistry: WORLD_REGISTRY,
+    createInitialAgentIR: (visionCells) => createVisionActionSeedAgentIR(visionCells, '默认 Agent'),
+    reconcileAgentIRToWorld: VISION_ACTION_HOST_PROFILE.reconcileAgentIR,
   });
 
 function createAgent(overrides: Partial<Agent> = {}): Agent {
@@ -214,7 +218,6 @@ const createRuleDrivenSessionAgent = (): AgentIR =>
         },
         body: {
           version: 1,
-          visionCellCount: 3,
           inputRules: [
             {
               id: 'vision-cells',
@@ -480,6 +483,8 @@ test('simulation session keeps legacy GraphIR compat state aligned across mode s
     worldManager: new WorldManager(1600, 1200),
     collisionDetector: new CollisionDetector(),
     worldRegistry: WORLD_REGISTRY,
+    createInitialAgentIR: (visionCells) => createVisionActionSeedAgentIR(visionCells, '默认 Agent'),
+    reconcileAgentIRToWorld: VISION_ACTION_HOST_PROFILE.reconcileAgentIR,
   });
 
   session.initialize();
@@ -751,10 +756,9 @@ test('simulation session vision-cell reconcile preserves AgentIR-only body rule 
   const currentAgent = createLegacySimulationSessionAdapter(session).getCurrentAgentIR();
   const customAgent = {
     ...currentAgent,
-        body: {
-          ...currentAgent.body,
-          visionCellCount: currentAgent.body.visionCellCount,
-          inputRules: [
+    body: {
+      ...currentAgent.body,
+      inputRules: [
         {
           id: 'custom-vision-rule',
           nodeIdPattern: '^vision-([RGB])-(\\d+)$',
@@ -1000,7 +1004,6 @@ test('simulation session legacy GraphIR compat getter rejects applied AgentIR bo
     ...currentAgent,
     body: {
       ...currentAgent.body,
-      visionCellCount: currentAgent.body.visionCellCount,
       inputRules: [
         {
           id: 'custom-input-a',

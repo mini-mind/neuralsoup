@@ -1,4 +1,4 @@
-import type { BodyIR, BodyInputRule, BodyOutputRule } from './agent-ir';
+import type { BodyInputRule, BodyOutputRule } from './agent-ir';
 
 export interface WorldInputBinding {
   source: string;
@@ -24,6 +24,6 @@ export interface WorldRegistry {
   outputs: WorldPortDescriptor[];
   resolveInputBinding(source: string): WorldInputBinding | null;
   resolveOutputBinding(target: string): WorldOutputBinding | null;
-  enumerateInputNodeIds(rule: BodyInputRule, body: BodyIR): string[];
-  enumerateOutputNodeIds(rule: BodyOutputRule, body: BodyIR): string[];
+  enumerateInputNodeIds(rule: BodyInputRule, projectedVisionCellCount: number): string[];
+  enumerateOutputNodeIds(rule: BodyOutputRule): string[];
 }

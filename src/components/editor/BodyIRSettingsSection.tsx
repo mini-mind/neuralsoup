@@ -4,6 +4,7 @@ import type { BodyIRPreviewData, BodyIRValidationMessage } from './types';
 
 interface BodyIRSettingsSectionProps {
   body?: BodyIR;
+  projectedVisionCellCount?: number;
   hasBodyDraftChanges?: boolean;
   onBodyChange?: (updater: (current: BodyIR) => BodyIR) => void;
   validation?: BodyIRValidationMessage[];
@@ -14,7 +15,6 @@ interface BodyIRSettingsSectionProps {
 
 const DEFAULT_BODY_IR_VALUE: BodyIR = {
   version: 1,
-  visionCellCount: 36,
   inputRules: [
     {
       id: 'input-rule-1',
@@ -81,6 +81,7 @@ const updateOutputRuleAt = (
 
 const BodyIRSettingsSection: React.FC<BodyIRSettingsSectionProps> = ({
   body,
+  projectedVisionCellCount,
   hasBodyDraftChanges = false,
   onBodyChange,
   validation,
@@ -99,6 +100,7 @@ const BodyIRSettingsSection: React.FC<BodyIRSettingsSectionProps> = ({
   }, [body]);
 
   const currentBody = body ?? localBody;
+  const effectiveProjectedVisionCellCount = projectedVisionCellCount ?? 0;
 
   const commitBodyChange = (updater: (current: BodyIR) => BodyIR) => {
     if (onBodyChange) {
@@ -353,28 +355,21 @@ const BodyIRSettingsSection: React.FC<BodyIRSettingsSectionProps> = ({
         <div className="body-ir-section-header">
           <div>
             <h5>visionCoverage</h5>
-            <p>定义 canonical BodyIR 的视觉输入覆盖范围；下方预览展示规则可投影的 endpoint 集合，不等同于最终已安装 runtime 形状。</p>
+            <p>视觉 coverage 由 host 配置投影决定，不再由 BodyIR 草稿直接编辑；下方预览展示当前 host coverage 下规则可投影的 endpoint 集合。</p>
           </div>
         </div>
 
         <div className="body-ir-rule-grid">
-          <label className="settings-param-item">
-            <span className="settings-param-label">visionCellCount</span>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={currentBody.visionCellCount}
-              className="settings-param-input body-ir-number-input"
-              data-testid="body-ir-vision-cell-count"
-              onChange={(event) =>
-                commitBodyChange((current) => ({
-                  ...current,
-                  visionCellCount: Math.max(0, Number.parseInt(event.target.value || '0', 10) || 0),
-                }))
-              }
-            />
-          </label>
+          <div className="settings-param-item">
+            <span className="settings-param-label">hostProjectedVisionCells</span>
+            <div
+              className="settings-param-input body-ir-number-input body-ir-readonly-input"
+              data-testid="body-ir-projected-vision-cell-count"
+            >
+              {effectiveProjectedVisionCellCount}
+            </div>
+            <span className="settings-param-description">修改入口位于“智能体参数”，BodyIR 仅维护输入输出映射规则。</span>
+          </div>
         </div>
       </section>
 

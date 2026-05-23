@@ -292,7 +292,11 @@ const getLayoutPosition = (
   );
 };
 
-const buildIndexes = (agent: AgentIR, worldRegistry: WorldRegistry): AgentGraphViewIndexes => {
+const buildIndexes = (
+  agent: AgentIR,
+  worldRegistry: WorldRegistry,
+  projectedVisionCellCount?: number
+): AgentGraphViewIndexes => {
   const pathById = new Map<string, string[]>();
   const nodeById = new Map<string, AgentGraphViewNodeRecord>();
   const containerById = new Map(agent.brain.containers.map((container) => [container.id, container]));
@@ -300,7 +304,11 @@ const buildIndexes = (agent: AgentIR, worldRegistry: WorldRegistry): AgentGraphV
   const linkById = new Map(agent.connections.map((connection) => [connection.id, connection]));
   const endpointByViewNodeId = new Map<string, AgentConnectionEndpoint>();
 
-  const { bodyInputNodeIds: bodyInputIds, bodyOutputNodeIds: bodyOutputIds } = resolveAgentBodyEndpointIds(agent, worldRegistry);
+  const { bodyInputNodeIds: bodyInputIds, bodyOutputNodeIds: bodyOutputIds } = resolveAgentBodyEndpointIds(
+    agent,
+    worldRegistry,
+    projectedVisionCellCount
+  );
 
   const rootChildren: AgentGraphViewNodeRecord[] = [];
 
@@ -673,6 +681,7 @@ export const buildAgentGraphViewModel = ({
   draftNodePositions,
   runtimeActiveNodeIds,
   installedSummary,
+  projectedVisionCellCount,
   worldRegistry,
 }: {
   agent: AgentIR;
@@ -680,9 +689,10 @@ export const buildAgentGraphViewModel = ({
   draftNodePositions: NodePositionDraftMap;
   runtimeActiveNodeIds: string[];
   installedSummary?: AgentIRSummary;
+  projectedVisionCellCount?: number;
   worldRegistry: WorldRegistry;
 }): AgentGraphViewModel => {
-  const indexes = buildIndexes(agent, worldRegistry);
+  const indexes = buildIndexes(agent, worldRegistry, projectedVisionCellCount);
   const compiledEndpointIds = resolveCompiledAgentBodyEndpointIds(agent, worldRegistry);
   const installedBodyInputNodeIds = new Set(compiledEndpointIds.bodyInputNodeIds);
   const installedBodyOutputNodeIds = new Set(compiledEndpointIds.bodyOutputNodeIds);

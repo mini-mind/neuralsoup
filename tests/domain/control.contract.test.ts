@@ -10,6 +10,8 @@ import {
 } from '../../src/domain/world';
 import { compileAgentIR, createAgentProgramRuntimeState, stepAgentProgram } from '../../src/domain/brain';
 import {
+  VISION_ACTION_HOST_PROFILE,
+  createVisionActionSeedAgentIR,
   createVisionActionCommandApplier,
   createVisionActionInputSignalProvider,
   createVisionActionOutputAdapter,
@@ -35,6 +37,8 @@ const createSimulationSession = (
     worldManager: new WorldManager(1600, 1200),
     collisionDetector: new CollisionDetector(),
     worldRegistry: WORLD_REGISTRY,
+    createInitialAgentIR: (visionCells) => createVisionActionSeedAgentIR(visionCells, '默认 Agent'),
+    reconcileAgentIRToWorld: VISION_ACTION_HOST_PROFILE.reconcileAgentIR,
   });
 
 function createAgent(overrides: Partial<Agent> = {}): Agent {
@@ -151,6 +155,8 @@ test('simulation session keeps main-agent runtime status aligned across mode swi
     worldManager: new WorldManager(1600, 1200),
     collisionDetector: new CollisionDetector(),
     worldRegistry: WORLD_REGISTRY,
+    createInitialAgentIR: (visionCells) => createVisionActionSeedAgentIR(visionCells, '默认 Agent'),
+    reconcileAgentIRToWorld: VISION_ACTION_HOST_PROFILE.reconcileAgentIR,
   });
 
   session.initialize();

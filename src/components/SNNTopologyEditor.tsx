@@ -46,6 +46,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   const state = useSNNTopologyState({
     agent,
     worldRegistry,
+    projectedVisionCellCount: visionCells,
     graphSessionToken,
     runtimeActiveNodeIds: runtimeActivity.activeNodeIds,
     onAgentChange,

@@ -1150,8 +1150,7 @@
         }
       ],
       "completed_at": "2026-05-23T19:56:29.120Z"
-    }
-    ,
+    },
     {
       "id": "task-031",
       "title": "World registry Phase 2：显式注入 registry，移除全局 default singleton",
@@ -1192,7 +1191,7 @@
     {
       "id": "task-032",
       "title": "Host adapter/runtime Phase 2：去掉 visualInputIndex、/3 视野推导和 action.* 三槽硬编码",
-      "status": "in_progress",
+      "status": "completed",
       "priority": "P0",
       "depends_on": [
         "task-031"
@@ -1216,9 +1215,29 @@
         {
           "at": "2026-05-23T21:59:42Z",
           "message": "Further narrowed task-032 execution coupling after a second gpt-5.4 review loop: runtime input lookup now keys by compiled input port id instead of source grammar strings, production snapshots strip compat-only visualInput leakage, and the remaining scope is no longer production visualInput fallback or tuple execution but the default registry/default seed/cellIndex semantics that still define the boot-time host grammar."
+        },
+        {
+          "at": "2026-05-24T03:20:00Z",
+          "message": "Closed the next task-032 host-assembly tranche after three gpt-5.4 cross-reviews: SimulationSession no longer imports the host seed directly, boot-time seed creation and vision-cell reconcile policy are now injected from a single host profile, and App/SimulationCanvas/SimulationEngine consume one shared host runtime profile instead of scattering registry/seed/adapter assembly across multiple roots."
+        },
+        {
+          "at": "2026-05-24T03:20:00Z",
+          "message": "Cross-review on the post-cutover worktree found the remaining P1-P2 scope is now concentrated in canonical BodyIR/runtime semantics: visionCellCount still persists in AgentIR, cellIndex still leaks through generic runtime binding APIs, and reconcile still mutates canonical AgentIR instead of producing a host-scoped installed projection."
+        },
+        {
+          "at": "2026-05-24T05:10:00Z",
+          "message": "Closed the next task-032 semantic tranche with another gpt-5.4 cross-review loop: SimulationSession now separates canonical AgentIR from applied/install-time AgentIR, compat export reads the applied view instead of relying on runtime document rewrites, generic AgentProgram input ports no longer expose cellIndex, and App/GraphView/BodyIR settings now consume explicit host-projected coverage instead of reading BodyIR.visionCellCount as the UI truth source."
+        },
+        {
+          "at": "2026-05-24T05:10:00Z",
+          "message": "Post-change reviews and green validation narrowed the remaining task-032 scope to one structural P1: BodyIR/storage/exchange/default-seed contracts still persist visionCellCount as canonical document data. The next phase should delete that field from the canonical schema and move coverage truth fully into host-projected install/preview context."
+        },
+        {
+          "at": "2026-05-23T22:51:25Z",
+          "message": "Closed the remaining task-032 structural P1: canonical BodyIR/storage/exchange no longer persists visionCellCount, host-projected coverage is now passed explicitly in main-path preview/view-model logic, compat import/export keeps legacy coverage recovery behind explicit compat helpers, and type-check plus domain/compat validation are green again."
         }
       ],
-      "completed_at": null
+      "completed_at": "2026-05-23T22:51:25Z"
     },
     {
       "id": "task-033",
