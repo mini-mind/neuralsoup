@@ -14,6 +14,7 @@ import {
   summarizeGraphIRDocument,
   type GraphIRDocument,
 } from '../../src/domain/brain/compat';
+import type { AgentIR } from '../../src/domain/brain';
 import type { Agent } from '../../src/types/simulation';
 
 function createAgent(overrides: Partial<Agent> = {}): Agent {
@@ -48,6 +49,82 @@ const getRootVisionCells = (document: GraphIRDocument) => {
 
 const compileDefaultBrain = (document: GraphIRDocument) =>
   compileBrainDefinition(document, createDefaultBodyDefinition(getRootVisionCells(document)));
+
+const createRuleDrivenSessionAgent = (): AgentIR => ({
+  version: 1,
+  metadata: {
+    id: 'agent-session-rule-driven',
+    name: 'Session Rule Driven Agent',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  },
+  body: {
+    version: 1,
+    visionCellCount: 3,
+    inputRules: [
+      {
+        id: 'vision-cells',
+        nodeIdPattern: '^sensor-([RGB])-(\\d+)$',
+        sourceTemplate: 'vision.$1.$2',
+        scale: 2,
+      },
+    ],
+    outputRules: [
+      {
+        id: 'motor-actions',
+        nodeIdPattern: '^effector-(turn-left|move-forward|turn-right)$',
+        targetTemplate: 'action.$1',
+        decayPerSecond: 3,
+      },
+    ],
+  },
+  brain: {
+    version: 1,
+    rootContainerId: 'root',
+    neurons: [
+      {
+        id: 'neuron-1',
+        label: 'Neuron 1',
+        model: 'izhikevich',
+        params: {
+          a: 0.02,
+          b: 0.2,
+          c: -65,
+          d: 8,
+          threshold: -70,
+        },
+        initialState: {
+          v: -65,
+        },
+      },
+    ],
+    containers: [
+      {
+        id: 'root',
+        label: 'Root',
+        children: [{ scope: 'brain', nodeId: 'neuron-1' }],
+      },
+    ],
+  },
+  connections: [
+    {
+      id: 'input-connection',
+      from: { scope: 'bodyInput', nodeId: 'sensor-G-2' },
+      to: { scope: 'brain', nodeId: 'neuron-1' },
+      weight: 1,
+    },
+    {
+      id: 'output-connection',
+      from: { scope: 'brain', nodeId: 'neuron-1' },
+      to: { scope: 'bodyOutput', nodeId: 'effector-move-forward' },
+      weight: 1,
+    },
+  ],
+  layout: {
+    version: 1,
+    nodes: {},
+  },
+});
 
 test('keyboard policy moves forward and cancels opposite turns', () => {
   const controller = new AgentController();
@@ -135,14 +212,14 @@ test('simulation session keeps main-agent program aligned across mode switches a
   session.setControlMode('snn');
   assert.equal(session.isMainAgentBrainProgramConfigured(), true);
   assert.equal(
-    summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount,
+    summarizeGraphIRDocument(session.getCurrentLegacyGraphIRDocument()).inputSignalCount,
     mainAgent.visionCells.length * 3 + 3
   );
 
   session.setControlMode('keyboard');
   session.updateAgentParameters({ visionCells: 24 });
   assert.equal(mainAgent.visionCells.length, 24);
-  assert.deepEqual(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()), {
+  assert.deepEqual(summarizeGraphIRDocument(session.getCurrentLegacyGraphIRDocument()), {
     inputSignalCount: 75,
     outputSignalCount: 6,
     neuronCount: 2,
@@ -152,7 +229,7 @@ test('simulation session keeps main-agent program aligned across mode switches a
   session.setControlMode('snn');
   session.updateAgentParameters({ visionCells: 18 });
   assert.equal(mainAgent.visionCells.length, 18);
-  assert.equal(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount, 57);
+  assert.equal(summarizeGraphIRDocument(session.getCurrentLegacyGraphIRDocument()).inputSignalCount, 57);
 
   const agent = createAgent({
     id: mainAgent.id,
@@ -200,7 +277,7 @@ test('simulation session preserves custom GraphIR leaf links across reset and re
     },
   ];
 
-  session.setGraphIRDocument(document);
+  session.setLegacyGraphIRDocument(document);
   assert.equal(session.isMainAgentBrainProgramConfigured(), true);
   assert.equal(session.getCurrentAgentIR().connections.length, 1);
   assert.equal(session.getCurrentAgentIR().connections[0]?.weight, 2);
@@ -208,13 +285,13 @@ test('simulation session preserves custom GraphIR leaf links across reset and re
   assert.equal(session.getCurrentAgentIR().connections[0]?.to.scope, 'bodyOutput');
 
   session.updateAgentParameters({ visionCells: 1 });
-  assert.equal(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount, 6);
+  assert.equal(summarizeGraphIRDocument(session.getCurrentLegacyGraphIRDocument()).inputSignalCount, 6);
   assert.equal(session.getCurrentAgentIR().connections.length, 1);
   assert.equal(session.getCurrentAgentIR().connections[0]?.weight, 2);
 
   session.reset();
   assert.equal(session.getMainAgentControlMode(), 'keyboard');
-  assert.equal(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount, 6);
+  assert.equal(summarizeGraphIRDocument(session.getCurrentLegacyGraphIRDocument()).inputSignalCount, 6);
   assert.equal(session.getCurrentAgentIR().connections.length, 1);
   assert.equal(session.getCurrentAgentIR().connections[0]?.weight, 2);
 });
@@ -245,7 +322,7 @@ test('simulation session rejects invalid GraphIR drafts without dropping the las
     },
   ];
 
-  const appliedStatus = session.setGraphIRDocument(validDocument);
+  const appliedStatus = session.setLegacyGraphIRDocument(validDocument);
   assert.equal(appliedStatus.state, 'applied');
   assert.equal(session.getCurrentAgentIR().connections.length, 1);
   assert.equal(session.getCurrentAgentIR().connections[0]?.from.nodeId, 'vision-R-0');
@@ -254,7 +331,7 @@ test('simulation session rejects invalid GraphIR drafts without dropping the las
   const invalidDocument = structuredClone(validDocument);
   invalidDocument.root.links[0]!.from.portId = 'in';
 
-  const invalidStatus = session.setGraphIRDocument(invalidDocument);
+  const invalidStatus = session.setLegacyGraphIRDocument(invalidDocument);
   assert.equal(invalidStatus.state, 'invalid');
   assert.ok(invalidStatus.message.includes('not an output port'));
   assert.deepEqual(invalidStatus.appliedSummary.leafLinkCount, 1);
@@ -290,7 +367,7 @@ test('simulation session keeps the last applied document and program when GraphI
     },
   ];
 
-  const appliedStatus = session.setGraphIRDocument(validDocument);
+  const appliedStatus = session.setLegacyGraphIRDocument(validDocument);
   assert.equal(appliedStatus.state, 'applied');
   const appliedSummary = appliedStatus.appliedSummary;
 
@@ -313,7 +390,7 @@ test('simulation session keeps the last applied document and program when GraphI
     weight: 1,
   });
 
-  const invalidStatus = session.setGraphIRDocument(invalidDocument, invalidBody);
+  const invalidStatus = session.setLegacyGraphIRDocument(invalidDocument, invalidBody);
   assert.equal(invalidStatus.state, 'invalid');
   assert.ok(
     invalidStatus.message.includes('missing-output-node') ||
@@ -328,7 +405,7 @@ test('simulation session keeps the last applied document and program when GraphI
   }));
   assert.deepEqual(persistedConnections, [{ from: 'vision-B-1', to: 'output-move-forward', weight: 2 }]);
 
-  const runtimeStatus = session.getGraphIRRuntimeStatus();
+  const runtimeStatus = session.getAgentRuntimeStatus();
   assert.equal(runtimeStatus.state, 'invalid');
   assert.deepEqual(runtimeStatus.appliedSummary, appliedSummary);
 
@@ -378,16 +455,16 @@ test('simulation session keeps applied GraphIR coherent when vision-cell reconci
       weight: 0.7,
     },
   ];
-  session.setGraphIRDocument(validDocument);
+  session.setLegacyGraphIRDocument(validDocument);
 
   const invalidDocument = structuredClone(validDocument);
   invalidDocument.root.links[0]!.from.portId = 'in';
-  const invalidStatus = session.setGraphIRDocument(invalidDocument);
+  const invalidStatus = session.setLegacyGraphIRDocument(invalidDocument);
   assert.equal(invalidStatus.state, 'invalid');
 
   session.updateAgentParameters({ visionCells: 1 });
 
-  assert.equal(summarizeGraphIRDocument(session.getCurrentGraphIRDocument()).inputSignalCount, 6);
+  assert.equal(summarizeGraphIRDocument(session.getCurrentLegacyGraphIRDocument()).inputSignalCount, 6);
   assert.equal(session.getCurrentAgentIR().connections.length, 1);
   assert.equal(session.getCurrentAgentIR().connections[0]?.from.nodeId, 'vision-R-0');
   assert.equal(session.getCurrentAgentIR().connections[0]?.to.nodeId, 'neuron-1');
@@ -452,7 +529,7 @@ test('simulation session exposes the main-agent active GraphIR leaf node ids', (
     threshold: -70,
   };
 
-  const status = session.setGraphIRDocument(document);
+  const status = session.setLegacyGraphIRDocument(document);
   assert.equal(status.state, 'applied');
 
   const mainAgent = session.getMainAgent();
@@ -468,7 +545,7 @@ test('simulation session exposes the main-agent active GraphIR leaf node ids', (
   });
 
   assert.deepEqual(
-    new Set(session.getGraphIRRuntimeActivitySnapshot().activeNodeIds),
+    new Set(session.getAgentRuntimeActivitySnapshot().activeNodeIds),
     new Set([
       'vision-R-0',
       'vision-G-0',
@@ -648,7 +725,7 @@ test('simulation session legacy GraphIR compat aliases stay behaviorally equival
   ];
 
   const legacyNamedStatus = session.setLegacyGraphIRDocument(document);
-  const legacyAliasStatus = session.setGraphIRDocument(document);
+  const legacyAliasStatus = session.setLegacyGraphIRDocument(document);
 
   assert.equal(legacyNamedStatus.state, 'applied');
   assert.equal(legacyAliasStatus.state, 'applied');
@@ -656,4 +733,22 @@ test('simulation session legacy GraphIR compat aliases stay behaviorally equival
   assert.equal(session.getCurrentAgentIR().connections[0]?.weight, 1.5);
   assert.equal(session.getCurrentAgentIR().connections[0]?.from.nodeId, 'vision-G-0');
   assert.equal(session.getCurrentAgentIR().connections[0]?.to.nodeId, 'output-move-forward');
+});
+
+test('simulation session setAgentIR accepts AgentIR-native body rules without requiring legacy GraphIR node ids', () => {
+  const session = new SimulationSession({
+    visionSystem: new VisionSystem(),
+    agentController: new AgentController(),
+    worldManager: new WorldManager(1600, 1200),
+    collisionDetector: new CollisionDetector(),
+  });
+
+  session.initialize();
+
+  const agent = createRuleDrivenSessionAgent();
+  const status = session.setAgentIR(agent);
+
+  assert.equal(status.state, 'applied');
+  assert.equal(session.getCurrentAgentIR().connections[0]?.from.nodeId, 'sensor-G-2');
+  assert.equal(session.getCurrentAgentIR().connections[1]?.to.nodeId, 'effector-move-forward');
 });

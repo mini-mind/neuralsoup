@@ -6,6 +6,7 @@ import {
   BRAIN_LIBRARY_STATUS_STORAGE_KEY,
   BRAIN_LIBRARY_STORAGE_KEY,
   createBrainLibraryItemFromAgent,
+  encodeBrainLibraryRecord,
   loadBrainLibraryWithStatus,
   normalizeImportedAgentPackage,
   saveBrainLibrary,
@@ -219,4 +220,18 @@ test('normalizeImportedAgentPackage applies import name and rewrites conflicting
   assert.equal(normalized.agent.metadata.name, 'Imported Brain');
   assert.notEqual(normalized.metadata.id, brain.metadata.id);
   assert.equal(normalized.metadata.id, normalized.agent.metadata.id);
+});
+
+test('Brain Library export payload can round-trip through import normalization', () => {
+  const brain = createAgentPackage('Roundtrip Brain', createDefaultGraphIRDocument(1));
+  const record = createBrainLibraryItemFromAgent('Roundtrip Brain', brain.agent);
+  const exported = encodeBrainLibraryRecord(record);
+  const normalized = normalizeImportedAgentPackage(exported, {
+    existingIds: [],
+  });
+
+  assert.ok(normalized);
+  assert.equal(normalized.metadata.name, 'Roundtrip Brain');
+  assert.equal(normalized.agent.metadata.name, 'Roundtrip Brain');
+  assert.equal(normalized.agent.body.visionCellCount, brain.agent.body.visionCellCount);
 });

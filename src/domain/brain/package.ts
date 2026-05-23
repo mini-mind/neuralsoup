@@ -74,6 +74,9 @@ export type AgentPackage = AgentLibraryItem;
 const INPUT_CHANNELS: BrainInputChannel[] = ['R', 'G', 'B'];
 const OUTPUT_CHANNELS: BrainOutputChannel[] = ['turn-left', 'move-forward', 'turn-right'];
 
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 const createBrainPackageId = (): string => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID();
@@ -217,4 +220,39 @@ export const createAgentPackage = (
     metadata: brainPackage.metadata,
     agent,
   };
+};
+
+export const isBrainPackage = (value: unknown): value is BrainPackage => {
+  if (!isObject(value) || value.packageVersion !== 1 || !isObject(value.metadata)) {
+    return false;
+  }
+
+  const definition = value.definition;
+  const layout = value.layout;
+  const body = value.body;
+  const root = isObject(definition) ? definition.root : null;
+
+  return (
+    typeof value.metadata.id === 'string' &&
+    typeof value.metadata.name === 'string' &&
+    typeof value.metadata.createdAt === 'string' &&
+    typeof value.metadata.updatedAt === 'string' &&
+    isObject(definition) &&
+    definition.version === 1 &&
+    Array.isArray(definition.models) &&
+    isObject(root) &&
+    root.id === 'root' &&
+    Array.isArray(root.children) &&
+    Array.isArray(root.links) &&
+    isObject(layout) &&
+    layout.version === 1 &&
+    isObject(layout.nodes) &&
+    isObject(body) &&
+    body.version === 1 &&
+    Array.isArray(body.inputSignals) &&
+    Array.isArray(body.outputSignals) &&
+    isObject(body.brainBindings) &&
+    Array.isArray(body.brainBindings.inputs) &&
+    Array.isArray(body.brainBindings.outputs)
+  );
 };

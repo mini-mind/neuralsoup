@@ -2,15 +2,15 @@ import { useMemo } from 'react';
 import {
   type AgentIR,
 } from '../../../domain/brain';
-import type { GraphIRDraftStatus, GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../../../types/graphIRRuntime';
+import type { AgentDraftStatus, AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../../../types/agentRuntime';
 import type { GraphCanvasViewport } from '../../hooks/useSNNTopologyState';
 
 interface UseGraphTopologyDiagnosticsModelOptions {
   agent: AgentIR;
   visionCells: number;
-  runtimeStatus: GraphIRRuntimeStatus;
-  draftStatus: GraphIRDraftStatus;
-  runtimeActivity: GraphIRRuntimeActivitySnapshot;
+  runtimeStatus: AgentRuntimeStatus;
+  draftStatus: AgentDraftStatus;
+  runtimeActivity: AgentRuntimeActivitySnapshot;
   nodeCount: number;
   connectionCount: number;
   selectedCount: number;

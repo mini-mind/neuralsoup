@@ -10,6 +10,9 @@ import { GraphIRValidationError, type GraphIRValidationIssue } from './ir';
 import type { AgentProgram, AgentProgramConnection, AgentProgramNeuronNode } from './agent-program';
 import type { BrainOutputChannel } from './shared';
 
+export type AgentValidationIssue = GraphIRValidationIssue;
+export class AgentValidationError extends GraphIRValidationError {}
+
 const BODY_INPUT_SOURCE_PATTERN = /^vision\.([RGB])\.(\d+)$/;
 const BODY_OUTPUT_TARGET_PATTERN = /^action\.(turn-left|move-forward|turn-right)$/;
 const INPUT_CHANNEL_OFFSET = {
@@ -35,7 +38,7 @@ const compileRulePattern = (
   nodeIdPattern: string,
   ruleId: string,
   scope: 'body input' | 'body output'
-): { regex: RegExp | null; issue: GraphIRValidationIssue | null } => {
+): { regex: RegExp | null; issue: AgentValidationIssue | null } => {
   try {
     return { regex: new RegExp(nodeIdPattern), issue: null };
   } catch (error) {
@@ -91,15 +94,15 @@ interface ResolvedRule<Rule> {
 
 interface ResolvedBodyEndpoints<RuntimeNode> {
   nodesById: Map<string, RuntimeNode>;
-  issues: GraphIRValidationIssue[];
+  issues: AgentValidationIssue[];
 }
 
 const buildResolvedInputRules = (rules: BodyInputRule[]): {
   rules: ResolvedRule<BodyInputRule>[];
-  issues: GraphIRValidationIssue[];
+  issues: AgentValidationIssue[];
 } => {
   const resolvedRules: ResolvedRule<BodyInputRule>[] = [];
-  const issues: GraphIRValidationIssue[] = [];
+  const issues: AgentValidationIssue[] = [];
 
   for (const rule of rules) {
     const { regex, issue } = compileRulePattern(rule.nodeIdPattern, rule.id, 'body input');
@@ -118,10 +121,10 @@ const buildResolvedInputRules = (rules: BodyInputRule[]): {
 
 const buildResolvedOutputRules = (rules: BodyOutputRule[]): {
   rules: ResolvedRule<BodyOutputRule>[];
-  issues: GraphIRValidationIssue[];
+  issues: AgentValidationIssue[];
 } => {
   const resolvedRules: ResolvedRule<BodyOutputRule>[] = [];
-  const issues: GraphIRValidationIssue[] = [];
+  const issues: AgentValidationIssue[] = [];
 
   for (const rule of rules) {
     const { regex, issue } = compileRulePattern(rule.nodeIdPattern, rule.id, 'body output');
@@ -260,13 +263,13 @@ const createNeuronProgramNode = (neuron: BrainNeuronNode): AgentProgramNeuronNod
 });
 
 interface AgentCompilationContext {
-  issues: GraphIRValidationIssue[];
+  issues: AgentValidationIssue[];
   bodyInputsById: Map<string, BodyInputNodeRuntime>;
   bodyOutputsById: Map<string, BodyOutputNodeRuntime>;
 }
 
 const buildAgentCompilationContext = (agent: AgentIR): AgentCompilationContext => {
-  const issues: GraphIRValidationIssue[] = [];
+  const issues: AgentValidationIssue[] = [];
   const bodyInputResolution = resolveBodyInputs(agent);
   const bodyOutputResolution = resolveBodyOutputs(agent);
   const neuronIds = new Set(agent.brain.neurons.map((neuron) => neuron.id));
@@ -327,14 +330,14 @@ const buildAgentCompilationContext = (agent: AgentIR): AgentCompilationContext =
   };
 };
 
-export const validateAgentIR = (agent: AgentIR): GraphIRValidationIssue[] => {
+export const validateAgentIR = (agent: AgentIR): AgentValidationIssue[] => {
   return buildAgentCompilationContext(agent).issues;
 };
 
 export const compileAgentIR = (agent: AgentIR): AgentProgram => {
   const { issues, bodyInputsById, bodyOutputsById } = buildAgentCompilationContext(agent);
   if (issues.length > 0) {
-    throw new GraphIRValidationError(issues);
+    throw new AgentValidationError(issues);
   }
 
   const neuronNodes = agent.brain.neurons.map(createNeuronProgramNode);

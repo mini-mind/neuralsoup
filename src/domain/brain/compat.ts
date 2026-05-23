@@ -5,3 +5,4 @@ export * from './compiler';
 export * from './legacy-graph-bridge';
 export * from './defaults';
 export * from './step';
+export type { AgentIRSummary } from './agent-ir';

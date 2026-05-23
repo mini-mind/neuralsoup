@@ -102,6 +102,13 @@ export interface AgentIR {
   layout?: AgentLayoutIR;
 }
 
+export interface AgentIRSummary {
+  inputSignalCount: number;
+  outputSignalCount: number;
+  neuronCount: number;
+  leafLinkCount: number;
+}
+
 export interface AgentLibraryItem {
   packageVersion: 1;
   metadata: AgentMetadata;

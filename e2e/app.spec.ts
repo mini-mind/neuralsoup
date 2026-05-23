@@ -840,8 +840,10 @@ test('brain library manages saved items and reports import errors', async ({ pag
     }
 
     return Buffer.concat(chunks).toString('utf8');
-  })) as { metadata?: { name?: string } };
+  })) as { packageVersion?: number; metadata?: { name?: string }; agent?: { metadata?: { name?: string } } };
+  expect(downloadedBrain.packageVersion).toBe(1);
   expect(downloadedBrain.metadata?.name).toBe('Renamed Brain');
+  expect(downloadedBrain.agent?.metadata?.name).toBe('Renamed Brain');
 
   page.once('dialog', (dialog) => dialog.accept());
   await page.locator(`[data-testid="brain-library-delete-${savedBrainId}"]`).click();

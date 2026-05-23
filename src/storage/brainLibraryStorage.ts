@@ -1,17 +1,11 @@
 import {
   type AgentIR,
+  type AgentLibraryItem,
   type AgentMetadata,
   validateAgentIR,
 } from '../domain/brain';
-import {
-  createAgentPackage,
-  createBrainLayoutFromDefinition,
-  type AgentPackage,
-  type BrainDefinition,
-  type BodyDefinition,
-  type BrainLayoutDocument,
-  type BrainPackage,
-} from '../domain/brain/compat';
+
+type AgentPackage = AgentLibraryItem;
 
 export const BRAIN_LIBRARY_STORAGE_KEY = 'neuralsoup.brain-library.v1';
 export const BRAIN_LIBRARY_CORRUPT_STORAGE_KEY = 'neuralsoup.brain-library.v1.corrupt';
@@ -67,79 +61,6 @@ const inferVisionCellCountFromAgent = (agent: AgentIR): number =>
     }
     return maxCount;
   }, 0);
-
-const isBrainDefinition = (value: unknown): value is BrainDefinition => {
-  if (!isObject(value)) {
-    return false;
-  }
-
-  const root = value.root;
-  return (
-    value.version === 1 &&
-    Array.isArray(value.models) &&
-    isObject(root) &&
-    root.id === 'root' &&
-    Array.isArray(root.children) &&
-    Array.isArray(root.links)
-  );
-};
-
-const isBrainLayoutDocument = (value: unknown): value is BrainLayoutDocument =>
-  isObject(value) && value.version === 1 && isObject(value.nodes);
-
-const isBodyInputSignal = (value: unknown): boolean =>
-  isObject(value) &&
-  typeof value.id === 'string' &&
-  isObject(value.source) &&
-  value.source.kind === 'vision-cell' &&
-  ['R', 'G', 'B'].includes(String(value.source.channel)) &&
-  typeof value.source.cellIndex === 'number';
-
-const isBodyOutputSignal = (value: unknown): boolean =>
-  isObject(value) &&
-  typeof value.id === 'string' &&
-  isObject(value.target) &&
-  value.target.kind === 'action-channel' &&
-  ['turn-left', 'move-forward', 'turn-right'].includes(String(value.target.channel));
-
-const isBodyInputBinding = (value: unknown): boolean =>
-  isObject(value) &&
-  typeof value.bodySignalId === 'string' &&
-  typeof value.brainSignalNodeId === 'string';
-
-const isBodyOutputBinding = (value: unknown): boolean =>
-  isObject(value) &&
-  typeof value.bodySignalId === 'string' &&
-  typeof value.brainSignalNodeId === 'string';
-
-const isBodyDefinition = (value: unknown): value is BodyDefinition =>
-  isObject(value) &&
-  value.version === 1 &&
-  Array.isArray(value.inputSignals) &&
-  value.inputSignals.every(isBodyInputSignal) &&
-  Array.isArray(value.outputSignals) &&
-  value.outputSignals.every(isBodyOutputSignal) &&
-  isObject(value.brainBindings) &&
-  Array.isArray(value.brainBindings.inputs) &&
-  value.brainBindings.inputs.every(isBodyInputBinding) &&
-  Array.isArray(value.brainBindings.outputs) &&
-  value.brainBindings.outputs.every(isBodyOutputBinding);
-
-export const isBrainPackage = (value: unknown): value is BrainPackage => {
-  if (!isObject(value) || value.packageVersion !== 1 || !isObject(value.metadata)) {
-    return false;
-  }
-
-  return (
-    typeof value.metadata.id === 'string' &&
-    typeof value.metadata.name === 'string' &&
-    typeof value.metadata.createdAt === 'string' &&
-    typeof value.metadata.updatedAt === 'string' &&
-    isBrainDefinition(value.definition) &&
-    isBrainLayoutDocument(value.layout) &&
-    isBodyDefinition(value.body)
-  );
-};
 
 export const isAgentPackage = (value: unknown): value is AgentPackage =>
   isObject(value) &&
@@ -330,9 +251,6 @@ export const encodeBrainLibraryRecord = (record: BrainLibraryRecord): AgentPacka
   },
 });
 
-export const createBrainLibraryItem = (name: string, definition: BrainDefinition): BrainLibraryRecord =>
-  toBrainLibraryRecord(createAgentPackage(name, definition));
-
 export const createBrainLibraryItemFromAgent = (name: string, agent: AgentIR): BrainLibraryRecord => {
   const timestamp = new Date().toISOString();
   const metadata = {
@@ -513,29 +431,6 @@ export const saveBrainLibrary = (brains: BrainLibraryRecord[]): void => {
     );
   }
 };
-
-export const upsertBrainLibraryItemDefinition = (
-  brains: BrainLibraryRecord[],
-  brainId: string,
-  definition: BrainDefinition,
-  body: BodyDefinition,
-  updatedAt?: string
-): BrainLibraryRecord[] =>
-  brains.map((brain) =>
-    brain.metadata.id === brainId
-      ? toBrainLibraryRecord(
-          createAgentPackage(brain.metadata.name, definition, {
-            id: brain.metadata.id,
-            createdAt: brain.metadata.createdAt,
-            updatedAt: updatedAt ?? new Date().toISOString(),
-            description: brain.metadata.description,
-            tags: brain.metadata.tags,
-            body,
-            layout: createBrainLayoutFromDefinition(definition),
-          })
-        )
-      : brain
-  );
 
 export const upsertBrainLibraryItemAgent = (
   brains: BrainLibraryRecord[],

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import SNNTopologyEditor from '../SNNTopologyEditor';
 import type { AgentIR } from '../../domain/brain';
-import type { GraphIRDraftStatus, GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../../types/graphIRRuntime';
+import type { AgentDraftStatus, AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../../types/agentRuntime';
 import type { GraphPathItem } from './types';
 
 interface GraphEditorPanelProps {
@@ -9,9 +9,9 @@ interface GraphEditorPanelProps {
   agent: AgentIR;
   graphSessionKey: number;
   visionCells: number;
-  runtimeStatus: GraphIRRuntimeStatus;
-  draftStatus: GraphIRDraftStatus;
-  runtimeActivity: GraphIRRuntimeActivitySnapshot;
+  runtimeStatus: AgentRuntimeStatus;
+  draftStatus: AgentDraftStatus;
+  runtimeActivity: AgentRuntimeActivitySnapshot;
   onAgentChange: (updater: (current: AgentIR) => AgentIR) => void;
   onGraphPathChange: (graphPath: GraphPathItem[], sourceSessionKey: number) => void;
   onGraphPathNavigateRegister: (navigate: (pathId: string) => void, sourceSessionKey: number) => void;

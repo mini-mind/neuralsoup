@@ -3,10 +3,12 @@ import { CollisionDetector } from '../engine/CollisionDetector';
 import { VisionSystem } from '../engine/VisionSystem';
 import { WorldManager } from '../engine/WorldManager';
 import {
+  AgentValidationError,
   compileAgentIR,
   createDefaultAgentIR,
   reconcileAgentIRVisionCells,
   summarizeAgentIR,
+  type AgentValidationIssue,
   type AgentIR,
 } from '../domain/brain';
 import {
@@ -17,10 +19,9 @@ import {
   validateGraphIRDocument,
   type BodyDefinition,
   type GraphIRDocument,
-  type GraphIRValidationIssue,
 } from '../domain/brain/compat';
 import type { Agent, SimulationState, World } from '../types/simulation';
-import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../types/graphIRRuntime';
+import type { AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../types/agentRuntime';
 import {
   type SimulationControlMode,
   type WorldConfig,
@@ -59,7 +60,7 @@ export class SimulationSession {
 
   private currentControlMode: SimulationControlMode;
   private currentAgentIR: AgentIR;
-  private graphIRRuntimeStatus: GraphIRRuntimeStatus;
+  private agentRuntimeStatus: AgentRuntimeStatus;
   private keyboardInputState: SimulationSessionInputState = {
     turnLeft: false,
     moveForward: false,
@@ -82,7 +83,7 @@ export class SimulationSession {
     });
     this.currentControlMode = options.initialControlMode ?? 'keyboard';
     this.currentAgentIR = createDefaultAgentIR(this.visionSystem.getVisionCells(), '默认 Agent');
-    this.graphIRRuntimeStatus = this.createAppliedGraphIRRuntimeStatus(this.currentAgentIR);
+    this.agentRuntimeStatus = this.createAppliedAgentRuntimeStatus(this.currentAgentIR);
     this.state = createEmptyWorldState(this.config, this.worldManager.getWorldBounds());
   }
 
@@ -178,7 +179,7 @@ export class SimulationSession {
   }
 
   // Legacy compat entry for tests and transitional GraphIR callers.
-  public setLegacyGraphIRDocument(document: GraphIRDocument, body?: BodyDefinition): GraphIRRuntimeStatus {
+  public setLegacyGraphIRDocument(document: GraphIRDocument, body?: BodyDefinition): AgentRuntimeStatus {
     const mainAgent = this.getMainAgent();
     const visionCells = mainAgent?.visionCells.length ?? this.visionSystem.getVisionCells();
     const nextAgent = reconcileAgentIRVisionCells(
@@ -197,18 +198,18 @@ export class SimulationSession {
     const issues = validateGraphIRDocument(reconciledDocument);
 
     if (issues.length > 0) {
-      return this.setInvalidGraphIRRuntimeStatus(issues);
+      return this.setInvalidAgentRuntimeStatus(issues);
     }
 
     try {
       compileBrainDefinition(reconciledDocument, reconciledBody);
       this.applyAgentIR(nextAgent, mainAgent);
     } catch (error) {
-      if (error instanceof GraphIRValidationError) {
-        return this.setInvalidGraphIRRuntimeStatus(error.issues);
+      if (error instanceof GraphIRValidationError || error instanceof AgentValidationError) {
+        return this.setInvalidAgentRuntimeStatus(error.issues);
       }
 
-      return this.setInvalidGraphIRRuntimeStatus([
+      return this.setInvalidAgentRuntimeStatus([
         {
           code: 'runtime-binding-error',
           message: error instanceof Error ? error.message : 'Unknown GraphIR runtime binding failure.',
@@ -216,26 +217,20 @@ export class SimulationSession {
       ]);
     }
 
-    return this.setAppliedGraphIRRuntimeStatus(this.currentAgentIR);
+    return this.setAppliedAgentRuntimeStatus(this.currentAgentIR);
   }
 
-  // Backward-compatible alias; do not introduce new production callers.
-  public setGraphIRDocument(document: GraphIRDocument, body?: BodyDefinition): GraphIRRuntimeStatus {
-    return this.setLegacyGraphIRDocument(document, body);
-  }
-
-  public setAgentIR(agent: AgentIR): GraphIRRuntimeStatus {
+  public setAgentIR(agent: AgentIR): AgentRuntimeStatus {
     const mainAgent = this.getMainAgent();
 
     try {
-      createLegacyGraphBridgeFromAgent(agent);
       this.applyAgentIR(agent, mainAgent);
     } catch (error) {
-      if (error instanceof GraphIRValidationError) {
-        return this.setInvalidGraphIRRuntimeStatus(error.issues);
+      if (error instanceof GraphIRValidationError || error instanceof AgentValidationError) {
+        return this.setInvalidAgentRuntimeStatus(error.issues);
       }
 
-      return this.setInvalidGraphIRRuntimeStatus([
+      return this.setInvalidAgentRuntimeStatus([
         {
           code: 'runtime-binding-error',
           message: error instanceof Error ? error.message : 'Unknown AgentIR runtime binding failure.',
@@ -243,7 +238,7 @@ export class SimulationSession {
       ]);
     }
 
-    return this.setAppliedGraphIRRuntimeStatus(agent);
+    return this.setAppliedAgentRuntimeStatus(agent);
   }
 
   public getMainAgentControlMode(): SimulationControlMode {
@@ -259,19 +254,15 @@ export class SimulationSession {
     return createLegacyGraphBridgeFromAgent(this.currentAgentIR).document;
   }
 
-  public getCurrentGraphIRDocument(): GraphIRDocument {
-    return this.getCurrentLegacyGraphIRDocument();
-  }
-
   public getCurrentAgentIR(): AgentIR {
     return this.currentAgentIR;
   }
 
-  public getGraphIRRuntimeStatus(): GraphIRRuntimeStatus {
-    return this.graphIRRuntimeStatus;
+  public getAgentRuntimeStatus(): AgentRuntimeStatus {
+    return this.agentRuntimeStatus;
   }
 
-  public getGraphIRRuntimeActivitySnapshot(): GraphIRRuntimeActivitySnapshot {
+  public getAgentRuntimeActivitySnapshot(): AgentRuntimeActivitySnapshot {
     const mainAgent = this.getMainAgent();
     if (!mainAgent) {
       return { activeNodeIds: [] };
@@ -326,7 +317,7 @@ export class SimulationSession {
 
     const nextAgent = reconcileAgentIRVisionCells(this.currentAgentIR, mainAgent.visionCells.length);
     this.applyAgentIR(nextAgent, mainAgent);
-    this.setAppliedGraphIRRuntimeStatus(nextAgent);
+    this.setAppliedAgentRuntimeStatus(nextAgent);
   }
 
   private applyAgentIR(
@@ -342,7 +333,7 @@ export class SimulationSession {
     this.currentAgentIR = agent;
   }
 
-  private createAppliedGraphIRRuntimeStatus(agent: AgentIR): GraphIRRuntimeStatus {
+  private createAppliedAgentRuntimeStatus(agent: AgentIR): AgentRuntimeStatus {
     return {
       state: 'applied',
       appliedSummary: summarizeAgentIR(agent),
@@ -351,18 +342,18 @@ export class SimulationSession {
     };
   }
 
-  private setAppliedGraphIRRuntimeStatus(agent: AgentIR): GraphIRRuntimeStatus {
-    this.graphIRRuntimeStatus = this.createAppliedGraphIRRuntimeStatus(agent);
-    return this.graphIRRuntimeStatus;
+  private setAppliedAgentRuntimeStatus(agent: AgentIR): AgentRuntimeStatus {
+    this.agentRuntimeStatus = this.createAppliedAgentRuntimeStatus(agent);
+    return this.agentRuntimeStatus;
   }
 
-  private setInvalidGraphIRRuntimeStatus(issues: GraphIRValidationIssue[]): GraphIRRuntimeStatus {
-    this.graphIRRuntimeStatus = {
+  private setInvalidAgentRuntimeStatus(issues: AgentValidationIssue[]): AgentRuntimeStatus {
+    this.agentRuntimeStatus = {
       state: 'invalid',
       appliedSummary: summarizeAgentIR(this.currentAgentIR),
       issues,
       message: issues.map((issue) => issue.message).join(' | '),
     };
-    return this.graphIRRuntimeStatus;
+    return this.agentRuntimeStatus;
   }
 }

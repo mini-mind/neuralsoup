@@ -1,7 +1,6 @@
-import type { AgentIR } from './agent-ir';
-import type { GraphIRDocumentSummary } from './ir';
+import type { AgentIR, AgentIRSummary } from './agent-ir';
 
-export const summarizeAgentIR = (agent: AgentIR): GraphIRDocumentSummary => {
+export const summarizeAgentIR = (agent: AgentIR): AgentIRSummary => {
   const inputNodeIds = new Set<string>();
   const outputNodeIds = new Set<string>();
 

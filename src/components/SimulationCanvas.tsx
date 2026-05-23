@@ -4,15 +4,15 @@ import type { AgentIR } from '../domain/brain';
 import { SimulationEngine, type SimulationLifecycleState } from '../engine/SimulationEngine';
 import type { SimulationControlMode } from '../domain/world';
 import type { SimulationState } from '../types/simulation';
-import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../types/graphIRRuntime';
+import type { AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../types/agentRuntime';
 import type { AgentParameters } from './editor/types';
 
 interface SimulationCanvasProps {
   onStatsUpdate: (stats: SimulationState['stats']) => void;
   onLifecycleChange: (state: SimulationLifecycleState) => void;
   onAgentParametersChange: (params: AgentParameters) => void;
-  onGraphIRStatusChange: (status: GraphIRRuntimeStatus) => void;
-  onGraphIRActivityChange: (snapshot: GraphIRRuntimeActivitySnapshot) => void;
+  onAgentRuntimeStatusChange: (status: AgentRuntimeStatus) => void;
+  onAgentRuntimeActivityChange: (snapshot: AgentRuntimeActivitySnapshot) => void;
   controlMode: Extract<SimulationControlMode, 'keyboard' | 'snn'>;
   agentDocument: AgentIR;
   agentParameters: AgentParameters;
@@ -36,8 +36,8 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   onStatsUpdate,
   onLifecycleChange,
   onAgentParametersChange,
-  onGraphIRStatusChange,
-  onGraphIRActivityChange,
+  onAgentRuntimeStatusChange,
+  onAgentRuntimeActivityChange,
   controlMode,
   agentDocument,
   agentParameters,
@@ -130,8 +130,8 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         newEngine = new SimulationEngine(newApp, fixedWorldWidth, fixedWorldHeight);
         newEngine.onStatsUpdate = onStatsUpdate;
         newEngine.onLifecycleChange = onLifecycleChange;
-        newEngine.onGraphIRStatusChange = onGraphIRStatusChange;
-        newEngine.onGraphIRActivityChange = onGraphIRActivityChange;
+        newEngine.onAgentRuntimeStatusChange = onAgentRuntimeStatusChange;
+        newEngine.onAgentRuntimeActivityChange = onAgentRuntimeActivityChange;
         newEngine.initialize();
 
         const mainAgent = newEngine.getMainAgent();
@@ -144,8 +144,8 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         setIsEngineReady(true);
         setEngineInstanceId((prev) => prev + 1);
         onAgentParametersChange(newEngine.getAgentParameters());
-        onGraphIRStatusChange(newEngine.getGraphIRRuntimeStatus());
-        onGraphIRActivityChange(newEngine.getGraphIRRuntimeActivitySnapshot());
+        onAgentRuntimeStatusChange(newEngine.getAgentRuntimeStatus());
+        onAgentRuntimeActivityChange(newEngine.getAgentRuntimeActivitySnapshot());
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown Pixi renderer error';
         console.error('Failed to initialize simulation canvas:', error);
@@ -169,7 +169,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         });
       }
     };
-  }, [onAgentParametersChange, onGraphIRActivityChange, onGraphIRStatusChange, onLifecycleChange, onStatsUpdate]);
+  }, [onAgentParametersChange, onAgentRuntimeActivityChange, onAgentRuntimeStatusChange, onLifecycleChange, onStatsUpdate]);
 
   useEffect(() => {
     if (!appRef.current) {
@@ -201,17 +201,17 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       return;
     }
 
-    engineRef.current.onGraphIRStatusChange = onGraphIRStatusChange;
-  }, [onGraphIRStatusChange]);
+    engineRef.current.onAgentRuntimeStatusChange = onAgentRuntimeStatusChange;
+  }, [onAgentRuntimeStatusChange]);
 
   useEffect(() => {
     if (!engineRef.current) {
       return;
     }
 
-    engineRef.current.onGraphIRActivityChange = onGraphIRActivityChange;
-    onGraphIRActivityChange(engineRef.current.getGraphIRRuntimeActivitySnapshot());
-  }, [onGraphIRActivityChange]);
+    engineRef.current.onAgentRuntimeActivityChange = onAgentRuntimeActivityChange;
+    onAgentRuntimeActivityChange(engineRef.current.getAgentRuntimeActivitySnapshot());
+  }, [onAgentRuntimeActivityChange]);
 
   useEffect(() => {
     const engine = engineRef.current;

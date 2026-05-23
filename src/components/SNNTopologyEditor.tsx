@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import type { AgentIR } from '../domain/brain';
-import type { GraphIRDraftStatus, GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../types/graphIRRuntime';
+import type { AgentDraftStatus, AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../types/agentRuntime';
 import GraphDetailModal from './editor/graph/GraphDetailModal';
 import GraphTopologyCanvas from './editor/graph/GraphTopologyCanvas';
 import GraphTopologyDiagnostics from './editor/graph/GraphTopologyDiagnostics';
@@ -19,9 +19,9 @@ interface SNNTopologyEditorProps {
   onAgentChange?: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
   onGraphPathChange?: (graphPath: GraphPathItem[], sourceSessionKey: number) => void;
   onGraphPathNavigateRegister?: (navigate: (pathId: string) => void, sourceSessionKey: number) => void;
-  runtimeStatus: GraphIRRuntimeStatus;
-  draftStatus: GraphIRDraftStatus;
-  runtimeActivity: GraphIRRuntimeActivitySnapshot;
+  runtimeStatus: AgentRuntimeStatus;
+  draftStatus: AgentDraftStatus;
+  runtimeActivity: AgentRuntimeActivitySnapshot;
   isActive?: boolean;
 }
 

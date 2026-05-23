@@ -15,7 +15,7 @@ import { SimulationSession } from '../runtime/SimulationSession';
 import type { SimulationControlMode } from '../domain/world';
 import type { AgentIR } from '../domain/brain';
 import type { BodyDefinition, GraphIRDocument } from '../domain/brain/compat';
-import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../types/graphIRRuntime';
+import type { AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../types/agentRuntime';
 
 export type SimulationLifecycleState = 'idle' | 'running' | 'paused';
 
@@ -49,8 +49,8 @@ export class SimulationEngine {
   // 回调函数
   public onStatsUpdate?: (stats: SimulationState['stats']) => void;
   public onLifecycleChange?: (state: SimulationLifecycleState) => void;
-  public onGraphIRStatusChange?: (status: GraphIRRuntimeStatus) => void;
-  public onGraphIRActivityChange?: (snapshot: GraphIRRuntimeActivitySnapshot) => void;
+  public onAgentRuntimeStatusChange?: (status: AgentRuntimeStatus) => void;
+  public onAgentRuntimeActivityChange?: (snapshot: AgentRuntimeActivitySnapshot) => void;
 
   constructor(app: PIXI.Application, initialWidth: number = 1600, initialHeight: number = 1200) {
     // 初始化各个系统
@@ -78,21 +78,17 @@ export class SimulationEngine {
   }
 
   // Legacy compat entry; production UI should use setAgentIR().
-  public setLegacyGraphIRDocument(document: GraphIRDocument, body?: BodyDefinition): GraphIRRuntimeStatus {
+  public setLegacyGraphIRDocument(document: GraphIRDocument, body?: BodyDefinition): AgentRuntimeStatus {
     const status = this.session.setLegacyGraphIRDocument(document, body);
-    this.onGraphIRStatusChange?.(status);
-    this.onGraphIRActivityChange?.(this.getGraphIRRuntimeActivitySnapshot());
+    this.emitAgentRuntimeStatus(status);
+    this.emitAgentRuntimeActivity(this.getAgentRuntimeActivitySnapshot());
     return status;
   }
 
-  public setGraphIRDocument(document: GraphIRDocument, body?: BodyDefinition): GraphIRRuntimeStatus {
-    return this.setLegacyGraphIRDocument(document, body);
-  }
-
-  public setAgentIR(agent: AgentIR): GraphIRRuntimeStatus {
+  public setAgentIR(agent: AgentIR): AgentRuntimeStatus {
     const status = this.session.setAgentIR(agent);
-    this.onGraphIRStatusChange?.(status);
-    this.onGraphIRActivityChange?.(this.getGraphIRRuntimeActivitySnapshot());
+    this.emitAgentRuntimeStatus(status);
+    this.emitAgentRuntimeActivity(this.getAgentRuntimeActivitySnapshot());
     return status;
   }
 
@@ -126,8 +122,8 @@ export class SimulationEngine {
     visionAngle?: number;
   }): void {
     this.session.updateAgentParameters(params);
-    this.onGraphIRStatusChange?.(this.getGraphIRRuntimeStatus());
-    this.onGraphIRActivityChange?.(this.getGraphIRRuntimeActivitySnapshot());
+    this.emitAgentRuntimeStatus(this.getAgentRuntimeStatus());
+    this.emitAgentRuntimeActivity(this.getAgentRuntimeActivitySnapshot());
     // 立即重新渲染世界，确保即使在暂停状态下也能看到变化
     this.renderWorld();
   }
@@ -147,12 +143,12 @@ export class SimulationEngine {
     };
   }
 
-  public getGraphIRRuntimeStatus(): GraphIRRuntimeStatus {
-    return this.session.getGraphIRRuntimeStatus();
+  public getAgentRuntimeStatus(): AgentRuntimeStatus {
+    return this.session.getAgentRuntimeStatus();
   }
 
-  public getGraphIRRuntimeActivitySnapshot(): GraphIRRuntimeActivitySnapshot {
-    return this.session.getGraphIRRuntimeActivitySnapshot();
+  public getAgentRuntimeActivitySnapshot(): AgentRuntimeActivitySnapshot {
+    return this.session.getAgentRuntimeActivitySnapshot();
   }
 
   /**
@@ -162,8 +158,8 @@ export class SimulationEngine {
     // 设置渲染器的世界尺寸
     this.renderer.setWorldDimensions(this.worldManager.width, this.worldManager.height);
     this.session.initialize();
-    this.onGraphIRStatusChange?.(this.getGraphIRRuntimeStatus());
-    this.onGraphIRActivityChange?.(this.getGraphIRRuntimeActivitySnapshot());
+    this.emitAgentRuntimeStatus(this.getAgentRuntimeStatus());
+    this.emitAgentRuntimeActivity(this.getAgentRuntimeActivitySnapshot());
     
     // 设置镜头跟随主智能体
     const mainAgent = this.getMainAgent();
@@ -233,8 +229,8 @@ export class SimulationEngine {
     this.session.setKeyboardInputState(this.keyboardInputState);
     this.setControlMode(this.currentControlMode);
     this.setCameraTarget(this.getMainAgent());
-    this.onGraphIRStatusChange?.(this.getGraphIRRuntimeStatus());
-    this.onGraphIRActivityChange?.(this.getGraphIRRuntimeActivitySnapshot());
+    this.emitAgentRuntimeStatus(this.getAgentRuntimeStatus());
+    this.emitAgentRuntimeActivity(this.getAgentRuntimeActivitySnapshot());
     this.renderWorld();
   }
 
@@ -262,7 +258,7 @@ export class SimulationEngine {
         ...stats,
         fps: this.fps
       });
-      this.onGraphIRActivityChange?.(this.getGraphIRRuntimeActivitySnapshot());
+      this.emitAgentRuntimeActivity(this.getAgentRuntimeActivitySnapshot());
     } else if (this.isPaused) {
       this.lastTime = currentTime;
     }
@@ -306,8 +302,8 @@ export class SimulationEngine {
   public setControlMode(newMode: SimulationControlMode): void {
     this.currentControlMode = newMode;
     this.session.setControlMode(newMode);
-    this.onGraphIRStatusChange?.(this.getGraphIRRuntimeStatus());
-    this.onGraphIRActivityChange?.(this.getGraphIRRuntimeActivitySnapshot());
+    this.emitAgentRuntimeStatus(this.getAgentRuntimeStatus());
+    this.emitAgentRuntimeActivity(this.getAgentRuntimeActivitySnapshot());
   }
 
   public getLifecycleState(): SimulationLifecycleState {
@@ -316,6 +312,14 @@ export class SimulationEngine {
     }
 
     return this.isPaused ? 'paused' : 'running';
+  }
+
+  private emitAgentRuntimeStatus(status: AgentRuntimeStatus): void {
+    this.onAgentRuntimeStatusChange?.(status);
+  }
+
+  private emitAgentRuntimeActivity(snapshot: AgentRuntimeActivitySnapshot): void {
+    this.onAgentRuntimeActivityChange?.(snapshot);
   }
 
   private emitLifecycleChange(): void {

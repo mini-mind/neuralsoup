@@ -9,7 +9,7 @@ import {
 } from './domain/brain';
 import type { SimulationControlMode } from './domain/world';
 import type { SimulationLifecycleState } from './engine/SimulationEngine';
-import type { GraphIRDraftStatus, GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from './types/graphIRRuntime';
+import type { AgentDraftStatus, AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from './types/agentRuntime';
 import type { SimulationState } from './types/simulation';
 import BrainLibraryModal from './components/editor/BrainLibraryModal';
 import EditorToolbar from './components/editor/EditorToolbar';
@@ -23,6 +23,7 @@ import {
   createBrainLibraryItemFromAgent,
   deleteBrainLibraryItem,
   duplicateBrainLibraryItem,
+  encodeBrainLibraryRecord,
   loadBrainLibraryWithStatus,
   normalizeImportedAgentPackage,
   renameBrainLibraryItem,
@@ -64,14 +65,14 @@ const clampSplitRatio = (containerSize: number, ratio: number): number => {
   return clamp(ratio, minRatio, maxRatio);
 };
 
-const createInitialGraphIRRuntimeStatus = (agent: AgentIR): GraphIRRuntimeStatus => ({
+const createInitialAgentRuntimeStatus = (agent: AgentIR): AgentRuntimeStatus => ({
   state: 'applied',
   appliedSummary: summarizeAgentIR(agent),
   issues: [],
   message: null,
 });
 
-const createGraphIRDraftStatus = (draftAgent: AgentIR): GraphIRDraftStatus => {
+const createAgentDraftStatus = (draftAgent: AgentIR): AgentDraftStatus => {
   const summary = summarizeAgentIR(draftAgent);
   const validationIssues = validateAgentIR(draftAgent);
 
@@ -127,11 +128,11 @@ const App: React.FC = () => {
   const [stats, setStats] = useState<SimulationState['stats']>(INITIAL_STATS);
   const [activeAgentDocument, setActiveAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
   const [draftAgentDocument, setDraftAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
-  const [draftGraphStatusOverride, setDraftGraphStatusOverride] = useState<GraphIRDraftStatus | null>(null);
-  const [graphIRRuntimeStatus, setGraphIRRuntimeStatus] = useState<GraphIRRuntimeStatus>(() =>
-    createInitialGraphIRRuntimeStatus(initialAgentDocument)
+  const [draftGraphStatusOverride, setDraftGraphStatusOverride] = useState<AgentDraftStatus | null>(null);
+  const [agentRuntimeStatus, setAgentRuntimeStatus] = useState<AgentRuntimeStatus>(() =>
+    createInitialAgentRuntimeStatus(initialAgentDocument)
   );
-  const [graphIRRuntimeActivity, setGraphIRRuntimeActivity] = useState<GraphIRRuntimeActivitySnapshot>({
+  const [agentRuntimeActivity, setAgentRuntimeActivity] = useState<AgentRuntimeActivitySnapshot>({
     activeNodeIds: []
   });
   const [brainLibrary, setBrainLibrary] = useState<BrainLibraryRecord[]>(() => initialBrainLibraryLoad.brains);
@@ -163,8 +164,8 @@ const App: React.FC = () => {
   const [graphEditorSessionKey, setGraphEditorSessionKey] = useState(0);
   const requestedLifecycleStateRef = useRef<SimulationLifecycleState>('idle');
   const draftAgentDocumentRef = useRef(draftAgentDocument);
-  const graphIRDraftStatus = useMemo<GraphIRDraftStatus>(
-    () => draftGraphStatusOverride ?? createGraphIRDraftStatus(draftAgentDocument),
+  const agentDraftStatus = useMemo<AgentDraftStatus>(
+    () => draftGraphStatusOverride ?? createAgentDraftStatus(draftAgentDocument),
     [draftAgentDocument, draftGraphStatusOverride]
   );
   const activeAgentDocumentRef = useRef(activeAgentDocument);
@@ -172,7 +173,7 @@ const App: React.FC = () => {
   const graphPathSessionKeyRef = useRef(0);
   const appRef = useRef<HTMLDivElement | null>(null);
   const simulationPanelRef = useRef<HTMLDivElement | null>(null);
-  const installedGraphSummary = graphIRRuntimeStatus.appliedSummary;
+  const installedGraphSummary = agentRuntimeStatus.appliedSummary;
   const hasUnsavedDraftChanges = !areAgentsEquivalent(activeAgentDocument, draftAgentDocument);
 
   useEffect(() => {
@@ -251,7 +252,7 @@ const App: React.FC = () => {
 
   const resetRuntimeForBrainSwitch = useCallback(() => {
     setStats(INITIAL_STATS);
-    setGraphIRRuntimeActivity({ activeNodeIds: [] });
+    setAgentRuntimeActivity({ activeNodeIds: [] });
     setLifecycleRequest('idle');
     setResetToken((current) => current + 1);
   }, [setLifecycleRequest]);
@@ -359,12 +360,12 @@ const App: React.FC = () => {
     );
   }, [handleAgentChange]);
 
-  const handleGraphIRRuntimeStatusChange = useCallback((nextStatus: GraphIRRuntimeStatus) => {
-    setGraphIRRuntimeStatus(nextStatus);
+  const handleAgentRuntimeStatusChange = useCallback((nextStatus: AgentRuntimeStatus) => {
+    setAgentRuntimeStatus(nextStatus);
   }, []);
 
-  const handleGraphIRRuntimeActivityChange = useCallback((nextSnapshot: GraphIRRuntimeActivitySnapshot) => {
-    setGraphIRRuntimeActivity(nextSnapshot);
+  const handleAgentRuntimeActivityChange = useCallback((nextSnapshot: AgentRuntimeActivitySnapshot) => {
+    setAgentRuntimeActivity(nextSnapshot);
   }, []);
 
   const formatNumber = (num: number): string => {
@@ -481,7 +482,8 @@ const App: React.FC = () => {
       return;
     }
 
-    const blob = new Blob([JSON.stringify(selectedBrain, null, 2)], {
+    const exportedPackage = encodeBrainLibraryRecord(selectedBrain);
+    const blob = new Blob([JSON.stringify(exportedPackage, null, 2)], {
       type: 'application/json',
     });
     const url = URL.createObjectURL(blob);
@@ -692,16 +694,16 @@ const App: React.FC = () => {
             },
           ],
         };
-        setDraftGraphStatusOverride(createGraphIRDraftStatus(invalidAgent));
+        setDraftGraphStatusOverride(createAgentDraftStatus(invalidAgent));
       },
-      getRuntimeActiveNodeIds: () => [...graphIRRuntimeActivity.activeNodeIds],
+      getRuntimeActiveNodeIds: () => [...agentRuntimeActivity.activeNodeIds],
       getGraphPathIds: () => graphPath.map((item) => item.id),
     };
 
     return () => {
       delete window.__NEURALSOUP_TEST_API__;
     };
-  }, [graphIRRuntimeActivity.activeNodeIds, graphPath, handleAgentChange, isE2ETestMode]);
+  }, [agentRuntimeActivity.activeNodeIds, graphPath, handleAgentChange, isE2ETestMode]);
 
   return (
     <div
@@ -726,8 +728,8 @@ const App: React.FC = () => {
           onStatsUpdate={handleStatsUpdate}
           onLifecycleChange={handleLifecycleChange}
           onAgentParametersChange={handleAgentParametersChange}
-          onGraphIRStatusChange={handleGraphIRRuntimeStatusChange}
-          onGraphIRActivityChange={handleGraphIRRuntimeActivityChange}
+          onAgentRuntimeStatusChange={handleAgentRuntimeStatusChange}
+          onAgentRuntimeActivityChange={handleAgentRuntimeActivityChange}
         />
         <div className="game-stats-overlay">
           <div className="game-stat-chip">
@@ -772,10 +774,10 @@ const App: React.FC = () => {
           <span data-testid="vision-cells-value">{agentParameters.visionCells}</span>
           <span data-testid="vision-range-value">{agentParameters.visionRange}</span>
           <span data-testid="vision-angle-value">{agentParameters.visionAngle}</span>
-          <span data-testid="graph-ir-validation-count">{graphIRDraftStatus.issues.length}</span>
-          <span data-testid="graph-ir-runtime-state">{graphIRRuntimeStatus.state}</span>
-          <span data-testid="graph-ir-runtime-validation-count">{graphIRRuntimeStatus.issues.length}</span>
-          <span data-testid="graph-ir-runtime-message">{graphIRRuntimeStatus.message ?? ''}</span>
+          <span data-testid="graph-ir-validation-count">{agentDraftStatus.issues.length}</span>
+          <span data-testid="graph-ir-runtime-state">{agentRuntimeStatus.state}</span>
+          <span data-testid="graph-ir-runtime-validation-count">{agentRuntimeStatus.issues.length}</span>
+          <span data-testid="graph-ir-runtime-message">{agentRuntimeStatus.message ?? ''}</span>
           <span data-testid="graph-ir-installed-input-count">{installedGraphSummary.inputSignalCount}</span>
           <span data-testid="graph-ir-installed-neuron-count">{installedGraphSummary.neuronCount}</span>
           <span data-testid="graph-ir-installed-output-count">{installedGraphSummary.outputSignalCount}</span>
@@ -788,9 +790,9 @@ const App: React.FC = () => {
             agent={draftAgentDocument}
             graphSessionKey={graphEditorSessionKey}
             visionCells={agentParameters.visionCells}
-            runtimeStatus={graphIRRuntimeStatus}
-            draftStatus={graphIRDraftStatus}
-            runtimeActivity={graphIRRuntimeActivity}
+            runtimeStatus={agentRuntimeStatus}
+            draftStatus={agentDraftStatus}
+            runtimeActivity={agentRuntimeActivity}
             onAgentChange={handleAgentChange}
             onGraphPathChange={handleGraphPathChange}
             onGraphPathNavigateRegister={handleGraphPathNavigateRegister}

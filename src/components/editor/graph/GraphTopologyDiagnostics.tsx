@@ -1,10 +1,10 @@
 import React from 'react';
-import type { GraphIRDraftStatus, GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../../../types/graphIRRuntime';
+import type { AgentDraftStatus, AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../../../types/agentRuntime';
 import type { GraphCanvasViewport } from '../../hooks/useSNNTopologyState';
 
 interface GraphTopologyDiagnosticsProps {
   visionCells: number;
-  draftStatus: GraphIRDraftStatus;
+  draftStatus: AgentDraftStatus;
   draftSummary: {
     inputSignalCount: number;
     outputSignalCount: number;
@@ -12,8 +12,8 @@ interface GraphTopologyDiagnosticsProps {
     leafLinkCount: number;
   };
   draftValidationCount: number;
-  runtimeStatus: GraphIRRuntimeStatus;
-  runtimeActivity: GraphIRRuntimeActivitySnapshot;
+  runtimeStatus: AgentRuntimeStatus;
+  runtimeActivity: AgentRuntimeActivitySnapshot;
   nodeCount: number;
   connectionCount: number;
   selectedCount: number;
