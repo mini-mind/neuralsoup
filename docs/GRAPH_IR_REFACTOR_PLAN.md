@@ -259,6 +259,114 @@ compat 约束：
 - GraphView 的 viewport/scale、expanded 和 size 仍是 session/computed state；若未来需要跨会话恢复，应以新 schema 单独设计，而不是复活旧字段。
 - compat bridge、legacy type export 与部分 migration 命名仍残留在 domain/storage/runtime 周边；它们不是主路径真源，但仍是后续收口对象。
 
+## World Registry 设计准备
+
+当前 `BodyIR` 已经是 canonical 真源，但 `sourceTemplate` / `targetTemplate` 仍被 runtime 和 preview 解释成受限 grammar：
+
+- 输入必须解析成 `vision.<channel>.<cellIndex>`。
+- 输出必须解析成 `action.<turn-left|move-forward|turn-right>`。
+- `visionCellCount`、`BrainInputChannel`、`BrainOutputChannel` 仍直接参与 endpoint 枚举和 runtime lower。
+
+这意味着当前系统虽然已经只有一套 authority，但 authority 本身仍是“规则 + 硬编码 host grammar”。
+
+下一阶段目标不是立刻引入完全开放的世界 DSL，而是先把“规则如何映射到宿主能力”的解释器注册化，让 canonical `BodyIR` 不再直接依赖 `vision.* / action.*` 这组字面协议。
+
+### 目标边界
+
+引入新的 registry-backed host contract：
+
+```ts
+export interface BodyInputBinding {
+  id: string;
+  source: string;
+  scale: number;
+  worldPort: string;
+  runtimeIndex?: number;
+}
+
+export interface BodyOutputBinding {
+  id: string;
+  target: string;
+  decayPerSecond: number;
+  worldPort: string;
+}
+
+export interface WorldPortDescriptor {
+  id: string;
+  direction: 'input' | 'output';
+  kind: string;
+  enumerable: boolean;
+}
+
+export interface WorldRegistry {
+  version: 1;
+  inputs: WorldPortDescriptor[];
+  outputs: WorldPortDescriptor[];
+  resolveInputBinding(source: string): {
+    worldPort: string;
+    runtimeIndex?: number;
+    normalizedSource: string;
+  } | null;
+  resolveOutputBinding(target: string): {
+    worldPort: string;
+    normalizedTarget: string;
+  } | null;
+  enumerateInputSources?(rule: BodyInputRule, body: BodyIR): string[];
+  enumerateOutputTargets?(rule: BodyOutputRule, body: BodyIR): string[];
+}
+```
+
+设计原则：
+
+- `BodyIR` 仍然只保存规则，不保存 registry state。
+- `WorldRegistry` 是 runtime/editor 的宿主描述，不进入持久化 `AgentIR`。
+- `sourceTemplate` / `targetTemplate` 在 canonical schema 中继续保留为字符串，不在本阶段改成 AST。
+- `BodyInputNodeRuntime` / `BodyOutputNodeRuntime` 后续要从“硬编码视觉/动作字段”收敛到“binding + registry metadata”。
+- `visionCellCount` 暂时继续保留在 `BodyIR`；它先作为默认 world registry 的输入覆盖范围参数，而不是直接等价于 `vision.*` grammar。
+
+### Phase 1 范围
+
+`task-024` 第一阶段只做接口抽象和默认 registry 落地，不做开放式 DSL：
+
+- 保留当前默认 world registry：
+  - 输入端口族仍是 `vision`
+  - 输出端口族仍是 `action`
+- 但把硬编码解析逻辑从 `agent-body-rules.ts` / `agent-compiler.ts` 挪到默认 registry 中。
+- preview、endpoint 枚举、compile、reconcile 共用同一个 registry 入口，而不是各自解析 `vision.* / action.*`。
+- `BrainOutputChannel` 不在第一阶段强制删除，但要从 canonical `BodyIR` 解释链中退出，只保留在默认 runtime/host adapter 层。
+
+### 非目标
+
+本阶段不做以下事情：
+
+- 不把 `BodyIR` 改写成完整 DSL 或 NESTML 风格 AST。
+- 不允许用户在 UI 中动态配置多套 registry。
+- 不引入新的持久化 schema 版本。
+- 不移除 `visionCellCount`。
+- 不在本阶段处理跨 world 的热插拔/插件协议。
+
+### 迁移边界
+
+本阶段迁移完成后，应满足：
+
+- `resolveAgentBodyInputRuleBindings` / `resolveAgentBodyOutputRuleBindings` 不再直接解析 `vision.* / action.*`。
+- `enumerateInputRuleNodeIds` / `enumerateOutputRuleNodeIds` 不再内嵌 `visionCellCount` 和动作集合推导，而是走默认 registry 的枚举接口。
+- `compileAgentIR` 不再直接依赖 `BrainOutputChannel` 解释 `BodyIR.targetTemplate`。
+- 默认 world/runtime adapter 仍可以把 registry 的 `worldPort` lower 到今天的视觉输入数组和动作输出槽位，因此用户可见行为不变。
+
+### task-024 切入点
+
+第一批代码落点应是：
+
+- 新增 `src/domain/brain/world-registry.ts`
+  - 定义 `WorldRegistry`、binding/result 类型
+  - 提供默认 `vision/action` registry
+- 改造 `agent-body-rules.ts`
+  - 将输入/输出解析与枚举委托给 registry
+- 改造 `agent-compiler.ts`
+  - `AgentProgramInputPort` / `AgentProgramOutputPort` 优先承载 registry-normalized data
+- 保持 `agent-step.ts` 和 runtime adapter 可兼容默认 registry，不在第一阶段扩展 UI
+
 ## 验收边界
 
 - 生产代码不再暴露 `BrainPackage`、`GraphIRDocument`、`BodyDefinition`、`AdapterNode`、`SignalNode`、`LeafLink` 作为持久化主结构。

@@ -6,7 +6,7 @@ import type {
   NeuronGroupNode,
   NeuronNode,
   TopologyNode,
-} from '../domain/brain/ir';
+} from './legacyGraphIR';
 import {
   createDefaultLegacyBodyDefinition,
   getLegacyBodyVisionCellCount,

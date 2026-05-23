@@ -1,14 +1,30 @@
 export {
   assertValidGraphIRDocument,
   GraphIRValidationError,
+  collectLeafNodes,
   collectNeuronNodes,
   collectSignalNodes,
   summarizeGraphIRDocument,
   validateGraphIRDocument,
-} from '../domain/brain/ir';
+} from './legacyGraphIRSchema';
 
 export type {
+  AdapterNode,
+  AggregateLinkView,
   GraphIRDocument,
+  GraphIRValidationIssue,
+  LeafLink,
+  LiteralValue,
   ModelDefinition,
+  NeuronGroupNode,
   NeuronNode,
-} from '../domain/brain/ir';
+  PortDefinition,
+  RootGraph,
+  SignalDefinition,
+  SignalNode,
+  TopologyNode,
+  ValidatedGraphIRDocument,
+  ValidatedRootGraph,
+  ValidatedTopologyNode,
+  VariableDefinition,
+} from './legacyGraphIRSchema';

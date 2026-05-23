@@ -3,14 +3,13 @@ import type {
   AggregateLinkView,
   LeafLink,
   LiteralValue,
-  ModelDefinition,
   NeuronGroupNode,
   NeuronNode,
   RootGraph,
   SignalNode,
   TopologyNode,
   GraphIRDocument,
-} from '../domain/brain/ir';
+} from './legacyGraphIR';
 import type { Position, IzhikevichNeuronParameters } from '../domain/brain/shared';
 import { getGraphLinkCapabilities } from '../components/editor/graph/graphLinkPolicy';
 import type {
@@ -61,8 +60,6 @@ export const isLeafNode = (node: TopologyNode): node is NeuronNode | SignalNode 
 
 export const isContainerNode = (node: TopologyNode): node is AdapterNode | NeuronGroupNode =>
   node.kind === 'adapter' || node.kind === 'neuron-group';
-
-const getModelById = (models: ModelDefinition[]) => new Map(models.map((model) => [model.id, model]));
 
 const toFiniteNumber = (value: LiteralValue | undefined, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? value : fallback;
@@ -398,7 +395,6 @@ export const buildLegacyGraphViewModel = ({
     });
   }
 
-  const modelById = getModelById(document.models);
   const containerLinks = document.root.links.filter(
     (link) => containerLeafIds.has(link.from.nodeId) && containerLeafIds.has(link.to.nodeId)
   );
@@ -603,6 +599,5 @@ export const buildLegacyGraphViewModel = ({
     visibleNodeByRefId,
     links,
     activeViewNodeIds,
-    modelById,
   };
 };

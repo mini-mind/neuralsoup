@@ -1,4 +1,4 @@
-import type { Position } from './shared';
+import type { Position } from '../domain/brain/shared';
 
 export type LiteralValue =
   | boolean

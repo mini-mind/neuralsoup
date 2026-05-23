@@ -15,14 +15,14 @@ import {
   type GraphIRValidationIssue,
   validateGraphIRDocument,
   type GraphIRDocument,
-} from '../domain/brain/ir';
+} from './legacyGraphIR';
 import { createDefaultLegacyBodyDefinition, type LegacyBodyDefinition } from '../compat/legacyBrainPackage';
 import type { AgentRuntimeStatus } from '../types/agentRuntime';
 import { deriveAgentIRVisionCellCount } from './legacyVisionCellCount';
 import {
   getLegacySimulationSessionAdapter,
   type LegacySimulationSessionCompatTarget,
-} from '../runtime/legacySimulationSessionAdapter';
+} from './legacySimulationSessionAdapter';
 
 const LEGACY_VISION_INPUT_PATTERN = /^vision-[RGB]-(\d+)$/;
 

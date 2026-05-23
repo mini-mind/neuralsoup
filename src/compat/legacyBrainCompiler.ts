@@ -2,7 +2,7 @@ import {
   collectLeafNodes,
   GraphIRValidationError,
   validateGraphIRDocument,
-} from '../domain/brain/ir';
+} from './legacyGraphIR';
 import { AgentValidationError, compileAgentIR } from '../domain/brain/agent-compiler';
 import { createAgentIRFromLegacyGraphDetailed } from './legacyGraphBridge';
 import type {
@@ -12,7 +12,7 @@ import type {
   NeuronNode,
   SignalNode,
   TopologyNode,
-} from '../domain/brain/ir';
+} from './legacyGraphIR';
 import type {
   LegacyBodyDefinition,
   LegacyBodyInputSignal,

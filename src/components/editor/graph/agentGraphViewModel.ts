@@ -6,7 +6,6 @@ import type {
   BrainNeuronNode,
 } from '../../../domain/brain';
 import { resolveAgentBodyEndpointIds } from '../../../domain/brain';
-import type { ModelDefinition } from '../../../domain/brain/ir';
 import type { Position } from '../../../domain/brain/shared';
 import { getGraphLinkCapabilities } from './graphLinkPolicy';
 import type {
@@ -57,8 +56,6 @@ const ROOT_FALLBACK_LAYOUT: Record<string, Position> = {
   'core-input-adapter': { x: 40, y: 180 },
   'core-output-adapter': { x: 520, y: 180 },
 };
-
-const DEFAULT_MODELS: ModelDefinition[] = [];
 
 const BODY_INPUTS_GROUP_ID = 'input-adapter';
 const BODY_OUTPUTS_GROUP_ID = 'output-adapter';
@@ -910,6 +907,5 @@ export const buildAgentGraphViewModel = ({
     visibleNodeByRefId,
     links,
     activeViewNodeIds,
-    modelById: new Map(DEFAULT_MODELS.map((model) => [model.id, model])),
   };
 };

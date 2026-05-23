@@ -1,5 +1,5 @@
-import { GraphIRValidationError, collectNeuronNodes, collectSignalNodes, validateGraphIRDocument } from '../domain/brain/ir';
-import type { GraphIRDocument, LeafLink, ModelDefinition, NeuronNode, SignalNode, TopologyNode } from '../domain/brain/ir';
+import { GraphIRValidationError, collectNeuronNodes, collectSignalNodes, validateGraphIRDocument } from './legacyGraphIR';
+import type { GraphIRDocument, LeafLink, ModelDefinition, NeuronNode, SignalNode, TopologyNode } from './legacyGraphIR';
 import type { BrainInputChannel, BrainOutputChannel, IzhikevichNeuronParameters } from '../domain/brain/shared';
 
 const DEFAULT_NEURON_PARAMS: IzhikevichNeuronParameters = {

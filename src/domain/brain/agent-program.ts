@@ -4,6 +4,7 @@ import type { BrainOutputChannel, IzhikevichNeuronParameters } from './shared';
 export interface AgentProgramInputPort {
   id: string;
   source: string;
+  worldPort: string;
   index: number;
   scale: number;
 }
@@ -11,6 +12,8 @@ export interface AgentProgramInputPort {
 export interface AgentProgramOutputPort {
   id: string;
   target: BrainOutputChannel;
+  normalizedTarget: string;
+  worldPort: string;
   decayPerSecond: number;
 }
 

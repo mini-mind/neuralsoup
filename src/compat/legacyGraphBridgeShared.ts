@@ -5,7 +5,7 @@ import type {
   BodyIR,
   BrainNeuronNode,
 } from '../domain/brain/agent-ir';
-import type { GraphIRDocument, NeuronNode, SignalNode, TopologyNode } from '../domain/brain/ir';
+import type { GraphIRDocument, NeuronNode, SignalNode, TopologyNode } from './legacyGraphIR';
 import { getLegacyBodyVisionCellCount, type LegacyBodyDefinition } from './legacyBrainPackage';
 
 export const DEFAULT_NEURON_PARAMS: IzhikevichNeuronParameters = {

@@ -5,7 +5,7 @@ import type {
   BodyOutputNodeRuntime,
   BodyOutputRule,
 } from './agent-ir';
-import type { BrainOutputChannel } from './shared';
+import { getDefaultWorldRegistry } from './world-registry';
 
 export type AgentBodyRuleScope = 'input' | 'output';
 export type AgentBodyRuleIssueKind = 'compile-error' | 'conflict' | 'unmatched';
@@ -30,7 +30,7 @@ export interface AgentBodyRuleIssueSummaryItem {
   nodeId?: string;
   relatedRuleIds?: string[];
   resolved?: string;
-  target?: BrainOutputChannel;
+  target?: string;
 }
 
 export interface AgentBodyRuleScopePreview {
@@ -56,121 +56,11 @@ interface BodyRuleResolution<RuntimeNode> {
   rules: AgentBodyRulePreviewGroup[];
 }
 
-const BODY_INPUT_SOURCE_PATTERN = /^vision\.([RGB])\.(\d+)$/;
-const BODY_OUTPUT_TARGET_PATTERN = /^action\.(turn-left|move-forward|turn-right)$/;
-const INPUT_CHANNEL_OFFSET = {
-  R: 0,
-  G: 1,
-  B: 2,
-} as const;
-const INPUT_CHANNEL_VALUES = ['R', 'G', 'B'] as const;
-const OUTPUT_CHANNEL_VALUES = ['turn-left', 'move-forward', 'turn-right'] as const;
-
-type SupportedGroupKind = 'channel' | 'cell' | 'action';
-type PatternSegment =
-  | { type: 'literal'; value: string }
-  | { type: 'group'; index: number; kind: SupportedGroupKind };
-
 const applyRuleTemplate = (template: string, match: RegExpExecArray): string =>
   template.replace(/\$(\d+)/g, (_token, rawGroupIndex: string) => {
     const groupIndex = Number.parseInt(rawGroupIndex, 10);
     return match[groupIndex] ?? '';
   });
-
-const appendLiteralSegment = (segments: PatternSegment[], literal: string) => {
-  if (literal.length === 0) {
-    return;
-  }
-
-  const lastSegment = segments[segments.length - 1];
-  if (lastSegment?.type === 'literal') {
-    lastSegment.value += literal;
-    return;
-  }
-
-  segments.push({ type: 'literal', value: literal });
-};
-
-const parseSupportedNodeIdPattern = (pattern: string): PatternSegment[] | null => {
-  const anchoredPattern =
-    pattern.startsWith('^') && pattern.endsWith('$') ? pattern.slice(1, -1) : pattern;
-  const segments: PatternSegment[] = [];
-  let cursor = 0;
-  let groupIndex = 1;
-
-  while (cursor < anchoredPattern.length) {
-    const remaining = anchoredPattern.slice(cursor);
-
-    if (remaining.startsWith('([RGB])')) {
-      segments.push({ type: 'group', index: groupIndex, kind: 'channel' });
-      groupIndex += 1;
-      cursor += '([RGB])'.length;
-      continue;
-    }
-
-    if (remaining.startsWith('(\\\\d+)') || remaining.startsWith('(\\d+)')) {
-      segments.push({ type: 'group', index: groupIndex, kind: 'cell' });
-      groupIndex += 1;
-      cursor += remaining.startsWith('(\\\\d+)') ? '(\\\\d+)'.length : '(\\d+)'.length;
-      continue;
-    }
-
-    if (remaining.startsWith('(turn-left|move-forward|turn-right)')) {
-      segments.push({ type: 'group', index: groupIndex, kind: 'action' });
-      groupIndex += 1;
-      cursor += '(turn-left|move-forward|turn-right)'.length;
-      continue;
-    }
-
-    const current = anchoredPattern[cursor];
-    if (!current) {
-      break;
-    }
-
-    if (current === '\\') {
-      const escaped = anchoredPattern[cursor + 1];
-      if (!escaped) {
-        return null;
-      }
-
-      appendLiteralSegment(segments, escaped);
-      cursor += 2;
-      continue;
-    }
-
-    if ('[]{}+*?|()'.includes(current)) {
-      return null;
-    }
-
-    appendLiteralSegment(segments, current);
-    cursor += 1;
-  }
-
-  return segments;
-};
-
-const buildNodeIdFromSegments = (
-  segments: PatternSegment[],
-  valuesByGroupIndex: Map<number, string>
-): string | null => {
-  let nodeId = '';
-
-  for (const segment of segments) {
-    if (segment.type === 'literal') {
-      nodeId += segment.value;
-      continue;
-    }
-
-    const value = valuesByGroupIndex.get(segment.index);
-    if (value == null) {
-      return null;
-    }
-
-    nodeId += value;
-  }
-
-  return nodeId;
-};
 
 const executeRulePattern = (regex: RegExp, nodeId: string): RegExpExecArray | null => {
   regex.lastIndex = 0;
@@ -200,17 +90,15 @@ const compileRulePattern = (
 };
 
 const parseBodyInputSource = (nodeId: string, source: string, scale: number): BodyInputNodeRuntime | null => {
-  const match = source.match(BODY_INPUT_SOURCE_PATTERN);
-  if (!match) {
+  const binding = getDefaultWorldRegistry().resolveInputBinding(source);
+  if (!binding || binding.runtimeIndex == null) {
     return null;
   }
-
-  const channel = match[1] as keyof typeof INPUT_CHANNEL_OFFSET;
-  const cellIndex = Number.parseInt(match[2], 10);
   return {
     id: nodeId,
-    source: `vision.${channel}.${cellIndex}`,
-    visualInputIndex: cellIndex * 3 + INPUT_CHANNEL_OFFSET[channel],
+    source: binding.source,
+    worldPort: binding.worldPort,
+    visualInputIndex: binding.runtimeIndex,
     scale,
   };
 };
@@ -220,84 +108,36 @@ const parseBodyOutputTarget = (
   target: string,
   decayPerSecond: number
 ): BodyOutputNodeRuntime | null => {
-  const match = target.match(BODY_OUTPUT_TARGET_PATTERN);
-  if (!match) {
+  const binding = getDefaultWorldRegistry().resolveOutputBinding(target);
+  if (!binding) {
     return null;
   }
 
   return {
     id: nodeId,
-    target: match[1] as BrainOutputChannel,
+    target: binding.runtimeTarget,
+    normalizedTarget: binding.target,
+    worldPort: binding.worldPort,
     decayPerSecond,
   };
 };
 
 const enumerateInputRuleNodeIds = (rule: BodyInputRule, visionCellCount: number): string[] => {
-  const templateMatch = rule.sourceTemplate.match(/^vision\.\$(\d+)\.\$(\d+)$/);
-  const segments = parseSupportedNodeIdPattern(rule.nodeIdPattern);
-  if (!templateMatch || !segments) {
-    return [];
-  }
-
-  const channelGroupIndex = Number.parseInt(templateMatch[1], 10);
-  const cellGroupIndex = Number.parseInt(templateMatch[2], 10);
-  const channelGroup = segments.find(
-    (segment): segment is Extract<PatternSegment, { type: 'group' }> =>
-      segment.type === 'group' && segment.index === channelGroupIndex
-  );
-  const cellGroup = segments.find(
-    (segment): segment is Extract<PatternSegment, { type: 'group' }> =>
-      segment.type === 'group' && segment.index === cellGroupIndex
-  );
-
-  if (channelGroup?.kind !== 'channel' || cellGroup?.kind !== 'cell') {
-    return [];
-  }
-
-  const nodeIds = new Set<string>();
-  for (let cellIndex = 0; cellIndex < visionCellCount; cellIndex += 1) {
-    for (const channel of INPUT_CHANNEL_VALUES) {
-      const nodeId = buildNodeIdFromSegments(
-        segments,
-        new Map([
-          [channelGroupIndex, channel],
-          [cellGroupIndex, String(cellIndex)],
-        ])
-      );
-      if (nodeId) {
-        nodeIds.add(nodeId);
-      }
-    }
-  }
-
-  return [...nodeIds];
+  return getDefaultWorldRegistry().enumerateInputNodeIds(rule, {
+    version: 1,
+    visionCellCount,
+    inputRules: [],
+    outputRules: [],
+  });
 };
 
 const enumerateOutputRuleNodeIds = (rule: BodyOutputRule): string[] => {
-  const templateMatch = rule.targetTemplate.match(/^action\.\$(\d+)$/);
-  const segments = parseSupportedNodeIdPattern(rule.nodeIdPattern);
-  if (!templateMatch || !segments) {
-    return [];
-  }
-
-  const actionGroupIndex = Number.parseInt(templateMatch[1], 10);
-  const actionGroup = segments.find(
-    (segment): segment is Extract<PatternSegment, { type: 'group' }> =>
-      segment.type === 'group' && segment.index === actionGroupIndex
-  );
-  if (actionGroup?.kind !== 'action') {
-    return [];
-  }
-
-  const nodeIds = new Set<string>();
-  for (const action of OUTPUT_CHANNEL_VALUES) {
-    const nodeId = buildNodeIdFromSegments(segments, new Map([[actionGroupIndex, action]]));
-    if (nodeId) {
-      nodeIds.add(nodeId);
-    }
-  }
-
-  return [...nodeIds];
+  return getDefaultWorldRegistry().enumerateOutputNodeIds(rule, {
+    version: 1,
+    visionCellCount: 0,
+    inputRules: [],
+    outputRules: [],
+  });
 };
 
 const collectEndpointIdsFromConnections = (agent: AgentIR, scope: 'bodyInput' | 'bodyOutput'): Set<string> => {
@@ -478,7 +318,7 @@ const resolveBodyOutputRules = (
   const nodesById = new Map<string, BodyOutputNodeRuntime>();
   const { compiledRules, issues, previews } = buildOutputPreviewGroups(rules);
   const previewByRuleId = new Map(previews.map((preview) => [preview.ruleId, preview]));
-  const targetToNodeId = new Map<BrainOutputChannel, string>();
+  const targetToNodeId = new Map<string, string>();
   const nodeIdList = [...nodeIds];
 
   for (const nodeId of nodeIdList) {

@@ -1,4 +1,4 @@
-import type { LeafLink, ModelDefinition } from '../domain/brain/ir';
+import type { LeafLink, ModelDefinition } from './legacyGraphIR';
 import type { BrainInputChannel, BrainOutputChannel, IzhikevichNeuronParameters } from '../domain/brain/shared';
 import type { AgentProgram } from '../domain/brain/agent-program';
 

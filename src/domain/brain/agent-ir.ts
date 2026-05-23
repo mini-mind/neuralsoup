@@ -1,4 +1,6 @@
-import type { BrainOutputChannel, IzhikevichNeuronParameters, Position } from './shared';
+import type { IzhikevichNeuronParameters, Position } from './shared';
+import type { BrainOutputChannel } from './shared';
+import { getDefaultWorldRegistry } from './world-registry';
 
 export interface AgentMetadata {
   id: string;
@@ -100,15 +102,10 @@ export interface AgentIRSummary {
   leafLinkCount: number;
 }
 
-export interface AgentLibraryItem {
-  packageVersion: 1;
-  metadata: AgentMetadata;
-  agent: AgentIR;
-}
-
 export interface BodyInputNodeRuntime {
   id: string;
   source: string;
+  worldPort: string;
   visualInputIndex: number;
   scale: number;
 }
@@ -116,11 +113,10 @@ export interface BodyInputNodeRuntime {
 export interface BodyOutputNodeRuntime {
   id: string;
   target: BrainOutputChannel;
+  normalizedTarget: string;
+  worldPort: string;
   decayPerSecond: number;
 }
-
-const LEGACY_BODY_INPUT_NODE_PATTERN = /^vision-[RGB]-(\d+)$/;
-const BODY_INPUT_SOURCE_PATTERN = /^vision\.[RGB]\.(\d+)$/;
 
 const normalizeVisionCellCount = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0
@@ -133,24 +129,10 @@ const applyRuleTemplate = (template: string, match: RegExpExecArray): string =>
     return match[groupIndex] ?? '';
   });
 
-const parseLegacyVisionCellIndex = (nodeId: string): number | null => {
-  const match = nodeId.match(LEGACY_BODY_INPUT_NODE_PATTERN);
-  if (!match) {
-    return null;
-  }
-
-  return Number.parseInt(match[1], 10);
-};
-
 export const resolveBodyInputVisionCellIndex = (
   nodeId: string,
   rules: BodyInputRule[]
 ): number | null => {
-  const legacyCellIndex = parseLegacyVisionCellIndex(nodeId);
-  if (legacyCellIndex != null) {
-    return legacyCellIndex;
-  }
-
   const matches = rules.flatMap((rule) => {
     try {
       const regex = new RegExp(rule.nodeIdPattern);
@@ -166,8 +148,8 @@ export const resolveBodyInputVisionCellIndex = (
   }
 
   const source = applyRuleTemplate(matches[0].rule.sourceTemplate, matches[0].match);
-  const sourceMatch = source.match(BODY_INPUT_SOURCE_PATTERN);
-  return sourceMatch ? Number.parseInt(sourceMatch[1], 10) : null;
+  const binding = getDefaultWorldRegistry().resolveInputBinding(source);
+  return binding?.runtimeIndex != null ? Math.floor(binding.runtimeIndex / 3) : null;
 };
 
 export const withVisionCellCount = (

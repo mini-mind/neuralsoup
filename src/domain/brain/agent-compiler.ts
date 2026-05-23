@@ -359,6 +359,7 @@ export const compileAgentIR = (agent: AgentIR): AgentProgram => {
       .map((node) => ({
         id: node.id,
         source: node.source,
+        worldPort: node.worldPort,
         index: node.visualInputIndex,
         scale: node.scale,
       })),
@@ -367,6 +368,8 @@ export const compileAgentIR = (agent: AgentIR): AgentProgram => {
       return {
         id: outputNode?.id ?? `output-${channel}`,
         target: channel,
+        normalizedTarget: outputNode?.normalizedTarget ?? `action.${channel}`,
+        worldPort: outputNode?.worldPort ?? 'action',
         decayPerSecond: outputNode?.decayPerSecond ?? 0,
       };
     }),

@@ -1,7 +1,7 @@
 import type { BrainInputChannel, BrainOutputChannel, Position } from '../domain/brain/shared';
 import type { AgentIR, AgentMetadata } from '../domain/brain/agent-ir';
 import { AgentValidationError } from '../domain/brain/agent-compiler';
-import type { GraphIRDocument } from '../domain/brain/ir';
+import type { GraphIRDocument } from './legacyGraphIR';
 import { createAgentIRFromLegacyGraphDetailed } from './legacyGraphBridge';
 
 export type LegacyBrainDefinition = GraphIRDocument;

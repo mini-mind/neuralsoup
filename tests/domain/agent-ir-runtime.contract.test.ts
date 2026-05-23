@@ -92,6 +92,7 @@ test('compileAgentIR resolves BodyIR regex rules into runtime ports instead of r
     {
       id: 'sensor-G-2',
       source: 'vision.G.2',
+      worldPort: 'vision',
       index: 7,
       scale: 2,
     },
@@ -101,6 +102,8 @@ test('compileAgentIR resolves BodyIR regex rules into runtime ports instead of r
     {
       id: 'effector-move-forward',
       target: 'move-forward',
+      normalizedTarget: 'action.move-forward',
+      worldPort: 'action',
       decayPerSecond: 3,
     }
   );

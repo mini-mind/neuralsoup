@@ -1,7 +1,7 @@
 import type { AgentIR } from '../domain/brain';
 import type { AgentRuntimeStatus } from '../types/agentRuntime';
 import type { Agent } from '../types/simulation';
-import { SimulationSession } from './SimulationSession';
+import { SimulationSession } from '../runtime/SimulationSession';
 
 export interface LegacySimulationSessionAdapter {
   getCurrentAgentIR(): AgentIR;

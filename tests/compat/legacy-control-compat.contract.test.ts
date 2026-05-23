@@ -5,7 +5,7 @@ import { VisionSystem } from '../../src/engine/VisionSystem';
 import { WorldManager } from '../../src/engine/WorldManager';
 import { CollisionDetector } from '../../src/engine/CollisionDetector';
 import { SimulationSession } from '../../src/runtime/SimulationSession';
-import { createLegacySimulationSessionAdapter } from '../../src/runtime/legacySimulationSessionAdapter';
+import { createLegacySimulationSessionAdapter } from '../../src/compat/legacySimulationSessionAdapter';
 import {
   exportLegacyGraphIRDocument,
   inspectLegacyGraphIRExport,

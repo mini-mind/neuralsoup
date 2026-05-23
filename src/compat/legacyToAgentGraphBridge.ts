@@ -13,7 +13,7 @@ import type {
   LeafLink,
   NeuronGroupNode,
   TopologyNode,
-} from '../domain/brain/ir';
+} from './legacyGraphIR';
 import {
   createLegacyBrainLayoutFromDefinition,
   createDefaultLegacyBodyDefinition,

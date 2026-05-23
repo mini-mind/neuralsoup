@@ -1,4 +1,3 @@
-import type { ModelDefinition } from '../../../domain/brain/ir';
 import type { Position } from '../../../domain/brain/shared';
 
 export interface GraphBreadcrumbItem {
@@ -67,7 +66,6 @@ export interface GraphViewModel<Node, Container> {
   visibleNodeByRefId: Map<string, GraphViewNode>;
   links: GraphViewLink[];
   activeViewNodeIds: Set<string>;
-  modelById: Map<string, ModelDefinition>;
 }
 
 export type NodePositionDraftMap = Record<string, Position>;
