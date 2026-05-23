@@ -21,6 +21,7 @@ import type {
   BrainProgramNeuronNode,
   BrainProgramOutputBinding,
   BrainProgramSignalNode,
+  LegacyBrainProgram,
   ProgramInputPort,
   ProgramOutputPort,
 } from './program';
@@ -221,9 +222,6 @@ const assertBodyBindingsTargetRootAdapterSignals = (
 };
 
 export const compileBrainDefinition = (document: BrainDefinition, body: BodyDefinition): BrainProgram => {
-  const agentProgram = compileAgentIR(
-    createAgentIRFromLegacyGraph('legacy-graph-bridge', document, body)
-  );
   const issues = validateGraphIRDocument(document);
   if (issues.length > 0) {
     throw new GraphIRValidationError(issues);
@@ -318,9 +316,13 @@ export const compileBrainDefinition = (document: BrainDefinition, body: BodyDefi
     targetNode.inputConnections.push(connection);
   }
 
-  return {
-    graphIR: document,
-    agentProgram,
+  const compiledAgentProgram = compileAgentIR(
+    createAgentIRFromLegacyGraph('legacy-graph-bridge', document, body)
+  );
+
+  const legacyProgram = {
+    legacyGraphIR: document,
+    compiledAgentProgram,
     inputPorts,
     neuronNodes,
     outputPorts,
@@ -345,5 +347,15 @@ export const compileBrainDefinition = (document: BrainDefinition, body: BodyDefi
       neurons: new Map(neuronNodes.map((node) => [node.id, node])),
       outputs: new Map(signalNodes.filter((node) => node.direction === 'output').map((node) => [node.id, node])),
     },
-  };
+  } as LegacyBrainProgram;
+  return Object.defineProperties(legacyProgram, {
+    graphIR: {
+      enumerable: true,
+      get: () => legacyProgram.legacyGraphIR,
+    },
+    agentProgram: {
+      enumerable: true,
+      get: () => legacyProgram.compiledAgentProgram,
+    },
+  }) as BrainProgram;
 };

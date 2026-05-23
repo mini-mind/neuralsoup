@@ -1,5 +1,5 @@
 import type { BrainOutputChannel, IzhikevichNeuronRuntimeState } from './shared';
-import type { BrainProgram } from './program';
+import type { LegacyBrainProgram } from './program';
 import { createAgentProgramRuntimeState, stepAgentProgram, type AgentProgramRuntimeState } from './agent-step';
 
 export interface BrainProgramRuntimeState {
@@ -29,33 +29,54 @@ const sigmoid = (value: number): number => 1 / (1 + Math.exp(-value));
 const normalizeOutputSignal = (value: number): number =>
   clampUnit((sigmoid(value * 2) - 0.5) * 2);
 
+const buildCompatSignalSnapshotFromAgentRuntime = (
+  program: LegacyBrainProgram,
+  sensoryInputs: number[],
+  agentRuntimeState: AgentProgramRuntimeState
+): Map<string, number> => {
+  const nextSignals = new Map(program.signalNodes.map((signalNode) => [signalNode.id, 0]));
+
+  for (const binding of program.inputBindings) {
+    nextSignals.set(binding.nodeId, sensoryInputs[binding.index] ?? 0);
+  }
+
+  for (const binding of program.outputBindings) {
+    const outputValue = agentRuntimeState.bodyOutputs.get(binding.nodeId) ?? 0;
+    nextSignals.set(binding.nodeId, outputValue);
+  }
+
+  return nextSignals;
+};
+
 export const createBrainProgramRuntimeState = (
-  program: BrainProgram
+  program: LegacyBrainProgram
 ): BrainProgramRuntimeState => ({
   neurons: new Map(
     program.neuronNodes.map((neuron) => [neuron.id, DEFAULT_RUNTIME_STATE()])
   ),
   signals: new Map(program.signalNodes.map((signalNode) => [signalNode.id, 0])),
-  agentRuntimeState: program.agentProgram ? createAgentProgramRuntimeState(program.agentProgram) : undefined,
+  agentRuntimeState: program.compiledAgentProgram
+    ? createAgentProgramRuntimeState(program.compiledAgentProgram)
+    : undefined,
   activeLeafNodeIds: [],
 });
 
 export const resetBrainProgramRuntimeState = (
-  program: BrainProgram
+  program: LegacyBrainProgram
 ): BrainProgramRuntimeState => createBrainProgramRuntimeState(program);
 
 export const stepBrainProgram = (
-  program: BrainProgram,
+  program: LegacyBrainProgram,
   sensoryInputs: number[],
   previousState: BrainProgramRuntimeState,
   deltaTimeSeconds: number,
   timestamp: number = Date.now()
 ): BrainProgramStepResult => {
-  if (program.agentProgram) {
+  if (program.compiledAgentProgram) {
     const agentResult = stepAgentProgram(
-      program.agentProgram,
+      program.compiledAgentProgram,
       sensoryInputs,
-      previousState.agentRuntimeState ?? createAgentProgramRuntimeState(program.agentProgram),
+      previousState.agentRuntimeState ?? createAgentProgramRuntimeState(program.compiledAgentProgram),
       deltaTimeSeconds,
       timestamp
     );
@@ -63,7 +84,11 @@ export const stepBrainProgram = (
     return {
       runtimeState: {
         neurons: agentResult.runtimeState.neurons,
-        signals: previousState.signals,
+        signals: buildCompatSignalSnapshotFromAgentRuntime(
+          program,
+          sensoryInputs,
+          agentResult.runtimeState
+        ),
         agentRuntimeState: agentResult.runtimeState,
         activeLeafNodeIds: agentResult.runtimeState.activeLeafNodeIds,
       },

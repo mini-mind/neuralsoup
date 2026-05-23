@@ -9,6 +9,7 @@ import {
   createDefaultGraphIRDocument,
   summarizeGraphIRDocument,
   validateGraphIRDocument,
+  type LegacyBrainProgram,
 } from '../../src/domain/brain/compat';
 import type { GraphIRDocument } from '../../src/domain/brain/compat';
 
@@ -22,7 +23,7 @@ const compileDefaultBrain = (document: GraphIRDocument) =>
 
 test('default GraphIR document compiles into a runtime program with vision-aligned bindings', () => {
   const document = createDefaultGraphIRDocument(24);
-  const program = compileDefaultBrain(document);
+  const program: LegacyBrainProgram = compileDefaultBrain(document);
 
   assert.equal(program.inputPorts.length, 72);
   assert.equal(program.outputPorts.length, 3);
@@ -36,6 +37,7 @@ test('default GraphIR document compiles into a runtime program with vision-align
     program.outputBindings.map((binding) => binding.channel),
     ['turn-left', 'move-forward', 'turn-right']
   );
+  assert.equal(program.legacyGraphIR, document);
 });
 
 test('default GraphIR summary reflects leaf topology counts', () => {

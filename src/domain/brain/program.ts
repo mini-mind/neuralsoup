@@ -64,9 +64,9 @@ export interface BrainProgramSignalNode {
   outputConnections: BrainProgramConnection[];
 }
 
-export interface BrainProgram {
-  graphIR: GraphIRDocument;
-  agentProgram?: AgentProgram;
+export interface LegacyBrainProgram {
+  legacyGraphIR: GraphIRDocument;
+  compiledAgentProgram?: AgentProgram;
   inputPorts: ProgramInputPort[];
   neuronNodes: BrainProgramNeuronNode[];
   outputPorts: ProgramOutputPort[];
@@ -76,4 +76,8 @@ export interface BrainProgram {
   outputBindings: BrainProgramOutputBinding[];
   modelsById: Map<string, ModelDefinition>;
   nodeIndex: BrainProgramNodeIndex;
+}
+export interface BrainProgram extends LegacyBrainProgram {
+  readonly graphIR: GraphIRDocument;
+  readonly agentProgram?: AgentProgram;
 }

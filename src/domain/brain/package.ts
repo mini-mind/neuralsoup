@@ -17,11 +17,23 @@ export interface BrainMetadata {
 export interface BrainLayoutNodeState {
   position?: Position;
   collapsed?: boolean;
+  size?: {
+    width: number;
+    height: number;
+  };
 }
 
 export interface BrainLayoutDocument {
   version: 1;
   nodes: Record<string, BrainLayoutNodeState>;
+  viewportByContainerId?: Record<
+    string,
+    {
+      x: number;
+      y: number;
+      scale: number;
+    }
+  >;
 }
 
 export interface BodyInputSignal {
@@ -31,6 +43,7 @@ export interface BodyInputSignal {
     channel: BrainInputChannel;
     cellIndex: number;
   };
+  scale?: number;
 }
 
 export interface BodyOutputSignal {
@@ -39,6 +52,7 @@ export interface BodyOutputSignal {
     kind: 'action-channel';
     channel: BrainOutputChannel;
   };
+  decayPerSecond?: number;
 }
 
 export interface BodyInputBinding {
@@ -130,6 +144,7 @@ export const createDefaultBodyDefinition = (visionCells: number): BodyDefinition
         channel,
         cellIndex,
       },
+      scale: 1,
     }))
   ),
   outputSignals: OUTPUT_CHANNELS.map((channel) => ({
@@ -138,6 +153,7 @@ export const createDefaultBodyDefinition = (visionCells: number): BodyDefinition
       kind: 'action-channel' as const,
       channel,
     },
+    decayPerSecond: 4,
   })),
   brainBindings: {
     inputs: INPUT_CHANNELS.flatMap((channel) =>
@@ -247,10 +263,60 @@ export const isBrainPackage = (value: unknown): value is BrainPackage => {
     isObject(layout) &&
     layout.version === 1 &&
     isObject(layout.nodes) &&
+    Object.values(layout.nodes).every(
+      (node) =>
+        isObject(node) &&
+        (node.position === undefined ||
+          (isObject(node.position) &&
+            typeof node.position.x === 'number' &&
+            Number.isFinite(node.position.x) &&
+            typeof node.position.y === 'number' &&
+            Number.isFinite(node.position.y))) &&
+        (node.collapsed === undefined || typeof node.collapsed === 'boolean') &&
+        (node.size === undefined ||
+          (isObject(node.size) &&
+            typeof node.size.width === 'number' &&
+            Number.isFinite(node.size.width) &&
+            typeof node.size.height === 'number' &&
+            Number.isFinite(node.size.height)))
+    ) &&
+    (layout.viewportByContainerId === undefined ||
+      (isObject(layout.viewportByContainerId) &&
+        Object.values(layout.viewportByContainerId).every(
+          (viewport) =>
+            isObject(viewport) &&
+            typeof viewport.x === 'number' &&
+            Number.isFinite(viewport.x) &&
+            typeof viewport.y === 'number' &&
+            Number.isFinite(viewport.y) &&
+            typeof viewport.scale === 'number' &&
+            Number.isFinite(viewport.scale)
+        ))) &&
     isObject(body) &&
     body.version === 1 &&
     Array.isArray(body.inputSignals) &&
+    body.inputSignals.every(
+      (signal) =>
+        isObject(signal) &&
+        typeof signal.id === 'string' &&
+        isObject(signal.source) &&
+        signal.source.kind === 'vision-cell' &&
+        ['R', 'G', 'B'].includes(String(signal.source.channel)) &&
+        typeof signal.source.cellIndex === 'number' &&
+        Number.isFinite(signal.source.cellIndex) &&
+        (signal.scale === undefined || (typeof signal.scale === 'number' && Number.isFinite(signal.scale)))
+    ) &&
     Array.isArray(body.outputSignals) &&
+    body.outputSignals.every(
+      (signal) =>
+        isObject(signal) &&
+        typeof signal.id === 'string' &&
+        isObject(signal.target) &&
+        signal.target.kind === 'action-channel' &&
+        ['turn-left', 'move-forward', 'turn-right'].includes(String(signal.target.channel)) &&
+        (signal.decayPerSecond === undefined ||
+          (typeof signal.decayPerSecond === 'number' && Number.isFinite(signal.decayPerSecond)))
+    ) &&
     isObject(body.brainBindings) &&
     Array.isArray(body.brainBindings.inputs) &&
     Array.isArray(body.brainBindings.outputs)

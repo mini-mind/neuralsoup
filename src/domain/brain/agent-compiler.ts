@@ -12,6 +12,8 @@ import type { BrainOutputChannel } from './shared';
 export type AgentValidationIssueCode =
   | 'missing-brain-root-container'
   | 'missing-brain-node'
+  | 'duplicate-brain-node-id'
+  | 'invalid-brain-structure'
   | 'invalid-connection-direction'
   | 'runtime-binding-error';
 
@@ -285,6 +287,165 @@ interface AgentCompilationContext {
   bodyOutputsById: Map<string, BodyOutputNodeRuntime>;
 }
 
+const buildBrainStructureIssues = (agent: AgentIR): AgentValidationIssue[] => {
+  const issues: AgentValidationIssue[] = [];
+  const neuronIds = new Set<string>();
+  const containerIds = new Set<string>();
+  const neuronOwners = new Map<string, string[]>();
+  const containerOwners = new Map<string, string[]>();
+
+  for (const neuron of agent.brain.neurons) {
+    if (neuronIds.has(neuron.id)) {
+      issues.push({
+        code: 'duplicate-brain-node-id',
+        message: `Brain neuron id "${neuron.id}" is duplicated.`,
+      });
+      continue;
+    }
+    neuronIds.add(neuron.id);
+  }
+
+  for (const container of agent.brain.containers) {
+    if (neuronIds.has(container.id)) {
+      issues.push({
+        code: 'duplicate-brain-node-id',
+        message: `Brain container id "${container.id}" collides with neuron id "${container.id}".`,
+      });
+      continue;
+    }
+    if (containerIds.has(container.id)) {
+      issues.push({
+        code: 'duplicate-brain-node-id',
+        message: `Brain container id "${container.id}" is duplicated.`,
+      });
+      continue;
+    }
+    containerIds.add(container.id);
+  }
+
+  for (const container of agent.brain.containers) {
+    for (const child of container.children) {
+      if (child.scope === 'brain') {
+        if (!neuronIds.has(child.nodeId)) {
+          issues.push({
+            code: 'missing-brain-node',
+            message: `Brain container "${container.id}" references missing neuron "${child.nodeId}".`,
+          });
+          continue;
+        }
+
+        const owners = neuronOwners.get(child.nodeId) ?? [];
+        owners.push(container.id);
+        neuronOwners.set(child.nodeId, owners);
+        continue;
+      }
+
+      if (!containerIds.has(child.nodeId)) {
+        issues.push({
+          code: 'missing-brain-node',
+          message: `Brain container "${container.id}" references missing child container "${child.nodeId}".`,
+        });
+        continue;
+      }
+
+      const owners = containerOwners.get(child.nodeId) ?? [];
+      owners.push(container.id);
+      containerOwners.set(child.nodeId, owners);
+    }
+  }
+
+  for (const neuronId of neuronIds) {
+    const owners = neuronOwners.get(neuronId) ?? [];
+    if (owners.length === 0) {
+      issues.push({
+        code: 'invalid-brain-structure',
+        message: `Brain neuron "${neuronId}" is not attached to any container.`,
+      });
+      continue;
+    }
+
+    if (owners.length > 1) {
+      issues.push({
+        code: 'invalid-brain-structure',
+        message: `Brain neuron "${neuronId}" is attached to multiple containers: ${owners.join(', ')}.`,
+      });
+    }
+  }
+
+  for (const containerId of containerIds) {
+    const owners = containerOwners.get(containerId) ?? [];
+    if (containerId === agent.brain.rootContainerId) {
+      if (owners.length > 0) {
+        issues.push({
+          code: 'invalid-brain-structure',
+          message: `Brain root container "${containerId}" cannot be nested under another container.`,
+        });
+      }
+      continue;
+    }
+
+    if (owners.length === 0) {
+      issues.push({
+        code: 'invalid-brain-structure',
+        message: `Brain container "${containerId}" is not attached to any parent container.`,
+      });
+      continue;
+    }
+
+    if (owners.length > 1) {
+      issues.push({
+        code: 'invalid-brain-structure',
+        message: `Brain container "${containerId}" is attached to multiple parent containers: ${owners.join(', ')}.`,
+      });
+    }
+  }
+
+  const containersById = new Map(agent.brain.containers.map((container) => [container.id, container]));
+  const visitState = new Map<string, 'visiting' | 'visited'>();
+
+  const visitContainer = (containerId: string, path: string[]): void => {
+    const state = visitState.get(containerId);
+    if (state === 'visiting') {
+      issues.push({
+        code: 'invalid-brain-structure',
+        message: `Brain container cycle detected: ${[...path, containerId].join(' -> ')}.`,
+      });
+      return;
+    }
+    if (state === 'visited') {
+      return;
+    }
+
+    const container = containersById.get(containerId);
+    if (!container) {
+      return;
+    }
+
+    visitState.set(containerId, 'visiting');
+    for (const child of container.children) {
+      if (child.scope === 'container') {
+        visitContainer(child.nodeId, [...path, containerId]);
+      }
+    }
+    visitState.set(containerId, 'visited');
+  };
+
+  if (containerIds.has(agent.brain.rootContainerId)) {
+    visitContainer(agent.brain.rootContainerId, []);
+  }
+
+  for (const containerId of containerIds) {
+    if (!visitState.has(containerId)) {
+      issues.push({
+        code: 'invalid-brain-structure',
+        message: `Brain container "${containerId}" is unreachable from root container "${agent.brain.rootContainerId}".`,
+      });
+    }
+  }
+
+  return issues;
+};
+
 const buildAgentCompilationContext = (agent: AgentIR): AgentCompilationContext => {
   const issues: AgentValidationIssue[] = [];
   const bodyInputResolution = resolveBodyInputs(agent);
@@ -293,6 +454,7 @@ const buildAgentCompilationContext = (agent: AgentIR): AgentCompilationContext =
   const containerIds = new Set(agent.brain.containers.map((container) => container.id));
 
   issues.push(...bodyInputResolution.issues, ...bodyOutputResolution.issues);
+  issues.push(...buildBrainStructureIssues(agent));
 
   if (!containerIds.has(agent.brain.rootContainerId)) {
     issues.push({

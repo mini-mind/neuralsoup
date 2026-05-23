@@ -169,3 +169,254 @@ test('legacy graph bridge preserves explicit BodyIR visionCellCount even when on
   assert.ok(inputAdapter && inputAdapter.kind === 'adapter');
   assert.equal(inputAdapter.children.length, 36 * 3);
 });
+
+test('legacy graph bridge projects rule-driven body node ids onto legacy GraphIR signal nodes without dropping links', () => {
+  const bridge = createLegacyGraphBridgeFromAgent(createRuleDrivenAgent());
+
+  assert.ok(
+    bridge.document.root.links.some(
+      (link) =>
+        link.from.nodeId === 'vision-G-2' &&
+        link.to.nodeId === 'core-input-G'
+    )
+  );
+  assert.ok(
+    bridge.document.root.links.some(
+      (link) =>
+        link.from.nodeId === 'core-input-G' &&
+        link.to.nodeId === 'neuron-1'
+    )
+  );
+  assert.ok(
+    bridge.document.root.links.some(
+      (link) =>
+        link.from.nodeId === 'neuron-1' &&
+        link.to.nodeId === 'core-output-move-forward'
+    )
+  );
+  assert.ok(
+    bridge.document.root.links.some(
+      (link) =>
+        link.from.nodeId === 'core-output-move-forward' &&
+        link.to.nodeId === 'output-move-forward'
+    )
+  );
+});
+
+test('validateAgentIR rejects invalid container ownership and missing child references', () => {
+  const invalidAgent: AgentIR = {
+    ...createRuleDrivenAgent(),
+    brain: {
+      ...createRuleDrivenAgent().brain,
+      containers: [
+        {
+          id: 'root',
+          label: 'Root',
+          children: [
+            { scope: 'brain', nodeId: 'neuron-1' },
+            { scope: 'brain', nodeId: 'missing-neuron' },
+            { scope: 'container', nodeId: 'group-1' },
+          ],
+        },
+        {
+          id: 'group-1',
+          label: 'Group 1',
+          children: [{ scope: 'brain', nodeId: 'neuron-1' }],
+        },
+        {
+          id: 'orphan-group',
+          label: 'Orphan',
+          children: [],
+        },
+      ],
+    },
+  };
+
+  const issues = validateAgentIR(invalidAgent);
+
+  assert.ok(
+    issues.some(
+      (issue) =>
+        issue.code === 'missing-brain-node' &&
+        issue.message.includes('missing-neuron')
+    )
+  );
+  assert.ok(
+    issues.some(
+      (issue) =>
+        issue.code === 'invalid-brain-structure' &&
+        issue.message.includes('neuron-1') &&
+        issue.message.includes('multiple containers')
+    )
+  );
+  assert.ok(
+    issues.some(
+      (issue) =>
+        issue.code === 'invalid-brain-structure' &&
+        issue.message.includes('orphan-group')
+    )
+  );
+});
+
+test('validateAgentIR rejects duplicate neuron and container ids', () => {
+  const baseAgent = createRuleDrivenAgent();
+  const invalidAgent: AgentIR = {
+    ...baseAgent,
+    brain: {
+      ...baseAgent.brain,
+      neurons: [...baseAgent.brain.neurons, { ...baseAgent.brain.neurons[0] }],
+      containers: [...baseAgent.brain.containers, { ...baseAgent.brain.containers[0] }],
+    },
+  };
+
+  const issues = validateAgentIR(invalidAgent);
+
+  assert.ok(
+    issues.some(
+      (issue) =>
+        issue.code === 'duplicate-brain-node-id' &&
+        issue.message.includes('neuron-1')
+    )
+  );
+  assert.ok(
+    issues.some(
+      (issue) =>
+        issue.code === 'duplicate-brain-node-id' &&
+        issue.message.includes('root')
+    )
+  );
+});
+
+test('legacy graph bridge reports dropped compat links when multiple AgentIR edges collapse onto one legacy bridge edge', () => {
+  const bridge = createLegacyGraphBridgeFromAgent({
+    ...createRuleDrivenAgent(),
+    connections: [
+      {
+        id: 'input-connection-a',
+        from: { scope: 'bodyInput', nodeId: 'sensor-G-2' },
+        to: { scope: 'brain', nodeId: 'neuron-1' },
+        weight: 1,
+      },
+      {
+        id: 'input-connection-b',
+        from: { scope: 'bodyInput', nodeId: 'sensor-G-2' },
+        to: { scope: 'brain', nodeId: 'neuron-1' },
+        weight: 0.5,
+      },
+    ],
+  });
+
+  assert.deepEqual(bridge.droppedConnectionIds, ['input-connection-b']);
+});
+
+test('legacy graph bridge does not treat lossless shared compat edges as dropped connections', () => {
+  const bridge = createLegacyGraphBridgeFromAgent({
+    ...createRuleDrivenAgent(),
+    brain: {
+      ...createRuleDrivenAgent().brain,
+      neurons: [
+        ...createRuleDrivenAgent().brain.neurons,
+        {
+          id: 'neuron-2',
+          label: 'Neuron 2',
+          model: 'izhikevich',
+          params: {
+            a: 0.02,
+            b: 0.2,
+            c: -65,
+            d: 8,
+            threshold: -70,
+          },
+          initialState: {
+            v: -65,
+          },
+        },
+      ],
+      containers: [
+        {
+          id: 'root',
+          label: 'Root',
+          children: [
+            { scope: 'brain', nodeId: 'neuron-1' },
+            { scope: 'brain', nodeId: 'neuron-2' },
+          ],
+        },
+      ],
+    },
+    connections: [
+      {
+        id: 'input-connection-a',
+        from: { scope: 'bodyInput', nodeId: 'sensor-G-2' },
+        to: { scope: 'brain', nodeId: 'neuron-1' },
+        weight: 1,
+      },
+      {
+        id: 'input-connection-b',
+        from: { scope: 'bodyInput', nodeId: 'sensor-G-2' },
+        to: { scope: 'brain', nodeId: 'neuron-2' },
+        weight: 1,
+      },
+      {
+        id: 'output-connection-a',
+        from: { scope: 'brain', nodeId: 'neuron-1' },
+        to: { scope: 'bodyOutput', nodeId: 'effector-move-forward' },
+        weight: 1,
+      },
+      {
+        id: 'output-connection-b',
+        from: { scope: 'brain', nodeId: 'neuron-2' },
+        to: { scope: 'bodyOutput', nodeId: 'effector-move-forward' },
+        weight: 1,
+      },
+    ],
+  });
+
+  assert.deepEqual(bridge.droppedConnectionIds, []);
+});
+
+test('validateAgentIR rejects neuron and container id collisions', () => {
+  const baseAgent = createRuleDrivenAgent();
+  const invalidAgent: AgentIR = {
+    ...baseAgent,
+    brain: {
+      ...baseAgent.brain,
+      containers: [
+        ...baseAgent.brain.containers,
+        {
+          id: 'neuron-1',
+          label: 'Colliding Container',
+          children: [],
+        },
+      ],
+    },
+  };
+
+  const issues = validateAgentIR(invalidAgent);
+
+  assert.ok(
+    issues.some(
+      (issue) =>
+        issue.code === 'duplicate-brain-node-id' &&
+        issue.message.includes('collides with neuron id')
+    )
+  );
+});
+
+test('legacy graph bridge marks unbridgeable body endpoints as dropped connections', () => {
+  const bridge = createLegacyGraphBridgeFromAgent({
+    ...createRuleDrivenAgent(),
+    body: {
+      ...createRuleDrivenAgent().body,
+      inputRules: [
+        {
+          id: 'non-legacy-input',
+          nodeIdPattern: '^sensor-([RGB])-(\\d+)$',
+          sourceTemplate: 'audio.$1.$2',
+          scale: 2,
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(bridge.droppedConnectionIds, ['input-connection']);
+});

@@ -43,15 +43,103 @@ const LEGACY_CORE_OUTPUT_ADAPTER_ID = 'core-output-adapter';
 
 const INPUT_CHANNEL_PATTERN = /^vision-([RGB])-(\d+)$/;
 const OUTPUT_CHANNEL_PATTERN = /^output-(turn-left|move-forward|turn-right)$/;
+const BODY_INPUT_SOURCE_PATTERN = /^vision\.([RGB])\.(\d+)$/;
+const BODY_OUTPUT_TARGET_PATTERN = /^action\.(turn-left|move-forward|turn-right)$/;
 const CORE_INPUT_NODE_PATTERN = /^core-input-([RGB])$/;
 const CORE_OUTPUT_NODE_PATTERN = /^core-output-(turn-left|move-forward|turn-right)$/;
 const SIGNAL_INPUT_PORT = 'in';
 const SIGNAL_OUTPUT_PORT = 'out';
 const NEURON_INPUT_PORT = 'dendrite';
 const NEURON_OUTPUT_PORT = 'axon';
+const LEGACY_INITIAL_STATE_V_KEY = '__agent_initialState_v';
+const LEGACY_INITIAL_STATE_U_KEY = '__agent_initialState_u';
 
 const clonePosition = (position?: Position): Position | undefined =>
   position ? { ...position } : undefined;
+
+const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const applyRuleTemplate = (template: string, match: RegExpExecArray): string =>
+  template.replace(/\$(\d+)/g, (_token, rawGroupIndex: string) => {
+    const groupIndex = Number.parseInt(rawGroupIndex, 10);
+    return match[groupIndex] ?? '';
+  });
+
+const resolveLegacyInputSignalNodeId = (agent: AgentIR, nodeId: string): string | null => {
+  if (INPUT_CHANNEL_PATTERN.test(nodeId)) {
+    return nodeId;
+  }
+
+  const matches = agent.body.inputRules.flatMap((rule) => {
+    try {
+      const regex = new RegExp(rule.nodeIdPattern);
+      const match = regex.exec(nodeId);
+      return match ? [{ rule, match }] : [];
+    } catch {
+      return [];
+    }
+  });
+
+  if (matches.length !== 1) {
+    return null;
+  }
+
+  const source = applyRuleTemplate(matches[0].rule.sourceTemplate, matches[0].match);
+  const parsed = source.match(BODY_INPUT_SOURCE_PATTERN);
+  return parsed ? `vision-${parsed[1]}-${parsed[2]}` : null;
+};
+
+const resolveBodyInputScale = (agent: AgentIR, nodeId: string): number | null => {
+  const matches = agent.body.inputRules.flatMap((rule) => {
+    try {
+      const regex = new RegExp(rule.nodeIdPattern);
+      const match = regex.exec(nodeId);
+      return match ? [{ rule, match }] : [];
+    } catch {
+      return [];
+    }
+  });
+
+  return matches.length === 1 ? matches[0].rule.scale : null;
+};
+
+const resolveLegacyOutputSignalNodeId = (agent: AgentIR, nodeId: string): string | null => {
+  if (OUTPUT_CHANNEL_PATTERN.test(nodeId)) {
+    return nodeId;
+  }
+
+  const matches = agent.body.outputRules.flatMap((rule) => {
+    try {
+      const regex = new RegExp(rule.nodeIdPattern);
+      const match = regex.exec(nodeId);
+      return match ? [{ rule, match }] : [];
+    } catch {
+      return [];
+    }
+  });
+
+  if (matches.length !== 1) {
+    return null;
+  }
+
+  const target = applyRuleTemplate(matches[0].rule.targetTemplate, matches[0].match);
+  const parsed = target.match(BODY_OUTPUT_TARGET_PATTERN);
+  return parsed ? `output-${parsed[1]}` : null;
+};
+
+const resolveBodyOutputDecay = (agent: AgentIR, nodeId: string): number | null => {
+  const matches = agent.body.outputRules.flatMap((rule) => {
+    try {
+      const regex = new RegExp(rule.nodeIdPattern);
+      const match = regex.exec(nodeId);
+      return match ? [{ rule, match }] : [];
+    } catch {
+      return [];
+    }
+  });
+
+  return matches.length === 1 ? matches[0].rule.decayPerSecond : null;
+};
 
 const createAgentMetadata = (
   name: string,
@@ -79,6 +167,17 @@ const getNeuronParams = (node: NeuronNode): IzhikevichNeuronParameters => {
     c: toFiniteNumber(overrides.c, DEFAULT_NEURON_PARAMS.c),
     d: toFiniteNumber(overrides.d, DEFAULT_NEURON_PARAMS.d),
     threshold: toFiniteNumber(overrides.threshold, DEFAULT_NEURON_PARAMS.threshold),
+  };
+};
+
+const getNeuronInitialState = (node: NeuronNode, params: IzhikevichNeuronParameters): BrainNeuronNode['initialState'] => {
+  const overrides = node.parameterOverrides ?? {};
+  const v = typeof overrides[LEGACY_INITIAL_STATE_V_KEY] === 'number' ? overrides[LEGACY_INITIAL_STATE_V_KEY] : params.c;
+  const u = typeof overrides[LEGACY_INITIAL_STATE_U_KEY] === 'number' ? overrides[LEGACY_INITIAL_STATE_U_KEY] : undefined;
+
+  return {
+    v,
+    u,
   };
 };
 
@@ -154,6 +253,46 @@ const buildBodyIRFromLegacy = (document: GraphIRDocument): BodyIR => {
   };
 };
 
+const buildBodyIRFromCompatBody = (body: BodyDefinition): BodyIR => {
+  const inputSignalsById = new Map(body.inputSignals.map((signal) => [signal.id, signal]));
+  const outputSignalsById = new Map(body.outputSignals.map((signal) => [signal.id, signal]));
+
+  return {
+    version: 1,
+    visionCellCount: Math.max(0, getBodyVisionCellCount(body)),
+    inputRules: body.brainBindings.inputs.flatMap((binding) => {
+      const signal = inputSignalsById.get(binding.bodySignalId);
+      if (!signal) {
+        return [];
+      }
+
+      return [
+        {
+          id: `compat-input:${binding.brainSignalNodeId}`,
+          nodeIdPattern: `^${escapeRegex(binding.brainSignalNodeId)}$`,
+          sourceTemplate: `vision.${signal.source.channel}.${signal.source.cellIndex}`,
+          scale: signal.scale ?? DEFAULT_VISION_SCALE,
+        },
+      ];
+    }),
+    outputRules: body.brainBindings.outputs.flatMap((binding) => {
+      const signal = outputSignalsById.get(binding.bodySignalId);
+      if (!signal) {
+        return [];
+      }
+
+      return [
+        {
+          id: `compat-output:${binding.brainSignalNodeId}`,
+          nodeIdPattern: `^${escapeRegex(binding.brainSignalNodeId)}$`,
+          targetTemplate: `action.${signal.target.channel}`,
+          decayPerSecond: signal.decayPerSecond ?? DEFAULT_OUTPUT_DECAY_PER_SECOND,
+        },
+      ];
+    }),
+  };
+};
+
 const buildBrainNeuronsFromLegacy = (document: GraphIRDocument): BrainNeuronNode[] =>
   collectNeuronNodes(document.root.children).map((node) => {
     const params = getNeuronParams(node);
@@ -162,9 +301,7 @@ const buildBrainNeuronsFromLegacy = (document: GraphIRDocument): BrainNeuronNode
       label: node.label,
       model: 'izhikevich',
       params,
-      initialState: {
-        v: params.c,
-      },
+      initialState: getNeuronInitialState(node, params),
     };
   });
 
@@ -202,9 +339,13 @@ const buildContainersFromLegacy = (
     }
   };
 
-  const legacyRootGroup = document.root.children.find(
-    (node): node is NeuronGroupNode => node.kind === 'neuron-group' && node.id === LEGACY_ROOT_GROUP_ID
+  const topLevelGroups = document.root.children.filter(
+    (node): node is NeuronGroupNode => node.kind === 'neuron-group'
   );
+  const legacyRootGroup =
+    topLevelGroups.length === 1
+      ? topLevelGroups[0]
+      : topLevelGroups.find((node) => node.id === LEGACY_ROOT_GROUP_ID);
   if (legacyRootGroup) {
     const containers: BrainContainerNode[] = [
       {
@@ -246,8 +387,14 @@ const buildContainersFromLegacy = (
   };
 };
 
-const buildAgentConnectionsFromLegacy = (document: GraphIRDocument): AgentConnection[] => {
+interface LegacyAgentConnectionBuildResult {
+  connections: AgentConnection[];
+  droppedLinkIds: string[];
+}
+
+const buildAgentConnectionsFromLegacy = (document: GraphIRDocument): LegacyAgentConnectionBuildResult => {
   const outgoingLinksByNodeId = new Map<string, LeafLink[]>();
+  const consumedLinkIds = new Set<string>();
 
   for (const link of document.root.links) {
     const existingLinks = outgoingLinksByNodeId.get(link.from.nodeId);
@@ -291,6 +438,8 @@ const buildAgentConnectionsFromLegacy = (document: GraphIRDocument): AgentConnec
           weight: link.weight * bridgedLink.weight,
           delayMs: (link.delayMs ?? 0) + (bridgedLink.delayMs ?? 0),
         });
+        consumedLinkIds.add(link.id);
+        consumedLinkIds.add(bridgedLink.id);
       }
       continue;
     }
@@ -317,6 +466,8 @@ const buildAgentConnectionsFromLegacy = (document: GraphIRDocument): AgentConnec
           weight: link.weight * bridgedLink.weight,
           delayMs: (link.delayMs ?? 0) + (bridgedLink.delayMs ?? 0),
         });
+        consumedLinkIds.add(link.id);
+        consumedLinkIds.add(bridgedLink.id);
       }
       continue;
     }
@@ -359,9 +510,164 @@ const buildAgentConnectionsFromLegacy = (document: GraphIRDocument): AgentConnec
       weight: link.weight,
       delayMs: link.delayMs,
     });
+    consumedLinkIds.add(link.id);
   }
 
-  return connections;
+  return {
+    connections,
+    droppedLinkIds: document.root.links
+      .map((link) => link.id)
+      .filter((linkId) => !consumedLinkIds.has(linkId)),
+  };
+};
+
+interface CompatBodyBindingMaps {
+  inputNodeIdToBodySignalId: Map<string, string>;
+  outputNodeIdToBodySignalId: Map<string, string>;
+  bodyInputSignalById: Map<string, BodyDefinition['inputSignals'][number]>;
+  bodyOutputSignalById: Map<string, BodyDefinition['outputSignals'][number]>;
+}
+
+const buildCompatBodyBindingMaps = (body: BodyDefinition): CompatBodyBindingMaps => ({
+  inputNodeIdToBodySignalId: new Map(
+    body.brainBindings.inputs.map((binding) => [binding.brainSignalNodeId, binding.bodySignalId])
+  ),
+  outputNodeIdToBodySignalId: new Map(
+    body.brainBindings.outputs.map((binding) => [binding.brainSignalNodeId, binding.bodySignalId])
+  ),
+  bodyInputSignalById: new Map(body.inputSignals.map((signal) => [signal.id, signal])),
+  bodyOutputSignalById: new Map(body.outputSignals.map((signal) => [signal.id, signal])),
+});
+
+const buildAgentConnectionsFromCompatBody = (
+  document: GraphIRDocument,
+  body: BodyDefinition
+): LegacyAgentConnectionBuildResult => {
+  const outgoingLinksByNodeId = new Map<string, LeafLink[]>();
+  const consumedLinkIds = new Set<string>();
+  for (const link of document.root.links) {
+    const existingLinks = outgoingLinksByNodeId.get(link.from.nodeId);
+    if (existingLinks) {
+      existingLinks.push(link);
+      continue;
+    }
+    outgoingLinksByNodeId.set(link.from.nodeId, [link]);
+  }
+
+  const { inputNodeIdToBodySignalId, outputNodeIdToBodySignalId } =
+    buildCompatBodyBindingMaps(body);
+  const connections: AgentConnection[] = [];
+
+  for (const link of document.root.links) {
+    const fromNodeId = link.from.nodeId;
+    const toNodeId = link.to.nodeId;
+    const directInputSignalId = inputNodeIdToBodySignalId.get(fromNodeId);
+    const directOutputSignalId = outputNodeIdToBodySignalId.get(toNodeId);
+
+    if (directInputSignalId && CORE_INPUT_NODE_PATTERN.test(toNodeId)) {
+      const bridgedLinks = outgoingLinksByNodeId.get(toNodeId) ?? [];
+      for (const bridgedLink of bridgedLinks) {
+        if (outputNodeIdToBodySignalId.has(bridgedLink.from.nodeId) || inputNodeIdToBodySignalId.has(bridgedLink.to.nodeId)) {
+          continue;
+        }
+
+        connections.push({
+          id: `${link.id}__${bridgedLink.id}`,
+          from: {
+            scope: 'bodyInput',
+            nodeId: fromNodeId,
+            portId: link.from.portId,
+          },
+          to: {
+            scope: 'brain',
+            nodeId: bridgedLink.to.nodeId,
+            portId: bridgedLink.to.portId,
+          },
+          weight: link.weight * bridgedLink.weight,
+          delayMs: (link.delayMs ?? 0) + (bridgedLink.delayMs ?? 0),
+        });
+        consumedLinkIds.add(link.id);
+        consumedLinkIds.add(bridgedLink.id);
+      }
+      continue;
+    }
+
+    if (CORE_OUTPUT_NODE_PATTERN.test(toNodeId) && !CORE_OUTPUT_NODE_PATTERN.test(fromNodeId)) {
+      const bridgedLinks = outgoingLinksByNodeId.get(toNodeId) ?? [];
+      for (const bridgedLink of bridgedLinks) {
+        const bodySignalId = outputNodeIdToBodySignalId.get(bridgedLink.to.nodeId);
+        if (!bodySignalId) {
+          continue;
+        }
+
+        connections.push({
+          id: `${link.id}__${bridgedLink.id}`,
+          from: {
+            scope: directInputSignalId ? 'bodyInput' : 'brain',
+            nodeId: fromNodeId,
+            portId: link.from.portId,
+          },
+          to: {
+            scope: 'bodyOutput',
+            nodeId: bridgedLink.to.nodeId,
+            portId: bridgedLink.to.portId,
+          },
+          weight: link.weight * bridgedLink.weight,
+          delayMs: (link.delayMs ?? 0) + (bridgedLink.delayMs ?? 0),
+        });
+        consumedLinkIds.add(link.id);
+        consumedLinkIds.add(bridgedLink.id);
+      }
+      continue;
+    }
+
+    if (CORE_INPUT_NODE_PATTERN.test(fromNodeId) || CORE_INPUT_NODE_PATTERN.test(toNodeId)) {
+      continue;
+    }
+
+    if (CORE_OUTPUT_NODE_PATTERN.test(fromNodeId) || CORE_OUTPUT_NODE_PATTERN.test(toNodeId)) {
+      continue;
+    }
+
+    const fromScope = directInputSignalId
+      ? 'bodyInput'
+      : outputNodeIdToBodySignalId.has(fromNodeId)
+        ? 'bodyOutput'
+        : 'brain';
+    const toScope = inputNodeIdToBodySignalId.has(toNodeId)
+      ? 'bodyInput'
+      : directOutputSignalId
+        ? 'bodyOutput'
+        : 'brain';
+
+    if (fromScope === 'bodyOutput' || toScope === 'bodyInput') {
+      continue;
+    }
+
+    connections.push({
+      id: link.id,
+      from: {
+        scope: fromScope,
+        nodeId: fromNodeId,
+        portId: link.from.portId,
+      },
+      to: {
+        scope: toScope,
+        nodeId: toNodeId,
+        portId: link.to.portId,
+      },
+      weight: link.weight,
+      delayMs: link.delayMs,
+    });
+    consumedLinkIds.add(link.id);
+  }
+
+  return {
+    connections,
+    droppedLinkIds: document.root.links
+      .map((link) => link.id)
+      .filter((linkId) => !consumedLinkIds.has(linkId)),
+  };
 };
 
 const buildAgentLayoutFromLegacy = (
@@ -374,6 +680,7 @@ const buildAgentLayoutFromLegacy = (
   for (const [nodeId, state] of Object.entries(graphLayout.nodes)) {
     nodes[nodeId] = {
       position: clonePosition(state.position),
+      size: state.size ? { ...state.size } : undefined,
       collapsed: state.collapsed,
       expanded: state.collapsed === false ? true : undefined,
     };
@@ -382,6 +689,14 @@ const buildAgentLayoutFromLegacy = (
   return {
     version: 1,
     nodes,
+    viewportByContainerId: graphLayout.viewportByContainerId
+      ? Object.fromEntries(
+          Object.entries(graphLayout.viewportByContainerId).map(([containerId, viewport]) => [
+            containerId,
+            { ...viewport },
+          ])
+        )
+      : undefined,
   };
 };
 
@@ -392,12 +707,29 @@ export const createAgentIRFromLegacyGraph = (
   layout?: BrainLayoutDocument,
   metadataOverrides?: Partial<AgentMetadata>
 ): AgentIR => {
+  return createAgentIRFromLegacyGraphDetailed(name, document, body, layout, metadataOverrides).agent;
+};
+
+export interface LegacyToAgentIRBridgeResult {
+  agent: AgentIR;
+  droppedLinkIds: string[];
+}
+
+export const createAgentIRFromLegacyGraphDetailed = (
+  name: string,
+  document: GraphIRDocument,
+  body?: BodyDefinition,
+  layout?: BrainLayoutDocument,
+  metadataOverrides?: Partial<AgentMetadata>
+): LegacyToAgentIRBridgeResult => {
   const resolvedBody = body ?? createDefaultBodyDefinition(1);
   const metadata = createAgentMetadata(name, metadataOverrides);
-  const agentBody = {
-    ...buildBodyIRFromLegacy(document),
-    visionCellCount: Math.max(0, getBodyVisionCellCount(resolvedBody)),
-  };
+  const agentBody = body
+    ? buildBodyIRFromCompatBody(resolvedBody)
+    : {
+        ...buildBodyIRFromLegacy(document),
+        visionCellCount: Math.max(0, getBodyVisionCellCount(resolvedBody)),
+      };
   const { containers, rootContainerId } = buildContainersFromLegacy(document);
   const brain: BrainIR = {
     version: 1,
@@ -405,16 +737,20 @@ export const createAgentIRFromLegacyGraph = (
     containers,
     rootContainerId,
   };
-
-  void resolvedBody;
+  const connectionBuildResult = body
+    ? buildAgentConnectionsFromCompatBody(document, resolvedBody)
+    : buildAgentConnectionsFromLegacy(document);
 
   return {
-    version: 1,
-    metadata,
-    body: agentBody,
-    brain,
-    connections: buildAgentConnectionsFromLegacy(document),
-    layout: buildAgentLayoutFromLegacy(document, layout),
+    agent: {
+      version: 1,
+      metadata,
+      body: agentBody,
+      brain,
+      connections: connectionBuildResult.connections,
+      layout: buildAgentLayoutFromLegacy(document, layout),
+    },
+    droppedLinkIds: connectionBuildResult.droppedLinkIds,
   };
 };
 
@@ -430,6 +766,8 @@ const createNeuronNodeFromAgent = (neuron: BrainNeuronNode, position?: Position)
     c: neuron.params.c,
     d: neuron.params.d,
     threshold: neuron.params.threshold,
+    [LEGACY_INITIAL_STATE_V_KEY]: neuron.initialState.v,
+    ...(neuron.initialState.u !== undefined ? { [LEGACY_INITIAL_STATE_U_KEY]: neuron.initialState.u } : {}),
   },
 });
 
@@ -473,7 +811,49 @@ export interface LegacyGraphBridgeResult {
   document: GraphIRDocument;
   body: BodyDefinition;
   layout: BrainLayoutDocument;
+  droppedConnectionIds: string[];
+  documentOnlyLosses: string[];
 }
+
+const buildCompatBodyFromAgent = (agent: AgentIR, visionCells: number): BodyDefinition => {
+  const nextBody = createDefaultBodyDefinition(visionCells);
+  const inputSignalsById = new Map(nextBody.inputSignals.map((signal) => [signal.id, signal]));
+  const outputSignalsById = new Map(nextBody.outputSignals.map((signal) => [signal.id, signal]));
+
+  for (const connection of agent.connections) {
+    if (connection.from.scope !== 'bodyInput') {
+      continue;
+    }
+    const legacyNodeId = resolveLegacyInputSignalNodeId(agent, connection.from.nodeId);
+    const scale = resolveBodyInputScale(agent, connection.from.nodeId);
+    const match = legacyNodeId?.match(INPUT_CHANNEL_PATTERN);
+    if (!match || scale == null) {
+      continue;
+    }
+    const signal = inputSignalsById.get(`vision-${match[1].toLowerCase()}-${match[2]}`);
+    if (signal) {
+      signal.scale = scale;
+    }
+  }
+
+  for (const connection of agent.connections) {
+    if (connection.to.scope !== 'bodyOutput') {
+      continue;
+    }
+    const legacyNodeId = resolveLegacyOutputSignalNodeId(agent, connection.to.nodeId);
+    const decayPerSecond = resolveBodyOutputDecay(agent, connection.to.nodeId);
+    const match = legacyNodeId?.match(OUTPUT_CHANNEL_PATTERN);
+    if (!match || decayPerSecond == null) {
+      continue;
+    }
+    const signal = outputSignalsById.get(`motor-${match[1]}`);
+    if (signal) {
+      signal.decayPerSecond = decayPerSecond;
+    }
+  }
+
+  return nextBody;
+};
 
 export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBridgeResult => {
   const visionCellIds = new Set<number>();
@@ -481,7 +861,8 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
     if (connection.from.scope !== 'bodyInput') {
       continue;
     }
-    const match = connection.from.nodeId.match(INPUT_CHANNEL_PATTERN);
+    const legacyInputNodeId = resolveLegacyInputSignalNodeId(agent, connection.from.nodeId);
+    const match = legacyInputNodeId?.match(INPUT_CHANNEL_PATTERN);
     if (!match) {
       continue;
     }
@@ -490,7 +871,8 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
 
   const visionCells = Math.max(agent.body.visionCellCount, visionCellIds.size > 0 ? Math.max(...visionCellIds) + 1 : 0, 1);
   const nextDocument = createDefaultGraphIRDocument(visionCells);
-  const nextBody = createDefaultBodyDefinition(visionCells);
+  const nextBody = buildCompatBodyFromAgent(agent, visionCells);
+  const documentOnlyLosses: string[] = [];
   const defaultRootGroup = nextDocument.root.children.find(
     (node): node is NeuronGroupNode => node.kind === 'neuron-group' && node.id === LEGACY_ROOT_GROUP_ID
   );
@@ -510,8 +892,10 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
 
       return {
         ...node,
-        position: agent.layout?.nodes[node.id]?.position ?? node.position,
-        collapsed: agent.layout?.nodes[node.id]?.collapsed ?? node.collapsed,
+        id: rootContainer.id,
+        label: rootContainer.label ?? rootContainer.id,
+        position: agent.layout?.nodes[rootContainer.id]?.position ?? node.position,
+        collapsed: agent.layout?.nodes[rootContainer.id]?.collapsed ?? node.collapsed,
         children: [
           ...(defaultCoreInputAdapter ? [{ ...defaultCoreInputAdapter }] : []),
           ...rootContainer.children.flatMap<TopologyNode>((childRef) => {
@@ -550,6 +934,9 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
   const coreInputLinkIds = new Set<string>();
   const rootOutputLinkIds = new Set<string>();
   const coreOutputLinkIds = new Set<string>();
+  const coreInputLinkSemantics = new Map<string, string>();
+  const coreOutputLinkSemantics = new Map<string, string>();
+  const droppedConnectionIds = new Set<string>();
 
   for (const connection of agent.connections) {
     if (connection.from.scope === 'bodyOutput' || connection.to.scope === 'bodyInput') {
@@ -557,20 +944,26 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
     }
 
     if (connection.from.scope === 'bodyInput' && connection.to.scope === 'brain') {
-      const channelMatch = connection.from.nodeId.match(INPUT_CHANNEL_PATTERN);
+      const legacyInputNodeId = resolveLegacyInputSignalNodeId(agent, connection.from.nodeId);
+      if (!legacyInputNodeId) {
+        droppedConnectionIds.add(connection.id);
+        continue;
+      }
+      const channelMatch = legacyInputNodeId.match(INPUT_CHANNEL_PATTERN);
       if (!channelMatch) {
         continue;
       }
 
       const channel = channelMatch[1];
+      const legacySignalNodeId = legacyInputNodeId;
       const coreInputNodeId = `core-input-${channel}`;
-      const rootLinkId = `bridge-root:${connection.from.nodeId}:${coreInputNodeId}`;
+      const rootLinkId = `bridge-root:${legacySignalNodeId}:${coreInputNodeId}`;
       if (!rootInputLinkIds.has(rootLinkId)) {
         rootInputLinkIds.add(rootLinkId);
         links.push({
           id: rootLinkId,
           from: {
-            nodeId: connection.from.nodeId,
+            nodeId: legacySignalNodeId,
             portId: connection.from.portId ?? SIGNAL_OUTPUT_PORT,
           },
           to: {
@@ -582,8 +975,10 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
       }
 
       const coreLinkId = `bridge-core:${coreInputNodeId}:${connection.to.nodeId}`;
+      const coreLinkSemanticKey = `${connection.weight}:${connection.delayMs ?? 0}:${connection.to.portId ?? NEURON_INPUT_PORT}`;
       if (!coreInputLinkIds.has(coreLinkId)) {
         coreInputLinkIds.add(coreLinkId);
+        coreInputLinkSemantics.set(coreLinkId, coreLinkSemanticKey);
         links.push({
           id: coreLinkId,
           from: {
@@ -597,6 +992,8 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
           weight: connection.weight,
           delayMs: connection.delayMs,
         });
+      } else if (coreInputLinkSemantics.get(coreLinkId) !== coreLinkSemanticKey) {
+        droppedConnectionIds.add(connection.id);
       }
       continue;
     }
@@ -619,16 +1016,24 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
     }
 
     if (connection.from.scope === 'brain' && connection.to.scope === 'bodyOutput') {
-      const outputMatch = connection.to.nodeId.match(OUTPUT_CHANNEL_PATTERN);
+      const legacyOutputNodeId = resolveLegacyOutputSignalNodeId(agent, connection.to.nodeId);
+      if (!legacyOutputNodeId) {
+        droppedConnectionIds.add(connection.id);
+        continue;
+      }
+      const outputMatch = legacyOutputNodeId.match(OUTPUT_CHANNEL_PATTERN);
       if (!outputMatch) {
         continue;
       }
 
       const action = outputMatch[1];
+      const legacySignalNodeId = legacyOutputNodeId;
       const coreOutputNodeId = `core-output-${action}`;
       const coreLinkId = `bridge-core:${connection.from.nodeId}:${coreOutputNodeId}`;
+      const coreLinkSemanticKey = `${connection.weight}:${connection.delayMs ?? 0}:${connection.from.portId ?? NEURON_OUTPUT_PORT}`;
       if (!coreOutputLinkIds.has(coreLinkId)) {
         coreOutputLinkIds.add(coreLinkId);
+        coreOutputLinkSemantics.set(coreLinkId, coreLinkSemanticKey);
         links.push({
           id: coreLinkId,
           from: {
@@ -642,9 +1047,11 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
           weight: connection.weight,
           delayMs: connection.delayMs,
         });
+      } else if (coreOutputLinkSemantics.get(coreLinkId) !== coreLinkSemanticKey) {
+        droppedConnectionIds.add(connection.id);
       }
 
-      const rootLinkId = `bridge-root:${coreOutputNodeId}:${connection.to.nodeId}`;
+      const rootLinkId = `bridge-root:${coreOutputNodeId}:${legacySignalNodeId}`;
       if (!rootOutputLinkIds.has(rootLinkId)) {
         rootOutputLinkIds.add(rootLinkId);
         links.push({
@@ -654,7 +1061,7 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
             portId: SIGNAL_OUTPUT_PORT,
           },
           to: {
-            nodeId: connection.to.nodeId,
+            nodeId: legacySignalNodeId,
             portId: connection.to.portId ?? SIGNAL_INPUT_PORT,
           },
           weight: 1,
@@ -671,11 +1078,36 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
         {
           position: clonePosition(state.position),
           collapsed: state.collapsed,
+          size: state.size ? { ...state.size } : undefined,
           expanded: state.expanded,
         },
       ])
     ),
+    viewportByContainerId: agent.layout?.viewportByContainerId
+      ? Object.fromEntries(
+          Object.entries(agent.layout.viewportByContainerId).map(([containerId, viewport]) => [
+            containerId,
+            { ...viewport },
+          ])
+        )
+      : undefined,
   };
+
+  if (
+    nextBody.inputSignals.some((signal) => (signal.scale ?? DEFAULT_VISION_SCALE) !== DEFAULT_VISION_SCALE) ||
+    nextBody.outputSignals.some(
+      (signal) => (signal.decayPerSecond ?? DEFAULT_OUTPUT_DECAY_PER_SECOND) !== DEFAULT_OUTPUT_DECAY_PER_SECOND
+    )
+  ) {
+    documentOnlyLosses.push('Legacy GraphIR document-only getter cannot preserve BodyIR scale/decay semantics.');
+  }
+
+  if (
+    Object.values(agent.layout?.nodes ?? {}).some((node) => node.size !== undefined) ||
+    agent.layout?.viewportByContainerId
+  ) {
+    documentOnlyLosses.push('Legacy GraphIR document-only getter cannot preserve AgentLayout size/viewport semantics.');
+  }
 
   return {
     document: {
@@ -688,5 +1120,7 @@ export const createLegacyGraphBridgeFromAgent = (agent: AgentIR): LegacyGraphBri
     },
     body: nextBody,
     layout,
+    droppedConnectionIds: [...droppedConnectionIds],
+    documentOnlyLosses,
   };
 };

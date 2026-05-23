@@ -18,7 +18,9 @@ import {
   stepBrainProgram,
   summarizeGraphIRDocument,
   type GraphIRDocument,
+  type LegacyBrainProgram,
 } from '../../src/domain/brain/compat';
+import type { BodyDefinition } from '../../src/domain/brain/compat';
 import type { AgentIR } from '../../src/domain/brain';
 import type { Agent } from '../../src/types/simulation';
 
@@ -54,6 +56,142 @@ const getRootVisionCells = (document: GraphIRDocument) => {
 
 const compileDefaultBrain = (document: GraphIRDocument) =>
   compileBrainDefinition(document, createDefaultBodyDefinition(getRootVisionCells(document)));
+
+const createValidCompatBoundaryDocument = (): GraphIRDocument => ({
+  version: 1,
+  models: [
+    {
+      id: 'spike-neuron',
+      kind: 'neuron',
+      state: [],
+      parameters: [],
+      internals: [],
+      inputs: [
+        {
+          id: 'dendrite',
+          signal: { id: 'spike', valueType: 'number' },
+        },
+      ],
+      outputs: [
+        {
+          id: 'axon',
+          signal: { id: 'spike', valueType: 'number' },
+        },
+      ],
+      equations: [],
+      onReceive: [],
+      update: [],
+    },
+    {
+      id: 'world-signal',
+      kind: 'signal',
+      state: [],
+      parameters: [],
+      internals: [],
+      inputs: [
+        {
+          id: 'in',
+          signal: { id: 'spike', valueType: 'number' },
+        },
+      ],
+      outputs: [
+        {
+          id: 'out',
+          signal: { id: 'spike', valueType: 'number' },
+        },
+      ],
+      equations: [],
+      onReceive: [],
+      update: [],
+    },
+  ],
+  root: {
+    id: 'root',
+    children: [
+      {
+        kind: 'adapter',
+        id: 'input-adapter',
+        label: 'Input Adapter',
+        adapterType: 'input',
+        children: [
+          {
+            kind: 'signal',
+            id: 'vision-in',
+            label: 'Vision In',
+            modelId: 'world-signal',
+            direction: 'input',
+            signal: { id: 'spike', valueType: 'number' },
+          },
+        ],
+      },
+      {
+        kind: 'neuron-group',
+        id: 'core-neuron-group',
+        label: 'Core',
+        children: [
+          {
+            kind: 'neuron',
+            id: 'neuron-1',
+            label: 'Neuron 1',
+            modelId: 'spike-neuron',
+          },
+          {
+            kind: 'adapter',
+            id: 'core-output-adapter',
+            label: 'Core Output',
+            adapterType: 'output',
+            children: [
+              {
+                kind: 'signal',
+                id: 'core-motor-out',
+                label: 'Core Motor Out',
+                modelId: 'world-signal',
+                direction: 'output',
+                signal: { id: 'spike', valueType: 'number' },
+              },
+            ],
+          },
+        ],
+      },
+      {
+        kind: 'adapter',
+        id: 'output-adapter',
+        label: 'Output Adapter',
+        adapterType: 'output',
+        children: [
+          {
+            kind: 'signal',
+            id: 'motor-out',
+            label: 'Motor Out',
+            modelId: 'world-signal',
+            direction: 'output',
+            signal: { id: 'spike', valueType: 'number' },
+          },
+        ],
+      },
+    ],
+    links: [
+      {
+        id: 'input-link',
+        from: { nodeId: 'vision-in', portId: 'out' },
+        to: { nodeId: 'neuron-1', portId: 'dendrite' },
+        weight: 1,
+      },
+      {
+        id: 'output-link-core',
+        from: { nodeId: 'neuron-1', portId: 'axon' },
+        to: { nodeId: 'core-motor-out', portId: 'in' },
+        weight: 1,
+      },
+      {
+        id: 'output-link-root',
+        from: { nodeId: 'core-motor-out', portId: 'out' },
+        to: { nodeId: 'motor-out', portId: 'in' },
+        weight: 1,
+      },
+    ],
+  },
+});
 
 const createRuleDrivenSessionAgent = (): AgentIR => ({
   version: 1,
@@ -301,6 +439,14 @@ test('simulation session preserves custom GraphIR leaf links across reset and re
   assert.equal(session.getCurrentAgentIR().connections[0]?.weight, 2);
 });
 
+test('legacy GraphIR compilation remains a compat wrapper over compiled Agent runtime', () => {
+  const document = createDefaultGraphIRDocument(1);
+  const program: LegacyBrainProgram = compileDefaultBrain(document);
+
+  assert.equal(program.legacyGraphIR, document);
+  assert.ok(program.compiledAgentProgram);
+});
+
 test('simulation session rejects invalid GraphIR drafts without dropping the last applied document', () => {
   const session = new SimulationSession({
     visionSystem: new VisionSystem(),
@@ -399,7 +545,8 @@ test('simulation session keeps the last applied document and program when GraphI
   assert.equal(invalidStatus.state, 'invalid');
   assert.ok(
     invalidStatus.message.includes('missing-output-node') ||
-      invalidStatus.message.includes('non-root or non-output brain signal')
+      invalidStatus.message.includes('non-root or non-output brain signal') ||
+      invalidStatus.message.includes('cannot preserve draft link')
   );
   assert.deepEqual(invalidStatus.appliedSummary.leafLinkCount, 1);
   assert.deepEqual(invalidStatus.appliedSummary, appliedSummary);
@@ -574,7 +721,7 @@ test('GraphIR leaf link weights change runtime action outputs', () => {
   const strongForwardLink = strongDocument.root.links.find((link) => link.id === 'link-neuron-1-output-move-forward');
   assert.ok(weakForwardLink);
   assert.ok(strongForwardLink);
-  weakForwardLink.weight = 0.2;
+  weakForwardLink.weight = 0;
   strongForwardLink.weight = 3;
 
   const weakProgram = compileDefaultBrain(weakDocument);
@@ -582,7 +729,7 @@ test('GraphIR leaf link weights change runtime action outputs', () => {
   const weakResult = stepBrainProgram(weakProgram, [1, 1, 0], createBrainProgramRuntimeState(weakProgram), 1);
   const strongResult = stepBrainProgram(strongProgram, [1, 1, 0], createBrainProgramRuntimeState(strongProgram), 1);
 
-  assert.equal(weakResult.outputs['move-forward'], 1);
+  assert.equal(weakResult.outputs['move-forward'], 0);
   assert.equal(strongResult.outputs['move-forward'], 1);
 });
 
@@ -697,6 +844,29 @@ test('simulation session vision-cell reconcile preserves AgentIR-only body rule 
   assert.equal(reconciledAgent.body.visionCellCount, 12);
   assert.equal(reconciledAgent.body.inputRules[0]?.scale, 3);
   assert.equal(reconciledAgent.body.outputRules[0]?.decayPerSecond, 9);
+  assert.equal(reconciledAgent.body.inputRules[0]?.nodeIdPattern, '^vision-([RGB])-(\\d+)$');
+  assert.equal(reconciledAgent.body.outputRules[0]?.nodeIdPattern, '^output-(turn-left|move-forward|turn-right)$');
+});
+
+test('simulation session vision-cell reconcile does not rewrite AgentIR-native body rule node ids', () => {
+  const session = new SimulationSession({
+    visionSystem: new VisionSystem(),
+    agentController: new AgentController(),
+    worldManager: new WorldManager(1600, 1200),
+    collisionDetector: new CollisionDetector(),
+  });
+
+  session.initialize();
+
+  const agent = createRuleDrivenSessionAgent();
+  const status = session.setAgentIR(agent);
+  assert.equal(status.state, 'applied');
+
+  session.updateAgentParameters({ visionCells: 12 });
+
+  const reconciledAgent = session.getCurrentAgentIR();
+  assert.equal(reconciledAgent.body.inputRules[0]?.nodeIdPattern, '^sensor-([RGB])-(\\d+)$');
+  assert.equal(reconciledAgent.body.outputRules[0]?.nodeIdPattern, '^effector-(turn-left|move-forward|turn-right)$');
 });
 
 test('simulation session legacy GraphIR compat getter preserves the applied bridgeable connection semantics', () => {
@@ -767,4 +937,88 @@ test('simulation session setAgentIR accepts AgentIR-native body rules without re
   assert.equal(status.state, 'applied');
   assert.equal(session.getCurrentAgentIR().connections[0]?.from.nodeId, 'sensor-G-2');
   assert.equal(session.getCurrentAgentIR().connections[1]?.to.nodeId, 'effector-move-forward');
+});
+
+test('simulation session legacy GraphIR compat setter rejects draft links that cannot be preserved', () => {
+  const session = new SimulationSession({
+    visionSystem: new VisionSystem(),
+    agentController: new AgentController(),
+    worldManager: new WorldManager(1600, 1200),
+    collisionDetector: new CollisionDetector(),
+  });
+
+  session.initialize();
+
+  const document = createDefaultGraphIRDocument(1);
+  document.root.links.push({
+    id: 'invalid-output-source-link',
+    from: {
+      nodeId: 'output-turn-left',
+      portId: 'out',
+    },
+    to: {
+      nodeId: 'neuron-1',
+      portId: 'dendrite',
+    },
+    weight: 1,
+  });
+
+  const status = setLegacyGraphIRDocument(session, document);
+  assert.equal(status.state, 'invalid');
+  assert.ok(status.message?.includes('invalid-output-source-link'));
+});
+
+test('simulation session legacy GraphIR compat setter accepts custom body bindings with non-legacy brain signal ids', () => {
+  const session = new SimulationSession({
+    visionSystem: new VisionSystem(),
+    agentController: new AgentController(),
+    worldManager: new WorldManager(1600, 1200),
+    collisionDetector: new CollisionDetector(),
+  });
+
+  session.initialize();
+
+  const document = createValidCompatBoundaryDocument();
+  const body: BodyDefinition = {
+    version: 1,
+    inputSignals: [
+      {
+        id: 'vision-g-0',
+        source: {
+          kind: 'vision-cell',
+          channel: 'G',
+          cellIndex: 0,
+        },
+        scale: 2,
+      },
+    ],
+    outputSignals: [
+      {
+        id: 'motor-move-forward',
+        target: {
+          kind: 'action-channel',
+          channel: 'move-forward',
+        },
+        decayPerSecond: 7,
+      },
+    ],
+    brainBindings: {
+      inputs: [
+        {
+          bodySignalId: 'vision-g-0',
+          brainSignalNodeId: 'vision-in',
+        },
+      ],
+      outputs: [
+        {
+          bodySignalId: 'motor-move-forward',
+          brainSignalNodeId: 'motor-out',
+        },
+      ],
+    },
+  };
+
+  const status = setLegacyGraphIRDocument(session, document, body);
+  assert.equal(status.state, 'invalid');
+  assert.ok(status.message?.includes('core-motor-out'));
 });

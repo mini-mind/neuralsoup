@@ -54,6 +54,7 @@ export type {
   BrainProgramNodeIndex,
   BrainProgramOutputBinding,
   BrainProgramSignalNode,
+  LegacyBrainProgram,
   ProgramInputPort,
   ProgramOutputPort,
 } from './program';
