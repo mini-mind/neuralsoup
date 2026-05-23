@@ -41,12 +41,12 @@ export const useGraphTopologyDiagnosticsModel = ({
   canvasScale,
 }: UseGraphTopologyDiagnosticsModelOptions) => {
   void agent;
-  const draftSummary = useMemo(() => draftStatus.summary, [draftStatus.summary]);
+  const canonicalSummary = useMemo(() => draftStatus.summary, [draftStatus.summary]);
   const draftValidationCount = useMemo(() => draftStatus.issues.length, [draftStatus.issues.length]);
 
   return {
     visionCells,
-    draftSummary,
+    canonicalSummary,
     draftValidationCount,
     draftStatus,
     runtimeStatus,

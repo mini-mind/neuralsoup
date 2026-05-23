@@ -1,5 +1,4 @@
 import type { IzhikevichNeuronParameters, Position } from './shared';
-import type { BrainOutputChannel } from './shared';
 import { getDefaultWorldRegistry } from './world-registry';
 
 export interface AgentMetadata {
@@ -112,7 +111,7 @@ export interface BodyInputNodeRuntime {
 
 export interface BodyOutputNodeRuntime {
   id: string;
-  target: BrainOutputChannel;
+  target: string;
   normalizedTarget: string;
   worldPort: string;
   decayPerSecond: number;

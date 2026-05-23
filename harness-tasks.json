@@ -1038,7 +1038,7 @@
     {
       "id": "task-027",
       "title": "Body endpoint projector 收口：分离 compile/runtime 规则解析与 GraphView 主动投影策略，消除 projection 假阴性",
-      "status": "pending",
+      "status": "completed",
       "priority": "P1",
       "depends_on": [
         "task-025"
@@ -1054,7 +1054,13 @@
         "cleanup": null
       },
       "error_log": [],
-      "checkpoints": []
+      "checkpoints": [
+        {
+          "at": "2026-05-23T18:45:28Z",
+          "message": "Closed the main runtime/authority P1s for task-027: compile/runtime output ports are now target-string based instead of fixed BrainOutputChannel slots, default world action lowering is explicit in the engine adapter, invalid installs preserve the last successfully applied compiled summary, and BodyIR settings now separate canonical coverage preview from compiled runtime shape. Revalidated with npm run type-check, npm run test:domain, and targeted Playwright diagnostics/body-ir flows."
+        }
+      ],
+      "completed_at": "2026-05-23T18:45:28Z"
     },
     {
       "id": "task-028",
@@ -1097,6 +1103,36 @@
       },
       "error_log": [],
       "checkpoints": []
+    },
+    {
+      "id": "task-030",
+      "title": "GraphView/diagnostics P2 收口：强化 canonical-only 可视反馈、拆清 draft/canonical 命名，并补分叉场景测试",
+      "status": "pending",
+      "priority": "P2",
+      "depends_on": [
+        "task-027"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"body ir|graph view diagnostics\"",
+        "timeout_seconds": 1200
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [
+        "GraphView canonical-only endpoint semantics are now explicit enough to avoid P1 authority mismatch, but authoring canonical nodes and installed runtime nodes still share one interaction model and canvas feedback remains weak.",
+        "Diagnostics still carry residual draft/canonical naming debt and E2E coverage does not yet exercise the main canonical-only vs compiled/applied divergence path end-to-end.",
+        "Default world registry continues to define a host-specific canonical subset rather than a fully generalized rule-truth expansion path."
+      ],
+      "checkpoints": [
+        {
+          "at": "2026-05-23T20:10:00Z",
+          "message": "Strengthened the GraphView/BodyIR P2 split by surfacing canonical vs compiled summaries in settings, marking canonical-only adapter counts directly in the graph view, renaming internal diagnostics flow toward canonical semantics, and adding domain/E2E coverage for canonical-only vs compiled divergence."
+        }
+      ]
     }
   ],
   "session_count": 9,

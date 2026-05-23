@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildAgentBodyRulePreviewModel,
+  resolveCompiledAgentBodyEndpointIds,
   type AgentIR,
 } from '../../src/domain/brain';
 
@@ -275,7 +276,7 @@ test('buildAgentBodyRulePreviewModel summarizes conflicts and unmatched endpoint
         issue.scope === 'output' &&
         issue.kind === 'conflict' &&
         issue.nodeId === 'effector-turn-left' &&
-        issue.target === 'turn-left'
+        issue.target === 'action.turn-left'
     ),
     true
   );
@@ -288,4 +289,21 @@ test('buildAgentBodyRulePreviewModel summarizes conflicts and unmatched endpoint
     ),
     true
   );
+});
+
+test('compiled body endpoint projection only includes referenced endpoints while canonical preview keeps full coverage', () => {
+  const agent = createRuleDrivenAgent();
+  const preview = buildAgentBodyRulePreviewModel(agent);
+  const compiledEndpointIds = resolveCompiledAgentBodyEndpointIds(agent);
+
+  assert.deepEqual(
+    compiledEndpointIds.bodyInputNodeIds,
+    ['sensor-G-2']
+  );
+  assert.deepEqual(
+    compiledEndpointIds.bodyOutputNodeIds,
+    ['effector-move-forward']
+  );
+  assert.equal(preview.input.endpointNodeIds.length > compiledEndpointIds.bodyInputNodeIds.length, true);
+  assert.equal(preview.output.endpointNodeIds.length > compiledEndpointIds.bodyOutputNodeIds.length, true);
 });

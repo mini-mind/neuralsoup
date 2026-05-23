@@ -1,4 +1,4 @@
-import type { BrainOutputChannel, IzhikevichNeuronRuntimeState } from './shared';
+import type { IzhikevichNeuronRuntimeState } from './shared';
 import type { AgentProgram } from './agent-program';
 
 export interface AgentProgramRuntimeState {
@@ -9,14 +9,8 @@ export interface AgentProgramRuntimeState {
 
 export interface AgentProgramStepResult {
   runtimeState: AgentProgramRuntimeState;
-  outputs: Record<BrainOutputChannel, number>;
+  outputsByTarget: Record<string, number>;
 }
-
-const DEFAULT_OUTPUTS: Record<BrainOutputChannel, number> = {
-  'turn-left': 0,
-  'move-forward': 0,
-  'turn-right': 0,
-};
 
 const ACTIVE_SIGNAL_EPSILON = 1e-6;
 const clampUnit = (value: number): number => Math.max(0, Math.min(1, value));
@@ -133,9 +127,9 @@ export const stepAgentProgram = (
     }
   }
 
-  const outputs = { ...DEFAULT_OUTPUTS };
+  const outputsByTarget: Record<string, number> = {};
   for (const port of program.outputPorts) {
-    outputs[port.target] = clampUnit(nextBodyOutputs.get(port.id) ?? 0);
+    outputsByTarget[port.target] = clampUnit(nextBodyOutputs.get(port.id) ?? 0);
   }
 
   return {
@@ -144,6 +138,6 @@ export const stepAgentProgram = (
       bodyOutputs: nextBodyOutputs,
       activeLeafNodeIds: [...activeLeafNodeIds],
     },
-    outputs,
+    outputsByTarget,
   };
 };

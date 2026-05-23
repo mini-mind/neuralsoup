@@ -5,6 +5,7 @@ import { VisionSystem } from '../../src/engine/VisionSystem';
 import { WorldManager } from '../../src/engine/WorldManager';
 import { CollisionDetector } from '../../src/engine/CollisionDetector';
 import { SimulationSession } from '../../src/runtime/SimulationSession';
+import { compileAgentIR, createAgentProgramRuntimeState, stepAgentProgram } from '../../src/domain/brain';
 import type { AgentRuntimeStatus } from '../../src/types/agentRuntime';
 import type { Agent } from '../../src/types/simulation';
 
@@ -153,4 +154,73 @@ test('simulation session keeps main-agent runtime status aligned across mode swi
   assert.equal(Number.isFinite(agent.velocity.y), true);
   assert.equal(agent.x, 0);
   assert.equal(agent.y, 0);
+});
+
+test('default world action adapter consumes normalized action.* runtime targets', () => {
+  const controller = new AgentController();
+  const session = new SimulationSession({
+    visionSystem: new VisionSystem(),
+    agentController: controller,
+    worldManager: new WorldManager(1600, 1200),
+    collisionDetector: new CollisionDetector(),
+  });
+
+  session.initialize();
+  session.setControlMode('snn');
+  const mainAgent = session.getMainAgent();
+  assert.ok(mainAgent);
+
+  const program = compileAgentIR(session.getCurrentAgentIR());
+  const result = stepAgentProgram(
+    program,
+    new Array(mainAgent.visualInput.length).fill(1),
+    createAgentProgramRuntimeState(program),
+    1,
+    1
+  );
+
+  assert.equal(typeof result.outputsByTarget['action.move-forward'], 'number');
+
+  const controlledAgent = createAgent({
+    id: mainAgent.id,
+    visualInput: new Array(mainAgent.visualInput.length).fill(1),
+  });
+  controller.updateAgent(controlledAgent, 1, {
+    controlMode: 'snn',
+    keyboardInputState: {
+      turnLeft: false,
+      moveForward: false,
+      turnRight: false,
+    },
+  });
+
+  assert.equal(Number.isFinite(controlledAgent.velocity.x), true);
+  assert.equal(Number.isFinite(controlledAgent.velocity.y), true);
+});
+
+test('invalid install keeps the last successfully applied runtime summary', () => {
+  const session = new SimulationSession({
+    visionSystem: new VisionSystem(),
+    agentController: new AgentController(),
+    worldManager: new WorldManager(1600, 1200),
+    collisionDetector: new CollisionDetector(),
+  });
+
+  session.initialize();
+  const appliedSummary = session.getAgentRuntimeStatus().appliedSummary;
+  const invalidAgent = {
+    ...session.getCurrentAgentIR(),
+    body: {
+      ...session.getCurrentAgentIR().body,
+      outputRules: session.getCurrentAgentIR().body.outputRules.map((rule) => ({
+        ...rule,
+        targetTemplate: 'thruster.$1',
+      })),
+    },
+  };
+
+  const runtimeStatus = session.setAgentIR(invalidAgent);
+
+  assert.equal(runtimeStatus.state, 'invalid');
+  assert.deepEqual(runtimeStatus.appliedSummary, appliedSummary);
 });

@@ -1,15 +1,14 @@
 import type {
   AgentIR,
+  AgentIRSummary,
   BodyInputNodeRuntime,
   BodyOutputNodeRuntime,
   BrainNeuronNode,
 } from './agent-ir';
 import {
-  resolveAgentBodyInputRuleBindings,
-  resolveAgentBodyOutputRuleBindings,
+  resolveAgentBodyEndpointResolution,
 } from './agent-body-rules';
 import type { AgentProgram, AgentProgramConnection, AgentProgramNeuronNode } from './agent-program';
-import type { BrainOutputChannel } from './shared';
 
 export type AgentValidationIssueCode =
   | 'missing-brain-root-container'
@@ -34,39 +33,31 @@ export class AgentValidationError extends Error {
   }
 }
 
-const ACTION_CHANNELS: BrainOutputChannel[] = ['turn-left', 'move-forward', 'turn-right'];
-
 interface ResolvedBodyEndpoints<RuntimeNode> {
   nodesById: Map<string, RuntimeNode>;
   issues: AgentValidationIssue[];
 }
 
 const resolveBodyInputs = (agent: AgentIR): ResolvedBodyEndpoints<BodyInputNodeRuntime> => {
-  const nodeIds = new Set(
-    agent.connections
-      .filter((connection) => connection.from.scope === 'bodyInput')
-      .map((connection) => connection.from.nodeId)
-  );
-  const resolution = resolveAgentBodyInputRuleBindings(agent.body.inputRules, nodeIds);
+  const resolution = resolveAgentBodyEndpointResolution(agent);
   return {
-    nodesById: resolution.nodesById,
-    issues: resolution.issues.map((issue) => ({
-      code: 'runtime-binding-error',
-      message: issue.message,
-    })),
+    nodesById: resolution.inputNodesById,
+    issues: resolution.issues
+      .filter((issue) => issue.scope === 'input')
+      .map((issue) => ({
+        code: 'runtime-binding-error',
+        message: issue.message,
+      })),
   };
 };
 
 const resolveBodyOutputs = (agent: AgentIR): ResolvedBodyEndpoints<BodyOutputNodeRuntime> => {
-  const nodeIds = new Set(
-    agent.connections
-      .filter((connection) => connection.to.scope === 'bodyOutput')
-      .map((connection) => connection.to.nodeId)
-  );
-  const resolution = resolveAgentBodyOutputRuleBindings(agent.body.outputRules, nodeIds);
+  const resolution = resolveAgentBodyEndpointResolution(agent);
   return {
-    nodesById: resolution.nodesById,
-    issues: resolution.issues.map((issue) => ({
+    nodesById: resolution.outputNodesById,
+    issues: resolution.issues
+      .filter((issue) => issue.scope === 'output')
+      .map((issue) => ({
       code: 'runtime-binding-error',
       message: issue.message,
     })),
@@ -89,7 +80,19 @@ interface AgentCompilationContext {
   issues: AgentValidationIssue[];
   bodyInputsById: Map<string, BodyInputNodeRuntime>;
   bodyOutputsById: Map<string, BodyOutputNodeRuntime>;
+  summary: AgentIRSummary;
 }
+
+const createCompiledAgentSummary = (
+  agent: AgentIR,
+  bodyInputsById: Map<string, BodyInputNodeRuntime>,
+  bodyOutputsById: Map<string, BodyOutputNodeRuntime>
+): AgentIRSummary => ({
+  inputSignalCount: bodyInputsById.size,
+  outputSignalCount: bodyOutputsById.size,
+  neuronCount: agent.brain.neurons.length,
+  leafLinkCount: agent.connections.length,
+});
 
 const buildBrainStructureIssues = (agent: AgentIR): AgentValidationIssue[] => {
   const issues: AgentValidationIssue[] = [];
@@ -316,6 +319,7 @@ const buildAgentCompilationContext = (agent: AgentIR): AgentCompilationContext =
     issues,
     bodyInputsById: bodyInputResolution.nodesById,
     bodyOutputsById: bodyOutputResolution.nodesById,
+    summary: createCompiledAgentSummary(agent, bodyInputResolution.nodesById, bodyOutputResolution.nodesById),
   };
 };
 
@@ -324,7 +328,7 @@ export const validateAgentIR = (agent: AgentIR): AgentValidationIssue[] => {
 };
 
 export const compileAgentIR = (agent: AgentIR): AgentProgram => {
-  const { issues, bodyInputsById, bodyOutputsById } = buildAgentCompilationContext(agent);
+  const { issues, bodyInputsById, bodyOutputsById, summary } = buildAgentCompilationContext(agent);
   if (issues.length > 0) {
     throw new AgentValidationError(issues);
   }
@@ -354,6 +358,7 @@ export const compileAgentIR = (agent: AgentIR): AgentProgram => {
 
   return {
     agent,
+    summary,
     inputPorts: [...bodyInputsById.values()]
       .sort((left, right) => left.visualInputIndex - right.visualInputIndex || left.id.localeCompare(right.id))
       .map((node) => ({
@@ -363,16 +368,15 @@ export const compileAgentIR = (agent: AgentIR): AgentProgram => {
         index: node.visualInputIndex,
         scale: node.scale,
       })),
-    outputPorts: ACTION_CHANNELS.map((channel) => {
-      const outputNode = [...bodyOutputsById.values()].find((node) => node.target === channel);
-      return {
-        id: outputNode?.id ?? `output-${channel}`,
-        target: channel,
-        normalizedTarget: outputNode?.normalizedTarget ?? `action.${channel}`,
-        worldPort: outputNode?.worldPort ?? 'action',
-        decayPerSecond: outputNode?.decayPerSecond ?? 0,
-      };
-    }),
+    outputPorts: [...bodyOutputsById.values()]
+      .sort((left, right) => left.target.localeCompare(right.target) || left.id.localeCompare(right.id))
+      .map((node) => ({
+        id: node.id,
+        target: node.target,
+        normalizedTarget: node.normalizedTarget,
+        worldPort: node.worldPort,
+        decayPerSecond: node.decayPerSecond,
+      })),
     neuronNodes,
     connections,
     bodyInputsById,

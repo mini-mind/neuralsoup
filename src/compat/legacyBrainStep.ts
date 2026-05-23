@@ -27,6 +27,12 @@ const DEFAULT_RUNTIME_STATE = (): IzhikevichNeuronRuntimeState => ({
   lastSpikeTime: 0,
 });
 
+const toCompatOutputs = (outputsByTarget: Record<string, number>): Record<BrainOutputChannel, number> => ({
+  'turn-left': outputsByTarget['action.turn-left'] ?? outputsByTarget['turn-left'] ?? 0,
+  'move-forward': outputsByTarget['action.move-forward'] ?? outputsByTarget['move-forward'] ?? 0,
+  'turn-right': outputsByTarget['action.turn-right'] ?? outputsByTarget['turn-right'] ?? 0,
+});
+
 const buildCompatSignalSnapshotFromAgentRuntime = (
   program: LegacyBrainProgram,
   sensoryInputs: number[],
@@ -95,6 +101,6 @@ export const stepLegacyBrainProgram = (
       agentRuntimeState: agentResult.runtimeState,
       activeLeafNodeIds: agentResult.runtimeState.activeLeafNodeIds,
     },
-    outputs: agentResult.outputs,
+    outputs: toCompatOutputs(agentResult.outputsByTarget),
   };
 };

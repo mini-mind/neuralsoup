@@ -7,7 +7,7 @@ import {
   compileAgentIR,
   createDefaultAgentIR,
   reconcileAgentIRVisionCells,
-  summarizeAgentIR,
+  summarizeCompiledAgentProgram,
   type AgentValidationIssue,
   type AgentIR,
 } from '../domain/brain';
@@ -52,6 +52,7 @@ export class SimulationSession {
   private currentControlMode: SimulationControlMode;
   private currentAgentIR: AgentIR;
   private agentRuntimeStatus: AgentRuntimeStatus;
+  private lastAppliedSummary: AgentRuntimeStatus['appliedSummary'];
   private keyboardInputState: SimulationSessionInputState = {
     turnLeft: false,
     moveForward: false,
@@ -75,6 +76,7 @@ export class SimulationSession {
     this.currentControlMode = options.initialControlMode ?? 'keyboard';
     this.currentAgentIR = createDefaultAgentIR(this.visionSystem.getVisionCells(), '默认 Agent');
     this.agentRuntimeStatus = this.createAppliedAgentRuntimeStatus(this.currentAgentIR);
+    this.lastAppliedSummary = this.agentRuntimeStatus.appliedSummary;
     this.state = createEmptyWorldState(this.config, this.worldManager.getWorldBounds());
   }
 
@@ -173,7 +175,8 @@ export class SimulationSession {
     const mainAgent = this.getMainAgent();
 
     try {
-      this.applyAgentIR(agent, mainAgent);
+      const compiledProgram = this.applyAgentIR(agent, mainAgent);
+      return this.setAppliedAgentRuntimeStatusFromProgram(compiledProgram);
     } catch (error) {
       if (error instanceof AgentValidationError) {
         return this.setInvalidAgentRuntimeStatus(error.issues);
@@ -187,7 +190,6 @@ export class SimulationSession {
       ]);
     }
 
-    return this.setAppliedAgentRuntimeStatus(agent);
   }
 
   public getMainAgentControlMode(): SimulationControlMode {
@@ -261,14 +263,14 @@ export class SimulationSession {
     }
 
     const nextAgent = reconcileAgentIRVisionCells(this.currentAgentIR, mainAgent.visionCells.length);
-    this.applyAgentIR(nextAgent, mainAgent);
-    this.setAppliedAgentRuntimeStatus(nextAgent);
+    const compiledProgram = this.applyAgentIR(nextAgent, mainAgent);
+    this.setAppliedAgentRuntimeStatusFromProgram(compiledProgram);
   }
 
   private applyAgentIR(
     agent: AgentIR,
     mainAgent: Agent | null
-  ): void {
+  ): ReturnType<typeof compileAgentIR> {
     const compiledProgram = compileAgentIR(agent);
 
     if (mainAgent) {
@@ -276,26 +278,38 @@ export class SimulationSession {
     }
 
     this.currentAgentIR = agent;
+    return compiledProgram;
   }
 
   private createAppliedAgentRuntimeStatus(agent: AgentIR): AgentRuntimeStatus {
+    const compiledProgram = compileAgentIR(agent);
     return {
       state: 'applied',
-      appliedSummary: summarizeAgentIR(agent),
+      appliedSummary: summarizeCompiledAgentProgram(compiledProgram),
       issues: [],
       message: null,
     };
   }
 
-  private setAppliedAgentRuntimeStatus(agent: AgentIR): AgentRuntimeStatus {
-    this.agentRuntimeStatus = this.createAppliedAgentRuntimeStatus(agent);
+  private createAppliedAgentRuntimeStatusFromProgram(compiledProgram: ReturnType<typeof compileAgentIR>): AgentRuntimeStatus {
+    return {
+      state: 'applied',
+      appliedSummary: summarizeCompiledAgentProgram(compiledProgram),
+      issues: [],
+      message: null,
+    };
+  }
+
+  private setAppliedAgentRuntimeStatusFromProgram(compiledProgram: ReturnType<typeof compileAgentIR>): AgentRuntimeStatus {
+    this.agentRuntimeStatus = this.createAppliedAgentRuntimeStatusFromProgram(compiledProgram);
+    this.lastAppliedSummary = this.agentRuntimeStatus.appliedSummary;
     return this.agentRuntimeStatus;
   }
 
   private setInvalidAgentRuntimeStatus(issues: AgentValidationIssue[]): AgentRuntimeStatus {
     this.agentRuntimeStatus = {
       state: 'invalid',
-      appliedSummary: summarizeAgentIR(this.currentAgentIR),
+      appliedSummary: this.lastAppliedSummary,
       issues,
       message: issues.map((issue) => issue.message).join(' | '),
     };

@@ -5,7 +5,7 @@ import type { GraphCanvasViewport } from '../../hooks/useSNNTopologyState';
 interface GraphTopologyDiagnosticsProps {
   visionCells: number;
   draftStatus: AgentDraftStatus;
-  draftSummary: {
+  canonicalSummary: {
     inputSignalCount: number;
     outputSignalCount: number;
     neuronCount: number;
@@ -29,7 +29,7 @@ interface GraphTopologyDiagnosticsProps {
 const GraphTopologyDiagnostics: React.FC<GraphTopologyDiagnosticsProps> = ({
   visionCells,
   draftStatus,
-  draftSummary,
+  canonicalSummary,
   draftValidationCount,
   runtimeStatus,
   runtimeActivity,
@@ -55,10 +55,10 @@ const GraphTopologyDiagnostics: React.FC<GraphTopologyDiagnosticsProps> = ({
         <span data-testid="topology-draft-vision-cells">{visionCells}</span>
         <span data-testid="topology-draft-state">{draftStatus.state}</span>
         <span data-testid="topology-draft-status-label">{draftStatusLabel}</span>
-        <span data-testid="topology-draft-input-count">{draftSummary.inputSignalCount}</span>
-        <span data-testid="topology-draft-output-count">{draftSummary.outputSignalCount}</span>
-        <span data-testid="topology-draft-neuron-count">{draftSummary.neuronCount}</span>
-        <span data-testid="topology-draft-connection-count">{draftSummary.leafLinkCount}</span>
+        <span data-testid="topology-draft-input-count">{canonicalSummary.inputSignalCount}</span>
+        <span data-testid="topology-draft-output-count">{canonicalSummary.outputSignalCount}</span>
+        <span data-testid="topology-draft-neuron-count">{canonicalSummary.neuronCount}</span>
+        <span data-testid="topology-draft-connection-count">{canonicalSummary.leafLinkCount}</span>
         <span data-testid="topology-draft-validation-count">{draftValidationCount}</span>
         <span data-testid="topology-draft-message">{draftMessage}</span>
         <span data-testid="topology-runtime-state">{runtimeStatus.state}</span>
@@ -80,9 +80,9 @@ const GraphTopologyDiagnostics: React.FC<GraphTopologyDiagnosticsProps> = ({
         <span data-testid="topology-selected-node">{selectedNodeId ?? 'none'}</span>
         <span data-testid="topology-selected-link">{selectedLinkId ?? 'none'}</span>
         <span data-testid="topology-vision-cells">{visionCells}</span>
-        <span data-testid="topology-input-count">{draftSummary.inputSignalCount}</span>
-        <span data-testid="topology-output-count">{draftSummary.outputSignalCount}</span>
-        <span data-testid="topology-validation-count">{draftValidationCount}</span>
+        <span data-testid="topology-canonical-input-count">{canonicalSummary.inputSignalCount}</span>
+        <span data-testid="topology-canonical-output-count">{canonicalSummary.outputSignalCount}</span>
+        <span data-testid="topology-canonical-validation-count">{draftValidationCount}</span>
         <span data-testid="topology-node-centers">{nodeCentersSummary}</span>
         <span data-testid="topology-node-view-positions">{nodeViewPositionsSummary}</span>
         <span data-testid="topology-scope">{currentScope}</span>

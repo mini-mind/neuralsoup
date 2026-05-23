@@ -435,6 +435,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
             active ? 'is-active' : '',
             pending ? 'is-pending' : '',
             node.proxy ? 'is-proxy' : '',
+            !node.runtimeInstalled && node.kind === 'signal' ? 'is-canonical-only' : '',
           ].join(' ');
 
           return (

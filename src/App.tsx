@@ -4,6 +4,7 @@ import {
   buildAgentBodyRulePreviewModel,
   createDefaultAgentIR,
   reconcileAgentIRVisionCells,
+  resolveCompiledAgentBodyEndpointIds,
   summarizeAgentIR,
   validateAgentIR,
   type AgentIR,
@@ -292,12 +293,15 @@ const App: React.FC = () => {
       }));
     });
 
+    const compiledEndpointIds = resolveCompiledAgentBodyEndpointIds(bodyPreviewAgent);
+
     return {
-      summary: `coverage ${draftBodyDocument.visionCellCount} cells；输入 endpoint ${bodyRulePreviewModel.input.endpointNodeIds.length} 个，输出 endpoint ${bodyRulePreviewModel.output.endpointNodeIds.length} 个。`,
+      canonicalSummary: `canonical coverage ${draftBodyDocument.visionCellCount} cells；输入 endpoint ${bodyRulePreviewModel.input.endpointNodeIds.length} 个，输出 endpoint ${bodyRulePreviewModel.output.endpointNodeIds.length} 个。`,
+      compiledSummary: `compiled runtime shape：输入 endpoint ${compiledEndpointIds.bodyInputNodeIds.length} 个，输出 endpoint ${compiledEndpointIds.bodyOutputNodeIds.length} 个。`,
       inputMatches,
       outputMatches,
     };
-  }, [bodyRulePreviewModel, draftBodyDocument]);
+  }, [bodyRulePreviewModel, draftBodyDocument, bodyPreviewAgent]);
   const bodyRuleValidation = useMemo<BodyIRValidationMessage[]>(() => {
     const inputRuleIndexById = new Map(draftBodyDocument.inputRules.map((rule, index) => [rule.id, index]));
     const outputRuleIndexById = new Map(draftBodyDocument.outputRules.map((rule, index) => [rule.id, index]));

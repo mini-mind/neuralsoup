@@ -5,7 +5,7 @@ import type {
   BrainContainerNode,
   BrainNeuronNode,
 } from '../../../domain/brain';
-import { resolveAgentBodyEndpointIds } from '../../../domain/brain';
+import { resolveAgentBodyEndpointIds, resolveCompiledAgentBodyEndpointIds } from '../../../domain/brain';
 import type { Position } from '../../../domain/brain/shared';
 import { getGraphLinkCapabilities } from './graphLinkPolicy';
 import type {
@@ -109,9 +109,13 @@ const getNodeDirection = (node: AgentGraphViewNodeRecord): GraphViewNode['direct
   return 'internal';
 };
 
-const createNodeDetail = (node: AgentGraphViewNodeRecord, childCount: number): string => {
+const createNodeDetail = (
+  node: AgentGraphViewNodeRecord,
+  childCount: number,
+  runtimeInstalledLeafCount: number
+): string => {
   if (node.kind === 'adapter') {
-    return `${childCount} signals`;
+    return `${childCount} canonical / ${runtimeInstalledLeafCount} installed`;
   }
 
   if (node.kind === 'neuron-group') {
@@ -119,7 +123,8 @@ const createNodeDetail = (node: AgentGraphViewNodeRecord, childCount: number): s
   }
 
   if (node.kind === 'signal') {
-    return node.endpoint?.scope === 'bodyInput' ? 'input' : 'output';
+    const direction = node.endpoint?.scope === 'bodyInput' ? 'input' : 'output';
+    return runtimeInstalledLeafCount > 0 ? `${direction} / installed` : `${direction} / canonical-only`;
   }
 
   return 'neuron';
@@ -669,6 +674,9 @@ export const buildAgentGraphViewModel = ({
   runtimeActiveNodeIds: string[];
 }): AgentGraphViewModel => {
   const indexes = buildIndexes(agent);
+  const compiledEndpointIds = resolveCompiledAgentBodyEndpointIds(agent);
+  const installedBodyInputNodeIds = new Set(compiledEndpointIds.bodyInputNodeIds);
+  const installedBodyOutputNodeIds = new Set(compiledEndpointIds.bodyOutputNodeIds);
   const { currentContainer, currentChildren, currentContainerKind } = getCurrentChildren(indexes, navigationPath);
   const currentScope = navigationPath.length === 0 ? 'root' : 'child';
   const scopeKey = navigationPath.length === 0 ? 'root' : navigationPath.join('/');
@@ -724,6 +732,16 @@ export const buildAgentGraphViewModel = ({
           : node.id === CORE_BODY_OUTPUTS_GROUP_ID
             ? indexes.bodyOutputNodeIds.length
         : [...indexes.nodeById.values()].filter((child) => indexes.parentContainerIdByNodeId.get(child.id) === node.id).length;
+    const runtimeInstalledLeafCount =
+      node.kind === 'signal'
+        ? node.endpoint?.scope === 'bodyInput'
+          ? (installedBodyInputNodeIds.has(node.refNodeId) ? 1 : 0)
+          : (installedBodyOutputNodeIds.has(node.refNodeId) ? 1 : 0)
+        : node.id === CORE_BODY_INPUTS_GROUP_ID
+          ? compiledEndpointIds.bodyInputNodeIds.length
+          : node.id === CORE_BODY_OUTPUTS_GROUP_ID
+            ? compiledEndpointIds.bodyOutputNodeIds.length
+          : 0;
     const direction = getNodeDirection(node);
     const leaf = isLeafNode(node);
     const capabilities = getGraphLinkCapabilities(
@@ -750,7 +768,7 @@ export const buildAgentGraphViewModel = ({
       width: size.width,
       height: size.height,
       parentId: navigationPath.at(-1) ?? null,
-      detail: createNodeDetail(node, childCount),
+      detail: createNodeDetail(node, childCount, runtimeInstalledLeafCount),
       editable: leaf,
       navigable: isContainerNode(node),
       leaf,
@@ -764,6 +782,8 @@ export const buildAgentGraphViewModel = ({
       expansionParentId: null,
       expansionOffsetX: 0,
       expansionOffsetY: 0,
+      runtimeInstalled: runtimeInstalledLeafCount > 0,
+      runtimeInstalledLeafCount,
     });
 
     if (!expanded || node.kind !== 'neuron-group') {
@@ -805,7 +825,7 @@ export const buildAgentGraphViewModel = ({
         width: size.width,
         height: size.height,
         parentId: node.id,
-        detail: createNodeDetail(child, 0),
+        detail: createNodeDetail(child, 0, 0),
         editable: leaf,
         navigable: isContainerNode(child),
         leaf,
@@ -819,6 +839,8 @@ export const buildAgentGraphViewModel = ({
         expansionParentId: node.id,
         expansionOffsetX: AGENT_GRAPH_EXPANDED_GROUP_PADDING,
         expansionOffsetY: AGENT_GRAPH_EXPANDED_GROUP_PADDING,
+        runtimeInstalled: false,
+        runtimeInstalledLeafCount: 0,
       });
     }
   }

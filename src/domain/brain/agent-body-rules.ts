@@ -115,7 +115,7 @@ const parseBodyOutputTarget = (
 
   return {
     id: nodeId,
-    target: binding.runtimeTarget,
+    target: binding.target,
     normalizedTarget: binding.target,
     worldPort: binding.worldPort,
     decayPerSecond,
@@ -159,6 +159,18 @@ export interface AgentBodyEndpointIds {
   bodyOutputNodeIds: string[];
 }
 
+export interface AgentCompiledBodyEndpointIds {
+  bodyInputNodeIds: string[];
+  bodyOutputNodeIds: string[];
+}
+
+export interface AgentBodyEndpointResolution {
+  inputNodesById: Map<string, BodyInputNodeRuntime>;
+  outputNodesById: Map<string, BodyOutputNodeRuntime>;
+  issues: AgentBodyRuleIssueSummaryItem[];
+  endpointIds: AgentBodyEndpointIds;
+}
+
 export const resolveAgentBodyEndpointIds = (agent: AgentIR): AgentBodyEndpointIds => {
   const bodyInputNodeIds = new Set<string>([
     ...collectEndpointIdsFromConnections(agent, 'bodyInput'),
@@ -172,6 +184,31 @@ export const resolveAgentBodyEndpointIds = (agent: AgentIR): AgentBodyEndpointId
   return {
     bodyInputNodeIds: [...bodyInputNodeIds].sort(),
     bodyOutputNodeIds: [...bodyOutputNodeIds].sort(),
+  };
+};
+
+export const resolveCompiledAgentBodyEndpointIds = (agent: AgentIR): AgentCompiledBodyEndpointIds => {
+  const referencedBodyInputNodeIds = collectEndpointIdsFromConnections(agent, 'bodyInput');
+  const referencedBodyOutputNodeIds = collectEndpointIdsFromConnections(agent, 'bodyOutput');
+  const input = resolveBodyInputRules(agent.body.inputRules, referencedBodyInputNodeIds);
+  const output = resolveBodyOutputRules(agent.body.outputRules, referencedBodyOutputNodeIds);
+
+  return {
+    bodyInputNodeIds: [...input.nodesById.keys()].sort(),
+    bodyOutputNodeIds: [...output.nodesById.keys()].sort(),
+  };
+};
+
+export const resolveAgentBodyEndpointResolution = (agent: AgentIR): AgentBodyEndpointResolution => {
+  const endpointIds = resolveAgentBodyEndpointIds(agent);
+  const input = resolveBodyInputRules(agent.body.inputRules, endpointIds.bodyInputNodeIds);
+  const output = resolveBodyOutputRules(agent.body.outputRules, endpointIds.bodyOutputNodeIds);
+
+  return {
+    inputNodesById: input.nodesById,
+    outputNodesById: output.nodesById,
+    issues: [...input.issues, ...output.issues],
+    endpointIds,
   };
 };
 
@@ -403,18 +440,18 @@ export const resolveAgentBodyOutputRuleBindings = (
 ): BodyRuleResolution<BodyOutputNodeRuntime> => resolveBodyOutputRules(rules, nodeIds);
 
 export const buildAgentBodyRulePreviewModel = (agent: AgentIR): AgentBodyRulePreviewModel => {
-  const endpointIds = resolveAgentBodyEndpointIds(agent);
-  const input = resolveBodyInputRules(agent.body.inputRules, endpointIds.bodyInputNodeIds);
-  const output = resolveBodyOutputRules(agent.body.outputRules, endpointIds.bodyOutputNodeIds);
+  const resolution = resolveAgentBodyEndpointResolution(agent);
+  const input = resolveBodyInputRules(agent.body.inputRules, resolution.endpointIds.bodyInputNodeIds);
+  const output = resolveBodyOutputRules(agent.body.outputRules, resolution.endpointIds.bodyOutputNodeIds);
 
   return {
     input: {
-      endpointNodeIds: [...endpointIds.bodyInputNodeIds],
+      endpointNodeIds: [...resolution.endpointIds.bodyInputNodeIds],
       rules: input.rules,
       previewsByRuleId: buildPreviewRecord(input.rules),
     },
     output: {
-      endpointNodeIds: [...endpointIds.bodyOutputNodeIds],
+      endpointNodeIds: [...resolution.endpointIds.bodyOutputNodeIds],
       rules: output.rules,
       previewsByRuleId: buildPreviewRecord(output.rules),
     },

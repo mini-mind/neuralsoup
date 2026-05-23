@@ -44,7 +44,8 @@ export interface BodyIROutputPreviewItem {
 }
 
 export interface BodyIRPreviewData {
-  summary?: string;
+  canonicalSummary?: string;
+  compiledSummary?: string;
   inputMatches?: BodyIRInputPreviewItem[];
   outputMatches?: BodyIROutputPreviewItem[];
 }

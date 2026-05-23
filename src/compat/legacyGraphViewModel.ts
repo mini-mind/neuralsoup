@@ -449,6 +449,8 @@ export const buildLegacyGraphViewModel = ({
         expansionParentId: null,
         expansionOffsetX: 0,
         expansionOffsetY: 0,
+        runtimeInstalled: true,
+        runtimeInstalledLeafCount: leaf ? 1 : 0,
       };
 
       if (!expanded) {
@@ -501,6 +503,8 @@ export const buildLegacyGraphViewModel = ({
             expansionParentId: node.id,
             expansionOffsetX: childDisplayOffset.x,
             expansionOffsetY: childDisplayOffset.y,
+            runtimeInstalled: true,
+            runtimeInstalledLeafCount: childLeaf ? 1 : 0,
           };
         }),
       ];

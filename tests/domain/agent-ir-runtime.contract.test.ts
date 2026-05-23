@@ -88,25 +88,34 @@ const createRuleDrivenAgent = (): AgentIR =>
 test('compileAgentIR resolves BodyIR regex rules into runtime ports instead of relying on legacy node ids', () => {
   const program = compileAgentIR(createRuleDrivenAgent());
 
-  assert.deepEqual(program.inputPorts, [
+  assert.equal(program.inputPorts.length, 9);
+  assert.deepEqual(
+    program.inputPorts.find((port) => port.id === 'sensor-G-2'),
     {
       id: 'sensor-G-2',
       source: 'vision.G.2',
       worldPort: 'vision',
       index: 7,
       scale: 2,
-    },
-  ]);
+    }
+  );
+  assert.equal(program.outputPorts.length, 3);
   assert.deepEqual(
-    program.outputPorts.find((port) => port.target === 'move-forward'),
+    program.outputPorts.find((port) => port.id === 'effector-move-forward'),
     {
       id: 'effector-move-forward',
-      target: 'move-forward',
+      target: 'action.move-forward',
       normalizedTarget: 'action.move-forward',
       worldPort: 'action',
       decayPerSecond: 3,
     }
   );
+  assert.deepEqual(program.summary, {
+    inputSignalCount: 9,
+    outputSignalCount: 3,
+    neuronCount: 1,
+    leafLinkCount: 2,
+  });
 });
 
 test('stepAgentProgram consumes rule-resolved input ports and activates rule-resolved output ports', () => {
@@ -117,7 +126,7 @@ test('stepAgentProgram consumes rule-resolved input ports and activates rule-res
 
   const result = stepAgentProgram(program, sensoryInputs, runtimeState, 1, 1);
 
-  assert.equal(result.outputs['move-forward'], 1);
+  assert.equal(result.outputsByTarget['action.move-forward'], 1);
   assert.deepEqual(
     new Set(result.runtimeState.activeLeafNodeIds),
     new Set(['sensor-G-2', 'neuron-1', 'effector-move-forward'])

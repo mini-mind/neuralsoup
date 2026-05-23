@@ -1,5 +1,4 @@
 import type { BodyIR, BodyInputRule, BodyOutputRule } from './agent-ir';
-import type { BrainOutputChannel } from './shared';
 
 export interface WorldInputBinding {
   source: string;
@@ -10,7 +9,6 @@ export interface WorldInputBinding {
 export interface WorldOutputBinding {
   target: string;
   worldPort: string;
-  runtimeTarget: BrainOutputChannel;
 }
 
 export interface WorldPortDescriptor {
@@ -235,7 +233,6 @@ export const createDefaultWorldRegistry = (): WorldRegistry => ({
     return {
       target: `action.${match[1]}`,
       worldPort: 'action',
-      runtimeTarget: match[1] as BrainOutputChannel,
     };
   },
   enumerateInputNodeIds: (rule, body) => enumerateVisionInputNodeIds(rule, body),

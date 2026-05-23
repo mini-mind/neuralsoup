@@ -329,3 +329,47 @@ test('agent graph view and body preview share the same canonical endpoint expans
     [...preview.output.endpointNodeIds].sort()
   );
 });
+
+test('agent graph view marks canonical-only body endpoints that are not installed in compiled runtime', () => {
+  const agent = createTestAgent();
+  agent.body.inputRules = [
+    {
+      id: 'sensor-inputs',
+      nodeIdPattern: '^sensor-([RGB])-(\\d+)$',
+      sourceTemplate: 'vision.$1.$2',
+      scale: 1,
+    },
+  ];
+  agent.body.outputRules = [
+    {
+      id: 'effector-outputs',
+      nodeIdPattern: '^effector-(turn-left|move-forward|turn-right)$',
+      targetTemplate: 'action.$1',
+      decayPerSecond: 2,
+    },
+  ];
+  agent.body.visionCellCount = 1;
+  agent.connections = [
+    {
+      id: 'sensor-link',
+      from: { scope: 'bodyInput', nodeId: 'sensor-G-0' },
+      to: { scope: 'brain', nodeId: 'neuron-1' },
+      weight: 1,
+    },
+  ];
+
+  const inputScopeView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: ['input-adapter'],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+  });
+
+  const installedInput = inputScopeView.nodes.find((node) => node.refNodeId === 'sensor-G-0');
+  const canonicalOnlyInput = inputScopeView.nodes.find((node) => node.refNodeId === 'sensor-R-0');
+  assert.ok(installedInput);
+  assert.ok(canonicalOnlyInput);
+  assert.equal(installedInput.runtimeInstalled, true);
+  assert.equal(canonicalOnlyInput.runtimeInstalled, false);
+  assert.equal(canonicalOnlyInput.detail.includes('canonical-only'), true);
+});

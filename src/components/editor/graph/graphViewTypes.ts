@@ -31,6 +31,8 @@ export interface GraphViewNode {
   expansionParentId: string | null;
   expansionOffsetX: number;
   expansionOffsetY: number;
+  runtimeInstalled: boolean;
+  runtimeInstalledLeafCount: number;
 }
 
 export interface GraphViewLink {

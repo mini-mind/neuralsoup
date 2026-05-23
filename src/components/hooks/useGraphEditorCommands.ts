@@ -691,6 +691,8 @@ export const useGraphEditorCommands = ({
         expansionParentId: null,
         expansionOffsetX: 0,
         expansionOffsetY: 0,
+        runtimeInstalled: true,
+        runtimeInstalledLeafCount: 1,
       };
 
       const uniqueSourceNodeIds = uniqueIds(sourceNodeIds);

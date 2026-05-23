@@ -269,6 +269,11 @@
   border-style: dashed;
 }
 
+.topology-node.is-canonical-only .topology-node-shape {
+  border-style: dashed;
+  opacity: 0.72;
+}
+
 .topology-node-label {
   max-width: 100%;
   font-size: 14px;

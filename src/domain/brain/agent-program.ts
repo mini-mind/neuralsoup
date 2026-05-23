@@ -1,5 +1,5 @@
-import type { AgentIR, BodyInputNodeRuntime, BodyOutputNodeRuntime } from './agent-ir';
-import type { BrainOutputChannel, IzhikevichNeuronParameters } from './shared';
+import type { AgentIR, AgentIRSummary, BodyInputNodeRuntime, BodyOutputNodeRuntime } from './agent-ir';
+import type { IzhikevichNeuronParameters } from './shared';
 
 export interface AgentProgramInputPort {
   id: string;
@@ -11,7 +11,7 @@ export interface AgentProgramInputPort {
 
 export interface AgentProgramOutputPort {
   id: string;
-  target: BrainOutputChannel;
+  target: string;
   normalizedTarget: string;
   worldPort: string;
   decayPerSecond: number;
@@ -39,6 +39,7 @@ export interface AgentProgramNeuronNode {
 
 export interface AgentProgram {
   agent: AgentIR;
+  summary: AgentIRSummary;
   inputPorts: AgentProgramInputPort[];
   outputPorts: AgentProgramOutputPort[];
   neuronNodes: AgentProgramNeuronNode[];

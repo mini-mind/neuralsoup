@@ -81,9 +81,9 @@ const selectors = {
   topologyRuntimeNeuronCount: '[data-testid="topology-runtime-neuron-count"]',
   topologyRuntimeConnectionCount: '[data-testid="topology-runtime-connection-count"]',
   graphInstalledAgentId: '[data-testid="graph-ir-installed-agent-id"]',
-  topologyInputCount: '[data-testid="topology-input-count"]',
-  topologyOutputCount: '[data-testid="topology-output-count"]',
-  topologyValidationCount: '[data-testid="topology-validation-count"]',
+  topologyCanonicalInputCount: '[data-testid="topology-canonical-input-count"]',
+  topologyCanonicalOutputCount: '[data-testid="topology-canonical-output-count"]',
+  topologyCanonicalValidationCount: '[data-testid="topology-canonical-validation-count"]',
   neuronLabelInput: '[data-testid="neuron-label-input"]',
   neuronInitialStateVInput: '[data-testid="neuron-initial-state-v-input"]',
   neuronInitialStateUInput: '[data-testid="neuron-initial-state-u-input"]',
@@ -846,12 +846,16 @@ test('body ir settings shows preview panel, surfaces validation after rule edits
   await expect(page.locator(selectors.bodyIrSettingsPanel)).toBeVisible();
   await expect(page.locator(selectors.bodyIrPreviewPanel)).toBeVisible();
   await expect(page.locator(selectors.bodyIrPreviewPanel)).toContainText('Preview / Validation');
-  await expect(page.locator(selectors.bodyIrPreviewPanel)).toContainText('输入 endpoint 108 个，输出 endpoint 3 个。');
+  await expect(page.locator(selectors.bodyIrPreviewPanel)).toContainText('runtime 实际安装形状以已编译程序为准');
+  await expect(page.locator('[data-testid="body-ir-preview-canonical-summary"]')).toContainText('输入 endpoint 108 个，输出 endpoint 3 个。');
+  await expect(page.locator('[data-testid="body-ir-preview-compiled-summary"]')).toContainText('compiled runtime shape：输入 endpoint 108 个，输出 endpoint 3 个。');
   await expect(page.locator('[data-testid="body-ir-input-preview-item-0"]')).toBeVisible();
   await expect(page.locator('[data-testid="body-ir-input-preview-item-0"]')).toContainText('vision-B-0');
   await expect(page.locator('[data-testid="body-ir-output-preview-item-0"]')).toBeVisible();
   await expect(page.locator('[data-testid="body-ir-output-preview-item-0"]')).toContainText('output-move-forward');
   await expect(page.locator(selectors.bodyIrValidationCount)).toHaveText('0');
+  await expect(page.locator(selectors.topologyDraftOutputCount)).toHaveText('3');
+  await expect(page.locator(selectors.topologyRuntimeOutputCount)).toHaveText('3');
 
   await expect(page.locator(selectors.bodyIrInputRulePattern0)).toHaveValue('^vision-([RGB])-(\\d+)$');
   await page.locator(selectors.bodyIrOutputRuleTargetTemplate0).fill('unsupported.$1');
@@ -865,6 +869,22 @@ test('body ir settings shows preview panel, surfaces validation after rule edits
   await expect(page.locator(selectors.bodyIrValidationCount)).toHaveText('0');
   await expect(page.locator('[data-testid^="body-ir-output-rule-message-0-"]')).toHaveCount(0);
   await expect(page.locator(selectors.bodyIrOutputRuleTargetTemplate0)).toHaveValue('action.$1');
+});
+
+test('graph view marks canonical-only body endpoints while settings show canonical and compiled summaries separately', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabSettings).click();
+  await page.locator(selectors.settingsNavBodyIr).click();
+  await expect(page.locator('[data-testid="body-ir-preview-canonical-summary"]')).toContainText('canonical coverage');
+  await expect(page.locator('[data-testid="body-ir-preview-compiled-summary"]')).toContainText('compiled runtime shape');
+
+  await page.locator(selectors.editorTabGraph).click();
+  await expect(page.locator(selectors.inputAdapterNode)).toBeVisible();
+  await expect(page.locator(selectors.inputAdapterNode)).toContainText('108 canonical / 0 installed');
+  await expect(page.locator(selectors.outputAdapterNode)).toContainText('3 canonical / 0 installed');
 });
 
 test('body ir edits stay draft-only until apply, then affect runtime/install state', async ({ page }, testInfo) => {
@@ -1795,15 +1815,15 @@ test('graph view diagnostics keep draft and installed runtime summaries aligned 
   const initialDraftOutputCount = await page.locator(selectors.topologyDraftOutputCount).innerText();
   const initialDraftNeuronCount = await page.locator(selectors.topologyDraftNeuronCount).innerText();
 
-  await expect(page.locator(selectors.topologyInputCount)).toHaveText(initialDraftInputCount);
+  await expect(page.locator(selectors.topologyCanonicalInputCount)).toHaveText(initialDraftInputCount);
   await expect(page.locator(selectors.topologyRuntimeInputCount)).toHaveText(initialDraftInputCount);
-  await expect(page.locator(selectors.topologyOutputCount)).toHaveText(initialDraftOutputCount);
+  await expect(page.locator(selectors.topologyCanonicalOutputCount)).toHaveText(initialDraftOutputCount);
   await expect(page.locator(selectors.topologyRuntimeOutputCount)).toHaveText(initialDraftOutputCount);
   await expect(page.locator(selectors.topologyRuntimeNeuronCount)).toHaveText(initialDraftNeuronCount);
   await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(String(DEFAULT_AGENT_CONNECTION_COUNT));
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(DEFAULT_AGENT_CONNECTION_COUNT));
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
-  await expect(page.locator(selectors.topologyValidationCount)).toHaveText('0');
+  await expect(page.locator(selectors.topologyCanonicalValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeValidationCount)).toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
 
@@ -2038,7 +2058,7 @@ test('graph view diagnostics expose invalid draft divergence through the real dr
 
   await expect(page.locator(selectors.topologyDraftConnectionCount)).toHaveText(String(Number.parseInt(baseDraftConnectionCount, 10) + 1));
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('1');
-  await expect(page.locator(selectors.topologyValidationCount)).toHaveText('1');
+  await expect(page.locator(selectors.topologyCanonicalValidationCount)).toHaveText('1');
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(baseRuntimeConnectionCount);
   await expect.poll(() => getDraftDiagnostics(page).then((value) => value.state)).toBe('invalid');
   await expect.poll(() => getDraftDiagnostics(page).then((value) => value.validationCount)).toBe('1');

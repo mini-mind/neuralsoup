@@ -353,7 +353,7 @@ const BodyIRSettingsSection: React.FC<BodyIRSettingsSectionProps> = ({
         <div className="body-ir-section-header">
           <div>
             <h5>visionCoverage</h5>
-            <p>定义 canonical BodyIR 的视觉输入覆盖范围，GraphView 预览和 runtime 输入维度都以此为准。</p>
+            <p>定义 canonical BodyIR 的视觉输入覆盖范围；下方预览展示规则可投影的 endpoint 集合，不等同于最终已安装 runtime 形状。</p>
           </div>
         </div>
 
@@ -459,11 +459,20 @@ const BodyIRSettingsSection: React.FC<BodyIRSettingsSectionProps> = ({
         <div className="body-ir-section-header">
           <div>
             <h5>Preview / Validation</h5>
-            <p>展示当前规则对 body endpoint 的投影结果，便于核对 nodeId 与 world 映射。</p>
+            <p>展示当前规则对 canonical body endpoint 的投影结果，便于核对 nodeId 与 world 映射；runtime 实际安装形状以已编译程序为准。</p>
           </div>
         </div>
 
-        {preview?.summary ? <p className="body-ir-preview-summary">{preview.summary}</p> : null}
+        {preview?.canonicalSummary ? (
+          <p className="body-ir-preview-summary" data-testid="body-ir-preview-canonical-summary">
+            {preview.canonicalSummary}
+          </p>
+        ) : null}
+        {preview?.compiledSummary ? (
+          <p className="body-ir-preview-summary" data-testid="body-ir-preview-compiled-summary">
+            {preview.compiledSummary}
+          </p>
+        ) : null}
 
         <div className="body-ir-preview-grid">
           <div className="body-ir-preview-block">
