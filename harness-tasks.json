@@ -196,7 +196,7 @@
     {
       "id": "task-008",
       "title": "GraphView AgentIR cutover: make editor/view-model/commands directly read and write AgentIR.brain, AgentIR.connections, and AgentIR.layout",
-      "status": "in_progress",
+      "status": "completed",
       "priority": "P0",
       "depends_on": [
         "task-007"
@@ -211,9 +211,7 @@
       "on_failure": {
         "cleanup": null
       },
-      "error_log": [
-        "Remaining P1/P2 after GraphView cleanup: App still prewrites installedAgentDocument before runtime success is known, so installedAgentDocument can diverge from the true last-applied runtime AgentIR on invalid installs; boundary aggregate links in root brain child scope remain visible but non-operable."
-      ],
+      "error_log": [],
       "checkpoints": [
         {
           "at": "2026-05-24T00:35:00Z",
@@ -330,9 +328,13 @@
         {
           "at": "2026-05-23T09:16:55Z",
           "message": "GraphView cleanup stage passed end-to-end revalidation: root brain child scope now projects boundary adapters without proxy nodes, aggregate links are no longer selectable as fake editable links, root/child default layout overlap was removed, and graph view plus brain library Playwright coverage passed in both renderer modes."
+        },
+        {
+          "at": "2026-05-23T18:55:00Z",
+          "message": "Cross-review after graph/runtime truth split confirmed the original task-008 scope is now closed: GraphView main path edits AgentIR.brain/connections/layout directly, installed runtime truth no longer prewrites on failed installs, aggregate boundary links are inspectable/read-only, and a follow-up domain fix now rejects bodyInput -> bodyOutput to keep runtime behavior aligned with the frozen IR contract."
         }
       ],
-      "completed_at": null
+      "completed_at": "2026-05-23T18:55:00Z"
     },
     {
       "id": "task-009",
@@ -353,7 +355,7 @@
         "cleanup": null
       },
       "error_log": [
-        "Remaining compat/runtime debt: legacySimulationSession still returns a compat-local invalid status contract that can diverge from canonical session invalidation semantics; SimulationSession still exposes compat/test-oriented probes; canonical AgentIR still carries visionCellCount and core-neuron-group legacy debt."
+        "Remaining production compat debt is now concentrated in Brain Library legacy load/import acceptance and the core-domain visionCellCount fallback path rather than runtime/session dual-source state."
       ],
       "checkpoints": [
         {
@@ -413,7 +415,9 @@
       "on_failure": {
         "cleanup": null
       },
-      "error_log": [],
+      "error_log": [
+        "Brain Library canonical record/storage path is mostly closed, but production load/import still accepts legacy envelopes on the main path and BodyIR still lacks a product-level editing/validation workflow."
+      ],
       "checkpoints": [
         {
           "at": "2026-05-23T00:40:00Z",
@@ -532,7 +536,7 @@
     {
       "id": "task-013",
       "title": "Compat 运行时命名收口：移除 BrainProgram/stepBrainProgram 对 AgentProgram 的命名倒挂与双真源残留",
-      "status": "in_progress",
+      "status": "completed",
       "priority": "P2",
       "depends_on": [
         "task-012"
@@ -592,11 +596,88 @@
         {
           "at": "2026-05-23T22:10:00Z",
           "message": "Storage boundary cleanup continued: brainLibraryStorage no longer reuses the general exchange normalizer on the canonical LocalStorage read path, legacy LocalStorage migration was narrowed to an internal storage upgrader, legacy package migration assertions moved from tests/domain into tests/compat, and brain-library e2e now explicitly rejects leaked top-level metadata/packageVersion in canonical storage while still covering the default neuralsoup-agent export/import contract."
+        },
+        {
+          "at": "2026-05-23T18:55:00Z",
+          "message": "Task-013 remaining findings were re-audited: the actionable residue is no longer compat runtime naming but production Brain Library compat input surfaces and BodyIR product closure, so the naming/segregation task is treated as complete and follow-up work moves to new dedicated tasks."
         }
       ],
+      "completed_at": "2026-05-23T18:55:00Z"
+    },
+    {
+      "id": "task-014",
+      "title": "BodyIR 产品闭环：在设置/编辑区提供 BodyIR 规则编辑、endpoint 投影预览与可见 validation",
+      "status": "pending",
+      "priority": "P0",
+      "depends_on": [
+        "task-008"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"graph view|brain library\"",
+        "timeout_seconds": 1200
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [
+        "BodyIR currently exists in schema/compiler/runtime/storage but not as a production editing surface; signal/body mapping remains read-only and validation is mostly hidden test diagnostics."
+      ],
+      "checkpoints": [],
+      "completed_at": null
+    },
+    {
+      "id": "task-015",
+      "title": "Compat 输入面收口：下沉 Brain Library legacy LocalStorage/package 兼容并移除 AgentIR 核心的 visionCellCount fallback",
+      "status": "pending",
+      "priority": "P1",
+      "depends_on": [
+        "task-008",
+        "task-010"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:compat && npm run test:e2e -- --grep \"brain library\"",
+        "timeout_seconds": 1200
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [
+        "Production startup/import paths still accept legacy storage/package envelopes, and AgentIR domain helpers still read the deprecated visionCellCount fallback unless callers explicitly opt out."
+      ],
+      "checkpoints": [],
+      "completed_at": null
+    },
+    {
+      "id": "task-016",
+      "title": "Layout 真源收口：决定并实现 viewportByContainerId/size/expanded 的持久化或从 schema 删除",
+      "status": "pending",
+      "priority": "P2",
+      "depends_on": [
+        "task-014"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"graph view\"",
+        "timeout_seconds": 900
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [
+        "AgentLayoutIR schema/document still advertise viewportByContainerId, size, and expanded, but current product behavior only persists position/collapsed while the rest remain session or computed state."
+      ],
+      "checkpoints": [],
       "completed_at": null
     }
   ],
   "session_count": 9,
-  "last_session": "2026-05-23T20:40:00Z"
+  "last_session": "2026-05-23T18:55:00Z"
 }

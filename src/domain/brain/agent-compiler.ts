@@ -1,11 +1,13 @@
 import type {
   AgentIR,
   BodyInputNodeRuntime,
-  BodyInputRule,
   BodyOutputNodeRuntime,
-  BodyOutputRule,
   BrainNeuronNode,
 } from './agent-ir';
+import {
+  resolveAgentBodyInputRuleBindings,
+  resolveAgentBodyOutputRuleBindings,
+} from './agent-body-rules';
 import type { AgentProgram, AgentProgramConnection, AgentProgramNeuronNode } from './agent-program';
 import type { BrainOutputChannel } from './shared';
 
@@ -32,241 +34,43 @@ export class AgentValidationError extends Error {
   }
 }
 
-const BODY_INPUT_SOURCE_PATTERN = /^vision\.([RGB])\.(\d+)$/;
-const BODY_OUTPUT_TARGET_PATTERN = /^action\.(turn-left|move-forward|turn-right)$/;
-const INPUT_CHANNEL_OFFSET = {
-  R: 0,
-  G: 1,
-  B: 2,
-} as const;
-
 const ACTION_CHANNELS: BrainOutputChannel[] = ['turn-left', 'move-forward', 'turn-right'];
-
-const applyRuleTemplate = (template: string, match: RegExpExecArray): string =>
-  template.replace(/\$(\d+)/g, (_token, rawGroupIndex: string) => {
-    const groupIndex = Number.parseInt(rawGroupIndex, 10);
-    return match[groupIndex] ?? '';
-  });
-
-const executeRulePattern = (regex: RegExp, nodeId: string): RegExpExecArray | null => {
-  regex.lastIndex = 0;
-  return regex.exec(nodeId);
-};
-
-const compileRulePattern = (
-  nodeIdPattern: string,
-  ruleId: string,
-  scope: 'body input' | 'body output'
-): { regex: RegExp | null; issue: AgentValidationIssue | null } => {
-  try {
-    return { regex: new RegExp(nodeIdPattern), issue: null };
-  } catch (error) {
-    return {
-      regex: null,
-      issue: {
-        code: 'runtime-binding-error',
-        message: `${scope} rule "${ruleId}" has invalid nodeIdPattern "${nodeIdPattern}": ${
-          error instanceof Error ? error.message : 'Unknown regular expression error.'
-        }`,
-      },
-    };
-  }
-};
-
-const parseBodyInputSource = (nodeId: string, source: string, scale: number): BodyInputNodeRuntime | null => {
-  const match = source.match(BODY_INPUT_SOURCE_PATTERN);
-  if (!match) {
-    return null;
-  }
-
-  const channel = match[1] as keyof typeof INPUT_CHANNEL_OFFSET;
-  const cellIndex = Number.parseInt(match[2], 10);
-  return {
-    id: nodeId,
-    source: `vision.${channel}.${cellIndex}`,
-    visualInputIndex: cellIndex * 3 + INPUT_CHANNEL_OFFSET[channel],
-    scale,
-  };
-};
-
-const parseBodyOutputTarget = (
-  nodeId: string,
-  target: string,
-  decayPerSecond: number
-): BodyOutputNodeRuntime | null => {
-  const match = target.match(BODY_OUTPUT_TARGET_PATTERN);
-  if (!match) {
-    return null;
-  }
-
-  return {
-    id: nodeId,
-    target: match[1] as BrainOutputChannel,
-    decayPerSecond,
-  };
-};
-
-interface ResolvedRule<Rule> {
-  rule: Rule;
-  regex: RegExp;
-}
 
 interface ResolvedBodyEndpoints<RuntimeNode> {
   nodesById: Map<string, RuntimeNode>;
   issues: AgentValidationIssue[];
 }
 
-const buildResolvedInputRules = (rules: BodyInputRule[]): {
-  rules: ResolvedRule<BodyInputRule>[];
-  issues: AgentValidationIssue[];
-} => {
-  const resolvedRules: ResolvedRule<BodyInputRule>[] = [];
-  const issues: AgentValidationIssue[] = [];
-
-  for (const rule of rules) {
-    const { regex, issue } = compileRulePattern(rule.nodeIdPattern, rule.id, 'body input');
-    if (issue) {
-      issues.push(issue);
-      continue;
-    }
-
-    if (regex) {
-      resolvedRules.push({ rule, regex });
-    }
-  }
-
-  return { rules: resolvedRules, issues };
-};
-
-const buildResolvedOutputRules = (rules: BodyOutputRule[]): {
-  rules: ResolvedRule<BodyOutputRule>[];
-  issues: AgentValidationIssue[];
-} => {
-  const resolvedRules: ResolvedRule<BodyOutputRule>[] = [];
-  const issues: AgentValidationIssue[] = [];
-
-  for (const rule of rules) {
-    const { regex, issue } = compileRulePattern(rule.nodeIdPattern, rule.id, 'body output');
-    if (issue) {
-      issues.push(issue);
-      continue;
-    }
-
-    if (regex) {
-      resolvedRules.push({ rule, regex });
-    }
-  }
-
-  return { rules: resolvedRules, issues };
-};
-
 const resolveBodyInputs = (agent: AgentIR): ResolvedBodyEndpoints<BodyInputNodeRuntime> => {
-  const nodes = new Map<string, BodyInputNodeRuntime>();
-  const { rules, issues } = buildResolvedInputRules(agent.body.inputRules);
   const nodeIds = new Set(
     agent.connections
       .filter((connection) => connection.from.scope === 'bodyInput')
       .map((connection) => connection.from.nodeId)
   );
-
-  for (const nodeId of nodeIds) {
-    const matches = rules
-      .map((entry) => ({ entry, match: executeRulePattern(entry.regex, nodeId) }))
-      .filter((candidate): candidate is { entry: ResolvedRule<BodyInputRule>; match: RegExpExecArray } => Boolean(candidate.match));
-
-    if (matches.length === 0) {
-      issues.push({
-        code: 'runtime-binding-error',
-        message: `Body input node "${nodeId}" does not match any BodyIR input rule.`,
-      });
-      continue;
-    }
-
-    if (matches.length > 1) {
-      issues.push({
-        code: 'runtime-binding-error',
-        message: `Body input node "${nodeId}" matches multiple BodyIR input rules: ${matches
-          .map((candidate) => candidate.entry.rule.id)
-          .join(', ')}.`,
-      });
-      continue;
-    }
-
-    const [{ entry, match }] = matches;
-    const source = applyRuleTemplate(entry.rule.sourceTemplate, match);
-    const parsed = parseBodyInputSource(nodeId, source, entry.rule.scale);
-    if (!parsed) {
-      issues.push({
-        code: 'runtime-binding-error',
-        message: `Body input rule "${entry.rule.id}" resolved node "${nodeId}" to unsupported source "${source}".`,
-      });
-      continue;
-    }
-
-    nodes.set(parsed.id, parsed);
-  }
-
-  return { nodesById: nodes, issues };
+  const resolution = resolveAgentBodyInputRuleBindings(agent.body.inputRules, nodeIds);
+  return {
+    nodesById: resolution.nodesById,
+    issues: resolution.issues.map((issue) => ({
+      code: 'runtime-binding-error',
+      message: issue.message,
+    })),
+  };
 };
 
 const resolveBodyOutputs = (agent: AgentIR): ResolvedBodyEndpoints<BodyOutputNodeRuntime> => {
-  const nodes = new Map<string, BodyOutputNodeRuntime>();
-  const { rules, issues } = buildResolvedOutputRules(agent.body.outputRules);
-  const targetToNodeId = new Map<BrainOutputChannel, string>();
   const nodeIds = new Set(
     agent.connections
       .filter((connection) => connection.to.scope === 'bodyOutput')
       .map((connection) => connection.to.nodeId)
   );
-
-  for (const nodeId of nodeIds) {
-    const matches = rules
-      .map((entry) => ({ entry, match: executeRulePattern(entry.regex, nodeId) }))
-      .filter((candidate): candidate is { entry: ResolvedRule<BodyOutputRule>; match: RegExpExecArray } => Boolean(candidate.match));
-
-    if (matches.length === 0) {
-      issues.push({
-        code: 'runtime-binding-error',
-        message: `Body output node "${nodeId}" does not match any BodyIR output rule.`,
-      });
-      continue;
-    }
-
-    if (matches.length > 1) {
-      issues.push({
-        code: 'runtime-binding-error',
-        message: `Body output node "${nodeId}" matches multiple BodyIR output rules: ${matches
-          .map((candidate) => candidate.entry.rule.id)
-          .join(', ')}.`,
-      });
-      continue;
-    }
-
-    const [{ entry, match }] = matches;
-    const target = applyRuleTemplate(entry.rule.targetTemplate, match);
-    const parsed = parseBodyOutputTarget(nodeId, target, entry.rule.decayPerSecond);
-    if (!parsed) {
-      issues.push({
-        code: 'runtime-binding-error',
-        message: `Body output rule "${entry.rule.id}" resolved node "${nodeId}" to unsupported target "${target}".`,
-      });
-      continue;
-    }
-
-    const existingNodeId = targetToNodeId.get(parsed.target);
-    if (existingNodeId && existingNodeId !== nodeId) {
-      issues.push({
-        code: 'runtime-binding-error',
-        message: `Body output nodes "${existingNodeId}" and "${nodeId}" both resolve to action target "${parsed.target}".`,
-      });
-      continue;
-    }
-
-    targetToNodeId.set(parsed.target, nodeId);
-    nodes.set(parsed.id, parsed);
-  }
-
-  return { nodesById: nodes, issues };
+  const resolution = resolveAgentBodyOutputRuleBindings(agent.body.outputRules, nodeIds);
+  return {
+    nodesById: resolution.nodesById,
+    issues: resolution.issues.map((issue) => ({
+      code: 'runtime-binding-error',
+      message: issue.message,
+    })),
+  };
 };
 
 const createNeuronProgramNode = (neuron: BrainNeuronNode): AgentProgramNeuronNode => ({
@@ -492,6 +296,12 @@ const buildAgentCompilationContext = (agent: AgentIR): AgentCompilationContext =
       issues.push({
         code: 'invalid-connection-direction',
         message: `Agent connection "${connection.id}" cannot start from bodyOutput.`,
+      });
+    }
+    if (connection.from.scope === 'bodyInput' && connection.to.scope === 'bodyOutput') {
+      issues.push({
+        code: 'invalid-connection-direction',
+        message: `Agent connection "${connection.id}" cannot connect bodyInput directly to bodyOutput.`,
       });
     }
     if (connection.to.scope === 'bodyInput') {

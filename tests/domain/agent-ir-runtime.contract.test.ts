@@ -149,6 +149,31 @@ test('validateAgentIR rejects body endpoints that do not match any BodyIR rule',
   );
 });
 
+test('validateAgentIR rejects direct bodyInput -> bodyOutput connections', () => {
+  const invalidAgent: AgentIR = {
+    ...createRuleDrivenAgent(),
+    connections: [
+      {
+        id: 'invalid-direct-body-bridge',
+        from: { scope: 'bodyInput', nodeId: 'sensor-G-2' },
+        to: { scope: 'bodyOutput', nodeId: 'effector-move-forward' },
+        weight: 1,
+      },
+    ],
+  };
+
+  const issues = validateAgentIR(invalidAgent);
+
+  assert.ok(
+    issues.some(
+      (issue) =>
+        issue.code === 'invalid-connection-direction' &&
+        issue.message.includes('invalid-direct-body-bridge') &&
+        issue.message.includes('bodyInput directly to bodyOutput')
+    )
+  );
+});
+
 test('validateAgentIR rejects invalid container ownership and missing child references', () => {
   const invalidAgent: AgentIR = {
     ...createRuleDrivenAgent(),

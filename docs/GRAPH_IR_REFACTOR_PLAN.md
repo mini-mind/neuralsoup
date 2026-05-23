@@ -29,11 +29,12 @@ export interface AgentIR {
 
 `BodyIR` 只保存规则，规则是真源。运行时或编辑器可按规则展开出实际 body input/output 节点，但展开结果不作为第二真源保存。
 
-当前实现中，`body.visionCellCount` 已降级为兼容访问器：
+当前实现中，`body.visionCellCount` 仍是兼容访问器，而不是持久化字段：
 
 - 不作为持久化字段写出。
 - 运行时由 `AgentIR.connections` 与 `AgentLayoutIR` 中的 body vision markers 推导。
 - 旧存储载荷若仍带该字段，只在导入归一化时用于恢复稀疏 vision coverage，然后立即收口回推导语义。
+- 当前核心 domain 仍保留 legacy fallback 读取路径；后续需要继续下沉到 import/migration 边界，避免 AgentIR 域内长期保留双真源语义。
 
 ```ts
 export interface BodyIR {
@@ -70,6 +71,7 @@ export interface BodyOutputRule {
 - 输入 `sourceTemplate` 目前必须解析成 `vision.<channel>.<cellIndex>`。
 - 输出 `targetTemplate` 目前必须解析成 `action.<turn-left|move-forward|turn-right>`。
 - 更通用的 source/target registry 仍是后续重构项，尚未完成下沉。
+- GraphView 对“未连线 body endpoint 的主动枚举”目前也只支持这套受限 grammar；它还不是 compile 同级的通用 regex 投影器。
 
 示例：
 
@@ -172,6 +174,8 @@ export interface AgentConnection {
 - 禁止 `brain -> bodyInput`。
 - 禁止 `bodyInput -> bodyOutput`。
 
+当前实现已按上述规则校验；`bodyInput -> bodyOutput` 会被 `validateAgentIR/compileAgentIR` 显式拒绝。
+
 `portId` 当前可选，第一阶段可以不使用；保留它是为了后续支持多端口神经元或更复杂模型。
 
 ## Layout
@@ -200,6 +204,12 @@ export interface AgentLayoutViewport {
 ```
 
 layout 只影响 GraphView 展示，不参与 runtime 编译。`viewportByContainerId` 用于恢复不同层级画布的平移和缩放状态；`size` 用于保存展开容器或自定义节点尺寸。
+
+当前真实状态：
+
+- `position` 与 `collapsed` 已进入主编辑路径并会持久化。
+- `viewportByContainerId` 尚未落盘，当前 viewport/scale 仍停留在 React session state。
+- `size` / `expanded` 仍主要是视图计算态，不是稳定持久化真源。
 
 ## 编译边界
 
@@ -238,7 +248,12 @@ compat 约束：
 - `LeafLink` 需要替换为 `AgentConnection`。
 - `position`、`collapsed`、`expanded`、`size` 和 viewport 需要从 topology/UI 临时状态移入 `AgentLayoutIR`。
 
-当前 Brain Library 的导入、导出和 LocalStorage 外部格式仍是 `AgentPackage` envelope；内部编辑与运行时真源正在收口到 `AgentIR`。后续再决定是否继续把外部格式收口为裸 `AgentIR`。
+当前 Brain Library 的真实边界如下：
+
+- LocalStorage 主格式是 canonical `BrainLibraryRecord` envelope，而不是 `AgentPackage`。
+- 默认导入/导出交换格式是 `neuralsoup-agent` envelope，核心载荷是 `AgentIR`。
+- legacy `AgentPackage` 仍作为兼容输入/显式兼容导出面保留。
+- legacy LocalStorage / legacy package 兼容仍存在，但应继续下沉到显式 migration/import 边界，而不是长期污染生产主路径。
 
 当前 Brain Library 额外约束：
 
@@ -246,11 +261,21 @@ compat 约束：
 - “保存当前 Brain”会原子切换当前编辑/运行 Agent 到新建库条目的 `AgentIR`，避免当前 Agent 与库条目身份漂移。
 - `AgentPackage` 仍作为外部兼容 envelope 保留，但 legacy package helper 已显式下沉到 compat/legacy 命名。
 
+## 当前剩余缺口
+
+当前实现与冻结设计相比，仍有以下明确缺口：
+
+- `BodyIR` 已进入 schema、compiler、runtime、storage，但生产 UI 还没有真正的 BodyIR 编辑器；signal leaf 仍是只读投影。
+- validation 已存在于 domain/runtime，但用户侧仍主要停留在隐藏诊断探针，尚未形成可见、可定位、可修复的问题面板。
+- GraphView 对 body endpoint 的主动投影仍是受限 grammar，不等同于 compile 级 regex 语义。
+- `viewportByContainerId`、`size`、`expanded` 仍未完成“是否持久化”为真的最终收口。
+
 ## 验收边界
 
 - 生产代码不再暴露 `BrainPackage`、`GraphIRDocument`、`BodyDefinition`、`AdapterNode`、`SignalNode`、`LeafLink` 作为持久化主结构。
 - 运行时入口收口为 `compileAgentIR(agent)` 或等价 AgentIR 编译边界。
 - GraphView 直接编辑 `AgentIR.brain`、`AgentIR.connections` 和 `AgentIR.layout`，不再把 body signal node 混入 brain topology。
+- BodyIR 需要具备生产可用的编辑与审查闭环：至少能编辑规则、查看 endpoint 投影，并在无效时展示可定位的 validation。
 - `npm run type-check` 通过。
 - `npm run test:domain` 通过。
 - 涉及 GraphView 或 Brain Library 行为时，`npm run test:e2e -- --grep "graph view|brain library"` 通过。

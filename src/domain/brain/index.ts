@@ -7,3 +7,4 @@ export * from './agent-summary';
 export * from './agent-defaults';
 export * from './agent-step';
 export * from './agent-body-endpoints';
+export * from './agent-body-rules';

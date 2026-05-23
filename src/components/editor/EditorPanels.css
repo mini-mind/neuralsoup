@@ -497,6 +497,12 @@ kbd {
   gap: 18px;
 }
 
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
 .settings-section-header h4 {
   margin: 0 0 6px;
   color: #ececec;
@@ -579,6 +585,234 @@ kbd {
   line-height: 1.5;
 }
 
+.body-ir-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.body-ir-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.body-ir-rule-section,
+.body-ir-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #2e2e2e;
+  border-radius: 6px;
+  background: #202020;
+}
+
+.body-ir-section-header,
+.body-ir-rule-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.body-ir-section-header h5,
+.body-ir-rule-card-header h5,
+.body-ir-preview h5,
+.body-ir-preview h6 {
+  margin: 0;
+  color: #ececec;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.body-ir-section-header p,
+.body-ir-rule-card-header p,
+.body-ir-preview-summary {
+  margin: 4px 0 0;
+  color: #9a9a9a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.body-ir-rule-list,
+.body-ir-inline-messages,
+.body-ir-message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.body-ir-rule-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #303030;
+  border-radius: 4px;
+  background: #1b1b1b;
+}
+
+.body-ir-rule-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.body-ir-text-input,
+.body-ir-number-input {
+  width: 100%;
+}
+
+.body-ir-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid #313131;
+  border-radius: 4px;
+  background: #1c1c1c;
+  color: #cccccc;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.body-ir-message.warning {
+  border-color: #5a4b2f;
+  background: #242018;
+}
+
+.body-ir-message.error {
+  border-color: #603636;
+  background: #281b1b;
+}
+
+.body-ir-message.info {
+  border-color: #364760;
+  background: #1b2028;
+}
+
+.body-ir-message-badge {
+  flex: 0 0 auto;
+  min-width: 28px;
+  color: #f0f0f0;
+  font-size: 11px;
+}
+
+.body-ir-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.body-ir-preview-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.body-ir-preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.body-ir-preview-list li,
+.body-ir-empty-state {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) 72px;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #303030;
+  border-radius: 4px;
+  background: #1b1b1b;
+  color: #cfcfcf;
+  font-size: 12px;
+}
+
+.body-ir-preview-list li span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.body-ir-empty-state {
+  display: block;
+  color: #8f8f8f;
+}
+
+.settings-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #2e2e2e;
+  border-radius: 6px;
+  background: #202020;
+}
+
+.settings-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-card-header h5 {
+  margin: 0;
+  color: #ececec;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-card-header span {
+  color: #8f8f8f;
+  font-size: 11px;
+}
+
+.settings-placeholder-copy,
+.settings-body-preview-footnote {
+  color: #9a9a9a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.settings-preview-list,
+.settings-validation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-preview-item,
+.settings-validation-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid #303030;
+  border-radius: 4px;
+  background: #1b1b1b;
+  color: #cfcfcf;
+  font-size: 12px;
+}
+
+.settings-preview-item strong,
+.settings-validation-item strong {
+  color: #f0f0f0;
+  font-weight: 600;
+}
+
 .settings-actions {
   display: flex;
   justify-content: space-between;
@@ -641,6 +875,16 @@ kbd {
   .settings-param-control {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .settings-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .body-ir-columns,
+  .body-ir-preview-grid,
+  .body-ir-rule-grid {
+    grid-template-columns: 1fr;
   }
 
   .settings-param-input {

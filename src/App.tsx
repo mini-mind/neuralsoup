@@ -16,7 +16,7 @@ import BrainLibraryModal from './components/editor/BrainLibraryModal';
 import EditorToolbar from './components/editor/EditorToolbar';
 import GraphEditorPanel from './components/editor/GraphEditorPanel';
 import { isEditableOrInteractiveTarget } from './components/editor/graph/isEditableOrInteractiveTarget';
-import SettingsPanel from './components/editor/SettingsPanel';
+import SettingsPanel, { type BodyIRRuleIssueItem } from './components/editor/SettingsPanel';
 import type { AgentParameters, EditorTab, GraphPathItem, SettingsSection } from './components/editor/types';
 import type { GraphDocumentChangeOptions } from './components/hooks/useSNNTopologyState';
 import {
@@ -243,6 +243,31 @@ const App: React.FC = () => {
   const persistedBrainLibrarySnapshotRef = useRef(serializeBrainLibrarySnapshot(initialBrainLibraryLoad.brains));
   const installedGraphSummary = agentRuntimeStatus.appliedSummary;
   const hasUnsavedDraftChanges = !areAgentsEquivalent(currentAgentDocument, draftAgentDocument);
+  const bodyRuleIssues = useMemo<BodyIRRuleIssueItem[]>(
+    () =>
+      agentDraftStatus.issues.flatMap<BodyIRRuleIssueItem>((issue) => {
+        const bodyInputRuleMatch = issue.message.match(/body input rule "([^"]+)"/i);
+        if (bodyInputRuleMatch) {
+          return [{ scope: 'input' as const, ruleId: bodyInputRuleMatch[1], message: issue.message }];
+        }
+
+        const bodyOutputRuleMatch = issue.message.match(/body output rule "([^"]+)"/i);
+        if (bodyOutputRuleMatch) {
+          return [{ scope: 'output' as const, ruleId: bodyOutputRuleMatch[1], message: issue.message }];
+        }
+
+        if (issue.message.includes('body input')) {
+          return [{ scope: 'input' as const, ruleId: 'unresolved', message: issue.message }];
+        }
+
+        if (issue.message.includes('body output')) {
+          return [{ scope: 'output' as const, ruleId: 'unresolved', message: issue.message }];
+        }
+
+        return [];
+      }),
+    [agentDraftStatus.issues]
+  );
 
   useEffect(() => {
     const nextSnapshot = serializeBrainLibrarySnapshot(brainLibrary);
@@ -881,6 +906,7 @@ const App: React.FC = () => {
           <span data-testid="vision-cells-value">{agentParameters.visionCells}</span>
           <span data-testid="vision-range-value">{agentParameters.visionRange}</span>
           <span data-testid="vision-angle-value">{agentParameters.visionAngle}</span>
+          <span data-testid="body-ir-validation-count">{bodyRuleIssues.length}</span>
           <span data-testid="graph-ir-validation-count">{agentDraftStatus.issues.length}</span>
           <span data-testid="graph-ir-runtime-state">{agentRuntimeStatus.state}</span>
           <span data-testid="graph-ir-runtime-validation-count">{agentRuntimeStatus.issues.length}</span>
@@ -912,9 +938,17 @@ const App: React.FC = () => {
             <SettingsPanel
               agentParameters={agentParameters}
               draftAgentParameters={draftAgentParameters}
+              body={draftAgentDocument.body}
               settingsSection={settingsSection}
+              bodyRuleIssues={bodyRuleIssues}
               onSettingsSectionChange={setSettingsSection}
               onDraftAgentParametersChange={setDraftAgentParameters}
+              onBodyChange={(updater) => {
+                handleAgentChange((currentAgent) => ({
+                  ...currentAgent,
+                  body: updater(currentAgent.body),
+                }), GRAPH_SEMANTIC_CHANGE);
+              }}
               onApply={applyDraftAgentParameters}
               onResetDefaults={resetDraftAgentParameters}
             />

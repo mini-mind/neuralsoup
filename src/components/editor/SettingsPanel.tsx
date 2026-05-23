@@ -1,12 +1,37 @@
 import React from 'react';
+import BodyIRSettingsSection from './BodyIRSettingsSection';
 import type { AgentParameters, SettingsSection } from './types';
+import type { BodyIR } from '../../domain/brain';
+
+export interface BodyIRRulePreviewItem {
+  nodeId: string;
+  resolved: string;
+}
+
+export interface BodyIRRuleIssueItem {
+  scope: 'input' | 'output';
+  ruleId: string;
+  message: string;
+}
+
+export interface BodyIRRuleEditorState {
+  inputRules: BodyIR['inputRules'];
+  outputRules: BodyIR['outputRules'];
+}
 
 interface SettingsPanelProps {
   agentParameters: AgentParameters;
   draftAgentParameters: AgentParameters;
+  body: BodyIR;
   settingsSection: SettingsSection;
+  bodyRulePreviews?: {
+    input: Record<string, BodyIRRulePreviewItem[]>;
+    output: Record<string, BodyIRRulePreviewItem[]>;
+  };
+  bodyRuleIssues?: BodyIRRuleIssueItem[];
   onSettingsSectionChange: (section: SettingsSection) => void;
   onDraftAgentParametersChange: React.Dispatch<React.SetStateAction<AgentParameters>>;
+  onBodyChange?: (updater: (current: BodyIR) => BodyIR) => void;
   onApply: () => void;
   onResetDefaults: () => void;
 }
@@ -14,12 +39,57 @@ interface SettingsPanelProps {
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
   agentParameters,
   draftAgentParameters,
+  body,
   settingsSection,
+  bodyRulePreviews,
+  bodyRuleIssues,
   onSettingsSectionChange,
   onDraftAgentParametersChange,
+  onBodyChange: _onBodyChange,
   onApply,
   onResetDefaults
 }) => {
+  const renderBodyIRPanel = () => {
+    const preview = bodyRulePreviews
+      ? {
+          summary: `输入预览 ${Object.keys(bodyRulePreviews.input).length} 组，输出预览 ${Object.keys(bodyRulePreviews.output).length} 组。`,
+          inputMatches: Object.entries(bodyRulePreviews.input).flatMap(([ruleId, items]) =>
+            items.map((item) => ({
+              nodeId: item.nodeId,
+              resolvedSource: item.resolved,
+              ruleIndex: body.inputRules.findIndex((rule) => rule.id === ruleId)
+            }))
+          ),
+          outputMatches: Object.entries(bodyRulePreviews.output).flatMap(([ruleId, items]) =>
+            items.map((item) => ({
+              nodeId: item.nodeId,
+              resolvedTarget: item.resolved,
+              ruleIndex: body.outputRules.findIndex((rule) => rule.id === ruleId)
+            }))
+          )
+        }
+      : undefined;
+
+    const validation = bodyRuleIssues?.map((issue) => ({
+      level: 'warning' as const,
+      message: issue.message,
+      scope: issue.scope === 'input' ? ('input-rule' as const) : ('output-rule' as const),
+      ruleIndex:
+        issue.scope === 'input'
+          ? body.inputRules.findIndex((rule) => rule.id === issue.ruleId)
+          : body.outputRules.findIndex((rule) => rule.id === issue.ruleId)
+    }));
+
+    return (
+      <BodyIRSettingsSection
+        body={body}
+        onBodyChange={_onBodyChange}
+        validation={validation}
+        preview={preview}
+      />
+    );
+  };
+
   const renderKeyboardInputGuide = () => (
     <div className="settings-page-section manual-control" data-testid="keyboard-input-panel">
       <h4>键盘覆盖说明</h4>
@@ -238,6 +308,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </button>
         <button
           type="button"
+          className={`settings-sidebar-item ${settingsSection === 'body-ir' ? 'active' : ''}`}
+          data-testid="settings-nav-body-ir"
+          aria-pressed={settingsSection === 'body-ir'}
+          onClick={() => onSettingsSectionChange('body-ir')}
+        >
+          Body IR
+        </button>
+        <button
+          type="button"
           className={`settings-sidebar-item ${settingsSection === 'keyboard-inputs' ? 'active' : ''}`}
           data-testid="settings-nav-keyboard-inputs"
           aria-pressed={settingsSection === 'keyboard-inputs'}
@@ -247,7 +326,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </button>
       </aside>
       <div className="settings-content">
-        {settingsSection === 'agent-parameters' ? renderAgentParameters() : renderKeyboardInputGuide()}
+        {settingsSection === 'agent-parameters'
+          ? renderAgentParameters()
+          : settingsSection === 'body-ir'
+            ? renderBodyIRPanel()
+            : renderKeyboardInputGuide()}
       </div>
     </div>
   );

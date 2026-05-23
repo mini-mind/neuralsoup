@@ -150,6 +150,21 @@ test('agent graph root brain child scope projects boundary adapters without prox
       decayPerSecond: 4,
     },
   ];
+  agent.connections = [
+    ...agent.connections,
+    {
+      id: 'body-input-to-neuron',
+      from: { scope: 'bodyInput', nodeId: 'vision-G-0' },
+      to: { scope: 'brain', nodeId: 'neuron-1' },
+      weight: 1,
+    },
+    {
+      id: 'neuron-to-body-output',
+      from: { scope: 'brain', nodeId: 'neuron-2' },
+      to: { scope: 'bodyOutput', nodeId: 'output-move-forward' },
+      weight: 1,
+    },
+  ];
   agent.layout = {
     version: 1,
     nodes: {
