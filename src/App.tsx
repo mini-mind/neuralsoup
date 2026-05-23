@@ -2,14 +2,13 @@ import React, { useState, useCallback, useEffect, useMemo, useRef, type CSSPrope
 import SimulationCanvas from './components/SimulationCanvas';
 import {
   buildAgentBodyRulePreviewModel,
-  createDefaultAgentIR,
-  createDefaultWorldRegistry,
   reconcileAgentIRVisionCells,
   resolveCompiledAgentBodyEndpointIds,
   summarizeAgentIR,
   validateAgentIR,
   type AgentIR,
 } from './domain/brain';
+import { createVisionActionSeedAgentIR, createVisionActionWorldRegistry } from './host';
 import type { SimulationControlMode } from './domain/world';
 import type { SimulationLifecycleState } from './engine/SimulationEngine';
 import type { AgentDraftStatus, AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from './types/agentRuntime';
@@ -86,7 +85,7 @@ const clampSplitRatio = (containerSize: number, ratio: number): number => {
   const maxRatio = (containerSize - MIN_PANEL_SIZE - SPLIT_DIVIDER_SIZE) / containerSize;
   return clamp(ratio, minRatio, maxRatio);
 };
-const DEFAULT_WORLD_REGISTRY = createDefaultWorldRegistry();
+const DEFAULT_WORLD_REGISTRY = createVisionActionWorldRegistry();
 
 const createInitialAgentRuntimeStatus = (agent: AgentIR): AgentRuntimeStatus => ({
   state: 'applied',
@@ -195,7 +194,7 @@ const applyBrainRecordIdentityToCurrentState = (
 
 const App: React.FC = () => {
   const initialBrainLibraryLoad = useRef(loadBrainLibraryWithStatus()).current;
-  const initialAgentDocument = createDefaultAgentIR(36, '当前 Agent');
+  const initialAgentDocument = createVisionActionSeedAgentIR(36, '当前 Agent');
   const isE2ETestMode = import.meta.env.MODE === 'test' || import.meta.env.VITE_E2E === 'true';
   const [runState, setRunState] = useState<SimulationLifecycleState>('idle');
   const [requestedLifecycleState, setRequestedLifecycleState] = useState<SimulationLifecycleState>('idle');
@@ -821,7 +820,7 @@ const App: React.FC = () => {
       return;
     }
 
-    const fallbackAgent = createDefaultAgentIR(agentParameters.visionCells, '当前 Agent');
+    const fallbackAgent = createVisionActionSeedAgentIR(agentParameters.visionCells, '当前 Agent');
     setActiveBrainId(null);
     setCurrentAgentDocument(fallbackAgent);
     setRuntimeInstallRequest(fallbackAgent);

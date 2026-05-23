@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDefaultAgentIR } from '../../src/domain/brain';
+import { createVisionActionSeedAgentIR } from '../../src/host';
 import {
   encodeBrainLibraryRecordAsLegacyAgentPackage,
   isLegacyBrainLibraryStorageEnvelope,
@@ -18,7 +18,7 @@ import {
 import type { AgentPackage as AgentLibraryItem } from '../../src/compat/legacyBrainPackage';
 
 const createAgentPackage = (name: string, visionCells: number): AgentLibraryItem => {
-  const agent = createDefaultAgentIR(visionCells, name);
+  const agent = createVisionActionSeedAgentIR(visionCells, name);
   return {
     packageVersion: 1,
     metadata: { ...agent.metadata },

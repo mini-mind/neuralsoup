@@ -7,6 +7,7 @@ import type {
 } from '../domain/brain/agent-ir';
 import type { GraphIRDocument, NeuronNode, SignalNode, TopologyNode } from './legacyGraphIR';
 import { getLegacyBodyVisionCellCount, type LegacyBodyDefinition } from './legacyBrainPackage';
+import { HOST_ROOT_CONTAINER_ID } from '../host';
 
 export const DEFAULT_NEURON_PARAMS: IzhikevichNeuronParameters = {
   a: 0.02,
@@ -16,7 +17,7 @@ export const DEFAULT_NEURON_PARAMS: IzhikevichNeuronParameters = {
   threshold: 30,
 };
 
-export const DEFAULT_ROOT_CONTAINER_ID = 'root-container';
+export const DEFAULT_ROOT_CONTAINER_ID = HOST_ROOT_CONTAINER_ID;
 export const DEFAULT_VISION_SCALE = 1;
 export const DEFAULT_OUTPUT_DECAY_PER_SECOND = 4;
 export const LEGACY_ROOT_GROUP_ID = 'core-neuron-group';

@@ -5,13 +5,13 @@ import { WorldManager } from '../engine/WorldManager';
 import {
   AgentValidationError,
   compileAgentIR,
-  createDefaultAgentIR,
   reconcileAgentIRVisionCells,
   summarizeCompiledAgentProgram,
   type AgentValidationIssue,
   type AgentIR,
   type WorldRegistry,
 } from '../domain/brain';
+import { createVisionActionSeedAgentIR } from '../host';
 import type { Agent, SimulationState, World } from '../types/simulation';
 import type { AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../types/agentRuntime';
 import {
@@ -78,7 +78,7 @@ export class SimulationSession {
       ...options.world
     });
     this.currentControlMode = options.initialControlMode ?? 'keyboard';
-    this.currentAgentIR = createDefaultAgentIR(this.visionSystem.getVisionCells(), '默认 Agent');
+    this.currentAgentIR = createVisionActionSeedAgentIR(this.visionSystem.getVisionCells(), '默认 Agent');
     this.agentRuntimeStatus = this.createAppliedAgentRuntimeStatus(this.currentAgentIR);
     this.lastAppliedSummary = this.agentRuntimeStatus.appliedSummary;
     this.state = createEmptyWorldState(this.config, this.worldManager.getWorldBounds());

@@ -39,17 +39,17 @@ const toCompatOutputs = (outputsByTarget: Record<string, number>): Record<BrainO
 });
 
 const toAgentWorldInputs = (program: LegacyBrainProgram, sensoryInputs: number[]): AgentWorldInputSignalMap => {
-  const inputsBySource: AgentWorldInputSignalMap = {};
+  const inputsById: AgentWorldInputSignalMap = {};
 
   for (const inputPort of getLegacyBrainProgramRuntimePayload(program).inputPorts) {
     const legacyBinding = program.inputBindings.find((binding) => binding.nodeId === inputPort.id);
     if (!legacyBinding) {
       continue;
     }
-    inputsBySource[inputPort.source] = sensoryInputs[legacyBinding.index] ?? 0;
+    inputsById[inputPort.id] = sensoryInputs[legacyBinding.index] ?? 0;
   }
 
-  return inputsBySource;
+  return inputsById;
 };
 
 const buildCompatSignalSnapshotFromAgentRuntime = (

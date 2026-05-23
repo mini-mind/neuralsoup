@@ -1,11 +1,11 @@
 import {
-  createDefaultWorldRegistry,
   type AgentIR,
   type AgentMetadata,
   validateAgentIR,
 } from '../domain/brain';
+import { createVisionActionWorldRegistry } from '../host';
 
-const DEFAULT_WORLD_REGISTRY = createDefaultWorldRegistry();
+const DEFAULT_WORLD_REGISTRY = createVisionActionWorldRegistry();
 
 export interface BrainLibraryRecord {
   agent: AgentIR;

@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AgentController } from '../../src/engine/AgentController';
-import { createDefaultWorldActionOutputAdapter } from '../../src/domain/world';
+import {
+} from '../../src/domain/world';
 import { VisionSystem } from '../../src/engine/VisionSystem';
 import { WorldManager } from '../../src/engine/WorldManager';
 import { CollisionDetector } from '../../src/engine/CollisionDetector';
@@ -13,15 +14,21 @@ import {
   setLegacyGraphIRDocument,
 } from '../../src/compat/legacySimulationSession';
 import {
-  createDefaultWorldRegistry,
   type AgentIR,
 } from '../../src/domain/brain';
+import {
+  createVisionActionCommandApplier,
+  createVisionActionOutputAdapter,
+  createVisionActionWorldRegistry,
+  VISION_ACTION_MOVEMENT_BINDINGS,
+} from '../../src/host';
 import { compileLegacyBrainDefinition } from '../../src/compat/legacyBrainCompiler';
 import { createDefaultGraphIRDocument } from '../../src/compat/legacyGraphDefaults';
 import { summarizeGraphIRDocument, type GraphIRDocument, type NeuronNode } from '../../src/compat/legacyGraphIR';
 import { createDefaultLegacyBodyDefinition, type LegacyBodyDefinition } from '../../src/compat/legacyBrainPackage';
 import type { LegacyBrainProgram } from '../../src/compat/legacyBrainProgram';
 import { createLegacyBrainProgramRuntimeState, stepLegacyBrainProgram } from '../../src/compat/legacyBrainStep';
+import { createLegacyVisualInputSignalProvider } from '../../src/compat/legacyWorldInputSignalProvider';
 import type { Agent } from '../../src/types/simulation';
 import {
   deriveAgentIRVisionCellCount,
@@ -29,9 +36,16 @@ import {
   withVisionCellLayoutMarkers,
 } from '../../src/compat/legacyVisionCellCount';
 
-const WORLD_REGISTRY = createDefaultWorldRegistry();
+const WORLD_REGISTRY = createVisionActionWorldRegistry();
 
-const createSimulationSession = (agentController: AgentController = new AgentController(createDefaultWorldActionOutputAdapter())) =>
+const createSimulationSession = (
+  agentController: AgentController = new AgentController(
+    createVisionActionOutputAdapter(),
+    createLegacyVisualInputSignalProvider(),
+    createVisionActionCommandApplier(),
+    VISION_ACTION_MOVEMENT_BINDINGS
+  )
+) =>
   new SimulationSession({
     visionSystem: new VisionSystem(),
     agentController,
@@ -321,7 +335,12 @@ test('simulation session legacy GraphIR compat setter rejects invalid drafts wit
 });
 
 test('simulation session legacy GraphIR compat setter keeps the last applied AgentIR and runtime when compat compile bindings fail', () => {
-  const agentController = new AgentController(createDefaultWorldActionOutputAdapter());
+  const agentController = new AgentController(
+    createVisionActionOutputAdapter(),
+    createLegacyVisualInputSignalProvider(),
+    createVisionActionCommandApplier(),
+    VISION_ACTION_MOVEMENT_BINDINGS
+  );
   const session = createSimulationSession(agentController);
 
   session.initialize();
@@ -448,7 +467,12 @@ test('simulation session keeps applied legacy GraphIR compat state coherent when
 });
 
 test('simulation session keeps legacy GraphIR compat state aligned across mode switches and vision-cell updates', () => {
-  const agentController = new AgentController(createDefaultWorldActionOutputAdapter());
+  const agentController = new AgentController(
+    createVisionActionOutputAdapter(),
+    createLegacyVisualInputSignalProvider(),
+    createVisionActionCommandApplier(),
+    VISION_ACTION_MOVEMENT_BINDINGS
+  );
   const visionSystem = new VisionSystem();
   const session = new SimulationSession({
     visionSystem,
@@ -580,7 +604,12 @@ test('legacy brain-program compat compiler rejects legacy GraphIR drafts that lo
 });
 
 test('simulation session exposes the main-agent active legacy GraphIR leaf node ids through compat runtime state', () => {
-  const agentController = new AgentController(createDefaultWorldActionOutputAdapter());
+  const agentController = new AgentController(
+    createVisionActionOutputAdapter(),
+    createLegacyVisualInputSignalProvider(),
+    createVisionActionCommandApplier(),
+    VISION_ACTION_MOVEMENT_BINDINGS
+  );
   const session = createSimulationSession(agentController);
 
   session.initialize();

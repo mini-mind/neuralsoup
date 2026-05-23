@@ -1,9 +1,9 @@
-import { createDefaultWorldRegistry } from '../domain/brain';
+import { createVisionActionWorldRegistry } from '../host';
 import type { AgentIR } from '../domain/brain/agent-ir';
 import { resolveBodyInputVisionCellIndex, withVisionCellCount } from '../domain/brain/agent-ir';
 
 const VISION_LAYOUT_MARKER_PATTERN = /^__body-vision-cell-(\d+)$/;
-const DEFAULT_WORLD_REGISTRY = createDefaultWorldRegistry();
+const DEFAULT_WORLD_REGISTRY = createVisionActionWorldRegistry();
 
 type LegacyBodyIR = AgentIR['body'] & {
   visionCellCount?: unknown;

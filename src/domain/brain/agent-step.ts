@@ -57,7 +57,7 @@ export const stepAgentProgram = (
       return 0;
     }
 
-    const rawValue = sensoryInputs[inputNode.source] ?? 0;
+    const rawValue = sensoryInputs[inputNode.id] ?? 0;
     const scaledValue = rawValue * inputNode.scale;
     if (Math.abs(scaledValue) > ACTIVE_SIGNAL_EPSILON) {
       activeLeafNodeIds.add(nodeId);

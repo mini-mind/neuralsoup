@@ -15,11 +15,7 @@ export interface WorldActionOutputAdapter {
   resolve(outputSignals: WorldOutputSignal[]): WorldControlCommand[];
 }
 
-const ACTION_TARGET_TO_COMMAND_KIND: Record<string, string> = {
-  'action.turn-left': 'turn-left',
-  'action.move-forward': 'move-forward',
-  'action.turn-right': 'turn-right',
-};
+const ACTION_TARGET_PATTERN = /^action\.([a-z0-9-]+)$/;
 
 export const createDefaultWorldActionOutputAdapter = (): WorldActionOutputAdapter => ({
   resolve(outputSignals) {
@@ -30,12 +26,12 @@ export const createDefaultWorldActionOutputAdapter = (): WorldActionOutputAdapte
         continue;
       }
 
-      const commandKind = ACTION_TARGET_TO_COMMAND_KIND[signal.normalizedTarget];
-      if (!commandKind) {
+      const commandMatch = signal.normalizedTarget.match(ACTION_TARGET_PATTERN);
+      if (!commandMatch) {
         continue;
       }
 
-      commandsByKind.set(commandKind, signal.value);
+      commandsByKind.set(commandMatch[1], signal.value);
     }
 
     return [...commandsByKind.entries()].map(([kind, value]) => ({ kind, value }));

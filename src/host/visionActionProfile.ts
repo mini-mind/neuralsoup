@@ -1,14 +1,26 @@
+import type {
+  AgentConnection,
+  AgentIR,
+  AgentLayoutIR,
+  AgentMetadata,
+  BodyIR,
+  BrainIR,
+  WorldRegistry,
+} from '../domain/brain';
 import {
-  type AgentConnection,
-  type AgentIR,
-  type AgentLayoutIR,
-  type AgentMetadata,
-  type BodyIR,
-  type BrainIR,
-} from './agent-ir';
+  createDefaultWorldActionOutputAdapter,
+  createMovementWorldControlCommandApplier,
+  createVisionCellWorldInputSignalProvider,
+  type MovementWorldControlBindings,
+} from '../domain/world';
 
 const INPUT_CHANNELS = ['R', 'G', 'B'] as const;
-export const DEFAULT_ROOT_CONTAINER_ID = 'root-container';
+export const HOST_ROOT_CONTAINER_ID = 'root-container';
+export const VISION_ACTION_MOVEMENT_BINDINGS: MovementWorldControlBindings = {
+  turnLeft: 'turn-left',
+  moveForward: 'move-forward',
+  turnRight: 'turn-right',
+};
 
 const DEFAULT_AGENT_LAYOUT_VERSION = 1 as const;
 const DEFAULT_AGENT_VERSION = 1 as const;
@@ -16,6 +28,91 @@ const DEFAULT_BODY_VERSION = 1 as const;
 const DEFAULT_BRAIN_VERSION = 1 as const;
 const DEFAULT_VISION_INPUT_RULE_ID = 'vision-inputs';
 const DEFAULT_MOTOR_OUTPUT_RULE_ID = 'motor-outputs';
+
+export const createVisionActionWorldRegistry = (): WorldRegistry => {
+  const bodyInputSourcePattern = /^vision\.([RGB])\.(\d+)$/;
+  const bodyOutputTargetPattern = /^action\.([a-z0-9-]+)$/;
+
+  return {
+    version: 1,
+    inputs: [{ id: 'vision', direction: 'input', kind: 'vision-array', enumerable: true }],
+    outputs: [{ id: 'action', direction: 'output', kind: 'action-map', enumerable: true }],
+    resolveInputBinding: (source) => {
+      const match = source.match(bodyInputSourcePattern);
+      if (!match) {
+        return null;
+      }
+
+      const cellIndex = Number.parseInt(match[2], 10);
+      return {
+        source: `vision.${match[1]}.${cellIndex}`,
+        worldPort: 'vision',
+        cellIndex,
+      };
+    },
+    resolveOutputBinding: (target) => {
+      const match = target.match(bodyOutputTargetPattern);
+      if (!match) {
+        return null;
+      }
+
+      return {
+        target: `action.${match[1]}`,
+        worldPort: 'action',
+      };
+    },
+    enumerateInputNodeIds: (rule, body) => {
+      const templateMatch = rule.sourceTemplate.match(/^vision\.\$(\d+)\.\$(\d+)$/);
+      if (!templateMatch) {
+        return [];
+      }
+
+      const channelGroupIndex = Number.parseInt(templateMatch[1], 10);
+      const cellGroupIndex = Number.parseInt(templateMatch[2], 10);
+      const anchoredPattern =
+        rule.nodeIdPattern.startsWith('^') && rule.nodeIdPattern.endsWith('$')
+          ? rule.nodeIdPattern.slice(1, -1)
+          : rule.nodeIdPattern;
+
+      const isSupportedPattern =
+        anchoredPattern.includes('([RGB])') &&
+        (anchoredPattern.includes('(\\d+)') || anchoredPattern.includes('(\\\\d+)'));
+      if (!isSupportedPattern || channelGroupIndex === cellGroupIndex) {
+        return [];
+      }
+
+      const nodeIds = new Set<string>();
+      for (let cellIndex = 0; cellIndex < body.visionCellCount; cellIndex += 1) {
+        for (const channel of INPUT_CHANNELS) {
+          const nodeId = anchoredPattern
+            .replace('([RGB])', channel)
+            .replace('(\\\\d+)', String(cellIndex))
+            .replace('(\\d+)', String(cellIndex));
+          nodeIds.add(nodeId);
+        }
+      }
+
+      return [...nodeIds];
+    },
+    enumerateOutputNodeIds: (rule) => {
+      const templateMatch = rule.targetTemplate.match(/^action\.\$(\d+)$/);
+      const alternationMatch = rule.nodeIdPattern.match(/\(([^)]+)\)/);
+      if (!templateMatch || !alternationMatch) {
+        return [];
+      }
+
+      return alternationMatch[1]
+        .split('|')
+        .filter((value) => value.length > 0)
+        .map((value) =>
+          rule.nodeIdPattern
+            .replace(/^\^/, '')
+            .replace(/\$$/, '')
+            .replace(alternationMatch[0], value)
+        );
+    },
+  };
+};
 
 const createAgentMetadata = (
   name: string,
@@ -51,7 +148,7 @@ const createDefaultBodyIR = (): BodyIR => ({
 
 const createDefaultBrainIR = (): BrainIR => ({
   version: DEFAULT_BRAIN_VERSION,
-  rootContainerId: DEFAULT_ROOT_CONTAINER_ID,
+  rootContainerId: HOST_ROOT_CONTAINER_ID,
   neurons: [
     {
       id: 'neuron-1',
@@ -86,7 +183,7 @@ const createDefaultBrainIR = (): BrainIR => ({
   ],
   containers: [
     {
-      id: DEFAULT_ROOT_CONTAINER_ID,
+      id: HOST_ROOT_CONTAINER_ID,
       label: '默认神经元组',
       children: [
         { scope: 'brain', nodeId: 'neuron-1' },
@@ -161,7 +258,7 @@ const createDefaultConnections = (visionCells: number): AgentConnection[] => {
 
 const createDefaultLayout = (visionCells: number): AgentLayoutIR => {
   const nodes: AgentLayoutIR['nodes'] = {
-    [DEFAULT_ROOT_CONTAINER_ID]: {
+    [HOST_ROOT_CONTAINER_ID]: {
       position: { x: 300, y: 200 },
     },
     'neuron-1': {
@@ -198,7 +295,7 @@ const createDefaultLayout = (visionCells: number): AgentLayoutIR => {
   };
 };
 
-export const createDefaultAgentIR = (
+export const createVisionActionSeedAgentIR = (
   visionCells: number = 36,
   name: string = '当前 Agent'
 ): AgentIR => {
@@ -221,3 +318,10 @@ export const createDefaultAgentIR = (
     layout: createDefaultLayout(normalizedVisionCells),
   };
 };
+
+export const createVisionActionInputSignalProvider = createVisionCellWorldInputSignalProvider;
+
+export const createVisionActionOutputAdapter = createDefaultWorldActionOutputAdapter;
+
+export const createVisionActionCommandApplier = () =>
+  createMovementWorldControlCommandApplier(VISION_ACTION_MOVEMENT_BINDINGS);

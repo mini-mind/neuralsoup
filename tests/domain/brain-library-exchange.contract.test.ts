@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDefaultAgentIR } from '../../src/domain/brain';
+import { createVisionActionSeedAgentIR } from '../../src/host';
 import { createBrainLibraryItemFromAgent } from '../../src/storage/brainLibraryRecord';
 import {
   encodeBrainLibraryRecordForExchange,
@@ -8,7 +8,7 @@ import {
 } from '../../src/storage/brainLibraryExchange';
 
 const createAgentPackage = (name: string, visionCells: number) => {
-  const agent = createDefaultAgentIR(visionCells, name);
+  const agent = createVisionActionSeedAgentIR(visionCells, name);
   return {
     packageVersion: 1,
     metadata: { ...agent.metadata },

@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildAgentBodyRulePreviewModel,
-  createDefaultWorldRegistry,
   resolveCompiledAgentBodyEndpointIds,
   type AgentIR,
 } from '../../src/domain/brain';
+import { createVisionActionWorldRegistry } from '../../src/host';
 
-const WORLD_REGISTRY = createDefaultWorldRegistry();
+const WORLD_REGISTRY = createVisionActionWorldRegistry();
 
 const createRuleDrivenAgent = (): AgentIR =>
   ({

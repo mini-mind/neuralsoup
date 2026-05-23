@@ -2,14 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   compileAgentIR,
-  createDefaultWorldRegistry,
   createAgentProgramRuntimeState,
   stepAgentProgram,
   validateAgentIR,
   type AgentIR,
 } from '../../src/domain/brain';
+import { createVisionActionWorldRegistry } from '../../src/host';
 
-const WORLD_REGISTRY = createDefaultWorldRegistry();
+const WORLD_REGISTRY = createVisionActionWorldRegistry();
 
 const createRuleDrivenAgent = (): AgentIR =>
   ({
@@ -125,7 +125,7 @@ test('stepAgentProgram consumes rule-resolved input ports and activates rule-res
   const program = compileAgentIR(createRuleDrivenAgent(), WORLD_REGISTRY);
   const runtimeState = createAgentProgramRuntimeState(program);
   const sensoryInputs: Record<string, number> = {
-    'vision.G.2': 0.5,
+    'sensor-G-2': 0.5,
   };
 
   const result = stepAgentProgram(program, sensoryInputs, runtimeState, 1, 1);

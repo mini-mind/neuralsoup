@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildAgentBodyRulePreviewModel, createDefaultWorldRegistry, type AgentIR } from '../../src/domain/brain';
+import { buildAgentBodyRulePreviewModel, type AgentIR } from '../../src/domain/brain';
 import { buildAgentGraphViewModel } from '../../src/components/editor/graph/agentGraphViewModel';
+import { createVisionActionWorldRegistry } from '../../src/host';
 
-const WORLD_REGISTRY = createDefaultWorldRegistry();
+const WORLD_REGISTRY = createVisionActionWorldRegistry();
 
 const createTestAgent = (): AgentIR => ({
   version: 1,

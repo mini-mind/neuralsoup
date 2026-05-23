@@ -3,14 +3,14 @@ import type { WorldState } from './state';
 import { buildStatsSnapshot } from './state';
 
 function cloneAgent(agent: Agent): Agent {
+  const { visualInput: _visualInput, ...agentWithoutCompatVisualInput } = agent;
   return {
-    ...agent,
+    ...agentWithoutCompatVisualInput,
     velocity: { ...agent.velocity },
     visionCells: agent.visionCells.map((cell) => ({
       ...cell,
       color: { ...cell.color }
     })),
-    visualInput: [...agent.visualInput]
   };
 }
 

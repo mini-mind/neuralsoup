@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDefaultAgentIR, createDefaultWorldRegistry, summarizeAgentIR, validateAgentIR } from '../../src/domain/brain';
+import { summarizeAgentIR, validateAgentIR } from '../../src/domain/brain';
+import { createVisionActionSeedAgentIR, createVisionActionWorldRegistry } from '../../src/host';
 
-const WORLD_REGISTRY = createDefaultWorldRegistry();
+const WORLD_REGISTRY = createVisionActionWorldRegistry();
 
-test('default AgentIR seed is valid and exposes vision-aligned body and runtime counts', () => {
-  const agent = createDefaultAgentIR(4, 'Seed Agent');
+test('vision-action host seed AgentIR is valid and exposes vision-aligned body and runtime counts', () => {
+  const agent = createVisionActionSeedAgentIR(4, 'Seed Agent');
 
   assert.equal(agent.metadata.name, 'Seed Agent');
   assert.equal(agent.body.visionCellCount, 4);
@@ -26,8 +27,8 @@ test('default AgentIR seed is valid and exposes vision-aligned body and runtime 
   });
 });
 
-test('default AgentIR seed layout does not persist compat-only bridge nodes', () => {
-  const agent = createDefaultAgentIR(4, 'Seed Agent');
+test('vision-action host seed layout does not persist compat-only bridge nodes', () => {
+  const agent = createVisionActionSeedAgentIR(4, 'Seed Agent');
   const layoutNodeIds = new Set(Object.keys(agent.layout?.nodes ?? {}));
 
   assert.equal(layoutNodeIds.has('core-input-adapter'), false);

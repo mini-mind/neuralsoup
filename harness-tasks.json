@@ -1192,14 +1192,14 @@
     {
       "id": "task-032",
       "title": "Host adapter/runtime Phase 2：去掉 visualInputIndex、/3 视野推导和 action.* 三槽硬编码",
-      "status": "pending",
+      "status": "in_progress",
       "priority": "P0",
       "depends_on": [
         "task-031"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "max_attempts": 3,
-      "started_at_commit": null,
+      "started_at_commit": "9f9cb0e",
       "validation": {
         "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"body ir|simulation lifecycle\"",
         "timeout_seconds": 1500
@@ -1208,7 +1208,16 @@
         "cleanup": null
       },
       "error_log": [],
-      "checkpoints": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-23T21:59:42Z",
+          "message": "Closed the first production-path P0 tranche with cross-review: AgentController now consumes explicit WorldInputSignalProvider and WorldControlCommandApplier seams, production VisionSystem no longer backfills legacy visualInput, compat visualInput decoding moved behind an explicit compat provider, the default action adapter now projects generic action slugs instead of a fixed tuple, and type-check plus domain/compat validation stayed green."
+        },
+        {
+          "at": "2026-05-23T21:59:42Z",
+          "message": "Further narrowed task-032 execution coupling after a second gpt-5.4 review loop: runtime input lookup now keys by compiled input port id instead of source grammar strings, production snapshots strip compat-only visualInput leakage, and the remaining scope is no longer production visualInput fallback or tuple execution but the default registry/default seed/cellIndex semantics that still define the boot-time host grammar."
+        }
+      ],
       "completed_at": null
     },
     {

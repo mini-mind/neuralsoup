@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDefaultAgentIR } from '../../src/domain/brain';
+import { createVisionActionSeedAgentIR } from '../../src/host';
 import {
   BRAIN_LIBRARY_CORRUPT_STORAGE_KEY,
   BRAIN_LIBRARY_STATUS_STORAGE_KEY,
@@ -48,7 +48,7 @@ const installMemoryLocalStorage = () => {
 
 test('Brain Library storage saves and loads v1 record payloads', () => {
   const storage = installMemoryLocalStorage();
-  const record = createBrainLibraryItemFromAgent('Stored Brain', createDefaultAgentIR(1, 'Stored Brain'));
+  const record = createBrainLibraryItemFromAgent('Stored Brain', createVisionActionSeedAgentIR(1, 'Stored Brain'));
 
   saveBrainLibrary([record]);
   const rawValue = storage.getItem(BRAIN_LIBRARY_STORAGE_KEY);
@@ -65,7 +65,7 @@ test('Brain Library storage saves and loads v1 record payloads', () => {
 });
 
 test('Brain Library record creation rejects invalid AgentIR instead of persisting a corrupt entry', () => {
-  const invalidAgent = createDefaultAgentIR(1, 'Invalid Brain');
+  const invalidAgent = createVisionActionSeedAgentIR(1, 'Invalid Brain');
   invalidAgent.body.outputRules[0] = {
     ...invalidAgent.body.outputRules[0],
     targetTemplate: 'thruster.$1',
@@ -112,7 +112,7 @@ test('Brain Library recovered status survives repeated reads until a successful 
 
 test('Brain Library storage rejects old array payloads instead of migrating implicitly', () => {
   const storage = installMemoryLocalStorage();
-  const brain = createBrainLibraryItemFromAgent('Old Array Brain', createDefaultAgentIR(1, 'Old Array Brain'));
+  const brain = createBrainLibraryItemFromAgent('Old Array Brain', createVisionActionSeedAgentIR(1, 'Old Array Brain'));
   storage.setItem(BRAIN_LIBRARY_STORAGE_KEY, JSON.stringify([brain]));
 
   const loaded = loadBrainLibraryWithStatus();
@@ -159,7 +159,7 @@ test('Brain Library storage quarantines structurally invalid non-canonical paylo
 test('Brain Library storage reports LocalStorage capacity write failures', () => {
   const storage = installMemoryLocalStorage();
   storage.failWrites = true;
-  const record = createBrainLibraryItemFromAgent('Too Large', createDefaultAgentIR(1, 'Too Large'));
+  const record = createBrainLibraryItemFromAgent('Too Large', createVisionActionSeedAgentIR(1, 'Too Large'));
 
   assert.throws(
     () => saveBrainLibrary([record]),
@@ -169,7 +169,7 @@ test('Brain Library storage reports LocalStorage capacity write failures', () =>
 
 test('Brain Library storage rewrites canonical records into normalized AgentIR shape on load', () => {
   const storage = installMemoryLocalStorage();
-  const agent = createDefaultAgentIR(2, 'Canonical Rewrite');
+  const agent = createVisionActionSeedAgentIR(2, 'Canonical Rewrite');
   const rawStoredRecord = structuredClone({ agent });
 
   rawStoredRecord.agent.layout ??= { version: 1, nodes: {} };
@@ -210,7 +210,7 @@ test('Brain Library storage rewrites canonical records into normalized AgentIR s
 });
 
 test('canonical Brain Library normalization strips legacy layout viewport fields from the main path', () => {
-  const agent = createDefaultAgentIR(1, 'Layout Payload Validation');
+  const agent = createVisionActionSeedAgentIR(1, 'Layout Payload Validation');
   const candidate = {
     ...agent,
     layout: {
@@ -235,7 +235,7 @@ test('canonical Brain Library normalization strips legacy layout viewport fields
 
 test('Brain Library canonical record storage rewrites leaked legacy body visionCellCount on canonical payload load', () => {
   const storage = installMemoryLocalStorage();
-  const brain = createDefaultAgentIR(2, 'Canonical Legacy Leak');
+  const brain = createVisionActionSeedAgentIR(2, 'Canonical Legacy Leak');
 
   storage.setItem(
     BRAIN_LIBRARY_STORAGE_KEY,
@@ -263,7 +263,7 @@ test('Brain Library canonical record storage rewrites leaked legacy body visionC
 });
 
 test('renameBrainLibraryItem updates canonical agent metadata only once', () => {
-  const record = createBrainLibraryItemFromAgent('Rename Source', createDefaultAgentIR(1, 'Rename Source'));
+  const record = createBrainLibraryItemFromAgent('Rename Source', createVisionActionSeedAgentIR(1, 'Rename Source'));
 
   const [renamed] = renameBrainLibraryItem([record], record.agent.metadata.id, 'Renamed Brain');
   assert.ok(renamed);
@@ -271,8 +271,8 @@ test('renameBrainLibraryItem updates canonical agent metadata only once', () => 
 });
 
 test('upsertBrainLibraryItemAgent updates canonical agent metadata timestamps', () => {
-  const record = createBrainLibraryItemFromAgent('Upsert Source', createDefaultAgentIR(1, 'Upsert Source'));
-  const replacement = createBrainLibraryItemFromAgent('Replacement Draft', createDefaultAgentIR(1, 'Replacement Draft')).agent;
+  const record = createBrainLibraryItemFromAgent('Upsert Source', createVisionActionSeedAgentIR(1, 'Upsert Source'));
+  const replacement = createBrainLibraryItemFromAgent('Replacement Draft', createVisionActionSeedAgentIR(1, 'Replacement Draft')).agent;
 
   const [updated] = upsertBrainLibraryItemAgent([record], record.agent.metadata.id, replacement, '2026-05-23T04:30:00.000Z');
   assert.ok(updated);

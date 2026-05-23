@@ -3,9 +3,9 @@ import {
   GraphIRValidationError,
   validateGraphIRDocument,
 } from './legacyGraphIR';
-import { createDefaultWorldRegistry } from '../domain/brain';
 import { AgentValidationError, compileAgentIR } from '../domain/brain/agent-compiler';
 import { createAgentIRFromLegacyGraphDetailed } from './legacyGraphBridge';
+import { createVisionActionWorldRegistry } from '../host';
 import type {
   LeafLink,
   LiteralValue,
@@ -46,7 +46,7 @@ const DEFAULT_IZHIKEVICH_PARAMETERS = {
   d: 8,
   threshold: 30,
 } as const;
-const DEFAULT_WORLD_REGISTRY = createDefaultWorldRegistry();
+const DEFAULT_WORLD_REGISTRY = createVisionActionWorldRegistry();
 
 const isRecord = (value: LiteralValue | undefined): value is Record<string, LiteralValue> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);

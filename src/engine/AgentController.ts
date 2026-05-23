@@ -8,11 +8,13 @@ import {
   type SimulationControlMode,
   type WorldControlCommand,
   type WorldActionOutputAdapter,
+  type MovementWorldControlBindings,
+  type WorldInputSignalProvider,
+  type WorldControlCommandApplier,
 } from '../domain/world';
 import {
   createAgentProgramRuntimeState,
   stepAgentProgram,
-  type AgentWorldInputSignalMap,
   type AgentProgram,
   type AgentProgramRuntimeState,
 } from '../domain/brain';
@@ -32,9 +34,20 @@ export class AgentController {
   private agentPrograms: Map<number, AgentProgram> = new Map();
   private agentRuntimeStates: Map<number, AgentProgramRuntimeState> = new Map();
   private readonly actionOutputAdapter: WorldActionOutputAdapter;
+  private readonly inputSignalProvider: WorldInputSignalProvider;
+  private readonly controlCommandApplier: WorldControlCommandApplier;
+  private readonly keyboardBindings: MovementWorldControlBindings;
 
-  constructor(actionOutputAdapter: WorldActionOutputAdapter) {
+  constructor(
+    actionOutputAdapter: WorldActionOutputAdapter,
+    inputSignalProvider: WorldInputSignalProvider,
+    controlCommandApplier: WorldControlCommandApplier,
+    keyboardBindings: MovementWorldControlBindings
+  ) {
     this.actionOutputAdapter = actionOutputAdapter;
+    this.inputSignalProvider = inputSignalProvider;
+    this.controlCommandApplier = controlCommandApplier;
+    this.keyboardBindings = keyboardBindings;
   }
 
   public installAgentProgram(agentId: number, program: AgentProgram): void {
@@ -54,14 +67,14 @@ export class AgentController {
    * 更新智能体控制
    */
   public updateAgent(agent: Agent, deltaTime: number, context: AgentUpdateContext): void {
-    const keyboardInputs = this.getKeyboardInputs(context.keyboardInputState);
+    const keyboardCommands = this.getKeyboardCommands(context.keyboardInputState);
 
     switch (context.controlMode) {
       case 'snn':
-        this.updateSNNAgent(agent, deltaTime, keyboardInputs);
+        this.updateSNNAgent(agent, deltaTime, keyboardCommands);
         break;
       case 'keyboard':
-        this.updateKeyboardAgent(agent, deltaTime, keyboardInputs);
+        this.updateKeyboardAgent(agent, deltaTime, keyboardCommands);
         break;
       case 'random':
         this.updateRandomAgent(agent, deltaTime);
@@ -84,9 +97,9 @@ export class AgentController {
   private updateKeyboardAgent(
     agent: Agent,
     deltaTime: number,
-    keyboardInputs: [number, number, number]
+    keyboardCommands: WorldControlCommand[]
   ): void {
-    this.applyLegacyActionVector(agent, keyboardInputs, deltaTime);
+    this.controlCommandApplier.apply(agent, keyboardCommands, deltaTime);
   }
 
   /**
@@ -95,7 +108,7 @@ export class AgentController {
   private updateSNNAgent(
     agent: Agent,
     deltaTime: number,
-    keyboardInputs: [number, number, number]
+    keyboardCommands: WorldControlCommand[]
   ): void {
     const agentProgram = this.agentPrograms.get(agent.id);
     const agentRuntimeState = this.agentRuntimeStates.get(agent.id);
@@ -103,13 +116,12 @@ export class AgentController {
       return;
     }
 
-    const hasKeyboardInput = keyboardInputs[0] > 0 || keyboardInputs[1] > 0 || keyboardInputs[2] > 0;
-    if (hasKeyboardInput) {
-      this.applyLegacyActionVector(agent, keyboardInputs, deltaTime);
+    if (keyboardCommands.length > 0) {
+      this.controlCommandApplier.apply(agent, keyboardCommands, deltaTime);
       return;
     }
 
-    const sensoryInputs = this.createWorldInputSignalMap(agent);
+    const sensoryInputs = this.inputSignalProvider.resolve(agent);
     const result = stepAgentProgram(
       agentProgram,
       sensoryInputs,
@@ -118,7 +130,11 @@ export class AgentController {
       Date.now()
     );
     this.agentRuntimeStates.set(agent.id, result.runtimeState);
-    this.applyCommands(agent, this.actionOutputAdapter.resolve(result.outputSignals), deltaTime);
+    this.controlCommandApplier.apply(
+      agent,
+      this.actionOutputAdapter.resolve(result.outputSignals),
+      deltaTime
+    );
   }
 
   /**
@@ -137,7 +153,7 @@ export class AgentController {
   /**
    * 获取键盘输入强度
    */
-  private getKeyboardInputs(inputState: KeyboardInputState): [number, number, number] {
+  private getKeyboardCommands(inputState: KeyboardInputState): WorldControlCommand[] {
     let turnLeft = inputState.turnLeft ? 1.0 : 0;
     let moveForward = inputState.moveForward ? 1.0 : 0;
     let turnRight = inputState.turnRight ? 1.0 : 0;
@@ -147,78 +163,11 @@ export class AgentController {
       turnRight = 0;
     }
     
-    return [turnLeft, moveForward, turnRight];
-  }
-
-  private createWorldInputSignalMap(agent: Agent): AgentWorldInputSignalMap {
-    const sensoryInputs: AgentWorldInputSignalMap = {};
-    const expectedVisualInputLength = agent.visionCells.length * 3;
-    const hasLegacyVisualInput =
-      agent.visualInput.length > 0 &&
-      (agent.visionCells.length === 0 || agent.visualInput.length !== expectedVisualInputLength);
-
-    if (hasLegacyVisualInput) {
-      const visualCellCount = Math.floor(agent.visualInput.length / 3);
-      for (let cellIndex = 0; cellIndex < visualCellCount; cellIndex += 1) {
-        const baseIndex = cellIndex * 3;
-        sensoryInputs[`vision.R.${cellIndex}`] = agent.visualInput[baseIndex] ?? 0;
-        sensoryInputs[`vision.G.${cellIndex}`] = agent.visualInput[baseIndex + 1] ?? 0;
-        sensoryInputs[`vision.B.${cellIndex}`] = agent.visualInput[baseIndex + 2] ?? 0;
-      }
-      return sensoryInputs;
-    }
-
-    for (const [cellIndex, cell] of agent.visionCells.entries()) {
-      sensoryInputs[`vision.R.${cellIndex}`] = cell.color.r;
-      sensoryInputs[`vision.G.${cellIndex}`] = cell.color.g;
-      sensoryInputs[`vision.B.${cellIndex}`] = cell.color.b;
-    }
-    return sensoryInputs;
-  }
-
-  private applyLegacyActionVector(agent: Agent, output: [number, number, number], deltaTime: number): void {
-    this.applyCommands(
-      agent,
-      [
-        { kind: 'turn-left', value: output[0] },
-        { kind: 'move-forward', value: output[1] },
-        { kind: 'turn-right', value: output[2] },
-      ],
-      deltaTime
-    );
-  }
-
-  /**
-   * 应用动作到智能体
-   */
-  private applyCommands(agent: Agent, commands: WorldControlCommand[], deltaTime: number): void {
-    const turnLeft = commands.find((command) => command.kind === 'turn-left')?.value ?? 0;
-    const moveForward = commands.find((command) => command.kind === 'move-forward')?.value ?? 0;
-    const turnRight = commands.find((command) => command.kind === 'turn-right')?.value ?? 0;
-    
-    // 转向
-    const turnSpeed = 3.0;
-    const turnThreshold = 0.3;
-    
-    if (turnLeft > turnThreshold) {
-      agent.angle -= turnSpeed * turnLeft * deltaTime;
-    }
-    if (turnRight > turnThreshold) {
-      agent.angle += turnSpeed * turnRight * deltaTime;
-    }
-    
-    // 前进
-    const maxSpeed = 60;
-    const moveThreshold = 0.2;
-    
-    if (moveForward > moveThreshold) {
-      const speed = maxSpeed * moveForward;
-      agent.velocity.x = Math.cos(agent.angle) * speed;
-      agent.velocity.y = Math.sin(agent.angle) * speed;
-    } else {
-      agent.velocity.x = 0;
-      agent.velocity.y = 0;
-    }
+    return [
+      { kind: this.keyboardBindings.turnLeft, value: turnLeft },
+      { kind: this.keyboardBindings.moveForward, value: moveForward },
+      { kind: this.keyboardBindings.turnRight, value: turnRight },
+    ].filter((command) => command.value > 0);
   }
 
   /**

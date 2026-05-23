@@ -12,12 +12,15 @@ import { AgentController } from './AgentController';
 import { WorldManager } from './WorldManager';
 import { CollisionDetector } from './CollisionDetector';
 import { SimulationSession } from '../runtime/SimulationSession';
-import {
-  createDefaultWorldActionOutputAdapter,
-  type SimulationControlMode,
-} from '../domain/world';
+import { type SimulationControlMode } from '../domain/world';
 import type { AgentIR, WorldRegistry } from '../domain/brain';
 import type { AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../types/agentRuntime';
+import {
+  createVisionActionCommandApplier,
+  createVisionActionInputSignalProvider,
+  createVisionActionOutputAdapter,
+  VISION_ACTION_MOVEMENT_BINDINGS,
+} from '../host';
 
 export type SimulationLifecycleState = 'idle' | 'running' | 'paused';
 
@@ -63,7 +66,12 @@ export class SimulationEngine {
     // 初始化各个系统
     this.renderer = new WorldRenderer(app);
     this.visionSystem = new VisionSystem();
-    this.agentController = new AgentController(createDefaultWorldActionOutputAdapter());
+    this.agentController = new AgentController(
+      createVisionActionOutputAdapter(),
+      createVisionActionInputSignalProvider(),
+      createVisionActionCommandApplier(),
+      VISION_ACTION_MOVEMENT_BINDINGS
+    );
     this.worldManager = new WorldManager(initialWidth, initialHeight);
     this.collisionDetector = new CollisionDetector();
     this.session = new SimulationSession(

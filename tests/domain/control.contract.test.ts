@@ -5,14 +5,30 @@ import { VisionSystem } from '../../src/engine/VisionSystem';
 import { WorldManager } from '../../src/engine/WorldManager';
 import { CollisionDetector } from '../../src/engine/CollisionDetector';
 import { SimulationSession } from '../../src/runtime/SimulationSession';
-import { createDefaultWorldActionOutputAdapter, type WorldControlCommand } from '../../src/domain/world';
-import { compileAgentIR, createAgentProgramRuntimeState, createDefaultWorldRegistry, stepAgentProgram } from '../../src/domain/brain';
+import {
+  type WorldControlCommand,
+} from '../../src/domain/world';
+import { compileAgentIR, createAgentProgramRuntimeState, stepAgentProgram } from '../../src/domain/brain';
+import {
+  createVisionActionCommandApplier,
+  createVisionActionInputSignalProvider,
+  createVisionActionOutputAdapter,
+  createVisionActionWorldRegistry,
+  VISION_ACTION_MOVEMENT_BINDINGS,
+} from '../../src/host';
 import type { AgentRuntimeStatus } from '../../src/types/agentRuntime';
-import type { Agent } from '../../src/types/simulation';
+import type { Agent, VisionCell } from '../../src/types/simulation';
 
-const WORLD_REGISTRY = createDefaultWorldRegistry();
+const WORLD_REGISTRY = createVisionActionWorldRegistry();
 
-const createSimulationSession = (agentController: AgentController = new AgentController(createDefaultWorldActionOutputAdapter())) =>
+const createSimulationSession = (
+  agentController: AgentController = new AgentController(
+    createVisionActionOutputAdapter(),
+    createVisionActionInputSignalProvider(),
+    createVisionActionCommandApplier(),
+    VISION_ACTION_MOVEMENT_BINDINGS
+  )
+) =>
   new SimulationSession({
     visionSystem: new VisionSystem(),
     agentController,
@@ -31,7 +47,7 @@ function createAgent(overrides: Partial<Agent> = {}): Agent {
     health: overrides.health ?? 100,
     energy: overrides.energy ?? 100,
     visionCells: overrides.visionCells ?? [],
-    visualInput: overrides.visualInput ?? [0, 0, 0],
+    visualInput: overrides.visualInput,
     motivation: overrides.motivation ?? 0,
     stress: overrides.stress ?? 0.5,
     homeostasis: overrides.homeostasis ?? 0.5,
@@ -40,8 +56,26 @@ function createAgent(overrides: Partial<Agent> = {}): Agent {
   };
 }
 
+function createVisionCells(
+  count: number,
+  color: { r: number; g: number; b: number } = { r: 0, g: 0, b: 0 }
+): VisionCell[] {
+  return Array.from({ length: count }, () => ({
+    angle: 0,
+    x: 0,
+    y: 0,
+    color: { ...color },
+    closestDistance: Infinity,
+  }));
+}
+
 test('keyboard policy moves forward and cancels opposite turns', () => {
-  const controller = new AgentController(createDefaultWorldActionOutputAdapter());
+  const controller = new AgentController(
+    createVisionActionOutputAdapter(),
+    createVisionActionInputSignalProvider(),
+    createVisionActionCommandApplier(),
+    VISION_ACTION_MOVEMENT_BINDINGS
+  );
 
   const forwardAgent = createAgent();
   controller.updateAgent(forwardAgent, 1, {
@@ -104,7 +138,12 @@ test('simulation session owns main-agent control mode and preserves it across re
 });
 
 test('simulation session keeps main-agent runtime status aligned across mode switches and vision-cell updates', () => {
-  const agentController = new AgentController(createDefaultWorldActionOutputAdapter());
+  const agentController = new AgentController(
+    createVisionActionOutputAdapter(),
+    createVisionActionInputSignalProvider(),
+    createVisionActionCommandApplier(),
+    VISION_ACTION_MOVEMENT_BINDINGS
+  );
   const visionSystem = new VisionSystem();
   const session = new SimulationSession({
     visionSystem,
@@ -146,7 +185,7 @@ test('simulation session keeps main-agent runtime status aligned across mode swi
 
   const agent = createAgent({
     id: mainAgent.id,
-    visualInput: new Array(mainAgent.visionCells.length * 3).fill(0),
+    visionCells: createVisionCells(mainAgent.visionCells.length),
   });
 
   agentController.updateAgent(agent, 1, {
@@ -165,7 +204,12 @@ test('simulation session keeps main-agent runtime status aligned across mode swi
 });
 
 test('default world action adapter consumes normalized action.* runtime targets', () => {
-  const controller = new AgentController(createDefaultWorldActionOutputAdapter());
+  const controller = new AgentController(
+    createVisionActionOutputAdapter(),
+    createVisionActionInputSignalProvider(),
+    createVisionActionCommandApplier(),
+    VISION_ACTION_MOVEMENT_BINDINGS
+  );
   const session = createSimulationSession(controller);
 
   session.initialize();
@@ -177,9 +221,9 @@ test('default world action adapter consumes normalized action.* runtime targets'
   const result = stepAgentProgram(
     program,
     Object.fromEntries(mainAgent.visionCells.flatMap((_cell, cellIndex) => [
-      [`vision.R.${cellIndex}`, 1],
-      [`vision.G.${cellIndex}`, 1],
-      [`vision.B.${cellIndex}`, 1],
+      [`vision-R-${cellIndex}`, 1],
+      [`vision-G-${cellIndex}`, 1],
+      [`vision-B-${cellIndex}`, 1],
     ])) as Record<string, number>,
     createAgentProgramRuntimeState(program),
     1,
@@ -190,7 +234,7 @@ test('default world action adapter consumes normalized action.* runtime targets'
 
   const controlledAgent = createAgent({
     id: mainAgent.id,
-    visualInput: new Array(mainAgent.visualInput.length).fill(1),
+    visionCells: createVisionCells(mainAgent.visionCells.length, { r: 1, g: 1, b: 1 }),
   });
   controller.updateAgent(controlledAgent, 1, {
     controlMode: 'snn',
@@ -218,7 +262,7 @@ test('agent controller consumes runtime outputs through the injected world actio
       adapterCalls.push(outputSignals.map((signal) => ({ ...signal })));
       return [{ kind: 'move-forward', value: 1 }] as WorldControlCommand[];
     },
-  });
+  }, createVisionActionInputSignalProvider(), createVisionActionCommandApplier(), VISION_ACTION_MOVEMENT_BINDINGS);
   const session = createSimulationSession(controller);
 
   session.initialize();
@@ -228,7 +272,7 @@ test('agent controller consumes runtime outputs through the injected world actio
 
   const controlledAgent = createAgent({
     id: mainAgent.id,
-    visualInput: new Array(mainAgent.visualInput.length).fill(1),
+    visionCells: createVisionCells(mainAgent.visionCells.length, { r: 1, g: 1, b: 1 }),
   });
 
   controller.updateAgent(controlledAgent, 1, {
@@ -253,8 +297,8 @@ test('agent controller consumes runtime outputs through the injected world actio
   assert.equal(controlledAgent.velocity.x > 0, true);
 });
 
-test('default world action adapter maps supported action targets into the expected control vector', () => {
-  const adapter = createDefaultWorldActionOutputAdapter();
+test('default world action adapter projects any action.* target into commands by slug', () => {
+  const adapter = createVisionActionOutputAdapter();
 
   assert.deepEqual(
     adapter.resolve([
@@ -280,9 +324,9 @@ test('default world action adapter maps supported action targets into the expect
         value: 0.5,
       },
       {
-        id: 'ignored',
-        target: 'action.unknown',
-        normalizedTarget: 'action.unknown',
+        id: 'strafe-left',
+        target: 'action.strafe-left',
+        normalizedTarget: 'action.strafe-left',
         worldPort: 'action',
         value: 1,
       },
@@ -298,8 +342,26 @@ test('default world action adapter maps supported action targets into the expect
       { kind: 'turn-left', value: 0.25 },
       { kind: 'move-forward', value: 0.75 },
       { kind: 'turn-right', value: 0.5 },
+      { kind: 'strafe-left', value: 1 },
     ] satisfies WorldControlCommand[]
   );
+});
+
+test('vision-cell world input provider ignores legacy visualInput and only uses visionCells as source of truth', () => {
+  const provider = createVisionActionInputSignalProvider();
+  const agent = createAgent({
+    visionCells: createVisionCells(2, { r: 0.1, g: 0.2, b: 0.3 }),
+    visualInput: [1, 1, 1, 1, 1, 1],
+  });
+
+  assert.deepEqual(provider.resolve(agent), {
+    'vision-R-0': 0.1,
+    'vision-G-0': 0.2,
+    'vision-B-0': 0.3,
+    'vision-R-1': 0.1,
+    'vision-G-1': 0.2,
+    'vision-B-1': 0.3,
+  });
 });
 
 test('invalid install keeps the last successfully applied runtime summary', () => {

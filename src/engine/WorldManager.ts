@@ -48,7 +48,6 @@ export class WorldManager {
         health: 100,
         energy: 100,
         visionCells: [],
-        visualInput: [],
         motivation: 0,
         stress: 0,
         homeostasis: 0.5,

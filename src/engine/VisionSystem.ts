@@ -115,9 +115,8 @@ export class VisionSystem {
       }
     }
     
-    // 应用模糊效果和更新视觉输入
+    // 应用模糊效果
     this.applyVisionBlur(agent);
-    this.updateVisualInput(agent);
   }
 
   /**
@@ -295,16 +294,6 @@ export class VisionSystem {
         g: totalG / count,
         b: totalB / count
       };
-    }
-  }
-
-  /**
-   * 更新智能体的视觉输入向量
-   */
-  private updateVisualInput(agent: Agent): void {
-    agent.visualInput = [];
-    for (const cell of agent.visionCells) {
-      agent.visualInput.push(cell.color.r, cell.color.g, cell.color.b);
     }
   }
 
