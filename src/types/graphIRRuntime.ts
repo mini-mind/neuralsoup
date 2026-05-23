@@ -1,4 +1,4 @@
-import type { GraphIRDocumentSummary, GraphIRValidationIssue } from '../domain/brain';
+import type { GraphIRDocumentSummary, GraphIRValidationIssue } from '../domain/brain/compat';
 
 export interface GraphIRRuntimeActivitySnapshot {
   activeNodeIds: string[];

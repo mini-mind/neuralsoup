@@ -6,7 +6,7 @@ import {
   createDefaultBodyDefinition,
   createDefaultGraphIRDocument,
   getBodyVisionCellCount,
-} from '../../src/domain/brain';
+} from '../../src/domain/brain/compat';
 import { isBrainPackage } from '../../src/storage/brainLibraryStorage';
 
 test('createDefaultBodyDefinition maps vision cells and motor channels into explicit body signals', () => {

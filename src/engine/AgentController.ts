@@ -7,14 +7,16 @@ import { Agent } from '../types/simulation';
 import type { SimulationControlMode } from '../domain/world';
 import {
   createAgentProgramRuntimeState,
-  createBrainProgramRuntimeState,
   stepAgentProgram,
-  stepBrainProgram,
   type AgentProgram,
   type AgentProgramRuntimeState,
-  type BrainProgram,
-  type BrainProgramRuntimeState
 } from '../domain/brain';
+import {
+  createBrainProgramRuntimeState,
+  stepBrainProgram,
+  type BrainProgram,
+  type BrainProgramRuntimeState,
+} from '../domain/brain/compat';
 
 export interface KeyboardInputState {
   turnLeft: boolean;

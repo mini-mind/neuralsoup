@@ -1,18 +1,20 @@
 import type {
+  IzhikevichNeuronParameters,
+  Position,
+} from '../../../domain/brain';
+import type {
   AdapterNode,
   AggregateLinkView,
   GraphIRDocument,
-  IzhikevichNeuronParameters,
   LeafLink,
   LiteralValue,
   ModelDefinition,
   NeuronGroupNode,
   NeuronNode,
-  Position,
   RootGraph,
   SignalNode,
   TopologyNode,
-} from '../../../domain/brain';
+} from '../../../domain/brain/compat';
 import { getGraphLinkCapabilities } from './graphLinkPolicy';
 import type {
   GraphBreadcrumbItem,

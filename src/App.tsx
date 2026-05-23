@@ -6,7 +6,6 @@ import {
   summarizeAgentIR,
   validateAgentIR,
   type AgentIR,
-  type AgentPackage,
 } from './domain/brain';
 import type { SimulationControlMode } from './domain/world';
 import type { SimulationLifecycleState } from './engine/SimulationEngine';
@@ -20,10 +19,10 @@ import SettingsPanel from './components/editor/SettingsPanel';
 import type { AgentParameters, EditorTab, GraphPathItem, SettingsSection } from './components/editor/types';
 import type { GraphDocumentChangeOptions } from './components/hooks/useSNNTopologyState';
 import {
+  type BrainLibraryRecord,
   createBrainLibraryItemFromAgent,
   deleteBrainLibraryItem,
   duplicateBrainLibraryItem,
-  isAgentPackage,
   loadBrainLibraryWithStatus,
   normalizeImportedAgentPackage,
   renameBrainLibraryItem,
@@ -135,7 +134,7 @@ const App: React.FC = () => {
   const [graphIRRuntimeActivity, setGraphIRRuntimeActivity] = useState<GraphIRRuntimeActivitySnapshot>({
     activeNodeIds: []
   });
-  const [brainLibrary, setBrainLibrary] = useState<AgentPackage[]>(() => initialBrainLibraryLoad.brains);
+  const [brainLibrary, setBrainLibrary] = useState<BrainLibraryRecord[]>(() => initialBrainLibraryLoad.brains);
   const [activeBrainId, setActiveBrainId] = useState<string | null>(null);
   const [isBrainLibraryOpen, setIsBrainLibraryOpen] = useState(false);
   const [brainLibraryStatusMessage, setBrainLibraryStatusMessage] = useState<string | null>(
@@ -449,10 +448,7 @@ const App: React.FC = () => {
     setEditorTab((currentTab) => (currentTab === 'graph' ? 'graph' : currentTab));
   }, [brainLibrary, confirmUnsavedBrainReplacement, resetGraphEditorSession, resetRuntimeForBrainSwitch]);
 
-  const handleImportBrain = useCallback((name: string, payload: AgentPackage) => {
-    if (!isAgentPackage(payload)) {
-      throw new Error('导入内容不是有效的 AgentPackage。');
-    }
+  const handleImportBrain = useCallback((name: string, payload: unknown) => {
     const nextBrain = normalizeImportedAgentPackage(payload, {
       name,
       existingIds: brainLibrary.map((brain) => brain.metadata.id),

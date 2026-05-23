@@ -1,9 +1,9 @@
 import React, { useId, useRef, useState } from 'react';
-import type { AgentPackage } from '../../domain/brain';
+import type { BrainLibraryRecord } from '../../storage/brainLibraryStorage';
 
 interface BrainLibraryModalProps {
   activeBrainId: string | null;
-  brains: AgentPackage[];
+  brains: BrainLibraryRecord[];
   isOpen: boolean;
   statusMessage: string | null;
   onClose: () => void;
@@ -13,12 +13,12 @@ interface BrainLibraryModalProps {
   onDeleteBrain: (brainId: string) => void;
   onDuplicateBrain: (brainId: string) => void;
   onExportBrain: (brainId: string) => void;
-  onImportBrain: (name: string, payload: AgentPackage) => void;
+  onImportBrain: (name: string, payload: unknown) => void;
 }
 
-const parseImportedBrainPackage = (rawValue: string): AgentPackage => {
+const parseImportedBrainPackage = (rawValue: string): unknown => {
   try {
-    return JSON.parse(rawValue) as AgentPackage;
+    return JSON.parse(rawValue) as unknown;
   } catch (error) {
     throw new Error(`JSON 解析失败：${error instanceof Error ? error.message : '未知错误'}`);
   }
@@ -72,7 +72,7 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
     }
   };
 
-  const startRenamingBrain = (brain: AgentPackage) => {
+  const startRenamingBrain = (brain: BrainLibraryRecord) => {
     setRenamingBrainId(brain.metadata.id);
     setRenamingBrainName(brain.metadata.name);
   };
@@ -94,7 +94,7 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
     setErrorMessage(null);
   };
 
-  const deleteBrain = (brain: AgentPackage) => {
+  const deleteBrain = (brain: BrainLibraryRecord) => {
     if (!window.confirm(`删除 Brain "${brain.metadata.name}"？此操作不能撤销。`)) {
       return;
     }

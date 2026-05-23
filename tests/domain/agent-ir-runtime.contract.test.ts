@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   compileAgentIR,
-  createLegacyGraphBridgeFromAgent,
   createAgentProgramRuntimeState,
   stepAgentProgram,
   validateAgentIR,
   type AgentIR,
 } from '../../src/domain/brain';
+import { createLegacyGraphBridgeFromAgent } from '../../src/domain/brain/compat';
 
 const createRuleDrivenAgent = (): AgentIR => ({
   version: 1,

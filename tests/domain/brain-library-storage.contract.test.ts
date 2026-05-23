@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAgentPackage, createDefaultGraphIRDocument } from '../../src/domain/brain';
+import { createAgentPackage, createDefaultGraphIRDocument } from '../../src/domain/brain/compat';
 import {
   BRAIN_LIBRARY_CORRUPT_STORAGE_KEY,
   BRAIN_LIBRARY_STATUS_STORAGE_KEY,
   BRAIN_LIBRARY_STORAGE_KEY,
+  createBrainLibraryItemFromAgent,
   loadBrainLibraryWithStatus,
   normalizeImportedAgentPackage,
   saveBrainLibrary,
@@ -45,8 +46,9 @@ const installMemoryLocalStorage = () => {
 test('Brain Library storage saves and loads v1 envelope payloads', () => {
   const storage = installMemoryLocalStorage();
   const brain = createAgentPackage('Stored Brain', createDefaultGraphIRDocument(1));
+  const record = createBrainLibraryItemFromAgent('Stored Brain', brain.agent);
 
-  saveBrainLibrary([brain]);
+  saveBrainLibrary([record]);
   const rawValue = storage.getItem(BRAIN_LIBRARY_STORAGE_KEY);
   assert.ok(rawValue);
   assert.equal(JSON.parse(rawValue).storageVersion, 1);
@@ -124,9 +126,10 @@ test('Brain Library storage quarantines structurally invalid AgentPackage payloa
 test('Brain Library storage reports LocalStorage capacity write failures', () => {
   const storage = installMemoryLocalStorage();
   storage.failWrites = true;
+  const record = createBrainLibraryItemFromAgent('Too Large', createAgentPackage('Too Large', createDefaultGraphIRDocument(1)).agent);
 
   assert.throws(
-    () => saveBrainLibrary([createAgentPackage('Too Large', createDefaultGraphIRDocument(1))]),
+    () => saveBrainLibrary([record]),
     /Brain Library 保存失败：quota exceeded/
   );
 });

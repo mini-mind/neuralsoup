@@ -9,8 +9,8 @@ import {
   createDefaultGraphIRDocument,
   summarizeGraphIRDocument,
   validateGraphIRDocument,
-} from '../../src/domain/brain';
-import type { GraphIRDocument } from '../../src/domain/brain';
+} from '../../src/domain/brain/compat';
+import type { GraphIRDocument } from '../../src/domain/brain/compat';
 
 const getRootVisionCells = (document: GraphIRDocument) => {
   const inputAdapter = document.root.children.find((node) => node.id === 'input-adapter' && node.kind === 'adapter');

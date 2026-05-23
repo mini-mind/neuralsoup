@@ -1,18 +1,26 @@
 import {
+  type AgentIR,
+  type AgentMetadata,
+  validateAgentIR,
+} from '../domain/brain';
+import {
   createAgentPackage,
   createBrainLayoutFromDefinition,
-  type AgentIR,
   type AgentPackage,
   type BrainDefinition,
   type BodyDefinition,
   type BrainLayoutDocument,
   type BrainPackage,
-  validateAgentIR,
-} from '../domain/brain';
+} from '../domain/brain/compat';
 
 export const BRAIN_LIBRARY_STORAGE_KEY = 'neuralsoup.brain-library.v1';
 export const BRAIN_LIBRARY_CORRUPT_STORAGE_KEY = 'neuralsoup.brain-library.v1.corrupt';
 export const BRAIN_LIBRARY_STATUS_STORAGE_KEY = 'neuralsoup.brain-library.v1.status';
+
+export interface BrainLibraryRecord {
+  metadata: AgentMetadata;
+  agent: AgentIR;
+}
 
 interface BrainLibraryStorageEnvelope {
   storageVersion: 1;
@@ -35,7 +43,7 @@ export type BrainLibraryLoadStatus =
     };
 
 export interface BrainLibraryLoadResult {
-  brains: AgentPackage[];
+  brains: BrainLibraryRecord[];
   status: BrainLibraryLoadStatus;
 }
 
@@ -297,10 +305,35 @@ const normalizeAgentPackage = (candidate: unknown): AgentPackage | null => {
   });
 };
 
-export const createBrainLibraryItem = (name: string, definition: BrainDefinition): AgentPackage =>
-  createAgentPackage(name, definition);
+const toBrainLibraryRecord = (candidate: AgentPackage): BrainLibraryRecord => ({
+  metadata: {
+    ...candidate.agent.metadata,
+  },
+  agent: {
+    ...candidate.agent,
+    metadata: {
+      ...candidate.agent.metadata,
+    },
+  },
+});
 
-export const createBrainLibraryItemFromAgent = (name: string, agent: AgentIR): AgentPackage => {
+export const encodeBrainLibraryRecord = (record: BrainLibraryRecord): AgentPackage => ({
+  packageVersion: 1,
+  metadata: {
+    ...record.metadata,
+  },
+  agent: {
+    ...record.agent,
+    metadata: {
+      ...record.metadata,
+    },
+  },
+});
+
+export const createBrainLibraryItem = (name: string, definition: BrainDefinition): BrainLibraryRecord =>
+  toBrainLibraryRecord(createAgentPackage(name, definition));
+
+export const createBrainLibraryItemFromAgent = (name: string, agent: AgentIR): BrainLibraryRecord => {
   const timestamp = new Date().toISOString();
   const metadata = {
     ...agent.metadata,
@@ -311,7 +344,6 @@ export const createBrainLibraryItemFromAgent = (name: string, agent: AgentIR): A
   };
 
   return {
-    packageVersion: 1,
     metadata,
     agent: {
       ...agent,
@@ -326,7 +358,7 @@ export const normalizeImportedAgentPackage = (
     name?: string;
     existingIds?: Iterable<string>;
   }
-): AgentPackage | null => {
+): BrainLibraryRecord | null => {
   const normalized = normalizeAgentPackage(candidate);
   if (!normalized) {
     return null;
@@ -351,10 +383,10 @@ export const normalizeImportedAgentPackage = (
   };
 };
 
-const createStorageEnvelope = (brains: AgentPackage[]): BrainLibraryStorageEnvelope => ({
+const createStorageEnvelope = (brains: BrainLibraryRecord[]): BrainLibraryStorageEnvelope => ({
   storageVersion: 1,
   savedAt: new Date().toISOString(),
-  brains,
+  brains: brains.map(encodeBrainLibraryRecord),
 });
 
 const backupCorruptStorage = (rawValue: string): void => {
@@ -429,6 +461,7 @@ export const loadBrainLibraryWithStatus = (): BrainLibraryLoadResult => {
     const normalizedBrains = parsed.brains
       .map(normalizeAgentPackage)
       .filter((brain): brain is AgentPackage => brain !== null);
+    const records = normalizedBrains.map(toBrainLibraryRecord);
 
     const shouldRewriteStorage = normalizedBrains.some((brain, index) => {
       const persistedBrain = parsed.brains[index];
@@ -445,11 +478,11 @@ export const loadBrainLibraryWithStatus = (): BrainLibraryLoadResult => {
       );
     });
     if (shouldRewriteStorage) {
-      saveBrainLibrary(normalizedBrains);
+      saveBrainLibrary(records);
     }
 
     return {
-      brains: normalizedBrains,
+      brains: records,
       status: { state: 'ok', message: null },
     };
   } catch {
@@ -464,9 +497,9 @@ export const loadBrainLibraryWithStatus = (): BrainLibraryLoadResult => {
   }
 };
 
-export const loadBrainLibrary = (): AgentPackage[] => loadBrainLibraryWithStatus().brains;
+export const loadBrainLibrary = (): BrainLibraryRecord[] => loadBrainLibraryWithStatus().brains;
 
-export const saveBrainLibrary = (brains: AgentPackage[]): void => {
+export const saveBrainLibrary = (brains: BrainLibraryRecord[]): void => {
   if (typeof window === 'undefined') {
     return;
   }
@@ -482,37 +515,38 @@ export const saveBrainLibrary = (brains: AgentPackage[]): void => {
 };
 
 export const upsertBrainLibraryItemDefinition = (
-  brains: AgentPackage[],
+  brains: BrainLibraryRecord[],
   brainId: string,
   definition: BrainDefinition,
   body: BodyDefinition,
   updatedAt?: string
-): AgentPackage[] =>
+): BrainLibraryRecord[] =>
   brains.map((brain) =>
     brain.metadata.id === brainId
-      ? createAgentPackage(brain.metadata.name, definition, {
-          id: brain.metadata.id,
-          createdAt: brain.metadata.createdAt,
-          updatedAt: updatedAt ?? new Date().toISOString(),
-          description: brain.metadata.description,
-          tags: brain.metadata.tags,
-          body,
-          layout: createBrainLayoutFromDefinition(definition),
-        })
+      ? toBrainLibraryRecord(
+          createAgentPackage(brain.metadata.name, definition, {
+            id: brain.metadata.id,
+            createdAt: brain.metadata.createdAt,
+            updatedAt: updatedAt ?? new Date().toISOString(),
+            description: brain.metadata.description,
+            tags: brain.metadata.tags,
+            body,
+            layout: createBrainLayoutFromDefinition(definition),
+          })
+        )
       : brain
   );
 
 export const upsertBrainLibraryItemAgent = (
-  brains: AgentPackage[],
+  brains: BrainLibraryRecord[],
   brainId: string,
   agent: AgentIR,
   updatedAt?: string
-): AgentPackage[] => {
+): BrainLibraryRecord[] => {
   const nextUpdatedAt = updatedAt ?? new Date().toISOString();
   return brains.map((brain) =>
     brain.metadata.id === brainId
       ? {
-          ...brain,
           metadata: {
             ...brain.metadata,
             updatedAt: nextUpdatedAt,
@@ -530,14 +564,13 @@ export const upsertBrainLibraryItemAgent = (
 };
 
 export const renameBrainLibraryItem = (
-  brains: AgentPackage[],
+  brains: BrainLibraryRecord[],
   brainId: string,
   name: string
-): AgentPackage[] =>
+): BrainLibraryRecord[] =>
   brains.map((brain) =>
     brain.metadata.id === brainId
       ? {
-          ...brain,
           metadata: { ...brain.metadata, name, updatedAt: new Date().toISOString() },
           agent: {
             ...brain.agent,
@@ -551,10 +584,10 @@ export const renameBrainLibraryItem = (
       : brain
   );
 
-export const deleteBrainLibraryItem = (brains: AgentPackage[], brainId: string): AgentPackage[] =>
+export const deleteBrainLibraryItem = (brains: BrainLibraryRecord[], brainId: string): BrainLibraryRecord[] =>
   brains.filter((brain) => brain.metadata.id !== brainId);
 
-export const duplicateBrainLibraryItem = (brains: AgentPackage[], brainId: string): AgentPackage[] => {
+export const duplicateBrainLibraryItem = (brains: BrainLibraryRecord[], brainId: string): BrainLibraryRecord[] => {
   const sourceBrain = brains.find((brain) => brain.metadata.id === brainId);
   if (!sourceBrain) {
     return brains;
@@ -565,7 +598,6 @@ export const duplicateBrainLibraryItem = (brains: AgentPackage[], brainId: strin
   return [
     ...brains,
     {
-      packageVersion: 1,
       metadata: {
         ...sourceBrain.metadata,
         id: duplicateId,

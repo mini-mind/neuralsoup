@@ -13,7 +13,8 @@ import { WorldManager } from './WorldManager';
 import { CollisionDetector } from './CollisionDetector';
 import { SimulationSession } from '../runtime/SimulationSession';
 import type { SimulationControlMode } from '../domain/world';
-import type { AgentIR, BodyDefinition, GraphIRDocument } from '../domain/brain';
+import type { AgentIR } from '../domain/brain';
+import type { BodyDefinition, GraphIRDocument } from '../domain/brain/compat';
 import type { GraphIRRuntimeActivitySnapshot, GraphIRRuntimeStatus } from '../types/graphIRRuntime';
 
 export type SimulationLifecycleState = 'idle' | 'running' | 'paused';

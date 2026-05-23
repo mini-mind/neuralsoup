@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { GraphIRDocument, ModelDefinition } from '../../src/domain/brain';
+import type { GraphIRDocument, ModelDefinition } from '../../src/domain/brain/compat';
 import { buildGraphViewModel } from '../../src/components/editor/graph/graphViewModel';
 
 const TEST_MODELS: ModelDefinition[] = [
