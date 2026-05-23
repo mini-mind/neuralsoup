@@ -17,7 +17,6 @@ import {
   type WorldConfig,
   createEmptyWorldState,
   createInitialWorldStats,
-  createSimulationStateSnapshot,
   createWorldConfig,
   createWorldSnapshot
 } from '../domain/world';
@@ -42,6 +41,17 @@ export interface SimulationSessionInputState {
   turnLeft: boolean;
   moveForward: boolean;
   turnRight: boolean;
+}
+
+export interface SimulationSessionRuntimeConfigSnapshot {
+  visionCells: number;
+  visionRange: number;
+  visionAngle: number;
+}
+
+export interface SimulationSessionRuntimeProgramSnapshot {
+  appliedAgentIR: AgentIR;
+  appliedSummary: AgentRuntimeStatus['appliedSummary'];
 }
 
 export class SimulationSession {
@@ -148,7 +158,7 @@ export class SimulationSession {
     visionAngle?: number;
   }): void {
     this.visionSystem.updateConfiguration(params);
-    const mainAgent = this.getMainAgent();
+    const mainAgent = this.findMainAgent();
     const didVisionCellCountChange = params.visionCells !== undefined;
 
     for (const agent of this.state.agents) {
@@ -162,7 +172,7 @@ export class SimulationSession {
 
   public setControlMode(newMode: SimulationControlMode): void {
     this.currentControlMode = newMode;
-    const mainAgent = this.getMainAgent();
+    const mainAgent = this.findMainAgent();
 
     if (!mainAgent) {
       return;
@@ -182,7 +192,7 @@ export class SimulationSession {
   }
 
   public setAgentIR(agent: AgentIR): AgentRuntimeStatus {
-    const mainAgent = this.getMainAgent();
+    const mainAgent = this.findMainAgent();
 
     try {
       const appliedAgent = mainAgent ? this.reconcileAgentIRToWorld(agent, mainAgent.visionCells.length) : agent;
@@ -203,33 +213,12 @@ export class SimulationSession {
 
   }
 
-  public getMainAgentControlMode(): SimulationControlMode {
-    return this.currentControlMode;
-  }
-
-  public getAgentControlMode(agentId: number): SimulationControlMode | null {
-    const agent = this.state.agents.find((candidate) => candidate.id === agentId);
-    return agent ? this.getEffectiveControlMode(agent) : null;
-  }
-
-  public getCurrentAgentIR(): AgentIR {
-    return this.currentAgentIR;
-  }
-
-  public getAppliedAgentIR(): AgentIR {
-    return this.appliedAgentIR;
-  }
-
-  public getVisionCellCount(): number {
-    return this.visionSystem.getVisionCells();
-  }
-
   public getAgentRuntimeStatus(): AgentRuntimeStatus {
     return this.agentRuntimeStatus;
   }
 
   public getAgentRuntimeActivitySnapshot(): AgentRuntimeActivitySnapshot {
-    const mainAgent = this.getMainAgent();
+    const mainAgent = this.findMainAgent();
     if (!mainAgent) {
       return { activeNodeIds: [] };
     }
@@ -239,12 +228,19 @@ export class SimulationSession {
     };
   }
 
-  public isMainAgentBrainProgramConfigured(): boolean {
-    return Boolean(this.getMainAgent());
+  public getRuntimeConfigSnapshot(): SimulationSessionRuntimeConfigSnapshot {
+    return {
+      visionCells: this.visionSystem.getVisionCells(),
+      visionRange: this.visionSystem.getVisionRange(),
+      visionAngle: this.visionSystem.getVisionAngle(),
+    };
   }
 
-  public getMainAgent(): Agent | null {
-    return this.state.agents.find((agent) => agent.id === this.config.mainAgentId) ?? null;
+  public getRuntimeProgramSnapshot(): SimulationSessionRuntimeProgramSnapshot {
+    return {
+      appliedAgentIR: this.appliedAgentIR,
+      appliedSummary: this.agentRuntimeStatus.appliedSummary,
+    };
   }
 
   public getStatsSnapshot(fps: number = 0): SimulationState['stats'] {
@@ -259,20 +255,15 @@ export class SimulationSession {
     });
   }
 
-  public getSimulationStateSnapshot(fps: number = 0): SimulationState {
-    this.state.stats.averageNeuralState = aggregateAverageNeuralState(this.state.agents);
-    return createSimulationStateSnapshot(this.state, fps);
-  }
-
-  public getState(): Readonly<WorldState> {
-    return this.state;
-  }
-
   private getEffectiveControlMode(agent: Agent): SimulationControlMode {
     return agent.id === this.config.mainAgentId ? this.currentControlMode : 'random';
   }
 
-  private syncMainAgentProgram(mainAgent: Agent | null = this.getMainAgent()): void {
+  private findMainAgent(): Agent | null {
+    return this.state.agents.find((agent) => agent.id === this.config.mainAgentId) ?? null;
+  }
+
+  private syncMainAgentProgram(mainAgent: Agent | null = this.findMainAgent()): void {
     if (!mainAgent) {
       return;
     }

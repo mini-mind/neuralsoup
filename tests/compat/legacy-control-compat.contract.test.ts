@@ -37,6 +37,11 @@ import {
   withDerivedBodyVisionCellCount,
   withVisionCellLayoutMarkers,
 } from '../../src/compat/legacyVisionCellCount';
+import {
+  expectMainAgent,
+  expectMainAgentProgramInstalled,
+  expectKeyboardModeControlsMainAgentOnly,
+} from '../helpers/sessionControlAssertions';
 
 const WORLD_REGISTRY = createVisionActionWorldRegistry();
 
@@ -57,6 +62,9 @@ const createSimulationSession = (
     createInitialAgentIR: (visionCells) => createVisionActionSeedAgentIR(visionCells, '默认 Agent'),
     reconcileAgentIRToWorld: VISION_ACTION_HOST_PROFILE.reconcileAgentIR,
   });
+
+const createLegacyCompatSession = (session: SimulationSession) =>
+  createLegacySimulationSessionAdapter(session);
 
 function createAgent(overrides: Partial<Agent> = {}): Agent {
   return {
@@ -317,7 +325,7 @@ test('simulation session legacy GraphIR compat setter rejects invalid drafts wit
     },
   ];
 
-  const appliedStatus = setLegacyGraphIRDocument(session, validDocument);
+  const appliedStatus = setLegacyGraphIRDocument(createLegacyCompatSession(session), validDocument);
   assert.equal(appliedStatus.state, 'applied');
   assert.equal(createLegacySimulationSessionAdapter(session).getCurrentAgentIR().connections.length, 1);
   assert.equal(createLegacySimulationSessionAdapter(session).getCurrentAgentIR().connections[0]?.from.nodeId, 'vision-R-0');
@@ -326,7 +334,7 @@ test('simulation session legacy GraphIR compat setter rejects invalid drafts wit
   const invalidDocument = structuredClone(validDocument);
   invalidDocument.root.links[0]!.from.portId = 'in';
 
-  const invalidStatus = setLegacyGraphIRDocument(session, invalidDocument);
+  const invalidStatus = setLegacyGraphIRDocument(createLegacyCompatSession(session), invalidDocument);
   assert.equal(invalidStatus.state, 'invalid');
   assert.ok(
     invalidStatus.message.includes('not an output port') ||
@@ -376,7 +384,7 @@ test('simulation session legacy GraphIR compat setter keeps the last applied Age
     },
   ];
 
-  const appliedStatus = setLegacyGraphIRDocument(session, validDocument);
+  const appliedStatus = setLegacyGraphIRDocument(createLegacyCompatSession(session), validDocument);
   assert.equal(appliedStatus.state, 'applied');
   const appliedSummary = appliedStatus.appliedSummary;
 
@@ -387,7 +395,7 @@ test('simulation session legacy GraphIR compat setter keeps the last applied Age
   };
   const invalidDocument = structuredClone(validDocument);
 
-  const invalidStatus = setLegacyGraphIRDocument(session, invalidDocument, invalidBody);
+  const invalidStatus = setLegacyGraphIRDocument(createLegacyCompatSession(session), invalidDocument, invalidBody);
   assert.equal(invalidStatus.state, 'invalid');
   assert.ok(
     invalidStatus.message.includes('missing-output-node') ||
@@ -413,8 +421,7 @@ test('simulation session legacy GraphIR compat setter keeps the last applied Age
   assert.equal(createLegacySimulationSessionAdapter(session).getCurrentAgentIR().connections[0]?.from.nodeId, 'vision-B-1');
   assert.equal(createLegacySimulationSessionAdapter(session).getCurrentAgentIR().connections[0]?.to.nodeId, 'neuron-1');
 
-  const mainAgent = session.getMainAgent();
-  assert.ok(mainAgent);
+  const mainAgent = expectMainAgent(session);
   const agent = createAgent({
     id: mainAgent.id,
     visualInput: [0, 0, 0, 0, 0, 1],
@@ -454,16 +461,16 @@ test('simulation session keeps applied legacy GraphIR compat state coherent when
       weight: 0.7,
     },
   ];
-  setLegacyGraphIRDocument(session, validDocument);
+  setLegacyGraphIRDocument(createLegacyCompatSession(session), validDocument);
 
   const invalidDocument = structuredClone(validDocument);
   invalidDocument.root.links[0]!.from.portId = 'in';
-  const invalidStatus = setLegacyGraphIRDocument(session, invalidDocument);
+  const invalidStatus = setLegacyGraphIRDocument(createLegacyCompatSession(session), invalidDocument);
   assert.equal(invalidStatus.state, 'invalid');
 
   session.updateAgentParameters({ visionCells: 1 });
 
-  assert.equal(summarizeGraphIRDocument(exportLegacyGraphIRDocument(session)).inputSignalCount, 6);
+  assert.equal(summarizeGraphIRDocument(exportLegacyGraphIRDocument(createLegacyCompatSession(session))).inputSignalCount, 6);
   assert.equal(createLegacySimulationSessionAdapter(session).getCurrentAgentIR().connections.length, 1);
   assert.equal(createLegacySimulationSessionAdapter(session).getCurrentAgentIR().connections[0]?.from.nodeId, 'vision-R-0');
   assert.equal(createLegacySimulationSessionAdapter(session).getCurrentAgentIR().connections[0]?.to.nodeId, 'neuron-1');
@@ -488,21 +495,18 @@ test('simulation session keeps legacy GraphIR compat state aligned across mode s
   });
 
   session.initialize();
-  const mainAgent = session.getMainAgent();
-  assert.ok(mainAgent);
-  assert.equal(session.isMainAgentBrainProgramConfigured(), true);
+  const mainAgent = expectMainAgentProgramInstalled(session);
 
   session.setControlMode('snn');
-  assert.equal(session.isMainAgentBrainProgramConfigured(), true);
   assert.equal(
-    summarizeGraphIRDocument(exportLegacyGraphIRDocument(session)).inputSignalCount,
+    summarizeGraphIRDocument(exportLegacyGraphIRDocument(createLegacyCompatSession(session))).inputSignalCount,
     mainAgent.visionCells.length * 3 + 3
   );
 
   session.setControlMode('keyboard');
   session.updateAgentParameters({ visionCells: 24 });
-  assert.equal(mainAgent.visionCells.length, 24);
-  assert.deepEqual(summarizeGraphIRDocument(exportLegacyGraphIRDocument(session)), {
+  assert.equal(expectMainAgent(session).visionCells.length, 24);
+  assert.deepEqual(summarizeGraphIRDocument(exportLegacyGraphIRDocument(createLegacyCompatSession(session))), {
     inputSignalCount: 75,
     outputSignalCount: 6,
     neuronCount: 2,
@@ -511,8 +515,8 @@ test('simulation session keeps legacy GraphIR compat state aligned across mode s
 
   session.setControlMode('snn');
   session.updateAgentParameters({ visionCells: 18 });
-  assert.equal(mainAgent.visionCells.length, 18);
-  assert.equal(summarizeGraphIRDocument(exportLegacyGraphIRDocument(session)).inputSignalCount, 57);
+  assert.equal(expectMainAgent(session).visionCells.length, 18);
+  assert.equal(summarizeGraphIRDocument(exportLegacyGraphIRDocument(createLegacyCompatSession(session))).inputSignalCount, 57);
 
   const agent = createAgent({
     id: mainAgent.id,
@@ -567,8 +571,8 @@ test('simulation session preserves custom legacy GraphIR compat leaf links acros
     },
   ];
 
-  setLegacyGraphIRDocument(session, document);
-  assert.equal(session.isMainAgentBrainProgramConfigured(), true);
+  setLegacyGraphIRDocument(createLegacyCompatSession(session), document);
+  expectMainAgentProgramInstalled(session);
   assert.equal(createLegacySimulationSessionAdapter(session).getCurrentAgentIR().connections.length, 2);
   assert.equal(createLegacySimulationSessionAdapter(session).getCurrentAgentIR().connections[0]?.weight, 2);
   assert.equal(createLegacySimulationSessionAdapter(session).getCurrentAgentIR().connections[0]?.from.scope, 'bodyInput');
@@ -577,13 +581,14 @@ test('simulation session preserves custom legacy GraphIR compat leaf links acros
   assert.equal(createLegacySimulationSessionAdapter(session).getCurrentAgentIR().connections[1]?.to.scope, 'bodyOutput');
 
   session.updateAgentParameters({ visionCells: 1 });
-  assert.equal(summarizeGraphIRDocument(exportLegacyGraphIRDocument(session)).inputSignalCount, 6);
+  assert.equal(summarizeGraphIRDocument(exportLegacyGraphIRDocument(createLegacyCompatSession(session))).inputSignalCount, 6);
   assert.equal(createLegacySimulationSessionAdapter(session).getCurrentAgentIR().connections.length, 2);
   assert.equal(createLegacySimulationSessionAdapter(session).getCurrentAgentIR().connections[0]?.weight, 2);
 
   session.reset();
-  assert.equal(session.getMainAgentControlMode(), 'keyboard');
-  assert.equal(summarizeGraphIRDocument(exportLegacyGraphIRDocument(session)).inputSignalCount, 6);
+  expectMainAgent(session);
+  assert.equal(session.getControlMode(), 'keyboard');
+  assert.equal(summarizeGraphIRDocument(exportLegacyGraphIRDocument(createLegacyCompatSession(session))).inputSignalCount, 6);
   assert.equal(createLegacySimulationSessionAdapter(session).getCurrentAgentIR().connections.length, 2);
   assert.equal(createLegacySimulationSessionAdapter(session).getCurrentAgentIR().connections[0]?.weight, 2);
 });
@@ -618,6 +623,8 @@ test('simulation session exposes the main-agent active legacy GraphIR leaf node 
   const session = createSimulationSession(agentController);
 
   session.initialize();
+  assert.equal(session.getControlMode(), 'keyboard');
+  expectKeyboardModeControlsMainAgentOnly(session);
   session.setControlMode('snn');
 
   const document = createDefaultGraphIRDocument(1);
@@ -629,13 +636,16 @@ test('simulation session exposes the main-agent active legacy GraphIR leaf node 
     threshold: -70,
   };
 
-  const status = setLegacyGraphIRDocument(session, document);
+  const status = setLegacyGraphIRDocument(createLegacyCompatSession(session), document);
   assert.equal(status.state, 'applied');
 
-  const mainAgent = session.getMainAgent();
-  assert.ok(mainAgent);
-  mainAgent.visualInput = [1, 1, 0];
-  agentController.updateAgent(mainAgent, 1 / 60, {
+  const mainAgent = expectMainAgent(session);
+  const runtimeProbe = createAgent({
+    id: mainAgent.id,
+    visionCells: mainAgent.visionCells,
+    visualInput: [1, 1, 0],
+  });
+  agentController.updateAgent(runtimeProbe, 1 / 60, {
     controlMode: 'snn',
     keyboardInputState: {
       turnLeft: false,
@@ -827,8 +837,8 @@ test('simulation session legacy GraphIR compat getter preserves the applied brid
     },
   ];
 
-  const legacyNamedStatus = setLegacyGraphIRDocument(session, document);
-  const legacyNamedDocument = exportLegacyGraphIRDocument(session);
+  const legacyNamedStatus = setLegacyGraphIRDocument(createLegacyCompatSession(session), document);
+  const legacyNamedDocument = exportLegacyGraphIRDocument(createLegacyCompatSession(session));
 
   assert.equal(legacyNamedStatus.state, 'applied');
   assert.ok(
@@ -885,7 +895,7 @@ test('simulation session legacy GraphIR compat setter rejects draft links that c
     weight: 1,
   });
 
-  const status = setLegacyGraphIRDocument(session, document);
+  const status = setLegacyGraphIRDocument(createLegacyCompatSession(session), document);
   assert.equal(status.state, 'invalid');
   assert.ok(status.message?.includes('invalid-output-source-link'));
 });
@@ -912,7 +922,7 @@ test('simulation session legacy GraphIR compat setter rejects drafts that would 
     },
   ];
 
-  const appliedStatus = setLegacyGraphIRDocument(session, validDocument);
+  const appliedStatus = setLegacyGraphIRDocument(createLegacyCompatSession(session), validDocument);
   assert.equal(appliedStatus.state, 'applied');
   assert.equal(createLegacySimulationSessionAdapter(session).getCurrentAgentIR().connections.length, 1);
 
@@ -932,7 +942,7 @@ test('simulation session legacy GraphIR compat setter rejects drafts that would 
     },
   ];
 
-  const invalidStatus = setLegacyGraphIRDocument(session, oversizedDraft);
+  const invalidStatus = setLegacyGraphIRDocument(createLegacyCompatSession(session), oversizedDraft);
   assert.equal(invalidStatus.state, 'invalid');
   assert.ok(invalidStatus.message?.includes('vision-G-2'));
   assert.equal(createLegacySimulationSessionAdapter(session).getCurrentAgentIR().connections.length, 1);
@@ -984,14 +994,14 @@ test('simulation session legacy GraphIR compat setter rejects custom body bindin
     },
   };
 
-  const status = setLegacyGraphIRDocument(session, document, body);
+  const status = setLegacyGraphIRDocument(createLegacyCompatSession(session), document, body);
   assert.equal(status.state, 'invalid');
   assert.ok(
     status.message?.includes('cannot preserve full BodyIR input rule semantics') ||
       status.message?.includes('cannot preserve full BodyIR output rule semantics')
   );
-  assert.equal(inspectLegacyGraphIRExport(session).issues.length, 0);
-  assert.doesNotThrow(() => exportLegacyGraphIRDocument(session));
+  assert.equal(inspectLegacyGraphIRExport(createLegacyCompatSession(session)).issues.length, 0);
+  assert.doesNotThrow(() => exportLegacyGraphIRDocument(createLegacyCompatSession(session)));
 });
 
 test('simulation session legacy GraphIR compat getter rejects applied AgentIR bodies with compat-only semantic loss', () => {
@@ -1051,7 +1061,7 @@ test('simulation session legacy GraphIR compat getter rejects applied AgentIR bo
 
   assert.equal(status.state, 'applied');
   assert.throws(
-    () => exportLegacyGraphIRDocument(session),
+    () => exportLegacyGraphIRDocument(createLegacyCompatSession(session)),
     (error: unknown) =>
       error instanceof Error &&
       error.message.includes('cannot preserve full BodyIR input rule semantics')
@@ -1084,7 +1094,7 @@ test('simulation session legacy GraphIR compat getter preserves explicit neuron 
 
   assert.equal(appliedStatus.state, 'applied');
 
-  const document = exportLegacyGraphIRDocument(session);
+  const document = exportLegacyGraphIRDocument(createLegacyCompatSession(session));
   const compatNeuron = getCoreNeuronGroup(document).children.find(
     (node): node is NeuronNode => node.kind === 'neuron' && node.id === 'neuron-1'
   );
@@ -1110,7 +1120,7 @@ test('simulation session legacy GraphIR compat setter reads explicit neuron init
     __agent_initialState_u: -13,
   };
 
-  const status = setLegacyGraphIRDocument(session, document);
+  const status = setLegacyGraphIRDocument(createLegacyCompatSession(session), document);
   assert.equal(status.state, 'applied');
 
   const appliedNeuron = createLegacySimulationSessionAdapter(session).getCurrentAgentIR().brain.neurons.find((neuron) => neuron.id === 'neuron-1');

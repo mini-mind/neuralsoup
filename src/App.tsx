@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef, type CSSProperties } from 'react';
-import SimulationCanvas from './components/SimulationCanvas';
+import SimulationCanvas, { type RuntimeInstallReceipt } from './components/SimulationCanvas';
 import {
   buildAgentBodyRulePreviewModel,
   resolveCompiledAgentBodyEndpointIds,
@@ -138,6 +138,9 @@ const normalizeAgentForCompare = (agent: AgentIR): AgentIR => ({
 const areAgentsEquivalent = (left: AgentIR, right: AgentIR): boolean =>
   JSON.stringify(normalizeAgentForCompare(left)) === JSON.stringify(normalizeAgentForCompare(right));
 
+const createRuntimeInstallRequestKey = (agent: AgentIR): string =>
+  JSON.stringify(normalizeAgentForCompare(agent));
+
 const serializeBrainLibrarySnapshot = (brains: BrainLibraryRecord[]): string =>
   JSON.stringify(brains);
 
@@ -197,13 +200,16 @@ const App: React.FC = () => {
   const [stats, setStats] = useState<SimulationState['stats']>(INITIAL_STATS);
   const [currentAgentDocument, setCurrentAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
   const [runtimeInstallRequest, setRuntimeInstallRequest] = useState<AgentIR>(() => initialAgentDocument);
-  const [installedAgentDocument, setInstalledAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
   const [draftAgentDocument, setDraftAgentDocument] = useState<AgentIR>(() => initialAgentDocument);
   const [draftBodyDocument, setDraftBodyDocument] = useState(() => initialAgentDocument.body);
   const [draftGraphStatusOverride, setDraftGraphStatusOverride] = useState<AgentDraftStatus | null>(null);
   const [agentRuntimeStatus, setAgentRuntimeStatus] = useState<AgentRuntimeStatus>(() =>
     createInitialAgentRuntimeStatus(initialAgentDocument)
   );
+  const [lastAppliedRuntimeInstallReceipt, setLastAppliedRuntimeInstallReceipt] = useState<RuntimeInstallReceipt>(() => ({
+    agentId: initialAgentDocument.metadata.id,
+    requestKey: createRuntimeInstallRequestKey(initialAgentDocument),
+  }));
   const [agentRuntimeActivity, setAgentRuntimeActivity] = useState<AgentRuntimeActivitySnapshot>({
     activeNodeIds: []
   });
@@ -265,7 +271,14 @@ const App: React.FC = () => {
   );
   const installedGraphSummary = agentRuntimeStatus.appliedSummary;
   const hasDraftEditingChanges = !areAgentsEquivalent(currentAgentDocument, draftAgentDocument);
-  const hasPendingRuntimeInstall = !areAgentsEquivalent(installedAgentDocument, currentAgentDocument);
+  const currentRuntimeInstallRequestKey = useMemo(
+    () => createRuntimeInstallRequestKey(currentAgentDocument),
+    [currentAgentDocument]
+  );
+  const hasPendingRuntimeInstall =
+    agentRuntimeStatus.state !== 'applied' ||
+    lastAppliedRuntimeInstallReceipt.agentId !== currentAgentDocument.metadata.id ||
+    lastAppliedRuntimeInstallReceipt.requestKey !== currentRuntimeInstallRequestKey;
   const hasUnsavedDraftChanges =
     hasDraftEditingChanges || hasPendingRuntimeInstall || bodyDraftStatus.hasChanges;
   const bodyRulePreviewModel = useMemo(
@@ -605,10 +618,12 @@ const App: React.FC = () => {
     setAgentRuntimeStatus(nextStatus);
   }, []);
 
-  const handleAgentRuntimeInstallApplied = useCallback((appliedAgent: AgentIR) => {
-    setInstalledAgentDocument((currentInstalled) =>
-      areAgentsEquivalent(currentInstalled, appliedAgent) ? currentInstalled : appliedAgent
-    );
+  const handleAgentRuntimeInstallApplied = useCallback((receipt: RuntimeInstallReceipt) => {
+    setLastAppliedRuntimeInstallReceipt((currentReceipt) => (
+      currentReceipt.agentId === receipt.agentId && currentReceipt.requestKey === receipt.requestKey
+        ? currentReceipt
+        : receipt
+    ));
   }, []);
 
   const handleAgentRuntimeActivityChange = useCallback((nextSnapshot: AgentRuntimeActivitySnapshot) => {
@@ -785,7 +800,6 @@ const App: React.FC = () => {
     setActiveBrainId(null);
     setCurrentAgentDocument(fallbackAgent);
     setRuntimeInstallRequest(fallbackAgent);
-    setInstalledAgentDocument(fallbackAgent);
     setDraftAgentDocument(fallbackAgent);
     setDraftBodyDocument(fallbackAgent.body);
     setDraftGraphStatusOverride(null);
@@ -1058,7 +1072,7 @@ const App: React.FC = () => {
           <span data-testid="graph-ir-runtime-state">{agentRuntimeStatus.state}</span>
           <span data-testid="graph-ir-runtime-validation-count">{agentRuntimeStatus.issues.length}</span>
           <span data-testid="graph-ir-runtime-message">{agentRuntimeStatus.message ?? ''}</span>
-          <span data-testid="graph-ir-installed-agent-id">{installedAgentDocument.metadata.id}</span>
+          <span data-testid="graph-ir-installed-agent-id">{lastAppliedRuntimeInstallReceipt.agentId}</span>
           <span data-testid="graph-ir-installed-input-count">{installedGraphSummary.inputSignalCount}</span>
           <span data-testid="graph-ir-installed-neuron-count">{installedGraphSummary.neuronCount}</span>
           <span data-testid="graph-ir-installed-output-count">{installedGraphSummary.outputSignalCount}</span>

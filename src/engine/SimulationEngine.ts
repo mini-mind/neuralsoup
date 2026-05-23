@@ -5,7 +5,7 @@
  */
 
 import * as PIXI from './pixi';
-import { Agent, SimulationState } from '../types/simulation';
+import type { SimulationState } from '../types/simulation';
 import { WorldRenderer } from './WorldRenderer';
 import { VisionSystem } from './VisionSystem';
 import { AgentController } from './AgentController';
@@ -144,10 +144,11 @@ export class SimulationEngine {
     visionRange: number;
     visionAngle: number;
   } {
+    const runtimeConfig = this.session.getRuntimeConfigSnapshot();
     return {
-      visionCells: this.visionSystem.getVisionCells(),
-      visionRange: this.visionSystem.getVisionRange(),
-      visionAngle: Math.round((this.visionSystem.getVisionAngle() * 180) / Math.PI) // 转换为度数
+      visionCells: runtimeConfig.visionCells,
+      visionRange: runtimeConfig.visionRange,
+      visionAngle: Math.round((runtimeConfig.visionAngle * 180) / Math.PI) // 转换为度数
     };
   }
 
@@ -168,12 +169,7 @@ export class SimulationEngine {
     this.session.initialize();
     this.emitAgentRuntimeStatus(this.getAgentRuntimeStatus());
     this.emitAgentRuntimeActivity(this.getAgentRuntimeActivitySnapshot());
-    
-    // 设置镜头跟随主智能体
-    const mainAgent = this.getMainAgent();
-    if (mainAgent) {
-      this.setCameraTarget(mainAgent);
-    }
+    this.setCameraTarget(this.mainAgentId);
     
     this.renderWorld();
     this.emitLifecycleChange();
@@ -236,7 +232,7 @@ export class SimulationEngine {
     this.session.reset();
     this.session.setKeyboardInputState(this.keyboardInputState);
     this.setControlMode(this.currentControlMode);
-    this.setCameraTarget(this.getMainAgent());
+    this.setCameraTarget(this.mainAgentId);
     this.emitAgentRuntimeStatus(this.getAgentRuntimeStatus());
     this.emitAgentRuntimeActivity(this.getAgentRuntimeActivitySnapshot());
     this.renderWorld();
@@ -284,24 +280,10 @@ export class SimulationEngine {
   }
 
   /**
-   * 获取主智能体
-   */
-  getMainAgent(): Agent | null {
-    return this.session.getMainAgent();
-  }
-
-  /**
    * 设置镜头跟随目标
    */
-  setCameraTarget(agent: Agent | null): void {
-    this.renderer.setCameraTarget(agent);
-  }
-
-  /**
-   * 获取仿真状态
-   */
-  getState(): SimulationState {
-    return this.session.getSimulationStateSnapshot(this.fps);
+  setCameraTarget(agentId: number | null): void {
+    this.renderer.setCameraTargetAgentId(agentId);
   }
 
   /**

@@ -1242,13 +1242,13 @@
     {
       "id": "task-033",
       "title": "Runtime API surface 收口：把 SimulationSession 的 AgentIR/vision introspection 下沉到 compat 或测试适配器",
-      "status": "pending",
+      "status": "completed",
       "priority": "P1",
       "depends_on": [
         "task-021",
         "task-022"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "max_attempts": 3,
       "started_at_commit": null,
       "validation": {
@@ -1259,8 +1259,13 @@
         "cleanup": null
       },
       "error_log": [],
-      "checkpoints": [],
-      "completed_at": null
+      "checkpoints": [
+        {
+          "at": "2026-05-24T10:45:00Z",
+          "message": "Closed runtime API surface phase: SimulationCanvas/App no longer mirror installed runtime truth through raw AgentIR, engine camera follow now targets main-agent identity instead of leaking live Agent objects, SimulationSession moved AgentIR/runtime-config introspection behind explicit runtime snapshots for compat, and domain/compat tests now rely on explicit helpers or compat adapters instead of test-only session probes."
+        }
+      ],
+      "completed_at": "2026-05-24T10:45:00Z"
     },
     {
       "id": "task-034",

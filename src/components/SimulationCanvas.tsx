@@ -8,13 +8,18 @@ import type { SimulationState } from '../types/simulation';
 import type { AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../types/agentRuntime';
 import type { AgentParameters } from './editor/types';
 
+export interface RuntimeInstallReceipt {
+  agentId: string;
+  requestKey: string;
+}
+
 interface SimulationCanvasProps {
   onStatsUpdate: (stats: SimulationState['stats']) => void;
   onLifecycleChange: (state: SimulationLifecycleState) => void;
   onAgentParametersChange: (params: AgentParameters) => void;
   onAgentRuntimeStatusChange: (status: AgentRuntimeStatus) => void;
   onAgentRuntimeActivityChange: (snapshot: AgentRuntimeActivitySnapshot) => void;
-  onAgentRuntimeInstallApplied?: (agent: AgentIR, status: AgentRuntimeStatus) => void;
+  onAgentRuntimeInstallApplied?: (receipt: RuntimeInstallReceipt, status: AgentRuntimeStatus) => void;
   controlMode: Extract<SimulationControlMode, 'keyboard' | 'snn'>;
   runtimeInstallRequest: AgentIR;
   agentParameters: AgentParameters;
@@ -34,6 +39,20 @@ const areAgentParametersEqual = (left: AgentParameters, right: AgentParameters):
     left.visionAngle === right.visionAngle
   );
 };
+
+const createRuntimeInstallRequestKey = (agent: AgentIR): string =>
+  JSON.stringify({
+    ...agent,
+    metadata: {
+      ...agent.metadata,
+      updatedAt: '',
+    },
+  });
+
+const createRuntimeInstallReceipt = (agent: AgentIR): RuntimeInstallReceipt => ({
+  agentId: agent.metadata.id,
+  requestKey: createRuntimeInstallRequestKey(agent),
+});
 
 const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   onStatsUpdate,
@@ -64,7 +83,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     (engine: SimulationEngine, agent: AgentIR) => {
       const status = engine.setAgentIR(agent);
       if (status.state === 'applied') {
-        onAgentRuntimeInstallApplied?.(agent, status);
+        onAgentRuntimeInstallApplied?.(createRuntimeInstallReceipt(agent), status);
       }
       return status;
     },
@@ -150,11 +169,6 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         newEngine.onAgentRuntimeStatusChange = onAgentRuntimeStatusChange;
         newEngine.onAgentRuntimeActivityChange = onAgentRuntimeActivityChange;
         newEngine.initialize();
-
-        const mainAgent = newEngine.getMainAgent();
-        if (mainAgent) {
-          newEngine.setCameraTarget(mainAgent);
-        }
 
         appRef.current = newApp;
         engineRef.current = newEngine;
@@ -247,7 +261,7 @@ const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       return;
     }
 
-    const requestKey = JSON.stringify(runtimeInstallRequest);
+    const requestKey = createRuntimeInstallRequestKey(runtimeInstallRequest);
     if (lastAppliedRuntimeRequestKeyRef.current === requestKey) {
       return;
     }

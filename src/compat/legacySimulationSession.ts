@@ -21,7 +21,7 @@ import type { AgentRuntimeStatus } from '../types/agentRuntime';
 import { deriveAgentIRVisionCellCount } from './legacyVisionCellCount';
 import {
   getLegacySimulationSessionAdapter,
-  type LegacySimulationSessionCompatTarget,
+  type LegacySimulationSessionAdapter,
 } from './legacySimulationSessionAdapter';
 
 const LEGACY_VISION_INPUT_PATTERN = /^vision-[RGB]-(\d+)$/;
@@ -38,7 +38,7 @@ const toAgentValidationIssues = (issues: GraphIRValidationIssue[]): AgentValidat
   }));
 
 const createInvalidCompatStatus = (
-  target: LegacySimulationSessionCompatTarget,
+  target: LegacySimulationSessionAdapter,
   issues: AgentValidationIssue[]
 ): AgentRuntimeStatus => {
   const session = getLegacySimulationSessionAdapter(target);
@@ -144,7 +144,7 @@ const auditLegacyGraphIRDocumentOnlyImport = (document: GraphIRDocument): AgentV
 };
 
 export const inspectLegacyGraphIRExport = (
-  target: LegacySimulationSessionCompatTarget
+  target: LegacySimulationSessionAdapter
 ): { compatBridge: LegacyGraphBridgeResult; issues: AgentValidationIssue[] } =>
   createLegacyCompatSinkAudit(
     getLegacySimulationSessionAdapter(target).getCurrentAgentIR(),
@@ -152,7 +152,7 @@ export const inspectLegacyGraphIRExport = (
   );
 
 export const setLegacyGraphIRDocument = (
-  target: LegacySimulationSessionCompatTarget,
+  target: LegacySimulationSessionAdapter,
   document: GraphIRDocument,
   body?: LegacyBodyDefinition
 ): AgentRuntimeStatus => {
@@ -224,7 +224,7 @@ export const setLegacyGraphIRDocument = (
   return session.setAgentIR(nextAgent);
 };
 
-export const exportLegacyGraphIRDocument = (target: LegacySimulationSessionCompatTarget): GraphIRDocument =>
+export const exportLegacyGraphIRDocument = (target: LegacySimulationSessionAdapter): GraphIRDocument =>
   (() => {
     const { compatBridge, issues } = inspectLegacyGraphIRExport(target);
 

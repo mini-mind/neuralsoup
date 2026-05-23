@@ -8,7 +8,7 @@ import { SimulationSession } from '../../src/runtime/SimulationSession';
 import {
   type WorldControlCommand,
 } from '../../src/domain/world';
-import { compileAgentIR, createAgentProgramRuntimeState, stepAgentProgram } from '../../src/domain/brain';
+import { compileAgentIR, createAgentProgramRuntimeState, stepAgentProgram, type AgentIR } from '../../src/domain/brain';
 import {
   VISION_ACTION_HOST_PROFILE,
   createVisionActionSeedAgentIR,
@@ -20,6 +20,11 @@ import {
 } from '../../src/host';
 import type { AgentRuntimeStatus } from '../../src/types/agentRuntime';
 import type { Agent, VisionCell } from '../../src/types/simulation';
+import {
+  expectMainAgent,
+  expectMainAgentProgramInstalled,
+  expectKeyboardModeControlsMainAgentOnly,
+} from '../helpers/sessionControlAssertions';
 
 const WORLD_REGISTRY = createVisionActionWorldRegistry();
 
@@ -40,6 +45,9 @@ const createSimulationSession = (
     createInitialAgentIR: (visionCells) => createVisionActionSeedAgentIR(visionCells, '默认 Agent'),
     reconcileAgentIRToWorld: VISION_ACTION_HOST_PROFILE.reconcileAgentIR,
   });
+
+const createSeedAgentForSession = (session: SimulationSession): AgentIR =>
+  createVisionActionSeedAgentIR(expectMainAgent(session).visionCells.length, '默认 Agent');
 
 function createAgent(overrides: Partial<Agent> = {}): Agent {
   return {
@@ -112,33 +120,25 @@ test('keyboard policy moves forward and cancels opposite turns', () => {
 });
 
 test('simulation session owns main-agent control mode and preserves it across reset', () => {
-  const session = createSimulationSession();
+  const agentController = new AgentController(
+    createVisionActionOutputAdapter(),
+    createVisionActionInputSignalProvider(),
+    createVisionActionCommandApplier(),
+    VISION_ACTION_MOVEMENT_BINDINGS
+  );
+  const session = createSimulationSession(agentController);
 
   session.initialize();
-  const initialMainAgent = session.getMainAgent();
-  assert.ok(initialMainAgent);
-  assert.equal(session.getMainAgentControlMode(), 'keyboard');
-  assert.equal(session.getAgentControlMode(initialMainAgent.id), 'keyboard');
-  assert.ok(
-    session.getState().agents.every(
-      (agent) =>
-        session.getAgentControlMode(agent.id) ===
-        (agent.id === initialMainAgent.id ? 'keyboard' : 'random')
-    )
-  );
+  expectMainAgent(session);
+  assert.equal(session.getControlMode(), 'keyboard');
+  expectKeyboardModeControlsMainAgentOnly(session);
 
   session.setControlMode('snn');
-  const snnMainAgent = session.getMainAgent();
-  assert.ok(snnMainAgent);
-  assert.equal(session.getMainAgentControlMode(), 'snn');
-  assert.equal(session.getAgentControlMode(snnMainAgent.id), 'snn');
+  expectMainAgentProgramInstalled(session);
 
   session.reset();
-  const resetMainAgent = session.getMainAgent();
-  assert.ok(resetMainAgent);
+  expectMainAgentProgramInstalled(session);
   assert.equal(session.getControlMode(), 'snn');
-  assert.equal(session.getMainAgentControlMode(), 'snn');
-  assert.equal(session.getAgentControlMode(resetMainAgent.id), 'snn');
 });
 
 test('simulation session keeps main-agent runtime status aligned across mode switches and vision-cell updates', () => {
@@ -160,19 +160,16 @@ test('simulation session keeps main-agent runtime status aligned across mode swi
   });
 
   session.initialize();
-  const mainAgent = session.getMainAgent();
-  assert.ok(mainAgent);
-  assert.equal(session.isMainAgentBrainProgramConfigured(), true);
+  const mainAgent = expectMainAgentProgramInstalled(session);
 
   session.setControlMode('snn');
-  assert.equal(session.isMainAgentBrainProgramConfigured(), true);
   let runtimeStatus: AgentRuntimeStatus = session.getAgentRuntimeStatus();
   assert.equal(runtimeStatus.state, 'applied');
   assert.equal(runtimeStatus.appliedSummary.inputSignalCount, mainAgent.visionCells.length * 3);
 
   session.setControlMode('keyboard');
   session.updateAgentParameters({ visionCells: 24 });
-  assert.equal(mainAgent.visionCells.length, 24);
+  assert.equal(expectMainAgent(session).visionCells.length, 24);
   runtimeStatus = session.getAgentRuntimeStatus();
   assert.equal(runtimeStatus.state, 'applied');
   assert.deepEqual(runtimeStatus.appliedSummary, {
@@ -184,7 +181,7 @@ test('simulation session keeps main-agent runtime status aligned across mode swi
 
   session.setControlMode('snn');
   session.updateAgentParameters({ visionCells: 18 });
-  assert.equal(mainAgent.visionCells.length, 18);
+  assert.equal(expectMainAgent(session).visionCells.length, 18);
   runtimeStatus = session.getAgentRuntimeStatus();
   assert.equal(runtimeStatus.state, 'applied');
   assert.equal(runtimeStatus.appliedSummary.inputSignalCount, 54);
@@ -220,10 +217,9 @@ test('default world action adapter consumes normalized action.* runtime targets'
 
   session.initialize();
   session.setControlMode('snn');
-  const mainAgent = session.getMainAgent();
-  assert.ok(mainAgent);
+  const mainAgent = expectMainAgent(session);
 
-  const program = compileAgentIR(session.getCurrentAgentIR(), WORLD_REGISTRY);
+  const program = compileAgentIR(createSeedAgentForSession(session), WORLD_REGISTRY);
   const result = stepAgentProgram(
     program,
     Object.fromEntries(mainAgent.visionCells.flatMap((_cell, cellIndex) => [
@@ -273,8 +269,7 @@ test('agent controller consumes runtime outputs through the injected world actio
 
   session.initialize();
   session.setControlMode('snn');
-  const mainAgent = session.getMainAgent();
-  assert.ok(mainAgent);
+  const mainAgent = expectMainAgent(session);
 
   const controlledAgent = createAgent({
     id: mainAgent.id,
@@ -375,11 +370,12 @@ test('invalid install keeps the last successfully applied runtime summary', () =
 
   session.initialize();
   const appliedSummary = session.getAgentRuntimeStatus().appliedSummary;
+  const currentAgent = createSeedAgentForSession(session);
   const invalidAgent = {
-    ...session.getCurrentAgentIR(),
+    ...currentAgent,
     body: {
-      ...session.getCurrentAgentIR().body,
-      outputRules: session.getCurrentAgentIR().body.outputRules.map((rule) => ({
+      ...currentAgent.body,
+      outputRules: currentAgent.body.outputRules.map((rule) => ({
         ...rule,
         targetTemplate: 'thruster.$1',
       })),

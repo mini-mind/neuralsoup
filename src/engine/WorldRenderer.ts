@@ -27,7 +27,7 @@ export class WorldRenderer {
   private worldHeight: number = 3000;
   
   // 镜头跟随参数
-  private cameraTarget: Agent | null = null;
+  private cameraTargetAgentId: number | null = null;
   private cameraLerpFactor = 1.0; // 提高响应速度，从0.3改为1.0 (立即跟随，用于调试)
 
   constructor(app: PIXI.Application) {
@@ -63,10 +63,11 @@ export class WorldRenderer {
     this.worldContainer.addChild(this.agentContainer);
   }
 
-  setCameraTarget(agent: Agent | null): void {
-    this.cameraTarget = agent;
-    
-    // 如果设置了新目标，立即定位镜头到目标位置
+  setCameraTargetAgentId(agentId: number | null): void {
+    this.cameraTargetAgentId = agentId;
+  }
+
+  private focusCamera(agent: Agent | null): void {
     if (agent) {
       const screenWidth = this.app.screen.width;
       const screenHeight = this.app.screen.height;
@@ -86,11 +87,12 @@ export class WorldRenderer {
   renderWorld(world: World): void {
     // 生成背景噪声（只生成一次）
     this.generateOceanNoise();
-    
-    // 更新镜头位置
-    this.updateCamera();
 
-    const focusedAgent = this.cameraTarget ?? world.agents.find(agent => agent.id === world.mainAgentId) ?? null;
+    const focusedAgent =
+      world.agents.find((agent) => agent.id === (this.cameraTargetAgentId ?? world.mainAgentId)) ?? null;
+
+    this.focusCamera(focusedAgent);
+    this.updateCamera(focusedAgent);
 
     // 渲染大范围视野扇形 (透明实线)
     this.visionFanGraphics.clear();
@@ -114,15 +116,15 @@ export class WorldRenderer {
     this.renderObstacles(world.obstacles);
   }
 
-  private updateCamera(): void {
-    if (!this.cameraTarget) return;
+  private updateCamera(cameraTarget: Agent | null): void {
+    if (!cameraTarget) return;
 
     const screenWidth = this.app.screen.width;
     const screenHeight = this.app.screen.height;
 
     // 目标pivot点 (智能体的世界坐标)
-    const targetPivotX = this.cameraTarget.x;
-    const targetPivotY = this.cameraTarget.y;
+    const targetPivotX = cameraTarget.x;
+    const targetPivotY = cameraTarget.y;
 
     // 平滑插值pivot点
     this.worldContainer.pivot.x += (targetPivotX - this.worldContainer.pivot.x) * this.cameraLerpFactor;
@@ -131,7 +133,7 @@ export class WorldRenderer {
     // 目标旋转角度，使智能体朝向屏幕上方
     // PixiJS 0度是右，顺时针为正。智能体角度0度是右，逆时针为正。
     // 因此，需要将智能体角度取反，并加上90度（Math.PI/2）的偏移量。
-    let targetRotation = -this.cameraTarget.angle - Math.PI / 2;
+    const targetRotation = -cameraTarget.angle - Math.PI / 2;
 
     // 平滑插值旋转 (处理角度的周期性)
     let shortestAngle = (targetRotation - this.worldContainer.rotation + Math.PI * 3) % (Math.PI * 2) - Math.PI;
