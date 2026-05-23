@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AgentController } from '../../src/engine/AgentController';
+import { createDefaultWorldActionOutputAdapter } from '../../src/domain/world';
 import { VisionSystem } from '../../src/engine/VisionSystem';
 import { WorldManager } from '../../src/engine/WorldManager';
 import { CollisionDetector } from '../../src/engine/CollisionDetector';
@@ -12,6 +13,7 @@ import {
   setLegacyGraphIRDocument,
 } from '../../src/compat/legacySimulationSession';
 import {
+  createDefaultWorldRegistry,
   type AgentIR,
 } from '../../src/domain/brain';
 import { compileLegacyBrainDefinition } from '../../src/compat/legacyBrainCompiler';
@@ -26,6 +28,17 @@ import {
   withDerivedBodyVisionCellCount,
   withVisionCellLayoutMarkers,
 } from '../../src/compat/legacyVisionCellCount';
+
+const WORLD_REGISTRY = createDefaultWorldRegistry();
+
+const createSimulationSession = (agentController: AgentController = new AgentController(createDefaultWorldActionOutputAdapter())) =>
+  new SimulationSession({
+    visionSystem: new VisionSystem(),
+    agentController,
+    worldManager: new WorldManager(1600, 1200),
+    collisionDetector: new CollisionDetector(),
+    worldRegistry: WORLD_REGISTRY,
+  });
 
 function createAgent(overrides: Partial<Agent> = {}): Agent {
   return {
@@ -267,12 +280,7 @@ test('legacy GraphIR compilation remains a compat wrapper over compiled Agent ru
 });
 
 test('simulation session legacy GraphIR compat setter rejects invalid drafts without dropping the last applied AgentIR', () => {
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController: new AgentController(),
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
-  });
+  const session = createSimulationSession();
 
   session.initialize();
 
@@ -313,13 +321,8 @@ test('simulation session legacy GraphIR compat setter rejects invalid drafts wit
 });
 
 test('simulation session legacy GraphIR compat setter keeps the last applied AgentIR and runtime when compat compile bindings fail', () => {
-  const agentController = new AgentController();
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController,
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
-  });
+  const agentController = new AgentController(createDefaultWorldActionOutputAdapter());
+  const session = createSimulationSession(agentController);
 
   session.initialize();
 
@@ -410,12 +413,7 @@ test('simulation session legacy GraphIR compat setter keeps the last applied Age
 });
 
 test('simulation session keeps applied legacy GraphIR compat state coherent when vision-cell reconciliation follows an invalid compat draft', () => {
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController: new AgentController(),
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
-  });
+  const session = createSimulationSession();
 
   session.initialize();
 
@@ -450,13 +448,14 @@ test('simulation session keeps applied legacy GraphIR compat state coherent when
 });
 
 test('simulation session keeps legacy GraphIR compat state aligned across mode switches and vision-cell updates', () => {
-  const agentController = new AgentController();
+  const agentController = new AgentController(createDefaultWorldActionOutputAdapter());
   const visionSystem = new VisionSystem();
   const session = new SimulationSession({
     visionSystem,
     agentController,
     worldManager: new WorldManager(1600, 1200),
     collisionDetector: new CollisionDetector(),
+    worldRegistry: WORLD_REGISTRY,
   });
 
   session.initialize();
@@ -507,12 +506,7 @@ test('simulation session keeps legacy GraphIR compat state aligned across mode s
 });
 
 test('simulation session preserves custom legacy GraphIR compat leaf links across reset and reconciles vision-cell changes', () => {
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController: new AgentController(),
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
-  });
+  const session = createSimulationSession();
 
   session.initialize();
 
@@ -586,13 +580,8 @@ test('legacy brain-program compat compiler rejects legacy GraphIR drafts that lo
 });
 
 test('simulation session exposes the main-agent active legacy GraphIR leaf node ids through compat runtime state', () => {
-  const agentController = new AgentController();
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController,
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
-  });
+  const agentController = new AgentController(createDefaultWorldActionOutputAdapter());
+  const session = createSimulationSession(agentController);
 
   session.initialize();
   session.setControlMode('snn');
@@ -699,12 +688,7 @@ test('legacy GraphIR compat runtime keeps outputs at zero when there is no senso
 });
 
 test('simulation session preserves custom output signal metadata when vision-cell reconciliation runs', () => {
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController: new AgentController(),
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
-  });
+  const session = createSimulationSession();
 
   session.initialize();
   const currentAgent = createLegacySimulationSessionAdapter(session).getCurrentAgentIR();
@@ -731,12 +715,7 @@ test('simulation session preserves custom output signal metadata when vision-cel
 });
 
 test('simulation session vision-cell reconcile preserves AgentIR-only body rule semantics', () => {
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController: new AgentController(),
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
-  });
+  const session = createSimulationSession();
 
   session.initialize();
 
@@ -779,12 +758,7 @@ test('simulation session vision-cell reconcile preserves AgentIR-only body rule 
 });
 
 test('simulation session vision-cell reconcile does not rewrite AgentIR-native body rule node ids', () => {
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController: new AgentController(),
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
-  });
+  const session = createSimulationSession();
 
   session.initialize();
 
@@ -800,12 +774,7 @@ test('simulation session vision-cell reconcile does not rewrite AgentIR-native b
 });
 
 test('simulation session legacy GraphIR compat getter preserves the applied bridgeable connection semantics', () => {
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController: new AgentController(),
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
-  });
+  const session = createSimulationSession();
 
   session.initialize();
 
@@ -852,12 +821,7 @@ test('simulation session legacy GraphIR compat getter preserves the applied brid
 });
 
 test('simulation session setAgentIR accepts AgentIR-native body rules without requiring legacy GraphIR node ids', () => {
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController: new AgentController(),
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
-  });
+  const session = createSimulationSession();
 
   session.initialize();
 
@@ -870,12 +834,7 @@ test('simulation session setAgentIR accepts AgentIR-native body rules without re
 });
 
 test('simulation session legacy GraphIR compat setter rejects draft links that cannot be preserved', () => {
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController: new AgentController(),
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
-  });
+  const session = createSimulationSession();
 
   session.initialize();
 
@@ -899,12 +858,7 @@ test('simulation session legacy GraphIR compat setter rejects draft links that c
 });
 
 test('simulation session legacy GraphIR compat setter rejects drafts that would require silent vision-cell reconcile', () => {
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController: new AgentController(),
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
-  });
+  const session = createSimulationSession();
 
   session.initialize();
   session.updateAgentParameters({ visionCells: 2 });
@@ -953,12 +907,7 @@ test('simulation session legacy GraphIR compat setter rejects drafts that would 
 });
 
 test('simulation session legacy GraphIR compat setter rejects custom body bindings when compat export cannot round-trip them', () => {
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController: new AgentController(),
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
-  });
+  const session = createSimulationSession();
 
   session.initialize();
 
@@ -1013,12 +962,7 @@ test('simulation session legacy GraphIR compat setter rejects custom body bindin
 });
 
 test('simulation session legacy GraphIR compat getter rejects applied AgentIR bodies with compat-only semantic loss', () => {
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController: new AgentController(),
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
-  });
+  const session = createSimulationSession();
 
   session.initialize();
 
@@ -1083,12 +1027,7 @@ test('simulation session legacy GraphIR compat getter rejects applied AgentIR bo
 });
 
 test('simulation session legacy GraphIR compat getter preserves explicit neuron initialState.u round-trip', () => {
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController: new AgentController(),
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
-  });
+  const session = createSimulationSession();
 
   session.initialize();
 
@@ -1124,12 +1063,7 @@ test('simulation session legacy GraphIR compat getter preserves explicit neuron 
 });
 
 test('simulation session legacy GraphIR compat setter reads explicit neuron initialState.u back into AgentIR', () => {
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController: new AgentController(),
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
-  });
+  const session = createSimulationSession();
 
   session.initialize();
 

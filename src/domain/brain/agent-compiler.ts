@@ -9,6 +9,7 @@ import {
   resolveAgentBodyEndpointResolution,
 } from './agent-body-rules';
 import type { AgentProgram, AgentProgramConnection, AgentProgramNeuronNode } from './agent-program';
+import type { WorldRegistry } from './world-registry';
 
 export type AgentValidationIssueCode =
   | 'missing-brain-root-container'
@@ -38,8 +39,8 @@ interface ResolvedBodyEndpoints<RuntimeNode> {
   issues: AgentValidationIssue[];
 }
 
-const resolveBodyInputs = (agent: AgentIR): ResolvedBodyEndpoints<BodyInputNodeRuntime> => {
-  const resolution = resolveAgentBodyEndpointResolution(agent);
+const resolveBodyInputs = (agent: AgentIR, registry: WorldRegistry): ResolvedBodyEndpoints<BodyInputNodeRuntime> => {
+  const resolution = resolveAgentBodyEndpointResolution(agent, registry);
   return {
     nodesById: resolution.inputNodesById,
     issues: resolution.issues
@@ -51,8 +52,8 @@ const resolveBodyInputs = (agent: AgentIR): ResolvedBodyEndpoints<BodyInputNodeR
   };
 };
 
-const resolveBodyOutputs = (agent: AgentIR): ResolvedBodyEndpoints<BodyOutputNodeRuntime> => {
-  const resolution = resolveAgentBodyEndpointResolution(agent);
+const resolveBodyOutputs = (agent: AgentIR, registry: WorldRegistry): ResolvedBodyEndpoints<BodyOutputNodeRuntime> => {
+  const resolution = resolveAgentBodyEndpointResolution(agent, registry);
   return {
     nodesById: resolution.outputNodesById,
     issues: resolution.issues
@@ -253,10 +254,10 @@ const buildBrainStructureIssues = (agent: AgentIR): AgentValidationIssue[] => {
   return issues;
 };
 
-const buildAgentCompilationContext = (agent: AgentIR): AgentCompilationContext => {
+const buildAgentCompilationContext = (agent: AgentIR, registry: WorldRegistry): AgentCompilationContext => {
   const issues: AgentValidationIssue[] = [];
-  const bodyInputResolution = resolveBodyInputs(agent);
-  const bodyOutputResolution = resolveBodyOutputs(agent);
+  const bodyInputResolution = resolveBodyInputs(agent, registry);
+  const bodyOutputResolution = resolveBodyOutputs(agent, registry);
   const neuronIds = new Set(agent.brain.neurons.map((neuron) => neuron.id));
   const containerIds = new Set(agent.brain.containers.map((container) => container.id));
 
@@ -323,12 +324,12 @@ const buildAgentCompilationContext = (agent: AgentIR): AgentCompilationContext =
   };
 };
 
-export const validateAgentIR = (agent: AgentIR): AgentValidationIssue[] => {
-  return buildAgentCompilationContext(agent).issues;
+export const validateAgentIR = (agent: AgentIR, registry: WorldRegistry): AgentValidationIssue[] => {
+  return buildAgentCompilationContext(agent, registry).issues;
 };
 
-export const compileAgentIR = (agent: AgentIR): AgentProgram => {
-  const { issues, bodyInputsById, bodyOutputsById, summary } = buildAgentCompilationContext(agent);
+export const compileAgentIR = (agent: AgentIR, registry: WorldRegistry): AgentProgram => {
+  const { issues, bodyInputsById, bodyOutputsById, summary } = buildAgentCompilationContext(agent, registry);
   if (issues.length > 0) {
     throw new AgentValidationError(issues);
   }

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import type { AgentIR, AgentIRSummary } from '../domain/brain';
+import type { AgentIR, AgentIRSummary, WorldRegistry } from '../domain/brain';
 import type { AgentDraftStatus, AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../types/agentRuntime';
 import GraphDetailModal from './editor/graph/GraphDetailModal';
 import GraphTopologyCanvas from './editor/graph/GraphTopologyCanvas';
@@ -17,6 +17,7 @@ interface SNNTopologyEditorProps {
   graphSessionToken: string;
   visionCells?: number;
   installedSummary: AgentIRSummary;
+  worldRegistry: WorldRegistry;
   onAgentChange?: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
   onGraphPathChange?: (graphPath: GraphPathItem[], sourceSessionToken: string) => void;
   onGraphPathNavigateRegister?: (navigate: (pathId: string) => void, sourceSessionToken: string) => void;
@@ -33,6 +34,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   graphSessionToken,
   visionCells = 36,
   installedSummary,
+  worldRegistry,
   onAgentChange,
   onGraphPathChange,
   onGraphPathNavigateRegister,
@@ -43,6 +45,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
 }) => {
   const state = useSNNTopologyState({
     agent,
+    worldRegistry,
     graphSessionToken,
     runtimeActiveNodeIds: runtimeActivity.activeNodeIds,
     onAgentChange,

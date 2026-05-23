@@ -9,6 +9,13 @@ export interface AgentProgramRuntimeState {
 
 export interface AgentProgramStepResult {
   runtimeState: AgentProgramRuntimeState;
+  outputSignals: Array<{
+    id: string;
+    target: string;
+    normalizedTarget: string;
+    worldPort: string;
+    value: number;
+  }>;
   outputsByTarget: Record<string, number>;
 }
 
@@ -127,9 +134,16 @@ export const stepAgentProgram = (
     }
   }
 
+  const outputSignals = program.outputPorts.map((port) => ({
+    id: port.id,
+    target: port.target,
+    normalizedTarget: port.normalizedTarget,
+    worldPort: port.worldPort,
+    value: clampUnit(nextBodyOutputs.get(port.id) ?? 0),
+  }));
   const outputsByTarget: Record<string, number> = {};
-  for (const port of program.outputPorts) {
-    outputsByTarget[port.target] = clampUnit(nextBodyOutputs.get(port.id) ?? 0);
+  for (const signal of outputSignals) {
+    outputsByTarget[signal.target] = signal.value;
   }
 
   return {
@@ -138,6 +152,7 @@ export const stepAgentProgram = (
       bodyOutputs: nextBodyOutputs,
       activeLeafNodeIds: [...activeLeafNodeIds],
     },
+    outputSignals,
     outputsByTarget,
   };
 };

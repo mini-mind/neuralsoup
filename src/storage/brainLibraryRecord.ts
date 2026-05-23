@@ -1,8 +1,11 @@
 import {
+  createDefaultWorldRegistry,
   type AgentIR,
   type AgentMetadata,
   validateAgentIR,
 } from '../domain/brain';
+
+const DEFAULT_WORLD_REGISTRY = createDefaultWorldRegistry();
 
 export interface BrainLibraryRecord {
   agent: AgentIR;
@@ -157,7 +160,7 @@ export const isValidBrainLibraryAgentPayload = (
     (isObject(agent.layout) &&
       agent.layout.version === 1 &&
       isObject(agent.layout.nodes))) &&
-  validateAgentIR(agent as unknown as AgentIR).length === 0;
+  validateAgentIR(agent as unknown as AgentIR, DEFAULT_WORLD_REGISTRY).length === 0;
 
 export const isBrainLibraryStoredRecord = (value: unknown): value is BrainLibraryRecord =>
   isObject(value) &&
@@ -186,7 +189,7 @@ export const normalizeCanonicalBrainLibraryRecord = (
 };
 
 const assertValidBrainLibraryAgent = (agent: AgentIR, context: string): void => {
-  const issues = validateAgentIR(agent);
+  const issues = validateAgentIR(agent, DEFAULT_WORLD_REGISTRY);
   if (issues.length === 0) {
     return;
   }

@@ -3,6 +3,7 @@ import {
   GraphIRValidationError,
   validateGraphIRDocument,
 } from './legacyGraphIR';
+import { createDefaultWorldRegistry } from '../domain/brain';
 import { AgentValidationError, compileAgentIR } from '../domain/brain/agent-compiler';
 import { createAgentIRFromLegacyGraphDetailed } from './legacyGraphBridge';
 import type {
@@ -45,6 +46,7 @@ const DEFAULT_IZHIKEVICH_PARAMETERS = {
   d: 8,
   threshold: 30,
 } as const;
+const DEFAULT_WORLD_REGISTRY = createDefaultWorldRegistry();
 
 const isRecord = (value: LiteralValue | undefined): value is Record<string, LiteralValue> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -240,7 +242,7 @@ const compileLegacyAgentProgram = (
     );
   }
 
-  return compileAgentIR(bridgeResult.agent);
+  return compileAgentIR(bridgeResult.agent, DEFAULT_WORLD_REGISTRY);
 };
 
 interface LegacyCompileAnalysis {

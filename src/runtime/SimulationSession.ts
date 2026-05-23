@@ -10,6 +10,7 @@ import {
   summarizeCompiledAgentProgram,
   type AgentValidationIssue,
   type AgentIR,
+  type WorldRegistry,
 } from '../domain/brain';
 import type { Agent, SimulationState, World } from '../types/simulation';
 import type { AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../types/agentRuntime';
@@ -29,6 +30,7 @@ export interface SimulationSessionDependencies {
   agentController: AgentController;
   worldManager: WorldManager;
   collisionDetector: CollisionDetector;
+  worldRegistry: WorldRegistry;
 }
 
 export interface SimulationSessionOptions {
@@ -47,6 +49,7 @@ export class SimulationSession {
   private readonly agentController: AgentController;
   private readonly worldManager: WorldManager;
   private readonly collisionDetector: CollisionDetector;
+  private readonly worldRegistry: WorldRegistry;
   private readonly config: WorldConfig;
 
   private currentControlMode: SimulationControlMode;
@@ -68,6 +71,7 @@ export class SimulationSession {
     this.agentController = dependencies.agentController;
     this.worldManager = dependencies.worldManager;
     this.collisionDetector = dependencies.collisionDetector;
+    this.worldRegistry = dependencies.worldRegistry;
     this.config = createWorldConfig({
       width: this.worldManager.width,
       height: this.worldManager.height,
@@ -262,7 +266,7 @@ export class SimulationSession {
       return;
     }
 
-    const nextAgent = reconcileAgentIRVisionCells(this.currentAgentIR, mainAgent.visionCells.length);
+    const nextAgent = reconcileAgentIRVisionCells(this.currentAgentIR, mainAgent.visionCells.length, this.worldRegistry);
     const compiledProgram = this.applyAgentIR(nextAgent, mainAgent);
     this.setAppliedAgentRuntimeStatusFromProgram(compiledProgram);
   }
@@ -271,7 +275,7 @@ export class SimulationSession {
     agent: AgentIR,
     mainAgent: Agent | null
   ): ReturnType<typeof compileAgentIR> {
-    const compiledProgram = compileAgentIR(agent);
+    const compiledProgram = compileAgentIR(agent, this.worldRegistry);
 
     if (mainAgent) {
       this.agentController.installAgentProgram(mainAgent.id, compiledProgram);
@@ -282,7 +286,7 @@ export class SimulationSession {
   }
 
   private createAppliedAgentRuntimeStatus(agent: AgentIR): AgentRuntimeStatus {
-    const compiledProgram = compileAgentIR(agent);
+    const compiledProgram = compileAgentIR(agent, this.worldRegistry);
     return {
       state: 'applied',
       appliedSummary: summarizeCompiledAgentProgram(compiledProgram),

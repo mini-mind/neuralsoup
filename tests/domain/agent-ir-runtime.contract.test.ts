@@ -2,11 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   compileAgentIR,
+  createDefaultWorldRegistry,
   createAgentProgramRuntimeState,
   stepAgentProgram,
   validateAgentIR,
   type AgentIR,
 } from '../../src/domain/brain';
+
+const WORLD_REGISTRY = createDefaultWorldRegistry();
 
 const createRuleDrivenAgent = (): AgentIR =>
   ({
@@ -86,7 +89,7 @@ const createRuleDrivenAgent = (): AgentIR =>
   });
 
 test('compileAgentIR resolves BodyIR regex rules into runtime ports instead of relying on legacy node ids', () => {
-  const program = compileAgentIR(createRuleDrivenAgent());
+  const program = compileAgentIR(createRuleDrivenAgent(), WORLD_REGISTRY);
 
   assert.equal(program.inputPorts.length, 9);
   assert.deepEqual(
@@ -119,7 +122,7 @@ test('compileAgentIR resolves BodyIR regex rules into runtime ports instead of r
 });
 
 test('stepAgentProgram consumes rule-resolved input ports and activates rule-resolved output ports', () => {
-  const program = compileAgentIR(createRuleDrivenAgent());
+  const program = compileAgentIR(createRuleDrivenAgent(), WORLD_REGISTRY);
   const runtimeState = createAgentProgramRuntimeState(program);
   const sensoryInputs = new Array(9).fill(0);
   sensoryInputs[7] = 0.5;
@@ -127,6 +130,16 @@ test('stepAgentProgram consumes rule-resolved input ports and activates rule-res
   const result = stepAgentProgram(program, sensoryInputs, runtimeState, 1, 1);
 
   assert.equal(result.outputsByTarget['action.move-forward'], 1);
+  assert.deepEqual(
+    result.outputSignals.find((signal) => signal.id === 'effector-move-forward'),
+    {
+      id: 'effector-move-forward',
+      target: 'action.move-forward',
+      normalizedTarget: 'action.move-forward',
+      worldPort: 'action',
+      value: 1,
+    }
+  );
   assert.deepEqual(
     new Set(result.runtimeState.activeLeafNodeIds),
     new Set(['sensor-G-2', 'neuron-1', 'effector-move-forward'])
@@ -146,7 +159,7 @@ test('validateAgentIR rejects body endpoints that do not match any BodyIR rule',
     ],
   };
 
-  const issues = validateAgentIR(invalidAgent);
+  const issues = validateAgentIR(invalidAgent, WORLD_REGISTRY);
 
   assert.ok(
     issues.some(
@@ -171,7 +184,7 @@ test('validateAgentIR rejects direct bodyInput -> bodyOutput connections', () =>
     ],
   };
 
-  const issues = validateAgentIR(invalidAgent);
+  const issues = validateAgentIR(invalidAgent, WORLD_REGISTRY);
 
   assert.ok(
     issues.some(
@@ -212,7 +225,7 @@ test('validateAgentIR rejects invalid container ownership and missing child refe
     },
   };
 
-  const issues = validateAgentIR(invalidAgent);
+  const issues = validateAgentIR(invalidAgent, WORLD_REGISTRY);
 
   assert.ok(
     issues.some(
@@ -249,7 +262,7 @@ test('validateAgentIR rejects duplicate neuron and container ids', () => {
     },
   };
 
-  const issues = validateAgentIR(invalidAgent);
+  const issues = validateAgentIR(invalidAgent, WORLD_REGISTRY);
 
   assert.ok(
     issues.some(
@@ -284,7 +297,7 @@ test('validateAgentIR rejects neuron and container id collisions', () => {
     },
   };
 
-  const issues = validateAgentIR(invalidAgent);
+  const issues = validateAgentIR(invalidAgent, WORLD_REGISTRY);
 
   assert.ok(
     issues.some(

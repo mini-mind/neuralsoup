@@ -5,9 +5,21 @@ import { VisionSystem } from '../../src/engine/VisionSystem';
 import { WorldManager } from '../../src/engine/WorldManager';
 import { CollisionDetector } from '../../src/engine/CollisionDetector';
 import { SimulationSession } from '../../src/runtime/SimulationSession';
-import { compileAgentIR, createAgentProgramRuntimeState, stepAgentProgram } from '../../src/domain/brain';
+import { createDefaultWorldActionOutputAdapter } from '../../src/domain/world';
+import { compileAgentIR, createAgentProgramRuntimeState, createDefaultWorldRegistry, stepAgentProgram } from '../../src/domain/brain';
 import type { AgentRuntimeStatus } from '../../src/types/agentRuntime';
 import type { Agent } from '../../src/types/simulation';
+
+const WORLD_REGISTRY = createDefaultWorldRegistry();
+
+const createSimulationSession = (agentController: AgentController = new AgentController(createDefaultWorldActionOutputAdapter())) =>
+  new SimulationSession({
+    visionSystem: new VisionSystem(),
+    agentController,
+    worldManager: new WorldManager(1600, 1200),
+    collisionDetector: new CollisionDetector(),
+    worldRegistry: WORLD_REGISTRY,
+  });
 
 function createAgent(overrides: Partial<Agent> = {}): Agent {
   return {
@@ -29,7 +41,7 @@ function createAgent(overrides: Partial<Agent> = {}): Agent {
 }
 
 test('keyboard policy moves forward and cancels opposite turns', () => {
-  const controller = new AgentController();
+  const controller = new AgentController(createDefaultWorldActionOutputAdapter());
 
   const forwardAgent = createAgent();
   controller.updateAgent(forwardAgent, 1, {
@@ -62,12 +74,7 @@ test('keyboard policy moves forward and cancels opposite turns', () => {
 });
 
 test('simulation session owns main-agent control mode and preserves it across reset', () => {
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController: new AgentController(),
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
-  });
+  const session = createSimulationSession();
 
   session.initialize();
   const initialMainAgent = session.getMainAgent();
@@ -97,13 +104,14 @@ test('simulation session owns main-agent control mode and preserves it across re
 });
 
 test('simulation session keeps main-agent runtime status aligned across mode switches and vision-cell updates', () => {
-  const agentController = new AgentController();
+  const agentController = new AgentController(createDefaultWorldActionOutputAdapter());
   const visionSystem = new VisionSystem();
   const session = new SimulationSession({
     visionSystem,
     agentController,
     worldManager: new WorldManager(1600, 1200),
     collisionDetector: new CollisionDetector(),
+    worldRegistry: WORLD_REGISTRY,
   });
 
   session.initialize();
@@ -157,20 +165,15 @@ test('simulation session keeps main-agent runtime status aligned across mode swi
 });
 
 test('default world action adapter consumes normalized action.* runtime targets', () => {
-  const controller = new AgentController();
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController: controller,
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
-  });
+  const controller = new AgentController(createDefaultWorldActionOutputAdapter());
+  const session = createSimulationSession(controller);
 
   session.initialize();
   session.setControlMode('snn');
   const mainAgent = session.getMainAgent();
   assert.ok(mainAgent);
 
-  const program = compileAgentIR(session.getCurrentAgentIR());
+  const program = compileAgentIR(session.getCurrentAgentIR(), WORLD_REGISTRY);
   const result = stepAgentProgram(
     program,
     new Array(mainAgent.visualInput.length).fill(1),
@@ -198,13 +201,101 @@ test('default world action adapter consumes normalized action.* runtime targets'
   assert.equal(Number.isFinite(controlledAgent.velocity.y), true);
 });
 
-test('invalid install keeps the last successfully applied runtime summary', () => {
-  const session = new SimulationSession({
-    visionSystem: new VisionSystem(),
-    agentController: new AgentController(),
-    worldManager: new WorldManager(1600, 1200),
-    collisionDetector: new CollisionDetector(),
+test('agent controller consumes runtime outputs through the injected world action adapter', () => {
+  const adapterCalls: Array<Array<{
+    id: string;
+    target: string;
+    normalizedTarget: string;
+    worldPort: string;
+    value: number;
+  }>> = [];
+  const controller = new AgentController({
+    resolve(outputSignals) {
+      adapterCalls.push(outputSignals.map((signal) => ({ ...signal })));
+      return [0, 1, 0];
+    },
   });
+  const session = createSimulationSession(controller);
+
+  session.initialize();
+  session.setControlMode('snn');
+  const mainAgent = session.getMainAgent();
+  assert.ok(mainAgent);
+
+  const controlledAgent = createAgent({
+    id: mainAgent.id,
+    visualInput: new Array(mainAgent.visualInput.length).fill(1),
+  });
+
+  controller.updateAgent(controlledAgent, 1, {
+    controlMode: 'snn',
+    keyboardInputState: {
+      turnLeft: false,
+      moveForward: false,
+      turnRight: false,
+    },
+  });
+
+  assert.equal(adapterCalls.length, 1);
+  assert.equal(
+    adapterCalls[0].some(
+      (signal) =>
+        signal.normalizedTarget === 'action.move-forward' &&
+        signal.worldPort === 'action' &&
+        typeof signal.value === 'number'
+    ),
+    true
+  );
+  assert.equal(controlledAgent.velocity.x > 0, true);
+});
+
+test('default world action adapter maps supported action targets into the expected control vector', () => {
+  const adapter = createDefaultWorldActionOutputAdapter();
+
+  assert.deepEqual(
+    adapter.resolve([
+      {
+        id: 'turn-left',
+        target: 'action.turn-left',
+        normalizedTarget: 'action.turn-left',
+        worldPort: 'action',
+        value: 0.25,
+      },
+      {
+        id: 'move-forward',
+        target: 'action.move-forward',
+        normalizedTarget: 'action.move-forward',
+        worldPort: 'action',
+        value: 0.75,
+      },
+      {
+        id: 'turn-right',
+        target: 'action.turn-right',
+        normalizedTarget: 'action.turn-right',
+        worldPort: 'action',
+        value: 0.5,
+      },
+      {
+        id: 'ignored',
+        target: 'action.unknown',
+        normalizedTarget: 'action.unknown',
+        worldPort: 'action',
+        value: 1,
+      },
+      {
+        id: 'other-port',
+        target: 'thruster.forward',
+        normalizedTarget: 'thruster.forward',
+        worldPort: 'thruster',
+        value: 1,
+      },
+    ]),
+    [0.25, 0.75, 0.5]
+  );
+});
+
+test('invalid install keeps the last successfully applied runtime summary', () => {
+  const session = createSimulationSession();
 
   session.initialize();
   const appliedSummary = session.getAgentRuntimeStatus().appliedSummary;

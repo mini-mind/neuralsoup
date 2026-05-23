@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import SNNTopologyEditor from '../SNNTopologyEditor';
-import type { AgentIR } from '../../domain/brain';
+import type { AgentIR, WorldRegistry } from '../../domain/brain';
 import type { AgentIRSummary } from '../../domain/brain/agent-ir';
 import type { AgentDraftStatus, AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../../types/agentRuntime';
 import type { GraphPathItem } from './types';
@@ -12,6 +12,7 @@ interface GraphEditorPanelProps {
   graphSessionToken: string;
   visionCells: number;
   installedSummary: AgentIRSummary;
+  worldRegistry: WorldRegistry;
   runtimeStatus: AgentRuntimeStatus;
   draftStatus: AgentDraftStatus;
   runtimeActivity: AgentRuntimeActivitySnapshot;
@@ -26,6 +27,7 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
   graphSessionToken,
   visionCells,
   installedSummary,
+  worldRegistry,
   runtimeStatus,
   draftStatus,
   runtimeActivity,
@@ -81,6 +83,7 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
         graphSessionToken={graphSessionToken}
         visionCells={visionCells}
         installedSummary={installedSummary}
+        worldRegistry={worldRegistry}
         onAgentChange={onAgentChange}
         onGraphPathChange={onGraphPathChange}
         onGraphPathNavigateRegister={onGraphPathNavigateRegister}

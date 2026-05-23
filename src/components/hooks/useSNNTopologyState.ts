@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { AgentIR } from '../../domain/brain';
+import type { AgentIR, WorldRegistry } from '../../domain/brain';
 import { buildAgentGraphViewModel } from '../editor/graph/agentGraphViewModel';
 import { clampZoom } from '../editor/graph/tools/canvasGeometry';
 import { useGraphEditorCommands } from './useGraphEditorCommands';
@@ -68,6 +68,7 @@ export interface GraphNodePositionUpdate extends GraphPoint {
 
 interface UseSNNTopologyStateOptions {
   agent: AgentIR;
+  worldRegistry: WorldRegistry;
   graphSessionToken?: string;
   runtimeActiveNodeIds?: string[];
   onAgentChange?: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
@@ -87,6 +88,7 @@ const areStringArraysEqual = (left: string[], right: string[]) =>
 
 export const useSNNTopologyState = ({
   agent,
+  worldRegistry,
   graphSessionToken = 'default',
   runtimeActiveNodeIds = [],
   onAgentChange,
@@ -132,8 +134,9 @@ export const useSNNTopologyState = ({
         navigationPath,
         draftNodePositions,
         runtimeActiveNodeIds,
+        worldRegistry,
       }),
-    [agent, draftNodePositions, navigationPath, runtimeActiveNodeIds]
+    [agent, draftNodePositions, navigationPath, runtimeActiveNodeIds, worldRegistry]
   );
   const {
     breadcrumbs,

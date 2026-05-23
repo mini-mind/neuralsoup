@@ -5,8 +5,12 @@ import type {
   AgentIRSummary,
   BrainContainerNode,
   BrainNeuronNode,
+  WorldRegistry,
 } from '../../../domain/brain';
-import { resolveAgentBodyEndpointIds, resolveCompiledAgentBodyEndpointIds } from '../../../domain/brain';
+import {
+  resolveAgentBodyEndpointIds,
+  resolveCompiledAgentBodyEndpointIds,
+} from '../../../domain/brain';
 import type { Position } from '../../../domain/brain/shared';
 import { getGraphLinkCapabilities } from './graphLinkPolicy';
 import type {
@@ -288,7 +292,7 @@ const getLayoutPosition = (
   );
 };
 
-const buildIndexes = (agent: AgentIR): AgentGraphViewIndexes => {
+const buildIndexes = (agent: AgentIR, worldRegistry: WorldRegistry): AgentGraphViewIndexes => {
   const pathById = new Map<string, string[]>();
   const nodeById = new Map<string, AgentGraphViewNodeRecord>();
   const containerById = new Map(agent.brain.containers.map((container) => [container.id, container]));
@@ -296,7 +300,7 @@ const buildIndexes = (agent: AgentIR): AgentGraphViewIndexes => {
   const linkById = new Map(agent.connections.map((connection) => [connection.id, connection]));
   const endpointByViewNodeId = new Map<string, AgentConnectionEndpoint>();
 
-  const { bodyInputNodeIds: bodyInputIds, bodyOutputNodeIds: bodyOutputIds } = resolveAgentBodyEndpointIds(agent);
+  const { bodyInputNodeIds: bodyInputIds, bodyOutputNodeIds: bodyOutputIds } = resolveAgentBodyEndpointIds(agent, worldRegistry);
 
   const rootChildren: AgentGraphViewNodeRecord[] = [];
 
@@ -669,15 +673,17 @@ export const buildAgentGraphViewModel = ({
   draftNodePositions,
   runtimeActiveNodeIds,
   installedSummary,
+  worldRegistry,
 }: {
   agent: AgentIR;
   navigationPath: string[];
   draftNodePositions: NodePositionDraftMap;
   runtimeActiveNodeIds: string[];
   installedSummary?: AgentIRSummary;
+  worldRegistry: WorldRegistry;
 }): AgentGraphViewModel => {
-  const indexes = buildIndexes(agent);
-  const compiledEndpointIds = resolveCompiledAgentBodyEndpointIds(agent);
+  const indexes = buildIndexes(agent, worldRegistry);
+  const compiledEndpointIds = resolveCompiledAgentBodyEndpointIds(agent, worldRegistry);
   const installedBodyInputNodeIds = new Set(compiledEndpointIds.bodyInputNodeIds);
   const installedBodyOutputNodeIds = new Set(compiledEndpointIds.bodyOutputNodeIds);
   const installedInputCount = installedSummary?.inputSignalCount ?? compiledEndpointIds.bodyInputNodeIds.length;

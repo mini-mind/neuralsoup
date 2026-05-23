@@ -2,9 +2,10 @@ import type { AgentIR, AgentIRSummary } from './agent-ir';
 import type { AgentProgram } from './agent-program';
 import { resolveAgentBodyEndpointIds } from './agent-body-rules';
 import { compileAgentIR } from './agent-compiler';
+import type { WorldRegistry } from './world-registry';
 
-export const summarizeAgentIR = (agent: AgentIR): AgentIRSummary => {
-  const endpointIds = resolveAgentBodyEndpointIds(agent);
+export const summarizeAgentIR = (agent: AgentIR, registry: WorldRegistry): AgentIRSummary => {
+  const endpointIds = resolveAgentBodyEndpointIds(agent, registry);
 
   return {
     inputSignalCount: endpointIds.bodyInputNodeIds.length,
@@ -16,4 +17,4 @@ export const summarizeAgentIR = (agent: AgentIR): AgentIRSummary => {
 
 export const summarizeCompiledAgentProgram = (program: AgentProgram): AgentIRSummary => program.summary;
 
-export const summarizeCompiledAgentIR = (agent: AgentIR): AgentIRSummary => compileAgentIR(agent).summary;
+export const summarizeCompiledAgentIR = (agent: AgentIR, registry: WorldRegistry): AgentIRSummary => compileAgentIR(agent, registry).summary;

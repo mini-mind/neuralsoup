@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildAgentBodyRulePreviewModel, type AgentIR } from '../../src/domain/brain';
+import { buildAgentBodyRulePreviewModel, createDefaultWorldRegistry, type AgentIR } from '../../src/domain/brain';
 import { buildAgentGraphViewModel } from '../../src/components/editor/graph/agentGraphViewModel';
+
+const WORLD_REGISTRY = createDefaultWorldRegistry();
 
 const createTestAgent = (): AgentIR => ({
   version: 1,
@@ -100,6 +102,7 @@ test('agent graph view expanded children expose separate viewId and refId indexe
     navigationPath: [agent.brain.rootContainerId],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
   });
 
   const expandedChild = viewModel.nodes.find((node) => node.viewId === 'expanded-group::neuron-1');
@@ -115,6 +118,7 @@ test('agent graph view expanded children use viewId for active highlights', () =
     navigationPath: [agent.brain.rootContainerId],
     draftNodePositions: {},
     runtimeActiveNodeIds: ['neuron-1'],
+    worldRegistry: WORLD_REGISTRY,
   });
 
   assert.equal(viewModel.activeViewNodeIds.has('expanded-group::neuron-1'), true);
@@ -128,6 +132,7 @@ test('agent graph root brain child scope does not inject orphan adapter proxy no
     navigationPath: [agent.brain.rootContainerId],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
   });
 
   assert.equal(viewModel.nodes.some((node) => node.proxy), false);
@@ -185,6 +190,7 @@ test('agent graph root brain child scope projects boundary adapters without prox
     navigationPath: [agent.brain.rootContainerId],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
   });
 
   assert.equal(viewModel.nodes.some((node) => node.id === 'core-input-adapter'), true);
@@ -241,6 +247,7 @@ test('agent graph root scope exposes canonical body endpoints even before any co
     navigationPath: [],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
   });
   const inputAdapter = rootView.nodes.find((node) => node.id === 'input-adapter');
   const outputAdapter = rootView.nodes.find((node) => node.id === 'output-adapter');
@@ -257,12 +264,14 @@ test('agent graph root scope exposes canonical body endpoints even before any co
     navigationPath: ['input-adapter'],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
   });
   const outputScopeView = buildAgentGraphViewModel({
     agent,
     navigationPath: ['output-adapter'],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
   });
 
   assert.deepEqual(
@@ -315,6 +324,7 @@ test('agent graph root adapters report installed counts from compiled runtime tr
     navigationPath: [],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
   });
 
   const inputAdapter = rootView.nodes.find((node) => node.id === 'input-adapter');
@@ -334,6 +344,7 @@ test('agent graph root scope uses the canonical rootContainerId as the top-level
     navigationPath: [],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
   });
 
   const rootBrainNode = rootView.nodes.find((node) => node.refNodeId === agent.brain.rootContainerId);
@@ -362,18 +373,20 @@ test('agent graph view and body preview share the same canonical endpoint expans
   ];
   agent.body.visionCellCount = 2;
 
-  const preview = buildAgentBodyRulePreviewModel(agent);
+  const preview = buildAgentBodyRulePreviewModel(agent, WORLD_REGISTRY);
   const inputScopeView = buildAgentGraphViewModel({
     agent,
     navigationPath: ['input-adapter'],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
   });
   const outputScopeView = buildAgentGraphViewModel({
     agent,
     navigationPath: ['output-adapter'],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
   });
 
   assert.deepEqual(
@@ -419,6 +432,7 @@ test('agent graph view marks canonical-only body endpoints that are not installe
     navigationPath: ['input-adapter'],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
   });
 
   const installedInput = inputScopeView.nodes.find((node) => node.refNodeId === 'sensor-G-0');

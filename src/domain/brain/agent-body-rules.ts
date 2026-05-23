@@ -5,7 +5,7 @@ import type {
   BodyOutputNodeRuntime,
   BodyOutputRule,
 } from './agent-ir';
-import { getDefaultWorldRegistry } from './world-registry';
+import type { WorldRegistry } from './world-registry';
 
 export type AgentBodyRuleScope = 'input' | 'output';
 export type AgentBodyRuleIssueKind = 'compile-error' | 'conflict' | 'unmatched';
@@ -89,8 +89,13 @@ const compileRulePattern = (
   }
 };
 
-const parseBodyInputSource = (nodeId: string, source: string, scale: number): BodyInputNodeRuntime | null => {
-  const binding = getDefaultWorldRegistry().resolveInputBinding(source);
+const parseBodyInputSource = (
+  registry: Pick<WorldRegistry, 'resolveInputBinding'>,
+  nodeId: string,
+  source: string,
+  scale: number
+): BodyInputNodeRuntime | null => {
+  const binding = registry.resolveInputBinding(source);
   if (!binding || binding.runtimeIndex == null) {
     return null;
   }
@@ -104,11 +109,12 @@ const parseBodyInputSource = (nodeId: string, source: string, scale: number): Bo
 };
 
 const parseBodyOutputTarget = (
+  registry: Pick<WorldRegistry, 'resolveOutputBinding'>,
   nodeId: string,
   target: string,
   decayPerSecond: number
 ): BodyOutputNodeRuntime | null => {
-  const binding = getDefaultWorldRegistry().resolveOutputBinding(target);
+  const binding = registry.resolveOutputBinding(target);
   if (!binding) {
     return null;
   }
@@ -122,8 +128,12 @@ const parseBodyOutputTarget = (
   };
 };
 
-const enumerateInputRuleNodeIds = (rule: BodyInputRule, visionCellCount: number): string[] => {
-  return getDefaultWorldRegistry().enumerateInputNodeIds(rule, {
+const enumerateInputRuleNodeIds = (
+  registry: Pick<WorldRegistry, 'enumerateInputNodeIds'>,
+  rule: BodyInputRule,
+  visionCellCount: number
+): string[] => {
+  return registry.enumerateInputNodeIds(rule, {
     version: 1,
     visionCellCount,
     inputRules: [],
@@ -131,8 +141,11 @@ const enumerateInputRuleNodeIds = (rule: BodyInputRule, visionCellCount: number)
   });
 };
 
-const enumerateOutputRuleNodeIds = (rule: BodyOutputRule): string[] => {
-  return getDefaultWorldRegistry().enumerateOutputNodeIds(rule, {
+const enumerateOutputRuleNodeIds = (
+  registry: Pick<WorldRegistry, 'enumerateOutputNodeIds'>,
+  rule: BodyOutputRule
+): string[] => {
+  return registry.enumerateOutputNodeIds(rule, {
     version: 1,
     visionCellCount: 0,
     inputRules: [],
@@ -171,14 +184,14 @@ export interface AgentBodyEndpointResolution {
   endpointIds: AgentBodyEndpointIds;
 }
 
-export const resolveAgentBodyEndpointIds = (agent: AgentIR): AgentBodyEndpointIds => {
+export const resolveAgentBodyEndpointIds = (agent: AgentIR, registry: WorldRegistry): AgentBodyEndpointIds => {
   const bodyInputNodeIds = new Set<string>([
     ...collectEndpointIdsFromConnections(agent, 'bodyInput'),
-    ...agent.body.inputRules.flatMap((rule) => enumerateInputRuleNodeIds(rule, agent.body.visionCellCount)),
+    ...agent.body.inputRules.flatMap((rule) => enumerateInputRuleNodeIds(registry, rule, agent.body.visionCellCount)),
   ]);
   const bodyOutputNodeIds = new Set<string>([
     ...collectEndpointIdsFromConnections(agent, 'bodyOutput'),
-    ...agent.body.outputRules.flatMap((rule) => enumerateOutputRuleNodeIds(rule)),
+    ...agent.body.outputRules.flatMap((rule) => enumerateOutputRuleNodeIds(registry, rule)),
   ]);
 
   return {
@@ -187,11 +200,11 @@ export const resolveAgentBodyEndpointIds = (agent: AgentIR): AgentBodyEndpointId
   };
 };
 
-export const resolveCompiledAgentBodyEndpointIds = (agent: AgentIR): AgentCompiledBodyEndpointIds => {
+export const resolveCompiledAgentBodyEndpointIds = (agent: AgentIR, registry: WorldRegistry): AgentCompiledBodyEndpointIds => {
   const referencedBodyInputNodeIds = collectEndpointIdsFromConnections(agent, 'bodyInput');
   const referencedBodyOutputNodeIds = collectEndpointIdsFromConnections(agent, 'bodyOutput');
-  const input = resolveBodyInputRules(agent.body.inputRules, referencedBodyInputNodeIds);
-  const output = resolveBodyOutputRules(agent.body.outputRules, referencedBodyOutputNodeIds);
+  const input = resolveBodyInputRules(registry, agent.body.inputRules, referencedBodyInputNodeIds);
+  const output = resolveBodyOutputRules(registry, agent.body.outputRules, referencedBodyOutputNodeIds);
 
   return {
     bodyInputNodeIds: [...input.nodesById.keys()].sort(),
@@ -199,10 +212,10 @@ export const resolveCompiledAgentBodyEndpointIds = (agent: AgentIR): AgentCompil
   };
 };
 
-export const resolveAgentBodyEndpointResolution = (agent: AgentIR): AgentBodyEndpointResolution => {
-  const endpointIds = resolveAgentBodyEndpointIds(agent);
-  const input = resolveBodyInputRules(agent.body.inputRules, endpointIds.bodyInputNodeIds);
-  const output = resolveBodyOutputRules(agent.body.outputRules, endpointIds.bodyOutputNodeIds);
+export const resolveAgentBodyEndpointResolution = (agent: AgentIR, registry: WorldRegistry): AgentBodyEndpointResolution => {
+  const endpointIds = resolveAgentBodyEndpointIds(agent, registry);
+  const input = resolveBodyInputRules(registry, agent.body.inputRules, endpointIds.bodyInputNodeIds);
+  const output = resolveBodyOutputRules(registry, agent.body.outputRules, endpointIds.bodyOutputNodeIds);
 
   return {
     inputNodesById: input.nodesById,
@@ -251,6 +264,7 @@ const buildInputPreviewGroups = (
 };
 
 const resolveBodyInputRules = (
+  registry: WorldRegistry,
   rules: BodyInputRule[],
   nodeIds: Iterable<string>
 ): BodyRuleResolution<BodyInputNodeRuntime> => {
@@ -294,7 +308,7 @@ const resolveBodyInputRules = (
 
     const [{ entry, match }] = matches;
     const source = applyRuleTemplate(entry.rule.sourceTemplate, match);
-    const parsed = parseBodyInputSource(nodeId, source, entry.rule.scale);
+    const parsed = parseBodyInputSource(registry, nodeId, source, entry.rule.scale);
     if (!parsed) {
       issues.push({
         scope: 'input',
@@ -349,6 +363,7 @@ const buildOutputPreviewGroups = (
 };
 
 const resolveBodyOutputRules = (
+  registry: WorldRegistry,
   rules: BodyOutputRule[],
   nodeIds: Iterable<string>
 ): BodyRuleResolution<BodyOutputNodeRuntime> => {
@@ -393,7 +408,7 @@ const resolveBodyOutputRules = (
 
     const [{ entry, match }] = matches;
     const target = applyRuleTemplate(entry.rule.targetTemplate, match);
-    const parsed = parseBodyOutputTarget(nodeId, target, entry.rule.decayPerSecond);
+    const parsed = parseBodyOutputTarget(registry, nodeId, target, entry.rule.decayPerSecond);
     if (!parsed) {
       issues.push({
         scope: 'output',
@@ -430,19 +445,21 @@ const resolveBodyOutputRules = (
 };
 
 export const resolveAgentBodyInputRuleBindings = (
+  registry: WorldRegistry,
   rules: BodyInputRule[],
   nodeIds: Iterable<string>
-): BodyRuleResolution<BodyInputNodeRuntime> => resolveBodyInputRules(rules, nodeIds);
+): BodyRuleResolution<BodyInputNodeRuntime> => resolveBodyInputRules(registry, rules, nodeIds);
 
 export const resolveAgentBodyOutputRuleBindings = (
+  registry: WorldRegistry,
   rules: BodyOutputRule[],
   nodeIds: Iterable<string>
-): BodyRuleResolution<BodyOutputNodeRuntime> => resolveBodyOutputRules(rules, nodeIds);
+): BodyRuleResolution<BodyOutputNodeRuntime> => resolveBodyOutputRules(registry, rules, nodeIds);
 
-export const buildAgentBodyRulePreviewModel = (agent: AgentIR): AgentBodyRulePreviewModel => {
-  const resolution = resolveAgentBodyEndpointResolution(agent);
-  const input = resolveBodyInputRules(agent.body.inputRules, resolution.endpointIds.bodyInputNodeIds);
-  const output = resolveBodyOutputRules(agent.body.outputRules, resolution.endpointIds.bodyOutputNodeIds);
+export const buildAgentBodyRulePreviewModel = (agent: AgentIR, registry: WorldRegistry): AgentBodyRulePreviewModel => {
+  const resolution = resolveAgentBodyEndpointResolution(agent, registry);
+  const input = resolveBodyInputRules(registry, agent.body.inputRules, resolution.endpointIds.bodyInputNodeIds);
+  const output = resolveBodyOutputRules(registry, agent.body.outputRules, resolution.endpointIds.bodyOutputNodeIds);
 
   return {
     input: {

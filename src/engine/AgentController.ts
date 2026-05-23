@@ -4,7 +4,10 @@
  */
 
 import { Agent } from '../types/simulation';
-import type { SimulationControlMode } from '../domain/world';
+import {
+  type SimulationControlMode,
+  type WorldActionOutputAdapter,
+} from '../domain/world';
 import {
   createAgentProgramRuntimeState,
   stepAgentProgram,
@@ -23,34 +26,14 @@ export interface AgentUpdateContext {
   keyboardInputState: KeyboardInputState;
 }
 
-const ACTION_TARGET_TO_INDEX = {
-  'action.turn-left': 0,
-  'action.move-forward': 1,
-  'action.turn-right': 2,
-} as const satisfies Record<string, 0 | 1 | 2>;
-type SupportedActionTarget = keyof typeof ACTION_TARGET_TO_INDEX;
-
-const isSupportedActionTarget = (target: string): target is SupportedActionTarget =>
-  target in ACTION_TARGET_TO_INDEX;
-
-const resolveWorldActionOutput = (outputsByTarget: Record<string, number>): [number, number, number] => {
-  const actionVector: [number, number, number] = [0, 0, 0];
-
-  for (const [target, value] of Object.entries(outputsByTarget)) {
-    if (!isSupportedActionTarget(target)) {
-      continue;
-    }
-
-    const actionIndex = ACTION_TARGET_TO_INDEX[target];
-    actionVector[actionIndex] = value;
-  }
-
-  return actionVector;
-};
-
 export class AgentController {
   private agentPrograms: Map<number, AgentProgram> = new Map();
   private agentRuntimeStates: Map<number, AgentProgramRuntimeState> = new Map();
+  private readonly actionOutputAdapter: WorldActionOutputAdapter;
+
+  constructor(actionOutputAdapter: WorldActionOutputAdapter) {
+    this.actionOutputAdapter = actionOutputAdapter;
+  }
 
   public installAgentProgram(agentId: number, program: AgentProgram): void {
     this.agentPrograms.set(agentId, program);
@@ -132,7 +115,7 @@ export class AgentController {
       Date.now()
     );
     this.agentRuntimeStates.set(agent.id, result.runtimeState);
-    this.applyAction(agent, resolveWorldActionOutput(result.outputsByTarget), deltaTime);
+    this.applyAction(agent, this.actionOutputAdapter.resolve(result.outputSignals), deltaTime);
   }
 
   /**

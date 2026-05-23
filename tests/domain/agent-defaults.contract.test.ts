@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDefaultAgentIR, summarizeAgentIR, validateAgentIR } from '../../src/domain/brain';
+import { createDefaultAgentIR, createDefaultWorldRegistry, summarizeAgentIR, validateAgentIR } from '../../src/domain/brain';
+
+const WORLD_REGISTRY = createDefaultWorldRegistry();
 
 test('default AgentIR seed is valid and exposes vision-aligned body and runtime counts', () => {
   const agent = createDefaultAgentIR(4, 'Seed Agent');
@@ -15,8 +17,8 @@ test('default AgentIR seed is valid and exposes vision-aligned body and runtime 
     agent.body.outputRules.map((rule) => rule.id),
     ['motor-outputs']
   );
-  assert.deepEqual(validateAgentIR(agent), []);
-  assert.deepEqual(summarizeAgentIR(agent), {
+  assert.deepEqual(validateAgentIR(agent, WORLD_REGISTRY), []);
+  assert.deepEqual(summarizeAgentIR(agent, WORLD_REGISTRY), {
     inputSignalCount: 12,
     outputSignalCount: 3,
     neuronCount: 2,

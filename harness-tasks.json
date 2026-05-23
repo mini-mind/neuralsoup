@@ -1151,7 +1151,138 @@
       ],
       "completed_at": "2026-05-23T19:56:29.120Z"
     }
+    ,
+    {
+      "id": "task-031",
+      "title": "World registry Phase 2：显式注入 registry，移除全局 default singleton",
+      "status": "pending",
+      "priority": "P0",
+      "depends_on": [
+        "task-024",
+        "task-025",
+        "task-026"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"body ir|graph view\"",
+        "timeout_seconds": 1500
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-23T21:01:25Z",
+          "message": "Phase 2 kickoff: cross-review confirmed the current production path still treats the default world registry as an implicit singleton and keeps host grammar semantics in compile/reconcile/runtime. As the first sub-step, default action target lowering was extracted from AgentController into an explicit default world action adapter with domain coverage, reducing one engine-side host hardcode before the broader registry injection cutover."
+        },
+        {
+          "at": "2026-05-23T21:07:03Z",
+          "message": "Cross-review follow-up closed the first task-031 P1: agent-step now preserves compiled output metadata through canonical outputSignals, the default world action adapter consumes {worldPort, normalizedTarget, value} instead of re-parsing a bare target map, and domain/compat suites stayed green while outputsByTarget remains as a transitional compat/testing view."
+        },
+        {
+          "at": "2026-05-23T21:09:08Z",
+          "message": "Further task-031 cleanup lifted default action-adapter ownership to the SimulationEngine composition root: AgentController no longer silently constructs the default host adapter itself, domain/compat test callers now choose the default adapter explicitly, and the host-lowering seam is narrower before the upcoming registry injection cutover."
+        }
+      ],
+      "completed_at": null
+    },
+    {
+      "id": "task-032",
+      "title": "Host adapter/runtime Phase 2：去掉 visualInputIndex、/3 视野推导和 action.* 三槽硬编码",
+      "status": "pending",
+      "priority": "P0",
+      "depends_on": [
+        "task-031"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"body ir|simulation lifecycle\"",
+        "timeout_seconds": 1500
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null
+    },
+    {
+      "id": "task-033",
+      "title": "Runtime API surface 收口：把 SimulationSession 的 AgentIR/vision introspection 下沉到 compat 或测试适配器",
+      "status": "pending",
+      "priority": "P1",
+      "depends_on": [
+        "task-021",
+        "task-022"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:compat",
+        "timeout_seconds": 1200
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null
+    },
+    {
+      "id": "task-034",
+      "title": "BrainIR 编辑约束收口：把 root/ownership/cycle/id 不变量前移到图编辑命令层",
+      "status": "pending",
+      "priority": "P1",
+      "depends_on": [
+        "task-008",
+        "task-030"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"graph view|graph detail\"",
+        "timeout_seconds": 1500
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null
+    },
+    {
+      "id": "task-035",
+      "title": "全局复审 Phase 5：围绕 world registry Phase 2、runtime API 收口和 BrainIR 编辑约束做交叉复审",
+      "status": "pending",
+      "priority": "P1",
+      "depends_on": [
+        "task-031",
+        "task-032",
+        "task-033",
+        "task-034"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:compat && npm run test:e2e -- --grep \"graph view|brain library|body|simulation lifecycle\"",
+        "timeout_seconds": 1800
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null
+    }
   ],
-  "session_count": 9,
-  "last_session": "2026-05-23T19:56:29.120Z"
+  "session_count": 10,
+  "last_session": "2026-05-23T21:01:25Z"
 }

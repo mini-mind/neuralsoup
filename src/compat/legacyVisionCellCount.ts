@@ -1,7 +1,9 @@
+import { createDefaultWorldRegistry } from '../domain/brain';
 import type { AgentIR } from '../domain/brain/agent-ir';
 import { resolveBodyInputVisionCellIndex, withVisionCellCount } from '../domain/brain/agent-ir';
 
 const VISION_LAYOUT_MARKER_PATTERN = /^__body-vision-cell-(\d+)$/;
+const DEFAULT_WORLD_REGISTRY = createDefaultWorldRegistry();
 
 type LegacyBodyIR = AgentIR['body'] & {
   visionCellCount?: unknown;
@@ -22,14 +24,22 @@ const deriveLegacyAgentIRVisionCellCount = (agent: AgentIR): number => {
 
   for (const connection of agent.connections) {
     if (connection.from.scope === 'bodyInput') {
-      const cellIndex = resolveBodyInputVisionCellIndex(connection.from.nodeId, agent.body.inputRules);
+      const cellIndex = resolveBodyInputVisionCellIndex(
+        connection.from.nodeId,
+        agent.body.inputRules,
+        DEFAULT_WORLD_REGISTRY
+      );
       if (cellIndex != null) {
         maxCellIndex = Math.max(maxCellIndex, cellIndex);
       }
     }
 
     if (connection.to.scope === 'bodyInput') {
-      const cellIndex = resolveBodyInputVisionCellIndex(connection.to.nodeId, agent.body.inputRules);
+      const cellIndex = resolveBodyInputVisionCellIndex(
+        connection.to.nodeId,
+        agent.body.inputRules,
+        DEFAULT_WORLD_REGISTRY
+      );
       if (cellIndex != null) {
         maxCellIndex = Math.max(maxCellIndex, cellIndex);
       }

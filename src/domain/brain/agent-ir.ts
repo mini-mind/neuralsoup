@@ -1,5 +1,5 @@
 import type { IzhikevichNeuronParameters, Position } from './shared';
-import { getDefaultWorldRegistry } from './world-registry';
+import type { WorldRegistry } from './world-registry';
 
 export interface AgentMetadata {
   id: string;
@@ -130,7 +130,8 @@ const applyRuleTemplate = (template: string, match: RegExpExecArray): string =>
 
 export const resolveBodyInputVisionCellIndex = (
   nodeId: string,
-  rules: BodyInputRule[]
+  rules: BodyInputRule[],
+  registry: Pick<WorldRegistry, 'resolveInputBinding'>
 ): number | null => {
   const matches = rules.flatMap((rule) => {
     try {
@@ -147,7 +148,7 @@ export const resolveBodyInputVisionCellIndex = (
   }
 
   const source = applyRuleTemplate(matches[0].rule.sourceTemplate, matches[0].match);
-  const binding = getDefaultWorldRegistry().resolveInputBinding(source);
+  const binding = registry.resolveInputBinding(source);
   return binding?.runtimeIndex != null ? Math.floor(binding.runtimeIndex / 3) : null;
 };
 

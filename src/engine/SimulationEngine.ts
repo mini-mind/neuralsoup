@@ -12,8 +12,11 @@ import { AgentController } from './AgentController';
 import { WorldManager } from './WorldManager';
 import { CollisionDetector } from './CollisionDetector';
 import { SimulationSession } from '../runtime/SimulationSession';
-import type { SimulationControlMode } from '../domain/world';
-import type { AgentIR } from '../domain/brain';
+import {
+  createDefaultWorldActionOutputAdapter,
+  type SimulationControlMode,
+} from '../domain/world';
+import type { AgentIR, WorldRegistry } from '../domain/brain';
 import type { AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../types/agentRuntime';
 
 export type SimulationLifecycleState = 'idle' | 'running' | 'paused';
@@ -51,11 +54,16 @@ export class SimulationEngine {
   public onAgentRuntimeStatusChange?: (status: AgentRuntimeStatus) => void;
   public onAgentRuntimeActivityChange?: (snapshot: AgentRuntimeActivitySnapshot) => void;
 
-  constructor(app: PIXI.Application, initialWidth: number = 1600, initialHeight: number = 1200) {
+  constructor(
+    app: PIXI.Application,
+    worldRegistry: WorldRegistry,
+    initialWidth: number = 1600,
+    initialHeight: number = 1200
+  ) {
     // 初始化各个系统
     this.renderer = new WorldRenderer(app);
     this.visionSystem = new VisionSystem();
-    this.agentController = new AgentController();
+    this.agentController = new AgentController(createDefaultWorldActionOutputAdapter());
     this.worldManager = new WorldManager(initialWidth, initialHeight);
     this.collisionDetector = new CollisionDetector();
     this.session = new SimulationSession(
@@ -63,7 +71,8 @@ export class SimulationEngine {
         visionSystem: this.visionSystem,
         agentController: this.agentController,
         worldManager: this.worldManager,
-        collisionDetector: this.collisionDetector
+        collisionDetector: this.collisionDetector,
+        worldRegistry,
       },
       {
         world: {

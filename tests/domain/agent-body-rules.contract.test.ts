@@ -2,9 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildAgentBodyRulePreviewModel,
+  createDefaultWorldRegistry,
   resolveCompiledAgentBodyEndpointIds,
   type AgentIR,
 } from '../../src/domain/brain';
+
+const WORLD_REGISTRY = createDefaultWorldRegistry();
 
 const createRuleDrivenAgent = (): AgentIR =>
   ({
@@ -84,7 +87,7 @@ const createRuleDrivenAgent = (): AgentIR =>
   });
 
 test('buildAgentBodyRulePreviewModel projects input and output endpoint previews by rule', () => {
-  const preview = buildAgentBodyRulePreviewModel(createRuleDrivenAgent());
+  const preview = buildAgentBodyRulePreviewModel(createRuleDrivenAgent(), WORLD_REGISTRY);
 
   assert.deepEqual(preview.input.previewsByRuleId['vision-cells'], [
     { nodeId: 'sensor-B-0', resolved: 'vision.B.0' },
@@ -106,7 +109,7 @@ test('buildAgentBodyRulePreviewModel projects input and output endpoint previews
 });
 
 test('buildAgentBodyRulePreviewModel enumerates canonical vision coverage without layout markers', () => {
-  const preview = buildAgentBodyRulePreviewModel(createRuleDrivenAgent());
+  const preview = buildAgentBodyRulePreviewModel(createRuleDrivenAgent(), WORLD_REGISTRY);
 
   assert.equal(preview.input.endpointNodeIds.includes('sensor-R-0'), true);
   assert.equal(preview.input.endpointNodeIds.includes('sensor-G-1'), true);
@@ -144,7 +147,7 @@ test('buildAgentBodyRulePreviewModel summarizes compile errors from invalid rege
     },
   };
 
-  const preview = buildAgentBodyRulePreviewModel(invalidAgent);
+  const preview = buildAgentBodyRulePreviewModel(invalidAgent, WORLD_REGISTRY);
 
   assert.equal(
     preview.issues.some(
@@ -248,7 +251,7 @@ test('buildAgentBodyRulePreviewModel summarizes conflicts and unmatched endpoint
     ],
   };
 
-  const preview = buildAgentBodyRulePreviewModel(invalidAgent);
+  const preview = buildAgentBodyRulePreviewModel(invalidAgent, WORLD_REGISTRY);
 
   assert.equal(
     preview.issues.some(
@@ -293,8 +296,8 @@ test('buildAgentBodyRulePreviewModel summarizes conflicts and unmatched endpoint
 
 test('compiled body endpoint projection only includes referenced endpoints while canonical preview keeps full coverage', () => {
   const agent = createRuleDrivenAgent();
-  const preview = buildAgentBodyRulePreviewModel(agent);
-  const compiledEndpointIds = resolveCompiledAgentBodyEndpointIds(agent);
+  const preview = buildAgentBodyRulePreviewModel(agent, WORLD_REGISTRY);
+  const compiledEndpointIds = resolveCompiledAgentBodyEndpointIds(agent, WORLD_REGISTRY);
 
   assert.deepEqual(
     compiledEndpointIds.bodyInputNodeIds,

@@ -3,6 +3,7 @@ import SimulationCanvas from './components/SimulationCanvas';
 import {
   buildAgentBodyRulePreviewModel,
   createDefaultAgentIR,
+  createDefaultWorldRegistry,
   reconcileAgentIRVisionCells,
   resolveCompiledAgentBodyEndpointIds,
   summarizeAgentIR,
@@ -85,17 +86,18 @@ const clampSplitRatio = (containerSize: number, ratio: number): number => {
   const maxRatio = (containerSize - MIN_PANEL_SIZE - SPLIT_DIVIDER_SIZE) / containerSize;
   return clamp(ratio, minRatio, maxRatio);
 };
+const DEFAULT_WORLD_REGISTRY = createDefaultWorldRegistry();
 
 const createInitialAgentRuntimeStatus = (agent: AgentIR): AgentRuntimeStatus => ({
   state: 'applied',
-  appliedSummary: summarizeAgentIR(agent),
+  appliedSummary: summarizeAgentIR(agent, DEFAULT_WORLD_REGISTRY),
   issues: [],
   message: null,
 });
 
 const createAgentDraftStatus = (draftAgent: AgentIR): AgentDraftStatus => {
-  const summary = summarizeAgentIR(draftAgent);
-  const validationIssues = validateAgentIR(draftAgent);
+  const summary = summarizeAgentIR(draftAgent, DEFAULT_WORLD_REGISTRY);
+  const validationIssues = validateAgentIR(draftAgent, DEFAULT_WORLD_REGISTRY);
 
   if (validationIssues.length > 0) {
     return {
@@ -272,7 +274,7 @@ const App: React.FC = () => {
   const hasUnsavedDraftChanges =
     hasDraftEditingChanges || hasPendingRuntimeInstall || bodyDraftStatus.hasChanges;
   const bodyRulePreviewModel = useMemo(
-    () => buildAgentBodyRulePreviewModel(bodyPreviewAgent),
+    () => buildAgentBodyRulePreviewModel(bodyPreviewAgent, DEFAULT_WORLD_REGISTRY),
     [bodyPreviewAgent]
   );
   const bodyRulePreview = useMemo<BodyIRPreviewData>(() => {
@@ -297,7 +299,7 @@ const App: React.FC = () => {
       }));
     });
 
-    const compiledEndpointIds = resolveCompiledAgentBodyEndpointIds(bodyPreviewAgent);
+    const compiledEndpointIds = resolveCompiledAgentBodyEndpointIds(bodyPreviewAgent, DEFAULT_WORLD_REGISTRY);
 
     return {
       canonicalSummary: `canonical coverage ${draftBodyDocument.visionCellCount} cells；输入 endpoint ${bodyRulePreviewModel.input.endpointNodeIds.length} 个，输出 endpoint ${bodyRulePreviewModel.output.endpointNodeIds.length} 个。`,
@@ -477,7 +479,7 @@ const App: React.FC = () => {
       if (shouldInstallToRuntime) {
         setRuntimeInstallRequest(normalizedAgentDocument);
       }
-      const canPersistActiveBrain = validateAgentIR(normalizedAgentDocument).length === 0;
+      const canPersistActiveBrain = validateAgentIR(normalizedAgentDocument, DEFAULT_WORLD_REGISTRY).length === 0;
       setBrainLibrary((currentLibrary) =>
         shouldPersistActiveBrain && canPersistActiveBrain && activeBrainId
           ? upsertBrainLibraryItemAgent(
@@ -585,7 +587,7 @@ const App: React.FC = () => {
           }
     );
     handleAgentChange(
-      (currentAgent) => reconcileAgentIRVisionCells(currentAgent, params.visionCells),
+      (currentAgent) => reconcileAgentIRVisionCells(currentAgent, params.visionCells, DEFAULT_WORLD_REGISTRY),
       GRAPH_SEMANTIC_CHANGE
     );
   }, [handleAgentChange]);
@@ -618,7 +620,8 @@ const App: React.FC = () => {
             ...currentAgent,
             body: draftBodyDocument,
           },
-          draftBodyDocument.visionCellCount
+          draftBodyDocument.visionCellCount,
+          DEFAULT_WORLD_REGISTRY
         ),
       GRAPH_SEMANTIC_CHANGE
     );
@@ -1034,6 +1037,7 @@ const App: React.FC = () => {
         <SimulationCanvas
           width={canvasWidth}
           height={canvasHeight}
+          worldRegistry={DEFAULT_WORLD_REGISTRY}
           controlMode={'snn' as Extract<SimulationControlMode, 'keyboard' | 'snn'>}
           runtimeInstallRequest={runtimeInstallRequest}
           agentParameters={agentParameters}
@@ -1108,6 +1112,7 @@ const App: React.FC = () => {
             graphSessionToken={graphEditorSessionToken}
             visionCells={bodyPreviewAgent.body.visionCellCount}
             installedSummary={installedGraphSummary}
+            worldRegistry={DEFAULT_WORLD_REGISTRY}
             runtimeStatus={agentRuntimeStatus}
             draftStatus={agentDraftStatus}
             runtimeActivity={agentRuntimeActivity}
