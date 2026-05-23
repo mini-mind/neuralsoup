@@ -705,7 +705,7 @@
     {
       "id": "task-017",
       "title": "BodyIR 真源收口：移除 canonical AgentIR 对 visionCellCount/layout marker 的语义依赖并下沉 compat getter",
-      "status": "in_progress",
+      "status": "completed",
       "priority": "P1",
       "depends_on": [
         "task-015",
@@ -728,9 +728,13 @@
         {
           "at": "2026-05-23T15:05:00Z",
           "message": "Closed the first half of BodyIR truth-source cleanup by removing production defaults/reconcile/storage main-path dependence on deriveAgentIRVisionCellCount and withDerivedBodyVisionCellCount; legacy sparse-coverage recovery now stays on explicit compat/import normalization paths."
+        },
+        {
+          "at": "2026-05-23T23:59:00Z",
+          "message": "Closed BodyIR truth-source cleanup by moving legacy vision/layout-marker derivation helpers out of canonical domain exports into src/compat, moving legacy import vision-count recovery out of canonical storage normalization, and revalidating with npm run type-check, npm run test:domain, npm run test:compat, plus targeted Playwright brain-library/graph-view coverage."
         }
       ],
-      "completed_at": null
+      "completed_at": "2026-05-23T23:59:00Z"
     },
     {
       "id": "task-018",
@@ -793,5 +797,5 @@
     }
   ],
   "session_count": 9,
-  "last_session": "2026-05-23T15:05:00Z"
+  "last_session": "2026-05-23T23:59:00Z"
 }

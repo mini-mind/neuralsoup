@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { type AgentIR } from '../../src/domain/brain';
+import { createLegacyGraphBridgeFromAgent } from '../../src/compat/legacyGraphBridge';
 import {
   deriveAgentIRVisionCellCount,
   withDerivedBodyVisionCellCount,
   withVisionCellLayoutMarkers,
-  type AgentIR,
-} from '../../src/domain/brain';
-import { createLegacyGraphBridgeFromAgent } from '../../src/compat/legacyGraphBridge';
+} from '../../src/compat/legacyVisionCellCount';
 
 const createRuleDrivenAgent = (): AgentIR =>
   withDerivedBodyVisionCellCount(

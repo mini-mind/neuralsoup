@@ -96,7 +96,6 @@ const selectors = {
   aggregateLinkDetail: '[data-testid="topology-aggregate-link-detail"]',
   aggregateLinkCount: '[data-testid="topology-aggregate-link-count"]',
   aggregateLinkReadonly: '[data-testid="topology-aggregate-link-readonly"]',
-  linkNeuronOneNeuronTwo: '[data-testid^="topology-link-link-neuron-1-neuron-2-"]',
   nodeNeuronOne: '[data-testid="topology-node-neuron-1"]',
   nodeNeuronTwo: '[data-testid="topology-node-neuron-2"]'
 } as const;
@@ -375,10 +374,16 @@ const getSvgLineMidpoint = async (page: Page, selector: string) => {
 };
 
 const getLeafLinkLocator = (page: Page, fromNodeId: string, toNodeId: string) =>
-  page.locator(`[data-testid^="topology-link-link-${fromNodeId}-${toNodeId}-"]`).first();
+  page
+    .locator(
+      `[data-topology-link-from-node-id="${fromNodeId}"][data-topology-link-to-node-id="${toNodeId}"]`
+    )
+    .first();
 
 const getAggregateLinkLocator = (page: Page) =>
-  page.locator('[data-testid^="topology-link-aggregate:"]').first();
+  page
+    .locator('g.topology-link.is-aggregate[data-topology-link-from-node-id][data-topology-link-to-node-id]')
+    .first();
 
 const doubleClickNode = async (page: Page, selector: string) => {
   const center = await getVisibleLocatorCenterInCanvas(page, selector);
@@ -1455,15 +1460,18 @@ test('graph view edits leaf params and leaf link weights through Graph IR inspec
   await expect(page.locator(selectors.neuronInitialStateUInput)).toHaveValue('');
   await closeTopologyDetailModal(page);
 
-  const leafLink = page.locator(selectors.linkNeuronOneNeuronTwo).first();
+  const leafLink = getLeafLinkLocator(page, 'neuron-1', 'neuron-2');
   await expect(leafLink).toBeVisible();
   await leafLink.click();
-  await expect(page.locator(selectors.topologySelectedLink)).toHaveText(/link-neuron-1-neuron-2-/);
-  await doubleClickAtCenter(page, selectors.linkNeuronOneNeuronTwo);
+  await expect(page.locator(selectors.topologySelectedLink)).toHaveText('link-neuron-1-neuron-2');
+  await doubleClickAtCenter(
+    page,
+    `[data-topology-link-from-node-id="neuron-1"][data-topology-link-to-node-id="neuron-2"]`
+  );
   await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
   await page.locator(selectors.connectionWeightInput).fill('1.25');
   await closeTopologyDetailModal(page);
-  await expect(page.locator(selectors.linkNeuronOneNeuronTwo)).toContainText('1.25');
+  await expect(getLeafLinkLocator(page, 'neuron-1', 'neuron-2')).toContainText('1.25');
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(runtimeConnectionCount));
 });
 

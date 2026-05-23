@@ -11,9 +11,6 @@ import {
   setLegacyGraphIRDocument,
 } from '../../src/compat/legacySimulationSession';
 import {
-  deriveAgentIRVisionCellCount,
-  withDerivedBodyVisionCellCount,
-  withVisionCellLayoutMarkers,
   type AgentIR,
 } from '../../src/domain/brain';
 import { compileLegacyBrainDefinition } from '../../src/compat/legacyBrainCompiler';
@@ -23,6 +20,11 @@ import { createDefaultLegacyBodyDefinition, type LegacyBodyDefinition } from '..
 import type { LegacyBrainProgram } from '../../src/compat/legacyBrainProgram';
 import { createLegacyBrainProgramRuntimeState, stepLegacyBrainProgram } from '../../src/compat/legacyBrainStep';
 import type { Agent } from '../../src/types/simulation';
+import {
+  deriveAgentIRVisionCellCount,
+  withDerivedBodyVisionCellCount,
+  withVisionCellLayoutMarkers,
+} from '../../src/compat/legacyVisionCellCount';
 
 function createAgent(overrides: Partial<Agent> = {}): Agent {
   return {

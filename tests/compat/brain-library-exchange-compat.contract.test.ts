@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDefaultAgentIR, deriveAgentIRVisionCellCount } from '../../src/domain/brain';
+import { createDefaultAgentIR } from '../../src/domain/brain';
 import {
   encodeBrainLibraryRecordAsLegacyAgentPackage,
   isLegacyBrainLibraryStorageEnvelope,
   loadLegacyBrainLibraryStorageEnvelope,
   normalizeImportedLegacyBrainExchange,
 } from '../../src/compat/brainLibraryCompat';
+import { deriveAgentIRVisionCellCount } from '../../src/compat/legacyVisionCellCount';
 import { createBrainLibraryItemFromAgent } from '../../src/storage/brainLibraryRecord';
 import {
   encodeBrainLibraryRecordForExchange,

@@ -1,6 +1,5 @@
 import {
   AgentValidationError,
-  deriveAgentIRVisionCellCount,
   type AgentValidationIssue,
 } from '../domain/brain';
 import {
@@ -20,6 +19,7 @@ import {
 import { createDefaultLegacyBodyDefinition, type LegacyBodyDefinition } from '../compat/legacyBrainPackage';
 import type { AgentRuntimeStatus } from '../types/agentRuntime';
 import { SimulationSession } from '../runtime/SimulationSession';
+import { deriveAgentIRVisionCellCount } from './legacyVisionCellCount';
 
 const LEGACY_VISION_INPUT_PATTERN = /^vision-[RGB]-(\d+)$/;
 

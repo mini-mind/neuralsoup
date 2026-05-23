@@ -1,10 +1,4 @@
-import {
-  deriveAgentIRVisionCellCount,
-  type AgentIR,
-  type BodyIR,
-  type BrainContainerNode,
-  type BrainNeuronNode,
-} from '../domain/brain/agent-ir';
+import { type AgentIR, type BodyIR, type BrainContainerNode, type BrainNeuronNode } from '../domain/brain/agent-ir';
 import type { Position } from '../domain/brain/shared';
 import type {
   GraphIRDocument,
@@ -42,6 +36,7 @@ import {
   resolveLegacyInputSignalNodeId,
   resolveLegacyOutputSignalNodeId,
 } from './legacyGraphBridgeShared';
+import { deriveAgentIRVisionCellCount } from './legacyVisionCellCount';
 
 const createNeuronNodeFromAgent = (neuron: BrainNeuronNode, position?: Position): NeuronNode => ({
   kind: 'neuron',

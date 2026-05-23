@@ -7,10 +7,7 @@ import type {
   BrainIR,
   BrainNeuronNode,
 } from '../domain/brain/agent-ir';
-import {
-  withDerivedBodyVisionCellCount,
-  withVisionCellCount,
-} from '../domain/brain/agent-ir';
+import { withVisionCellCount } from '../domain/brain/agent-ir';
 import type {
   GraphIRDocument,
   LeafLink,
@@ -39,6 +36,7 @@ import {
   getNeuronInitialState,
   getNeuronParams,
 } from './legacyGraphBridgeShared';
+import { withDerivedBodyVisionCellCount } from './legacyVisionCellCount';
 
 const deriveLegacyDocumentVisionCellCount = (document: GraphIRDocument): number =>
   Math.max(

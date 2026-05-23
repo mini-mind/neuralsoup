@@ -4,7 +4,6 @@ import {
   isAgentMetadata,
   isValidBrainLibraryAgentPayload,
   normalizeCanonicalBrainLibraryRecord,
-  normalizeImportedBrainLibraryRecord,
   type BrainLibraryRecord,
 } from '../storage/brainLibraryRecord';
 
@@ -36,6 +35,46 @@ const hasValidOptionalTopLevelMetadata = (value: unknown): boolean => value === 
 const getLegacyVisionCellCount = (agent: AgentIR): number | null => {
   const value = (agent as LegacyAgentPackageWithLegacyBody['agent']).body.visionCellCount;
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : null;
+};
+
+const normalizeImportedBrainLibraryRecord = (
+  agent: AgentIR,
+  metadataOverride?: AgentMetadata,
+  options?: {
+    legacyVisionCellCount?: number | null;
+  }
+): BrainLibraryRecord => {
+  const explicitVisionCellCount =
+    typeof (agent.body as AgentIR['body'] & { visionCellCount?: unknown }).visionCellCount === 'number'
+      ? Math.max(0, Math.floor((agent.body as AgentIR['body'] & { visionCellCount?: number }).visionCellCount ?? 0))
+      : 0;
+  const structuredVisionCellCount = Math.max(
+    0,
+    ...agent.connections.flatMap((connection) => {
+      const fromNodeId = connection.from.scope === 'bodyInput' ? connection.from.nodeId : null;
+      const toNodeId = connection.to.scope === 'bodyInput' ? connection.to.nodeId : null;
+      return [fromNodeId, toNodeId]
+        .filter((nodeId): nodeId is string => nodeId != null)
+        .map((nodeId) => {
+          const match = nodeId.match(/^vision-[RGB]-(\d+)$/);
+          return match ? Number.parseInt(match[1] ?? '-1', 10) + 1 : 0;
+        });
+    })
+  );
+  const effectiveVisionCellCount = Math.max(
+    explicitVisionCellCount,
+    structuredVisionCellCount,
+    options?.legacyVisionCellCount != null ? Math.max(0, Math.floor(options.legacyVisionCellCount)) : 0
+  );
+  const nextAgent = {
+    ...agent,
+    body: {
+      ...agent.body,
+      visionCellCount: effectiveVisionCellCount,
+    },
+  };
+
+  return normalizeCanonicalBrainLibraryRecord(nextAgent, metadataOverride);
 };
 
 const isValidLegacyAgentPayload = (agent: unknown): agent is AgentIR => {

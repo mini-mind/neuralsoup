@@ -13,7 +13,7 @@ interface BrainLibraryModalProps {
   onDeleteBrain: (brainId: string) => void;
   onDuplicateBrain: (brainId: string) => void;
   onExportBrain: (brainId: string) => void;
-  onImportBrain: (name: string, payload: unknown) => void;
+  onImportBrain: (name: string, payload: unknown) => void | Promise<void>;
 }
 
 const parseImportedBrainPackage = (rawValue: string): unknown => {
@@ -51,18 +51,20 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
   }
 
   const handleImportFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
+    const input = event.currentTarget;
+    const file = input.files?.[0];
     if (!file) {
       return;
     }
 
     try {
       const text = await file.text();
-      onImportBrain(importName || file.name.replace(/\.json$/i, ''), parseImportedBrainPackage(text));
+      await onImportBrain(importName || file.name.replace(/\.json$/i, ''), parseImportedBrainPackage(text));
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '导入失败');
+    } finally {
+      input.value = '';
     }
   };
 
