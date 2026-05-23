@@ -13,6 +13,7 @@ const createTestAgent = (): AgentIR => ({
   },
   body: {
     version: 1,
+    visionCellCount: 0,
     inputRules: [],
     outputRules: [],
   },
@@ -150,6 +151,7 @@ test('agent graph root brain child scope projects boundary adapters without prox
       decayPerSecond: 4,
     },
   ];
+  agent.body.visionCellCount = 1;
   agent.connections = [
     ...agent.connections,
     {
@@ -212,6 +214,7 @@ test('agent graph root scope exposes canonical body endpoints even before any co
       decayPerSecond: 4,
     },
   ];
+  agent.body.visionCellCount = 1;
   agent.layout = {
     version: 1,
     nodes: {
@@ -243,6 +246,7 @@ test('agent graph root scope exposes canonical body endpoints even before any co
   const outputAdapter = rootView.nodes.find((node) => node.id === 'output-adapter');
   assert.ok(inputAdapter);
   assert.ok(outputAdapter);
+  assert.equal(rootView.links.some((link) => link.aggregate), false);
 
   const inputScopeView = buildAgentGraphViewModel({
     agent,

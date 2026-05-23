@@ -11,6 +11,7 @@ interface BodyIRSettingsSectionProps {
 
 const DEFAULT_BODY_IR_VALUE: BodyIR = {
   version: 1,
+  visionCellCount: 36,
   inputRules: [
     {
       id: 'input-rule-1',
@@ -313,8 +314,37 @@ const BodyIRSettingsSection: React.FC<BodyIRSettingsSectionProps> = ({ body, onB
     <div className="settings-page-section body-ir-settings" data-testid="body-ir-settings-panel">
       <div className="settings-section-header">
         <h4>BodyIR 映射规则</h4>
-        <p>维护 body endpoint 到 world 信号的映射规则，并实时查看投影预览与校验结果。</p>
+        <p>维护 body endpoint 到 world 信号的映射规则、视觉 coverage，并实时查看投影预览与校验结果。</p>
       </div>
+
+      <section className="body-ir-rule-section" data-testid="body-ir-coverage-section">
+        <div className="body-ir-section-header">
+          <div>
+            <h5>visionCoverage</h5>
+            <p>定义 canonical BodyIR 的视觉输入覆盖范围，GraphView 预览和 runtime 输入维度都以此为准。</p>
+          </div>
+        </div>
+
+        <div className="body-ir-rule-grid">
+          <label className="settings-param-item">
+            <span className="settings-param-label">visionCellCount</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={currentBody.visionCellCount}
+              className="settings-param-input body-ir-number-input"
+              data-testid="body-ir-vision-cell-count"
+              onChange={(event) =>
+                commitBodyChange((current) => ({
+                  ...current,
+                  visionCellCount: Math.max(0, Number.parseInt(event.target.value || '0', 10) || 0),
+                }))
+              }
+            />
+          </label>
+        </div>
+      </section>
 
       {bodyMessages.length > 0 ? (
         <div className="body-ir-message-list" data-testid="body-ir-validation-list">

@@ -9,7 +9,7 @@ import type {
 } from '../domain/brain/agent-ir';
 import {
   withDerivedBodyVisionCellCount,
-  withVisionCellLayoutMarkers,
+  withVisionCellCount,
 } from '../domain/brain/agent-ir';
 import type {
   GraphIRDocument,
@@ -472,7 +472,7 @@ export const createAgentIRFromLegacyGraphDetailed = (
 
   return {
     agent: withDerivedBodyVisionCellCount(
-      withVisionCellLayoutMarkers(
+      withVisionCellCount(
         {
           version: 1,
           metadata,
@@ -481,7 +481,7 @@ export const createAgentIRFromLegacyGraphDetailed = (
           connections: connectionBuildResult.connections,
           layout: buildAgentLayoutFromLegacy(document, layout),
         },
-        Math.max(1, body ? getLegacyBodyVisionCellCount(resolvedBody) : deriveLegacyDocumentVisionCellCount(document))
+        Math.max(0, body ? getLegacyBodyVisionCellCount(resolvedBody) : deriveLegacyDocumentVisionCellCount(document))
       )
     ),
     droppedLinkIds: connectionBuildResult.droppedLinkIds,

@@ -65,9 +65,6 @@ export interface GraphDocumentChangeOptions {
   persistActiveBrain?: boolean;
 }
 
-const getScopeBaseViewport = (scope: 'root' | 'child'): GraphPoint =>
-  scope === 'root' ? { x: 0, y: 0 } : { x: 48, y: 36 };
-
 const uniqueIds = (ids: string[]) => Array.from(new Set(ids));
 
 const areStringArraysEqual = (left: string[], right: string[]) =>
@@ -248,11 +245,9 @@ export const useSNNTopologyState = ({
     setSelectionRect(null);
     setShowDetailModal(null);
     setDraftNodePositions({});
-    setCanvasViewport({ x: 0, y: 0 });
-    setCanvasScale(1);
     setPendingFocusNodeId(null);
     setPendingFocusLinkId(null);
-  }, [setCanvasScale, setPendingFocusLinkId]);
+  }, [setPendingFocusLinkId]);
 
   useEffect(() => {
     if (editorSessionKeyRef.current === graphSessionKey) {
@@ -279,9 +274,7 @@ export const useSNNTopologyState = ({
     }
 
     scopeSessionRef.current = scopeKey;
-    setCanvasViewport(getScopeBaseViewport(currentScope));
-    setCanvasScale(1);
-  }, [currentScope, scopeKey, setCanvasScale]);
+  }, [scopeKey]);
 
   useEffect(() => {
     if (navigationPath.length > 0) {

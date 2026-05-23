@@ -7,6 +7,7 @@ test('default AgentIR seed is valid and exposes vision-aligned body and runtime 
 
   assert.equal(agent.metadata.name, 'Seed Agent');
   assert.equal(deriveAgentIRVisionCellCount(agent), 4);
+  assert.equal(agent.body.visionCellCount, 4);
   assert.deepEqual(
     agent.body.inputRules.map((rule) => rule.id),
     ['vision-inputs']
@@ -38,6 +39,7 @@ test('default AgentIR seed layout does not persist compat-only bridge nodes', ()
   assert.equal(layoutNodeIds.has('core-output-turn-right'), false);
   assert.equal(layoutNodeIds.has('input-adapter'), false);
   assert.equal(layoutNodeIds.has('output-adapter'), false);
+  assert.equal([...layoutNodeIds].some((nodeId) => nodeId.startsWith('__body-vision-cell-')), false);
   assert.equal(layoutNodeIds.has(agent.brain.rootContainerId), true);
   assert.equal(agent.brain.rootContainerId, 'root-container');
   assert.equal(layoutNodeIds.has('neuron-1'), true);

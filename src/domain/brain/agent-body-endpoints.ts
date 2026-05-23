@@ -1,5 +1,4 @@
 import type { AgentIR, BodyInputRule, BodyOutputRule } from './agent-ir';
-import { deriveAgentIRVisionCellCount } from './agent-ir';
 
 const INPUT_SOURCE_TEMPLATE_PATTERN = /^vision\.\$(\d+)\.\$(\d+)$/;
 const OUTPUT_TARGET_TEMPLATE_PATTERN = /^action\.\$(\d+)$/;
@@ -185,44 +184,19 @@ const collectEndpointIdsFromConnections = (agent: AgentIR, scope: 'bodyInput' | 
   return endpointIds;
 };
 
-const collectEndpointIdsFromLayout = (agent: AgentIR, rules: Array<BodyInputRule | BodyOutputRule>): Set<string> => {
-  const endpointIds = new Set<string>();
-  const layoutNodeIds = Object.keys(agent.layout?.nodes ?? {});
-
-  for (const rule of rules) {
-    let regex: RegExp;
-    try {
-      regex = new RegExp(rule.nodeIdPattern);
-    } catch {
-      continue;
-    }
-
-    for (const nodeId of layoutNodeIds) {
-      regex.lastIndex = 0;
-      if (regex.test(nodeId)) {
-        endpointIds.add(nodeId);
-      }
-    }
-  }
-
-  return endpointIds;
-};
-
 export interface AgentBodyEndpointIds {
   bodyInputNodeIds: string[];
   bodyOutputNodeIds: string[];
 }
 
 export const resolveAgentBodyEndpointIds = (agent: AgentIR): AgentBodyEndpointIds => {
-  const visionCellCount = deriveAgentIRVisionCellCount(agent);
+  const visionCellCount = agent.body.visionCellCount;
   const bodyInputNodeIds = new Set<string>([
     ...collectEndpointIdsFromConnections(agent, 'bodyInput'),
-    ...collectEndpointIdsFromLayout(agent, agent.body.inputRules),
     ...agent.body.inputRules.flatMap((rule) => enumerateInputRuleNodeIds(rule, visionCellCount)),
   ]);
   const bodyOutputNodeIds = new Set<string>([
     ...collectEndpointIdsFromConnections(agent, 'bodyOutput'),
-    ...collectEndpointIdsFromLayout(agent, agent.body.outputRules),
     ...agent.body.outputRules.flatMap((rule) => enumerateOutputRuleNodeIds(rule)),
   ]);
 

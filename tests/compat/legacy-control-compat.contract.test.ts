@@ -184,6 +184,7 @@ const createRuleDrivenSessionAgent = (): AgentIR =>
         },
         body: {
           version: 1,
+          visionCellCount: 3,
           inputRules: [
             {
               id: 'vision-cells',
@@ -735,9 +736,10 @@ test('simulation session vision-cell reconcile preserves AgentIR-only body rule 
   const currentAgent = session.getCurrentAgentIR();
   const customAgent = {
     ...currentAgent,
-    body: {
-      ...currentAgent.body,
-      inputRules: [
+        body: {
+          ...currentAgent.body,
+          visionCellCount: currentAgent.body.visionCellCount,
+          inputRules: [
         {
           id: 'custom-vision-rule',
           nodeIdPattern: '^vision-([RGB])-(\\d+)$',
@@ -1024,6 +1026,7 @@ test('simulation session legacy GraphIR compat getter rejects applied AgentIR bo
     ...currentAgent,
     body: {
       ...currentAgent.body,
+      visionCellCount: currentAgent.body.visionCellCount,
       inputRules: [
         {
           id: 'custom-input-a',

@@ -1,7 +1,7 @@
 import {
   resolveBodyInputVisionCellIndex,
   withDerivedBodyVisionCellCount,
-  withVisionCellLayoutMarkers,
+  withVisionCellCount,
   type AgentConnection,
   type AgentIR,
   type BodyInputRule,
@@ -35,7 +35,7 @@ export const reconcileAgentIRVisionCells = (
   visionCells: number
 ): AgentIR =>
   withDerivedBodyVisionCellCount(
-    withVisionCellLayoutMarkers(
+    withVisionCellCount(
       {
         ...agent,
         connections: reconcileConnectionsForVisionCells(agent.connections, visionCells, agent.body.inputRules),

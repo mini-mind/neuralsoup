@@ -1,4 +1,4 @@
-import { deriveAgentIRVisionCellCount, type AgentIR, type AgentIRSummary } from './agent-ir';
+import type { AgentIR, AgentIRSummary } from './agent-ir';
 
 export const summarizeAgentIR = (agent: AgentIR): AgentIRSummary => {
   const inputNodeIds = new Set<string>();
@@ -14,7 +14,7 @@ export const summarizeAgentIR = (agent: AgentIR): AgentIRSummary => {
   }
 
   return {
-    inputSignalCount: Math.max(deriveAgentIRVisionCellCount(agent) * 3 + 3, inputNodeIds.size),
+    inputSignalCount: Math.max(agent.body.visionCellCount * 3 + 3, inputNodeIds.size),
     outputSignalCount: Math.max(3, outputNodeIds.size),
     neuronCount: agent.brain.neurons.length,
     leafLinkCount: agent.connections.length,

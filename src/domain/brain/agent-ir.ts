@@ -25,12 +25,9 @@ export interface BodyOutputRule {
 
 export interface BodyIR {
   version: 1;
+  visionCellCount: number;
   inputRules: BodyInputRule[];
   outputRules: BodyOutputRule[];
-  /**
-   * @deprecated Compatibility accessor only. Derived from AgentIR and not persisted.
-   */
-  readonly visionCellCount?: number;
 }
 
 export interface BrainNeuronInitialState {
@@ -126,9 +123,14 @@ const LEGACY_BODY_INPUT_NODE_PATTERN = /^vision-[RGB]-(\d+)$/;
 const BODY_INPUT_SOURCE_PATTERN = /^vision\.[RGB]\.(\d+)$/;
 const VISION_LAYOUT_MARKER_PATTERN = /^__body-vision-cell-(\d+)$/;
 
-type LegacyBodyIR = BodyIR & {
+type LegacyBodyIR = Omit<BodyIR, 'visionCellCount'> & {
   visionCellCount?: unknown;
 };
+
+const normalizeVisionCellCount = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? Math.max(0, Math.floor(value))
+    : null;
 
 const applyRuleTemplate = (template: string, match: RegExpExecArray): string =>
   template.replace(/\$(\d+)/g, (_token, rawGroupIndex: string) => {
@@ -145,9 +147,39 @@ const parseLegacyVisionCellIndex = (nodeId: string): number | null => {
   return Number.parseInt(match[1], 10);
 };
 
-const stripLegacyBodyVisionCellCount = (body: BodyIR): BodyIR => {
-  const { visionCellCount: _legacyVisionCellCount, ...bodyWithoutLegacyVisionCellCount } = body as LegacyBodyIR;
-  return bodyWithoutLegacyVisionCellCount as BodyIR;
+const deriveLegacyAgentIRVisionCellCount = (agent: AgentIR): number => {
+  const canonicalVisionCellCount = normalizeVisionCellCount((agent.body as LegacyBodyIR).visionCellCount);
+  if (canonicalVisionCellCount != null) {
+    return canonicalVisionCellCount;
+  }
+
+  let maxCellIndex = -1;
+
+  for (const connection of agent.connections) {
+    if (connection.from.scope === 'bodyInput') {
+      const cellIndex = resolveBodyInputVisionCellIndex(connection.from.nodeId, agent.body.inputRules);
+      if (cellIndex != null) {
+        maxCellIndex = Math.max(maxCellIndex, cellIndex);
+      }
+    }
+
+    if (connection.to.scope === 'bodyInput') {
+      const cellIndex = resolveBodyInputVisionCellIndex(connection.to.nodeId, agent.body.inputRules);
+      if (cellIndex != null) {
+        maxCellIndex = Math.max(maxCellIndex, cellIndex);
+      }
+    }
+  }
+
+  for (const nodeId of Object.keys(agent.layout?.nodes ?? {})) {
+    const match = nodeId.match(VISION_LAYOUT_MARKER_PATTERN);
+    if (!match) {
+      continue;
+    }
+    maxCellIndex = Math.max(maxCellIndex, Number.parseInt(match[1], 10));
+  }
+
+  return maxCellIndex + 1;
 };
 
 export const createVisionCellLayoutMarkerId = (cellIndex: number): string => `__body-vision-cell-${cellIndex}`;
@@ -189,79 +221,39 @@ export const resolveBodyInputVisionCellIndex = (
   return sourceMatch ? Number.parseInt(sourceMatch[1], 10) : null;
 };
 
-const deriveStructuredAgentIRVisionCellCount = (agent: AgentIR): number => {
-  let maxCellIndex = -1;
-
-  for (const connection of agent.connections) {
-    if (connection.from.scope === 'bodyInput') {
-      const cellIndex = resolveBodyInputVisionCellIndex(connection.from.nodeId, agent.body.inputRules);
-      if (cellIndex != null) {
-        maxCellIndex = Math.max(maxCellIndex, cellIndex);
-      }
-    }
-
-    if (connection.to.scope === 'bodyInput') {
-      const cellIndex = resolveBodyInputVisionCellIndex(connection.to.nodeId, agent.body.inputRules);
-      if (cellIndex != null) {
-        maxCellIndex = Math.max(maxCellIndex, cellIndex);
-      }
-    }
-  }
-
-  for (const nodeId of Object.keys(agent.layout?.nodes ?? {})) {
-    const markerIndex = parseVisionCellLayoutMarkerIndex(nodeId);
-    if (markerIndex != null) {
-      maxCellIndex = Math.max(maxCellIndex, markerIndex);
-    }
-  }
-
-  return maxCellIndex + 1;
-};
-
 export const deriveAgentIRVisionCellCount = (agent: AgentIR): number =>
-  deriveStructuredAgentIRVisionCellCount(agent);
+  normalizeVisionCellCount((agent.body as LegacyBodyIR).visionCellCount) ?? deriveLegacyAgentIRVisionCellCount(agent);
 
 export const withDerivedBodyVisionCellCount = (agent: AgentIR): AgentIR => {
-  const body = stripLegacyBodyVisionCellCount(agent.body);
-  const normalizedAgent = {
+  return {
     ...agent,
-    body,
+    body: {
+      ...agent.body,
+      visionCellCount: deriveLegacyAgentIRVisionCellCount(agent),
+    },
   };
-
-  Object.defineProperty(body, 'visionCellCount', {
-    configurable: true,
-    enumerable: false,
-    get: () => deriveAgentIRVisionCellCount(normalizedAgent),
-  });
-
-  return normalizedAgent;
 };
 
-export const withVisionCellLayoutMarkers = (
+export const withVisionCellCount = (
   agent: AgentIR,
   visionCellCount: number
 ): AgentIR => {
   const normalizedVisionCellCount = Math.max(0, Math.floor(visionCellCount));
-  const nextLayoutNodes = { ...(agent.layout?.nodes ?? {}) };
-
-  for (const nodeId of Object.keys(nextLayoutNodes)) {
-    const markerIndex = parseVisionCellLayoutMarkerIndex(nodeId);
-    if (markerIndex != null && markerIndex >= normalizedVisionCellCount) {
-      delete nextLayoutNodes[nodeId];
-    }
-  }
-
-  for (let cellIndex = 0; cellIndex < normalizedVisionCellCount; cellIndex += 1) {
-    const markerId = createVisionCellLayoutMarkerId(cellIndex);
-    nextLayoutNodes[markerId] ??= {};
-  }
 
   return {
     ...agent,
-    layout: {
-      version: 1,
-      ...(agent.layout ?? {}),
-      nodes: nextLayoutNodes,
+    body: {
+      ...agent.body,
+      visionCellCount: normalizedVisionCellCount,
     },
   };
 };
+
+/**
+ * @deprecated Compatibility helper retained during migration. Canonical production
+ * paths no longer write layout markers and only update BodyIR.visionCellCount.
+ */
+export const withVisionCellLayoutMarkers = (
+  agent: AgentIR,
+  visionCellCount: number
+): AgentIR => withVisionCellCount(agent, visionCellCount);

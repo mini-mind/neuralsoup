@@ -5,88 +5,85 @@ import {
   createAgentProgramRuntimeState,
   stepAgentProgram,
   validateAgentIR,
-  withDerivedBodyVisionCellCount,
-  withVisionCellLayoutMarkers,
   type AgentIR,
 } from '../../src/domain/brain';
 
 const createRuleDrivenAgent = (): AgentIR =>
-  withDerivedBodyVisionCellCount(
-    withVisionCellLayoutMarkers({
+  ({
+    version: 1,
+    metadata: {
+      id: 'agent-rule-driven',
+      name: 'Rule Driven Agent',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+    body: {
       version: 1,
-      metadata: {
-        id: 'agent-rule-driven',
-        name: 'Rule Driven Agent',
-        createdAt: '2026-01-01T00:00:00.000Z',
-        updatedAt: '2026-01-01T00:00:00.000Z',
-      },
-      body: {
-        version: 1,
-        inputRules: [
-          {
-            id: 'vision-cells',
-            nodeIdPattern: '^sensor-([RGB])-(\\d+)$',
-            sourceTemplate: 'vision.$1.$2',
-            scale: 2,
-          },
-        ],
-        outputRules: [
-          {
-            id: 'motor-actions',
-            nodeIdPattern: '^effector-(turn-left|move-forward|turn-right)$',
-            targetTemplate: 'action.$1',
-            decayPerSecond: 3,
-          },
-        ],
-      },
-      brain: {
-        version: 1,
-        rootContainerId: 'root',
-        neurons: [
-          {
-            id: 'neuron-1',
-            label: 'Neuron 1',
-            model: 'izhikevich',
-            params: {
-              a: 0.02,
-              b: 0.2,
-              c: -65,
-              d: 8,
-              threshold: -70,
-            },
-            initialState: {
-              v: -65,
-            },
-          },
-        ],
-        containers: [
-          {
-            id: 'root',
-            label: 'Root',
-            children: [{ scope: 'brain', nodeId: 'neuron-1' }],
-          },
-        ],
-      },
-      connections: [
+      visionCellCount: 3,
+      inputRules: [
         {
-          id: 'input-connection',
-          from: { scope: 'bodyInput', nodeId: 'sensor-G-2' },
-          to: { scope: 'brain', nodeId: 'neuron-1' },
-          weight: 1,
-        },
-        {
-          id: 'output-connection',
-          from: { scope: 'brain', nodeId: 'neuron-1' },
-          to: { scope: 'bodyOutput', nodeId: 'effector-move-forward' },
-          weight: 1,
+          id: 'vision-cells',
+          nodeIdPattern: '^sensor-([RGB])-(\\d+)$',
+          sourceTemplate: 'vision.$1.$2',
+          scale: 2,
         },
       ],
-      layout: {
-        version: 1,
-        nodes: {},
+      outputRules: [
+        {
+          id: 'motor-actions',
+          nodeIdPattern: '^effector-(turn-left|move-forward|turn-right)$',
+          targetTemplate: 'action.$1',
+          decayPerSecond: 3,
+        },
+      ],
+    },
+    brain: {
+      version: 1,
+      rootContainerId: 'root',
+      neurons: [
+        {
+          id: 'neuron-1',
+          label: 'Neuron 1',
+          model: 'izhikevich',
+          params: {
+            a: 0.02,
+            b: 0.2,
+            c: -65,
+            d: 8,
+            threshold: -70,
+          },
+          initialState: {
+            v: -65,
+          },
+        },
+      ],
+      containers: [
+        {
+          id: 'root',
+          label: 'Root',
+          children: [{ scope: 'brain', nodeId: 'neuron-1' }],
+        },
+      ],
+    },
+    connections: [
+      {
+        id: 'input-connection',
+        from: { scope: 'bodyInput', nodeId: 'sensor-G-2' },
+        to: { scope: 'brain', nodeId: 'neuron-1' },
+        weight: 1,
       },
-    }, 3)
-  );
+      {
+        id: 'output-connection',
+        from: { scope: 'brain', nodeId: 'neuron-1' },
+        to: { scope: 'bodyOutput', nodeId: 'effector-move-forward' },
+        weight: 1,
+      },
+    ],
+    layout: {
+      version: 1,
+      nodes: {},
+    },
+  });
 
 test('compileAgentIR resolves BodyIR regex rules into runtime ports instead of relying on legacy node ids', () => {
   const program = compileAgentIR(createRuleDrivenAgent());

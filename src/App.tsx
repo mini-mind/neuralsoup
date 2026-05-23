@@ -3,7 +3,6 @@ import SimulationCanvas from './components/SimulationCanvas';
 import {
   buildAgentBodyRulePreviewModel,
   createDefaultAgentIR,
-  deriveAgentIRVisionCellCount,
   reconcileAgentIRVisionCells,
   summarizeAgentIR,
   validateAgentIR,
@@ -156,7 +155,7 @@ const applyBrainRecordToEditorState = (
     setEditorTab: React.Dispatch<React.SetStateAction<EditorTab>>;
   }
 ): void => {
-  const bodyVisionCells = deriveAgentIRVisionCellCount(brain.agent);
+  const bodyVisionCells = brain.agent.body.visionCellCount;
   options.resetGraphEditorSession();
   options.resetRuntimeForBrainSwitch();
   options.setIsBrainLibraryOpen(true);
@@ -278,11 +277,11 @@ const App: React.FC = () => {
     });
 
     return {
-      summary: `输入 endpoint ${bodyRulePreviewModel.input.endpointNodeIds.length} 个，输出 endpoint ${bodyRulePreviewModel.output.endpointNodeIds.length} 个。`,
+      summary: `coverage ${draftAgentDocument.body.visionCellCount} cells；输入 endpoint ${bodyRulePreviewModel.input.endpointNodeIds.length} 个，输出 endpoint ${bodyRulePreviewModel.output.endpointNodeIds.length} 个。`,
       inputMatches,
       outputMatches,
     };
-  }, [bodyRulePreviewModel, draftAgentDocument.body.inputRules, draftAgentDocument.body.outputRules]);
+  }, [bodyRulePreviewModel, draftAgentDocument.body.visionCellCount, draftAgentDocument.body.inputRules, draftAgentDocument.body.outputRules]);
   const bodyRuleValidation = useMemo<BodyIRValidationMessage[]>(() => {
     const inputRuleIndexById = new Map(draftAgentDocument.body.inputRules.map((rule, index) => [rule.id, index]));
     const outputRuleIndexById = new Map(draftAgentDocument.body.outputRules.map((rule, index) => [rule.id, index]));
@@ -1011,10 +1010,18 @@ const App: React.FC = () => {
               onSettingsSectionChange={setSettingsSection}
               onDraftAgentParametersChange={setDraftAgentParameters}
               onBodyChange={(updater) => {
-                handleAgentChange((currentAgent) => ({
-                  ...currentAgent,
-                  body: updater(currentAgent.body),
-                }), GRAPH_SEMANTIC_CHANGE);
+                handleAgentChange((currentAgent) => {
+                  const nextBody = updater(currentAgent.body);
+                  setDraftAgentParameters((current) =>
+                    current.visionCells === nextBody.visionCellCount
+                      ? current
+                      : { ...current, visionCells: nextBody.visionCellCount }
+                  );
+                  return {
+                    ...currentAgent,
+                    body: nextBody,
+                  };
+                }, GRAPH_SEMANTIC_CHANGE);
               }}
               onApply={applyDraftAgentParameters}
               onResetDefaults={resetDraftAgentParameters}

@@ -4,7 +4,6 @@ import {
   type AgentMetadata,
   validateAgentIR,
   withDerivedBodyVisionCellCount,
-  withVisionCellLayoutMarkers,
 } from '../domain/brain';
 
 export interface BrainLibraryRecord {
@@ -24,12 +23,16 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 const createAgentLibraryId = (): string => `agent-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 const stripLegacyVisionCellCount = (agent: AgentIR): AgentIR => {
-  const { visionCellCount: _legacyVisionCellCount, ...bodyWithoutLegacyVisionCellCount } = agent.body as AgentIR['body'] & {
-    visionCellCount?: unknown;
-  };
+  const legacyVisionCellCount =
+    typeof (agent.body as AgentIR['body'] & { visionCellCount?: unknown }).visionCellCount === 'number'
+      ? Math.max(0, Math.floor((agent.body as AgentIR['body'] & { visionCellCount?: number }).visionCellCount ?? 0))
+      : deriveAgentIRVisionCellCount(agent);
   return {
     ...agent,
-    body: bodyWithoutLegacyVisionCellCount,
+    body: {
+      ...agent.body,
+      visionCellCount: legacyVisionCellCount,
+    },
   };
 };
 
@@ -62,45 +65,20 @@ export const isAgentMetadata = (value: unknown): value is AgentMetadataShape =>
   typeof value.createdAt === 'string' &&
   typeof value.updatedAt === 'string';
 
-const hasAcceptableBodyVisionCellCount = (
-  body: Record<string, unknown>,
-  options?: {
-    allowLegacyVisionCellCount?: boolean;
-  }
-): boolean => {
-  const descriptor = Object.getOwnPropertyDescriptor(body, 'visionCellCount');
-  if (!descriptor) {
-    return true;
-  }
-
-  if (typeof descriptor.get === 'function') {
-    return true;
-  }
-
-  if (options?.allowLegacyVisionCellCount !== true) {
-    return descriptor.value === undefined;
-  }
-
-  return (
-    descriptor.value === undefined ||
-    (typeof descriptor.value === 'number' &&
-      Number.isFinite(descriptor.value) &&
-      descriptor.value >= 0)
-  );
-};
+const hasAcceptableBodyVisionCellCount = (body: Record<string, unknown>): boolean =>
+  typeof body.visionCellCount === 'number' &&
+  Number.isFinite(body.visionCellCount) &&
+  body.visionCellCount >= 0;
 
 export const isValidBrainLibraryAgentPayload = (
-  agent: unknown,
-  options?: {
-    allowLegacyVisionCellCount?: boolean;
-  }
+  agent: unknown
 ): agent is AgentIR =>
   isObject(agent) &&
   agent.version === 1 &&
   isAgentMetadata(agent.metadata) &&
   isObject(agent.body) &&
   agent.body.version === 1 &&
-  hasAcceptableBodyVisionCellCount(agent.body, options) &&
+  hasAcceptableBodyVisionCellCount(agent.body) &&
   Array.isArray(agent.body.inputRules) &&
   agent.body.inputRules.every(
     (rule) =>
@@ -197,16 +175,12 @@ export const normalizeCanonicalBrainLibraryRecord = (
   metadataOverride?: AgentMetadata
 ): BrainLibraryRecord => {
   const metadata = metadataOverride ?? { ...agent.metadata };
-  const normalizedVisionCellCount = deriveAgentIRVisionCellCount(agent);
   const normalizedAgent = withDerivedBodyVisionCellCount(
-    withVisionCellLayoutMarkers(
-      stripNonCanonicalLayoutState(
-        stripLegacyVisionCellCount({
-          ...agent,
-          metadata,
-        })
-      ),
-      normalizedVisionCellCount
+    stripNonCanonicalLayoutState(
+      stripLegacyVisionCellCount({
+        ...agent,
+        metadata,
+      })
     )
   );
 
@@ -225,17 +199,34 @@ export const normalizeImportedBrainLibraryRecord = (
     legacyVisionCellCount?: number | null;
   }
 ): BrainLibraryRecord => {
-  const structuredVisionCellCount = deriveAgentIRVisionCellCount(agent);
+  const explicitVisionCellCount =
+    typeof (agent.body as AgentIR['body'] & { visionCellCount?: unknown }).visionCellCount === 'number'
+      ? Math.max(0, Math.floor((agent.body as AgentIR['body'] & { visionCellCount?: number }).visionCellCount ?? 0))
+      : 0;
+  const structuredVisionCellCount = deriveAgentIRVisionCellCount(
+    explicitVisionCellCount > 0
+      ? {
+          ...agent,
+          body: {
+            ...agent.body,
+            visionCellCount: explicitVisionCellCount,
+          },
+        }
+      : agent
+  );
   const effectiveVisionCellCount =
-    structuredVisionCellCount > 0
-      ? structuredVisionCellCount
-      : options?.legacyVisionCellCount != null
-        ? options.legacyVisionCellCount
-        : 0;
-  const nextAgent =
-    effectiveVisionCellCount > structuredVisionCellCount
-      ? withVisionCellLayoutMarkers(agent, effectiveVisionCellCount)
-      : agent;
+    Math.max(
+      explicitVisionCellCount,
+      structuredVisionCellCount,
+      options?.legacyVisionCellCount != null ? Math.max(0, Math.floor(options.legacyVisionCellCount)) : 0
+    );
+  const nextAgent = {
+    ...agent,
+    body: {
+      ...agent.body,
+      visionCellCount: effectiveVisionCellCount,
+    },
+  };
 
   return normalizeCanonicalBrainLibraryRecord(nextAgent, metadataOverride);
 };

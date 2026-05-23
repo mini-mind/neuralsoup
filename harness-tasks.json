@@ -672,7 +672,7 @@
     {
       "id": "task-016",
       "title": "Layout 真源收口：决定并实现 viewportByContainerId/size/expanded 的持久化或从 schema 删除",
-      "status": "in_progress",
+      "status": "completed",
       "priority": "P2",
       "depends_on": [
         "task-014"
@@ -694,11 +694,89 @@
         {
           "at": "2026-05-23T20:05:00Z",
           "message": "Stage audit confirmed production AgentIR layout truth only persists position/collapsed, while viewport/size/expanded remain session or computed state; implementation is now aligning schema, canonical storage validation, docs, and task tracking to that reality."
+        },
+        {
+          "at": "2026-05-23T12:09:01Z",
+          "message": "Layout truth-source closure revalidated end-to-end: AgentLayoutIR canonical schema/storage/compat now only preserve position/collapsed, graph-view Playwright coverage passed in both renderer modes (66 passed), and cross-review confirmed the next remaining risks moved to BodyIR truth-source closure plus GraphView session-state ownership rather than the removed layout fields."
         }
       ],
+      "completed_at": "2026-05-23T12:09:01Z"
+    },
+    {
+      "id": "task-017",
+      "title": "BodyIR 真源收口：移除 canonical AgentIR 对 visionCellCount/layout marker 的语义依赖并下沉 compat getter",
+      "status": "pending",
+      "priority": "P1",
+      "depends_on": [
+        "task-015",
+        "task-016"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:compat && npm run test:e2e -- --grep \"brain library|graph view\"",
+        "timeout_seconds": 1200
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [
+        "Canonical AgentIR still derives body coverage semantics from visionCellCount compat accessors and persisted layout markers, so layout is not yet a pure presentation layer and BodyIR is not fully self-describing."
+      ],
+      "checkpoints": [],
+      "completed_at": null
+    },
+    {
+      "id": "task-018",
+      "title": "Body endpoint authority 收口：统一 compile、validate、preview 与 GraphView 的 endpoint expansion/binding 解释器",
+      "status": "pending",
+      "priority": "P1",
+      "depends_on": [
+        "task-014",
+        "task-017"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"graph view|body\"",
+        "timeout_seconds": 1200
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [
+        "GraphView still uses a limited body endpoint projection path distinct from compile/runtime regex semantics, leaving compile, validate, preview, and UI with multiple competing interpreters."
+      ],
+      "checkpoints": [],
+      "completed_at": null
+    },
+    {
+      "id": "task-019",
+      "title": "GraphView session state 收口：清理 viewport 双真源并统一 expanded child 的 viewId/refId 交互语义",
+      "status": "pending",
+      "priority": "P2",
+      "depends_on": [
+        "task-016"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"graph view\"",
+        "timeout_seconds": 1200
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [
+        "GraphView still carries structural session-state debt around multiple viewport writers and mixed viewId/refNodeId handling for expanded children, even though the current graph-view suite is green."
+      ],
+      "checkpoints": [],
       "completed_at": null
     }
   ],
   "session_count": 9,
-  "last_session": "2026-05-23T18:55:00Z"
+  "last_session": "2026-05-23T12:09:01Z"
 }

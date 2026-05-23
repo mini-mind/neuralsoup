@@ -1,6 +1,5 @@
 import {
   withDerivedBodyVisionCellCount,
-  withVisionCellLayoutMarkers,
   type AgentConnection,
   type AgentIR,
   type AgentLayoutIR,
@@ -32,6 +31,7 @@ const createAgentMetadata = (
 
 const createDefaultBodyIR = (): BodyIR => ({
   version: DEFAULT_BODY_VERSION,
+  visionCellCount: 36,
   inputRules: [
     {
       id: DEFAULT_VISION_INPUT_RULE_ID,
@@ -210,14 +210,15 @@ export const createDefaultAgentIR = (
       ? crypto.randomUUID()
       : `agent-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-  return withDerivedBodyVisionCellCount(
-    withVisionCellLayoutMarkers({
+  return withDerivedBodyVisionCellCount({
     version: DEFAULT_AGENT_VERSION,
     metadata: createAgentMetadata(name, timestamp, idSource),
-    body: createDefaultBodyIR(),
+    body: {
+      ...createDefaultBodyIR(),
+      visionCellCount: normalizedVisionCells,
+    },
     brain: createDefaultBrainIR(),
     connections: createDefaultConnections(normalizedVisionCells),
     layout: createDefaultLayout(normalizedVisionCells),
-    }, normalizedVisionCells)
-  );
+  });
 };

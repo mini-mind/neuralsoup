@@ -38,11 +38,35 @@ const getLegacyVisionCellCount = (agent: AgentIR): number | null => {
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : null;
 };
 
+const isValidLegacyAgentPayload = (agent: unknown): agent is AgentIR => {
+  if (!isObject(agent)) {
+    return false;
+  }
+
+  const candidateBody = (agent as { body?: unknown }).body;
+  if (!isObject(candidateBody)) {
+    return false;
+  }
+
+  const candidateVisionCellCount = candidateBody.visionCellCount;
+  if (candidateVisionCellCount === undefined) {
+    return isValidBrainLibraryAgentPayload({
+      ...(agent as Record<string, unknown>),
+      body: {
+        ...candidateBody,
+        visionCellCount: 0,
+      },
+    });
+  }
+
+  return isValidBrainLibraryAgentPayload(agent);
+};
+
 export const isLegacyAgentPackage = (value: unknown): value is AgentLibraryItem =>
   isObject(value) &&
   value.packageVersion === 1 &&
   hasValidOptionalTopLevelMetadata((value as LegacyAgentPackageLike).metadata) &&
-  isValidBrainLibraryAgentPayload((value as LegacyAgentPackageLike).agent, { allowLegacyVisionCellCount: true });
+  isValidLegacyAgentPayload((value as LegacyAgentPackageLike).agent);
 
 export const encodeBrainLibraryRecordAsLegacyAgentPackage = (
   record: BrainLibraryRecord

@@ -42,7 +42,7 @@ test('Brain Library default exchange payload is AgentIR-native and round-trips t
   assert.equal(exported.kind, 'neuralsoup-agent');
   assert.equal(normalized.agent.metadata.name, 'Roundtrip Brain');
   assert.equal(deriveAgentIRVisionCellCount(normalized.agent), brain.agent.body.visionCellCount);
-  assert.equal('visionCellCount' in JSON.parse(JSON.stringify(exported)).agent.body, false);
+  assert.equal(JSON.parse(JSON.stringify(exported)).agent.body.visionCellCount, 1);
 });
 
 test('Brain Library default import normalization rejects legacy AgentPackage compat payloads', () => {
@@ -106,7 +106,7 @@ test('explicit compat storage loader migrates legacy AgentPackage payloads missi
   assert.equal(deriveAgentIRVisionCellCount(loaded[0].agent), 2);
 });
 
-test('explicit compat storage loader preserves sparse legacy vision-cell counts without writing body visionCellCount', () => {
+test('explicit compat storage loader preserves sparse legacy vision-cell counts by upgrading to canonical body visionCellCount', () => {
   const brain = createAgentPackage('Sparse Legacy Agent', 36);
   brain.agent.connections = [
     {
@@ -124,8 +124,29 @@ test('explicit compat storage loader preserves sparse legacy vision-cell counts 
   });
   assert.ok(loaded);
   assert.equal(deriveAgentIRVisionCellCount(loaded[0].agent), 36);
-  assert.equal('visionCellCount' in JSON.parse(JSON.stringify(loaded[0])).agent.body, false);
-  assert.ok(loaded[0].agent.layout?.nodes?.['__body-vision-cell-35']);
+  assert.equal(JSON.parse(JSON.stringify(loaded[0])).agent.body.visionCellCount, 36);
+});
+
+test('explicit compat storage loader preserves explicit legacy body visionCellCount when structural evidence is sparse', () => {
+  const brain = createAgentPackage('Explicit Legacy Coverage', 36);
+  brain.agent.connections = [
+    {
+      id: 'sparse-input',
+      from: { scope: 'bodyInput', nodeId: 'vision-G-2', portId: 'out' },
+      to: { scope: 'brain', nodeId: 'neuron-1', portId: 'dendrite' },
+      weight: 1,
+    },
+  ];
+
+  const loaded = loadLegacyBrainLibraryStorageEnvelope({
+    storageVersion: 1,
+    savedAt: new Date().toISOString(),
+    brains: [brain],
+  });
+
+  assert.ok(loaded);
+  assert.equal(loaded[0]?.agent.body.visionCellCount, 36);
+  assert.equal(deriveAgentIRVisionCellCount(loaded[0]!.agent), 36);
 });
 
 test('explicit compat storage loader normalizes legacy top-level metadata to agent metadata truth', () => {

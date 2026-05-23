@@ -6,7 +6,7 @@ import type {
   BrainNeuronNode,
 } from '../domain/brain/agent-ir';
 import type { GraphIRDocument, NeuronNode, SignalNode, TopologyNode } from '../domain/brain/ir';
-import type { LegacyBodyDefinition } from './legacyBrainPackage';
+import { getLegacyBodyVisionCellCount, type LegacyBodyDefinition } from './legacyBrainPackage';
 
 export const DEFAULT_NEURON_PARAMS: IzhikevichNeuronParameters = {
   a: 0.02,
@@ -201,6 +201,12 @@ export const buildBodyIRFromLegacy = (document: GraphIRDocument): BodyIR => {
 
   return {
     version: 1,
+    visionCellCount: Math.max(
+      0,
+      ...signals
+        .filter((signal) => INPUT_CHANNEL_PATTERN.test(signal.id))
+        .map((signal) => Number.parseInt(signal.id.match(INPUT_CHANNEL_PATTERN)?.[2] ?? '-1', 10) + 1)
+    ),
     inputRules: hasVisionSignals
       ? [
           {
@@ -230,6 +236,7 @@ export const buildBodyIRFromCompatBody = (body: LegacyBodyDefinition): BodyIR =>
 
   return {
     version: 1,
+    visionCellCount: getLegacyBodyVisionCellCount(body),
     inputRules: body.brainBindings.inputs.flatMap((binding) => {
       const signal = inputSignalsById.get(binding.bodySignalId);
       if (!signal) {
