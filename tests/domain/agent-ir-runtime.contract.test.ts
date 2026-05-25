@@ -170,6 +170,42 @@ test('validateAgentIR rejects body endpoints that do not match any BodyIR rule',
   );
 });
 
+test('validateAgentIR rejects body output rules that resolve to unsupported action targets', () => {
+  const invalidAgent: AgentIR = {
+    ...createRuleDrivenAgent(),
+    body: {
+      ...createRuleDrivenAgent().body,
+      outputRules: [
+        {
+          id: 'motor-actions',
+          nodeIdPattern: '^effector-(strafe-left)$',
+          targetTemplate: 'action.$1',
+          decayPerSecond: 3,
+        },
+      ],
+    },
+    connections: [
+      {
+        id: 'unsupported-output-connection',
+        from: { scope: 'brain', nodeId: 'neuron-1' },
+        to: { scope: 'bodyOutput', nodeId: 'effector-strafe-left' },
+        weight: 1,
+      },
+    ],
+  };
+
+  const issues = validateAgentIR(invalidAgent, WORLD_REGISTRY);
+
+  assert.ok(
+    issues.some(
+      (issue) =>
+        issue.code === 'runtime-binding-error' &&
+        issue.message.includes('effector-strafe-left') &&
+        issue.message.includes('unsupported target "action.strafe-left"')
+    )
+  );
+});
+
 test('validateAgentIR rejects direct bodyInput -> bodyOutput connections', () => {
   const invalidAgent: AgentIR = {
     ...createRuleDrivenAgent(),

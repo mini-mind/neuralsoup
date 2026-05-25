@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createVisionActionSeedAgentIR } from '../../src/host';
+import { createVisionActionSeedAgentIR, createVisionActionWorldRegistry } from '../../src/host';
 import {
   BRAIN_LIBRARY_CORRUPT_STORAGE_KEY,
   BRAIN_LIBRARY_STATUS_STORAGE_KEY,
@@ -14,6 +14,8 @@ import {
   renameBrainLibraryItem,
   upsertBrainLibraryItemAgent,
 } from '../../src/storage/brainLibraryRecord';
+
+const WORLD_REGISTRY = createVisionActionWorldRegistry();
 class MemoryStorage {
   private values = new Map<string, string>();
   public failWrites = false;
@@ -48,9 +50,9 @@ const installMemoryLocalStorage = () => {
 
 test('Brain Library storage saves and loads v1 record payloads', () => {
   const storage = installMemoryLocalStorage();
-  const record = createBrainLibraryItemFromAgent('Stored Brain', createVisionActionSeedAgentIR(1, 'Stored Brain'));
+  const record = createBrainLibraryItemFromAgent('Stored Brain', createVisionActionSeedAgentIR(1, 'Stored Brain'), WORLD_REGISTRY);
 
-  saveBrainLibrary([record]);
+  saveBrainLibrary([record], WORLD_REGISTRY);
   const rawValue = storage.getItem(BRAIN_LIBRARY_STORAGE_KEY);
   assert.ok(rawValue);
   assert.equal(JSON.parse(rawValue).storageVersion, 1);
@@ -58,7 +60,7 @@ test('Brain Library storage saves and loads v1 record payloads', () => {
   assert.equal('metadata' in JSON.parse(rawValue).brains[0], false);
   assert.equal('visionCellCount' in JSON.parse(rawValue).brains[0].agent.body, false);
 
-  const loaded = loadBrainLibraryWithStatus();
+  const loaded = loadBrainLibraryWithStatus(WORLD_REGISTRY);
   assert.equal(loaded.status.state, 'ok');
   assert.equal(loaded.brains.length, 1);
   assert.equal(loaded.brains[0].agent.metadata.name, 'Stored Brain');
@@ -72,7 +74,7 @@ test('Brain Library record creation rejects invalid AgentIR instead of persistin
   };
 
   assert.throws(
-    () => createBrainLibraryItemFromAgent('Invalid Brain', invalidAgent),
+    () => createBrainLibraryItemFromAgent('Invalid Brain', invalidAgent, WORLD_REGISTRY),
     /当前 AgentIR 无效/
   );
 });
@@ -81,7 +83,7 @@ test('Brain Library storage quarantines corrupted JSON payloads', () => {
   const storage = installMemoryLocalStorage();
   storage.setItem(BRAIN_LIBRARY_STORAGE_KEY, '{broken');
 
-  const loaded = loadBrainLibraryWithStatus();
+  const loaded = loadBrainLibraryWithStatus(WORLD_REGISTRY);
 
   assert.equal(loaded.status.state, 'recovered');
   assert.match(loaded.status.message ?? '', /JSON 解析失败/);
@@ -89,9 +91,9 @@ test('Brain Library storage quarantines corrupted JSON payloads', () => {
   assert.equal(storage.getItem(BRAIN_LIBRARY_STORAGE_KEY), null);
   assert.ok(storage.getItem(BRAIN_LIBRARY_CORRUPT_STORAGE_KEY));
   assert.ok(storage.getItem(BRAIN_LIBRARY_STATUS_STORAGE_KEY));
-  assert.equal(loadBrainLibraryWithStatus().status.state, 'recovered');
+  assert.equal(loadBrainLibraryWithStatus(WORLD_REGISTRY).status.state, 'recovered');
   assert.ok(storage.getItem(BRAIN_LIBRARY_STATUS_STORAGE_KEY));
-  saveBrainLibrary([]);
+  saveBrainLibrary([], WORLD_REGISTRY);
   assert.equal(storage.getItem(BRAIN_LIBRARY_STATUS_STORAGE_KEY), null);
 });
 
@@ -99,23 +101,27 @@ test('Brain Library recovered status survives repeated reads until a successful 
   const storage = installMemoryLocalStorage();
   storage.setItem(BRAIN_LIBRARY_STORAGE_KEY, '{broken');
 
-  const firstLoad = loadBrainLibraryWithStatus();
-  const secondLoad = loadBrainLibraryWithStatus();
+  const firstLoad = loadBrainLibraryWithStatus(WORLD_REGISTRY);
+  const secondLoad = loadBrainLibraryWithStatus(WORLD_REGISTRY);
 
   assert.equal(firstLoad.status.state, 'recovered');
   assert.equal(secondLoad.status.state, 'recovered');
   assert.ok(storage.getItem(BRAIN_LIBRARY_STATUS_STORAGE_KEY));
 
-  saveBrainLibrary([]);
+  saveBrainLibrary([], WORLD_REGISTRY);
   assert.equal(storage.getItem(BRAIN_LIBRARY_STATUS_STORAGE_KEY), null);
 });
 
 test('Brain Library storage rejects old array payloads instead of migrating implicitly', () => {
   const storage = installMemoryLocalStorage();
-  const brain = createBrainLibraryItemFromAgent('Old Array Brain', createVisionActionSeedAgentIR(1, 'Old Array Brain'));
+  const brain = createBrainLibraryItemFromAgent(
+    'Old Array Brain',
+    createVisionActionSeedAgentIR(1, 'Old Array Brain'),
+    WORLD_REGISTRY
+  );
   storage.setItem(BRAIN_LIBRARY_STORAGE_KEY, JSON.stringify([brain]));
 
-  const loaded = loadBrainLibraryWithStatus();
+  const loaded = loadBrainLibraryWithStatus(WORLD_REGISTRY);
 
   assert.equal(loaded.status.state, 'recovered');
   assert.match(loaded.status.message ?? '', /存储格式无效/);
@@ -147,7 +153,7 @@ test('Brain Library storage quarantines structurally invalid non-canonical paylo
     })
   );
 
-  const loaded = loadBrainLibraryWithStatus();
+  const loaded = loadBrainLibraryWithStatus(WORLD_REGISTRY);
 
   assert.equal(loaded.status.state, 'recovered');
   assert.match(loaded.status.message ?? '', /存储格式无效/);
@@ -159,10 +165,10 @@ test('Brain Library storage quarantines structurally invalid non-canonical paylo
 test('Brain Library storage reports LocalStorage capacity write failures', () => {
   const storage = installMemoryLocalStorage();
   storage.failWrites = true;
-  const record = createBrainLibraryItemFromAgent('Too Large', createVisionActionSeedAgentIR(1, 'Too Large'));
+  const record = createBrainLibraryItemFromAgent('Too Large', createVisionActionSeedAgentIR(1, 'Too Large'), WORLD_REGISTRY);
 
   assert.throws(
-    () => saveBrainLibrary([record]),
+    () => saveBrainLibrary([record], WORLD_REGISTRY),
     /Brain Library 保存失败：quota exceeded/
   );
 });
@@ -195,7 +201,7 @@ test('Brain Library storage rewrites canonical records into normalized AgentIR s
     })
   );
 
-  const loaded = loadBrainLibraryWithStatus();
+  const loaded = loadBrainLibraryWithStatus(WORLD_REGISTRY);
 
   assert.equal(loaded.status.state, 'ok');
   assert.equal(loaded.brains.length, 1);
@@ -228,8 +234,8 @@ test('canonical Brain Library normalization strips legacy layout viewport fields
     };
   };
 
-  assert.equal(isValidBrainLibraryAgentPayload(candidate), true);
-  const normalized = createBrainLibraryItemFromAgent('Normalized Layout', candidate);
+  assert.equal(isValidBrainLibraryAgentPayload(candidate, WORLD_REGISTRY), true);
+  const normalized = createBrainLibraryItemFromAgent('Normalized Layout', candidate, WORLD_REGISTRY);
   assert.equal('viewportByContainerId' in (normalized.agent.layout ?? {}), false);
 });
 
@@ -257,7 +263,7 @@ test('Brain Library canonical record storage strips leaked legacy body visionCel
     })
   );
 
-  const loaded = loadBrainLibraryWithStatus();
+  const loaded = loadBrainLibraryWithStatus(WORLD_REGISTRY);
 
   assert.equal(loaded.status.state, 'ok');
   assert.equal(loaded.brains.length, 1);
@@ -270,7 +276,7 @@ test('Brain Library canonical record storage strips leaked legacy body visionCel
 });
 
 test('renameBrainLibraryItem updates canonical agent metadata only once', () => {
-  const record = createBrainLibraryItemFromAgent('Rename Source', createVisionActionSeedAgentIR(1, 'Rename Source'));
+  const record = createBrainLibraryItemFromAgent('Rename Source', createVisionActionSeedAgentIR(1, 'Rename Source'), WORLD_REGISTRY);
 
   const [renamed] = renameBrainLibraryItem([record], record.agent.metadata.id, 'Renamed Brain');
   assert.ok(renamed);
@@ -278,10 +284,20 @@ test('renameBrainLibraryItem updates canonical agent metadata only once', () => 
 });
 
 test('upsertBrainLibraryItemAgent updates canonical agent metadata timestamps', () => {
-  const record = createBrainLibraryItemFromAgent('Upsert Source', createVisionActionSeedAgentIR(1, 'Upsert Source'));
-  const replacement = createBrainLibraryItemFromAgent('Replacement Draft', createVisionActionSeedAgentIR(1, 'Replacement Draft')).agent;
+  const record = createBrainLibraryItemFromAgent('Upsert Source', createVisionActionSeedAgentIR(1, 'Upsert Source'), WORLD_REGISTRY);
+  const replacement = createBrainLibraryItemFromAgent(
+    'Replacement Draft',
+    createVisionActionSeedAgentIR(1, 'Replacement Draft'),
+    WORLD_REGISTRY
+  ).agent;
 
-  const [updated] = upsertBrainLibraryItemAgent([record], record.agent.metadata.id, replacement, '2026-05-23T04:30:00.000Z');
+  const [updated] = upsertBrainLibraryItemAgent(
+    [record],
+    record.agent.metadata.id,
+    replacement,
+    WORLD_REGISTRY,
+    '2026-05-23T04:30:00.000Z'
+  );
   assert.ok(updated);
   assert.equal(updated.agent.metadata.updatedAt, '2026-05-23T04:30:00.000Z');
 });

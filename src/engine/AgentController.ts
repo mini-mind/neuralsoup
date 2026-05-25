@@ -116,11 +116,6 @@ export class AgentController {
       return;
     }
 
-    if (keyboardCommands.length > 0) {
-      this.controlCommandApplier.apply(agent, keyboardCommands, deltaTime);
-      return;
-    }
-
     const sensoryInputs = this.inputSignalProvider.resolve(agent);
     const result = stepAgentProgram(
       agentProgram,
@@ -130,11 +125,9 @@ export class AgentController {
       Date.now()
     );
     this.agentRuntimeStates.set(agent.id, result.runtimeState);
-    this.controlCommandApplier.apply(
-      agent,
-      this.actionOutputAdapter.resolve(result.outputSignals),
-      deltaTime
-    );
+    const runtimeCommands = this.actionOutputAdapter.resolve(result.outputSignals);
+    const appliedCommands = keyboardCommands.length > 0 ? keyboardCommands : runtimeCommands;
+    this.controlCommandApplier.apply(agent, appliedCommands, deltaTime);
   }
 
   /**

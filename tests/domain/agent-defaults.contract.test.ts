@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { summarizeAgentIR, validateAgentIR } from '../../src/domain/brain';
-import { createVisionActionSeedAgentIR, createVisionActionWorldRegistry } from '../../src/host';
+import {
+  createVisionActionHostProfile,
+  createVisionActionSeedAgentIR,
+  createVisionActionWorldRegistry,
+} from '../../src/host';
 
 const WORLD_REGISTRY = createVisionActionWorldRegistry();
 
@@ -45,4 +49,29 @@ test('vision-action host seed layout does not persist compat-only bridge nodes',
   assert.equal(agent.brain.rootContainerId, 'root-container');
   assert.equal(layoutNodeIds.has('neuron-1'), true);
   assert.equal(layoutNodeIds.has('neuron-2'), true);
+});
+
+test('custom movement bindings produce a seed agent aligned with the injected host profile registry', () => {
+  const hostProfile = createVisionActionHostProfile({
+    turnLeft: 'yaw-left',
+    moveForward: 'thrust',
+    turnRight: 'yaw-right',
+  });
+
+  const agent = hostProfile.createSeedAgentIR(4, 'Custom Host Seed');
+
+  assert.deepEqual(
+    agent.body.outputRules.map((rule) => rule.nodeIdPattern),
+    ['^output-(yaw-left|thrust|yaw-right)$']
+  );
+  assert.equal(
+    agent.connections.some(
+      (connection) =>
+        connection.to.scope === 'bodyOutput' &&
+        connection.to.nodeId === 'output-thrust'
+    ),
+    true
+  );
+  assert.deepEqual(validateAgentIR(agent, hostProfile.worldRegistry), []);
+  assert.deepEqual(summarizeAgentIR(agent, hostProfile.worldRegistry, 4).outputSignalCount, 3);
 });

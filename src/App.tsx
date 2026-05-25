@@ -1,10 +1,12 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import SimulationCanvas, { type RuntimeInstallReceipt } from './components/SimulationCanvas';
 import {
+  preflightBrainStructure,
   buildAgentBodyRulePreviewModel,
   resolveCompiledAgentBodyEndpointIds,
   summarizeAgentIR,
   validateAgentIR,
+  type WorldRegistry,
   type AgentIR,
 } from './domain/brain';
 import { VISION_ACTION_HOST_PROFILE } from './host';
@@ -54,6 +56,7 @@ declare global {
     __NEURALSOUP_TEST_API__?: {
       injectValidDraftOnly: () => void;
       injectInvalidGraphDraft: () => void;
+      injectInvalidStructureDraft: () => void;
       getRuntimeActiveNodeIds: () => string[];
       getGraphPathIds: () => string[];
       getActiveAgentId: () => string;
@@ -84,25 +87,33 @@ const clampSplitRatio = (containerSize: number, ratio: number): number => {
   const maxRatio = (containerSize - MIN_PANEL_SIZE - SPLIT_DIVIDER_SIZE) / containerSize;
   return clamp(ratio, minRatio, maxRatio);
 };
-const DEFAULT_HOST_PROFILE = VISION_ACTION_HOST_PROFILE;
-const DEFAULT_WORLD_REGISTRY = DEFAULT_HOST_PROFILE.worldRegistry;
-
-const createInitialAgentRuntimeStatus = (agent: AgentIR): AgentRuntimeStatus => ({
+const createInitialAgentRuntimeStatus = (
+  agent: AgentIR,
+  worldRegistry: WorldRegistry
+): AgentRuntimeStatus => ({
   state: 'applied',
-  appliedSummary: summarizeAgentIR(agent, DEFAULT_WORLD_REGISTRY),
+  appliedSummary: summarizeAgentIR(agent, worldRegistry),
   issues: [],
   message: null,
 });
 
-const createAgentDraftStatus = (draftAgent: AgentIR): AgentDraftStatus => {
-  const summary = summarizeAgentIR(draftAgent, DEFAULT_WORLD_REGISTRY);
-  const validationIssues = validateAgentIR(draftAgent, DEFAULT_WORLD_REGISTRY);
+const createAgentDraftStatus = (
+  draftAgent: AgentIR,
+  worldRegistry: WorldRegistry
+): AgentDraftStatus => {
+  const summary = summarizeAgentIR(draftAgent, worldRegistry);
+  const structuralIssues = preflightBrainStructure(draftAgent.brain).issues.map((issue) => ({
+    code: 'invalid-brain-structure' as const,
+    message: issue.message,
+  }));
+  const validationIssues = validateAgentIR(draftAgent, worldRegistry);
+  const allIssues = [...structuralIssues, ...validationIssues];
 
-  if (validationIssues.length > 0) {
+  if (allIssues.length > 0) {
     return {
       state: 'invalid',
-      issues: validationIssues,
-      message: validationIssues.map((issue) => issue.message).join(' | '),
+      issues: allIssues,
+      message: allIssues.map((issue) => issue.message).join(' | '),
       summary,
     };
   }
@@ -191,8 +202,10 @@ const applyBrainRecordIdentityToCurrentState = (
 };
 
 const App: React.FC = () => {
-  const initialBrainLibraryLoad = useRef(loadBrainLibraryWithStatus()).current;
-  const initialAgentDocument = DEFAULT_HOST_PROFILE.createSeedAgentIR(36, '当前 Agent');
+  const hostProfile = VISION_ACTION_HOST_PROFILE;
+  const worldRegistry = hostProfile.worldRegistry;
+  const initialBrainLibraryLoad = useRef(loadBrainLibraryWithStatus(worldRegistry)).current;
+  const initialAgentDocument = hostProfile.createSeedAgentIR(36, '当前 Agent');
   const isE2ETestMode = import.meta.env.MODE === 'test' || import.meta.env.VITE_E2E === 'true';
   const [runState, setRunState] = useState<SimulationLifecycleState>('idle');
   const [requestedLifecycleState, setRequestedLifecycleState] = useState<SimulationLifecycleState>('idle');
@@ -204,7 +217,7 @@ const App: React.FC = () => {
   const [draftBodyDocument, setDraftBodyDocument] = useState(() => initialAgentDocument.body);
   const [draftGraphStatusOverride, setDraftGraphStatusOverride] = useState<AgentDraftStatus | null>(null);
   const [agentRuntimeStatus, setAgentRuntimeStatus] = useState<AgentRuntimeStatus>(() =>
-    createInitialAgentRuntimeStatus(initialAgentDocument)
+    createInitialAgentRuntimeStatus(initialAgentDocument, worldRegistry)
   );
   const [lastAppliedRuntimeInstallReceipt, setLastAppliedRuntimeInstallReceipt] = useState<RuntimeInstallReceipt>(() => ({
     agentId: initialAgentDocument.metadata.id,
@@ -251,8 +264,8 @@ const App: React.FC = () => {
     [draftAgentDocument, draftBodyDocument]
   );
   const bodyPreviewDraftStatus = useMemo<AgentDraftStatus>(
-    () => createAgentDraftStatus(bodyPreviewAgent),
-    [bodyPreviewAgent]
+    () => createAgentDraftStatus(bodyPreviewAgent, worldRegistry),
+    [bodyPreviewAgent, worldRegistry]
   );
   const agentDraftStatus = useMemo<AgentDraftStatus>(
     () => draftGraphStatusOverride ?? bodyPreviewDraftStatus,
@@ -282,8 +295,8 @@ const App: React.FC = () => {
   const hasUnsavedDraftChanges =
     hasDraftEditingChanges || hasPendingRuntimeInstall || bodyDraftStatus.hasChanges;
   const bodyRulePreviewModel = useMemo(
-    () => buildAgentBodyRulePreviewModel(bodyPreviewAgent, DEFAULT_WORLD_REGISTRY, draftProjectedVisionCellCount),
-    [bodyPreviewAgent, draftProjectedVisionCellCount]
+    () => buildAgentBodyRulePreviewModel(bodyPreviewAgent, worldRegistry, draftProjectedVisionCellCount),
+    [bodyPreviewAgent, draftProjectedVisionCellCount, worldRegistry]
   );
   const bodyRulePreview = useMemo<BodyIRPreviewData>(() => {
     const inputRuleById = new Map(draftBodyDocument.inputRules.map((rule, index) => [rule.id, { rule, index }]));
@@ -307,7 +320,7 @@ const App: React.FC = () => {
       }));
     });
 
-    const compiledEndpointIds = resolveCompiledAgentBodyEndpointIds(bodyPreviewAgent, DEFAULT_WORLD_REGISTRY);
+    const compiledEndpointIds = resolveCompiledAgentBodyEndpointIds(bodyPreviewAgent, worldRegistry);
 
     return {
       canonicalSummary: `host projected coverage ${draftProjectedVisionCellCount} cells；输入 endpoint ${bodyRulePreviewModel.input.endpointNodeIds.length} 个，输出 endpoint ${bodyRulePreviewModel.output.endpointNodeIds.length} 个。`,
@@ -375,7 +388,7 @@ const App: React.FC = () => {
     }
 
     try {
-      saveBrainLibrary(brainLibrary);
+      saveBrainLibrary(brainLibrary, worldRegistry);
       persistedBrainLibrarySnapshotRef.current = nextSnapshot;
       setBrainLibraryStatusMessage((currentMessage) =>
         currentMessage?.startsWith('Brain Library 保存失败') ? null : currentMessage
@@ -383,7 +396,7 @@ const App: React.FC = () => {
     } catch (error) {
       setBrainLibraryStatusMessage(error instanceof Error ? error.message : 'Brain Library 保存失败。');
     }
-  }, [brainLibrary]);
+  }, [brainLibrary, worldRegistry]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia(`(max-width: ${STACKED_LAYOUT_BREAKPOINT}px)`);
@@ -487,19 +500,20 @@ const App: React.FC = () => {
       if (shouldInstallToRuntime) {
         setRuntimeInstallRequest(normalizedAgentDocument);
       }
-      const canPersistActiveBrain = validateAgentIR(normalizedAgentDocument, DEFAULT_WORLD_REGISTRY).length === 0;
+      const canPersistActiveBrain = validateAgentIR(normalizedAgentDocument, worldRegistry).length === 0;
       setBrainLibrary((currentLibrary) =>
         shouldPersistActiveBrain && canPersistActiveBrain && activeBrainId
           ? upsertBrainLibraryItemAgent(
               currentLibrary,
               activeBrainId,
               normalizedAgentDocument,
+              worldRegistry,
               nextUpdatedAt
             )
           : currentLibrary
       );
     },
-    [activeBrainId]
+    [activeBrainId, worldRegistry]
   );
 
   useEffect(() => {
@@ -587,10 +601,10 @@ const App: React.FC = () => {
   const handleAgentParametersApply = useCallback((params: AgentParameters) => {
     setAgentParameters((current) => (areAgentParametersEqual(current, params) ? current : params));
     handleAgentChange(
-      (currentAgent) => DEFAULT_HOST_PROFILE.reconcileAgentIR(currentAgent, params.visionCells),
+      (currentAgent) => hostProfile.reconcileAgentIR(currentAgent, params.visionCells),
       GRAPH_SEMANTIC_CHANGE
     );
-  }, [handleAgentChange]);
+  }, [handleAgentChange, hostProfile]);
 
   const handleDraftAgentParametersChange = useCallback<React.Dispatch<React.SetStateAction<AgentParameters>>>((value) => {
     setDraftAgentParameters((current) => (typeof value === 'function' ? value(current) : value));
@@ -599,7 +613,7 @@ const App: React.FC = () => {
   const handleBodyApply = useCallback(() => {
     handleAgentChange(
       (currentAgent) =>
-        DEFAULT_HOST_PROFILE.reconcileAgentIR(
+        hostProfile.reconcileAgentIR(
           {
             ...currentAgent,
             body: draftBodyDocument,
@@ -608,7 +622,7 @@ const App: React.FC = () => {
         ),
       GRAPH_SEMANTIC_CHANGE
     );
-  }, [agentParameters.visionCells, draftBodyDocument, handleAgentChange]);
+  }, [agentParameters.visionCells, draftBodyDocument, handleAgentChange, hostProfile]);
 
   const handleBodyReset = useCallback(() => {
     setDraftBodyDocument(draftAgentDocumentRef.current.body);
@@ -673,10 +687,14 @@ const App: React.FC = () => {
   }, []);
 
   const handleCreateBrainFromCurrent = useCallback((name: string) => {
-    const nextBrain = createBrainLibraryItemFromAgent(name, {
-      ...draftAgentDocumentRef.current,
-      body: draftBodyDocumentRef.current,
-    });
+    const nextBrain = createBrainLibraryItemFromAgent(
+      name,
+      {
+        ...draftAgentDocumentRef.current,
+        body: draftBodyDocumentRef.current,
+      },
+      worldRegistry
+    );
     setBrainLibrary((currentLibrary) => [...currentLibrary, nextBrain]);
     setIsBrainLibraryOpen(true);
     applyBrainRecordIdentityToCurrentState(nextBrain, {
@@ -687,7 +705,7 @@ const App: React.FC = () => {
       setDraftBodyDocument,
       setDraftGraphStatusOverride,
     });
-  }, []);
+  }, [worldRegistry]);
 
   const confirmUnsavedBrainReplacement = useCallback((): boolean => {
     if (!hasUnsavedDraftChanges) {
@@ -721,10 +739,14 @@ const App: React.FC = () => {
   }, [brainLibrary, confirmUnsavedBrainReplacement, resetRuntimeForBrainSwitch]);
 
   const handleImportBrain = useCallback((name: string, payload: unknown) => {
-    const nextBrain = normalizeImportedBrainExchange(payload, {
-      name,
-      existingIds: brainLibrary.map((brain) => brain.agent.metadata.id),
-    });
+    const nextBrain = normalizeImportedBrainExchange(
+      payload,
+      worldRegistry,
+      {
+        name,
+        existingIds: brainLibrary.map((brain) => brain.agent.metadata.id),
+      }
+    );
     if (!nextBrain) {
       throw new Error('导入内容规范化失败。');
     }
@@ -744,7 +766,7 @@ const App: React.FC = () => {
       setDraftGraphStatusOverride,
       setEditorTab,
     });
-  }, [brainLibrary, confirmUnsavedBrainReplacement, resetRuntimeForBrainSwitch]);
+  }, [brainLibrary, confirmUnsavedBrainReplacement, resetRuntimeForBrainSwitch, worldRegistry]);
 
   const handleExportBrain = useCallback((brainId: string) => {
     const selectedBrain = brainLibrary.find((brain) => brain.agent.metadata.id === brainId);
@@ -796,7 +818,7 @@ const App: React.FC = () => {
       return;
     }
 
-    const fallbackAgent = DEFAULT_HOST_PROFILE.createSeedAgentIR(agentParameters.visionCells, '当前 Agent');
+    const fallbackAgent = hostProfile.createSeedAgentIR(agentParameters.visionCells, '当前 Agent');
     setActiveBrainId(null);
     setCurrentAgentDocument(fallbackAgent);
     setRuntimeInstallRequest(fallbackAgent);
@@ -805,7 +827,7 @@ const App: React.FC = () => {
     setDraftGraphStatusOverride(null);
     setGraphPath(ROOT_GRAPH_PATH);
     resetRuntimeForBrainSwitch();
-  }, [activeBrainId, agentParameters.visionCells, resetRuntimeForBrainSwitch]);
+  }, [activeBrainId, agentParameters.visionCells, hostProfile, resetRuntimeForBrainSwitch]);
 
   const handleDuplicateBrain = useCallback((brainId: string) => {
     setBrainLibrary((currentLibrary) => duplicateBrainLibraryItem(currentLibrary, brainId));
@@ -984,6 +1006,30 @@ const App: React.FC = () => {
           GRAPH_DRAFT_ONLY_CHANGE
         );
       },
+      injectInvalidStructureDraft: () => {
+        const currentAgent = draftAgentDocumentRef.current;
+        if (currentAgent.brain.containers.some((container) => container.id === 'invalid-orphan-group')) {
+          return;
+        }
+
+        handleGraphAgentChange(
+          (draftAgent) => ({
+            ...draftAgent,
+            brain: {
+              ...draftAgent.brain,
+              containers: [
+                ...draftAgent.brain.containers,
+                {
+                  id: 'invalid-orphan-group',
+                  label: 'Invalid Orphan',
+                  children: [],
+                },
+              ],
+            },
+          }),
+          GRAPH_DRAFT_ONLY_CHANGE
+        );
+      },
       getRuntimeActiveNodeIds: () => [...agentRuntimeActivity.activeNodeIds],
       getGraphPathIds: () => graphPath.map((item) => item.id),
       getActiveAgentId: () => currentAgentDocumentRef.current.metadata.id,
@@ -994,7 +1040,7 @@ const App: React.FC = () => {
     return () => {
       delete window.__NEURALSOUP_TEST_API__;
     };
-  }, [activeBrainId, agentRuntimeActivity.activeNodeIds, graphPath, handleAgentChange, isE2ETestMode]);
+  }, [activeBrainId, agentRuntimeActivity.activeNodeIds, graphPath, handleAgentChange, handleGraphAgentChange, isE2ETestMode]);
 
   return (
     <div
@@ -1011,7 +1057,7 @@ const App: React.FC = () => {
         <SimulationCanvas
           width={canvasWidth}
           height={canvasHeight}
-          hostProfile={DEFAULT_HOST_PROFILE}
+          hostProfile={hostProfile}
           controlMode={'snn' as Extract<SimulationControlMode, 'keyboard' | 'snn'>}
           runtimeInstallRequest={runtimeInstallRequest}
           agentParameters={agentParameters}
@@ -1086,7 +1132,7 @@ const App: React.FC = () => {
             graphSessionToken={graphEditorSessionToken}
             visionCells={draftProjectedVisionCellCount}
             installedSummary={installedGraphSummary}
-            worldRegistry={DEFAULT_WORLD_REGISTRY}
+            worldRegistry={worldRegistry}
             runtimeStatus={agentRuntimeStatus}
             draftStatus={agentDraftStatus}
             runtimeActivity={agentRuntimeActivity}

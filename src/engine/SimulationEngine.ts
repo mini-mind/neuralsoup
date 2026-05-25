@@ -15,10 +15,7 @@ import { SimulationSession } from '../runtime/SimulationSession';
 import { type SimulationControlMode } from '../domain/world';
 import type { AgentIR } from '../domain/brain';
 import type { AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from '../types/agentRuntime';
-import {
-  VISION_ACTION_HOST_PROFILE,
-  type HostRuntimeProfile,
-} from '../host';
+import type { HostRuntimeProfile } from '../host';
 
 export type SimulationLifecycleState = 'idle' | 'running' | 'paused';
 
@@ -57,7 +54,7 @@ export class SimulationEngine {
 
   constructor(
     app: PIXI.Application,
-    hostProfile: HostRuntimeProfile = VISION_ACTION_HOST_PROFILE,
+    hostProfile: HostRuntimeProfile,
     initialWidth: number = 1600,
     initialHeight: number = 1200
   ) {

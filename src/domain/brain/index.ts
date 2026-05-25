@@ -7,3 +7,4 @@ export * from './agent-summary';
 export * from './agent-step';
 export * from './agent-body-rules';
 export * from './world-registry';
+export * from './brain-structural-preflight';

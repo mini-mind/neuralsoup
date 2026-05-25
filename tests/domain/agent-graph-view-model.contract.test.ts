@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildAgentBodyRulePreviewModel, type AgentIR } from '../../src/domain/brain';
+import { buildAgentBodyRulePreviewModel, preflightBrainStructure, type AgentIR } from '../../src/domain/brain';
 import { buildAgentGraphViewModel } from '../../src/components/editor/graph/agentGraphViewModel';
 import { createVisionActionWorldRegistry } from '../../src/host';
 
@@ -341,6 +341,10 @@ test('agent graph root adapters report installed counts from compiled runtime tr
 
 test('agent graph root scope uses the canonical rootContainerId as the top-level brain node id', () => {
   const agent = createTestAgent();
+  agent.brain.containers = [
+    agent.brain.containers[1]!,
+    agent.brain.containers[0]!,
+  ];
   const rootView = buildAgentGraphViewModel({
     agent,
     navigationPath: [],
@@ -353,6 +357,92 @@ test('agent graph root scope uses the canonical rootContainerId as the top-level
   assert.ok(rootBrainNode);
   assert.equal(rootBrainNode.id, agent.brain.rootContainerId);
   assert.equal(rootBrainNode.rootContainer, true);
+});
+
+test('agent graph projects the canonical root even when root is not the first container entry', () => {
+  const agent = createTestAgent();
+  agent.brain.containers = [
+    agent.brain.containers[1]!,
+    agent.brain.containers[0]!,
+  ];
+
+  const rootView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
+  });
+
+  assert.deepEqual(
+    rootView.nodes
+      .filter((node) => node.kind === 'neuron-group')
+      .map((node) => node.refNodeId),
+    [agent.brain.rootContainerId]
+  );
+
+  const rootScopeView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [agent.brain.rootContainerId],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
+  });
+
+  assert.deepEqual(
+    rootScopeView.nodes
+      .filter((node) => node.parentId === agent.brain.rootContainerId)
+      .map((node) => node.refNodeId),
+    ['expanded-group']
+  );
+});
+
+test('agent graph detects container cycles without recursive blow-up', () => {
+  const agent = createTestAgent();
+  agent.brain.containers = [
+    {
+      id: 'root-group',
+      label: 'Root',
+      children: [{ scope: 'container', nodeId: 'expanded-group' }],
+    },
+    {
+      id: 'expanded-group',
+      label: 'Expanded',
+      children: [
+        { scope: 'brain', nodeId: 'neuron-1' },
+        { scope: 'container', nodeId: 'root-group' },
+      ],
+    },
+  ];
+
+  const preflight = preflightBrainStructure(agent.brain);
+  assert.equal(preflight.issues.some((issue) => issue.code === 'container-cycle'), true);
+
+  const rootView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
+  });
+  assert.deepEqual(
+    rootView.nodes
+      .filter((node) => node.kind === 'neuron-group')
+      .map((node) => node.refNodeId),
+    [agent.brain.rootContainerId]
+  );
+
+  const rootScopeView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [agent.brain.rootContainerId],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
+  });
+
+  assert.equal(rootScopeView.nodes.length < 10, true);
+  assert.equal(new Set(rootScopeView.nodes.map((node) => node.viewId)).size, rootScopeView.nodes.length);
+  assert.equal(rootScopeView.nodes.some((node) => node.refNodeId === 'expanded-group'), true);
 });
 
 test('agent graph view and body preview share the same canonical endpoint expansion', () => {

@@ -45,9 +45,15 @@ const DEFAULT_BRAIN_VERSION = 1 as const;
 const DEFAULT_VISION_INPUT_RULE_ID = 'vision-inputs';
 const DEFAULT_MOTOR_OUTPUT_RULE_ID = 'motor-outputs';
 
-export const createVisionActionWorldRegistry = (): WorldRegistry => {
+const toSupportedActionTargets = (bindings: MovementWorldControlBindings): Set<string> =>
+  new Set(Object.values(bindings).map((binding) => `action.${binding}`));
+
+export const createVisionActionWorldRegistry = (
+  movementBindings: MovementWorldControlBindings = VISION_ACTION_MOVEMENT_BINDINGS
+): WorldRegistry => {
   const bodyInputSourcePattern = /^vision\.([RGB])\.(\d+)$/;
   const bodyOutputTargetPattern = /^action\.([a-z0-9-]+)$/;
+  const supportedActionTargets = toSupportedActionTargets(movementBindings);
 
   return {
     version: 1,
@@ -68,12 +74,13 @@ export const createVisionActionWorldRegistry = (): WorldRegistry => {
     },
     resolveOutputBinding: (target) => {
       const match = target.match(bodyOutputTargetPattern);
-      if (!match) {
+      const normalizedTarget = match ? `action.${match[1]}` : null;
+      if (!normalizedTarget || !supportedActionTargets.has(normalizedTarget)) {
         return null;
       }
 
       return {
-        target: `action.${match[1]}`,
+        target: normalizedTarget,
         worldPort: 'action',
       };
     },
@@ -141,7 +148,9 @@ const createAgentMetadata = (
   updatedAt: timestamp,
 });
 
-const createDefaultBodyIR = (): BodyIR => ({
+const createDefaultBodyIR = (
+  movementBindings: MovementWorldControlBindings = VISION_ACTION_MOVEMENT_BINDINGS
+): BodyIR => ({
   version: DEFAULT_BODY_VERSION,
   inputRules: [
     {
@@ -154,7 +163,11 @@ const createDefaultBodyIR = (): BodyIR => ({
   outputRules: [
     {
       id: DEFAULT_MOTOR_OUTPUT_RULE_ID,
-      nodeIdPattern: '^output-(turn-left|move-forward|turn-right)$',
+      nodeIdPattern: `^output-(${[
+        movementBindings.turnLeft,
+        movementBindings.moveForward,
+        movementBindings.turnRight,
+      ].join('|')})$`,
       targetTemplate: 'action.$1',
       decayPerSecond: 4,
     },
@@ -208,7 +221,10 @@ const createDefaultBrainIR = (): BrainIR => ({
   ],
 });
 
-const createDefaultConnections = (visionCells: number): AgentConnection[] => {
+const createDefaultConnections = (
+  visionCells: number,
+  movementBindings: MovementWorldControlBindings = VISION_ACTION_MOVEMENT_BINDINGS
+): AgentConnection[] => {
   const connections: AgentConnection[] = [];
 
   for (let cellIndex = 0; cellIndex < visionCells; cellIndex += 1) {
@@ -246,23 +262,23 @@ const createDefaultConnections = (visionCells: number): AgentConnection[] => {
       delayMs: 0,
     },
     {
-      id: 'link-neuron-1-output-move-forward',
+      id: `link-neuron-1-output-${movementBindings.moveForward}`,
       from: { scope: 'brain', nodeId: 'neuron-1', portId: 'axon' },
-      to: { scope: 'bodyOutput', nodeId: 'output-move-forward', portId: 'in' },
+      to: { scope: 'bodyOutput', nodeId: `output-${movementBindings.moveForward}`, portId: 'in' },
       weight: 1,
       delayMs: 0,
     },
     {
-      id: 'link-neuron-2-output-turn-left',
+      id: `link-neuron-2-output-${movementBindings.turnLeft}`,
       from: { scope: 'brain', nodeId: 'neuron-2', portId: 'axon' },
-      to: { scope: 'bodyOutput', nodeId: 'output-turn-left', portId: 'in' },
+      to: { scope: 'bodyOutput', nodeId: `output-${movementBindings.turnLeft}`, portId: 'in' },
       weight: 1,
       delayMs: 0,
     },
     {
-      id: 'link-neuron-2-output-turn-right',
+      id: `link-neuron-2-output-${movementBindings.turnRight}`,
       from: { scope: 'brain', nodeId: 'neuron-2', portId: 'axon' },
-      to: { scope: 'bodyOutput', nodeId: 'output-turn-right', portId: 'in' },
+      to: { scope: 'bodyOutput', nodeId: `output-${movementBindings.turnRight}`, portId: 'in' },
       weight: 1,
       delayMs: 0,
     }
@@ -271,7 +287,10 @@ const createDefaultConnections = (visionCells: number): AgentConnection[] => {
   return connections;
 };
 
-const createDefaultLayout = (visionCells: number): AgentLayoutIR => {
+const createDefaultLayout = (
+  visionCells: number,
+  movementBindings: MovementWorldControlBindings = VISION_ACTION_MOVEMENT_BINDINGS
+): AgentLayoutIR => {
   const nodes: AgentLayoutIR['nodes'] = {
     [HOST_ROOT_CONTAINER_ID]: {
       position: { x: 300, y: 200 },
@@ -282,13 +301,13 @@ const createDefaultLayout = (visionCells: number): AgentLayoutIR => {
     'neuron-2': {
       position: { x: 50, y: 250 },
     },
-    'output-turn-left': {
+    [`output-${movementBindings.turnLeft}`]: {
       position: { x: 320, y: 160 },
     },
-    'output-move-forward': {
+    [`output-${movementBindings.moveForward}`]: {
       position: { x: 320, y: 230 },
     },
-    'output-turn-right': {
+    [`output-${movementBindings.turnRight}`]: {
       position: { x: 320, y: 300 },
     },
   };
@@ -312,7 +331,8 @@ const createDefaultLayout = (visionCells: number): AgentLayoutIR => {
 
 export const createVisionActionSeedAgentIR = (
   visionCells: number = 36,
-  name: string = '当前 Agent'
+  name: string = '当前 Agent',
+  movementBindings: MovementWorldControlBindings = VISION_ACTION_MOVEMENT_BINDINGS
 ): AgentIR => {
   const normalizedVisionCells = Math.max(0, Math.floor(visionCells));
   const timestamp = new Date().toISOString();
@@ -324,31 +344,35 @@ export const createVisionActionSeedAgentIR = (
   return {
     version: DEFAULT_AGENT_VERSION,
     metadata: createAgentMetadata(name, timestamp, idSource),
-    body: createDefaultBodyIR(),
+    body: createDefaultBodyIR(movementBindings),
     brain: createDefaultBrainIR(),
-    connections: createDefaultConnections(normalizedVisionCells),
-    layout: createDefaultLayout(normalizedVisionCells),
+    connections: createDefaultConnections(normalizedVisionCells, movementBindings),
+    layout: createDefaultLayout(normalizedVisionCells, movementBindings),
   };
 };
 
 export const createVisionActionInputSignalProvider = createVisionCellWorldInputSignalProvider;
 
-export const createVisionActionOutputAdapter = createDefaultWorldActionOutputAdapter;
+export const createVisionActionOutputAdapter = () =>
+  createDefaultWorldActionOutputAdapter(VISION_ACTION_MOVEMENT_BINDINGS);
 
 export const createVisionActionCommandApplier = () =>
   createMovementWorldControlCommandApplier(VISION_ACTION_MOVEMENT_BINDINGS);
 
-export const createVisionActionHostProfile = (): HostRuntimeProfile => {
-  const worldRegistry = createVisionActionWorldRegistry();
+export const createVisionActionHostProfile = (
+  movementBindings: MovementWorldControlBindings = VISION_ACTION_MOVEMENT_BINDINGS
+): HostRuntimeProfile => {
+  const worldRegistry = createVisionActionWorldRegistry(movementBindings);
 
   return {
     worldRegistry,
-    movementBindings: VISION_ACTION_MOVEMENT_BINDINGS,
-    createSeedAgentIR: (visionCells, name = '当前 Agent') => createVisionActionSeedAgentIR(visionCells, name),
+    movementBindings,
+    createSeedAgentIR: (visionCells, name = '当前 Agent') =>
+      createVisionActionSeedAgentIR(visionCells, name, movementBindings),
     reconcileAgentIR: (agent, visionCells) => reconcileAgentIRVisionCells(agent, visionCells, worldRegistry),
     createInputSignalProvider: createVisionActionInputSignalProvider,
-    createOutputAdapter: createVisionActionOutputAdapter,
-    createCommandApplier: createVisionActionCommandApplier,
+    createOutputAdapter: () => createDefaultWorldActionOutputAdapter(movementBindings),
+    createCommandApplier: () => createMovementWorldControlCommandApplier(movementBindings),
   };
 };
 

@@ -4,6 +4,7 @@ import {
   normalizeCanonicalBrainLibraryRecord,
   type BrainLibraryRecord,
 } from './brainLibraryRecord';
+import type { WorldRegistry } from '../domain/brain';
 
 export const BRAIN_LIBRARY_STORAGE_KEY = 'neuralsoup.brain-library.v1';
 export const BRAIN_LIBRARY_CORRUPT_STORAGE_KEY = 'neuralsoup.brain-library.v1.corrupt';
@@ -37,14 +38,20 @@ export interface BrainLibraryLoadResult {
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const isBrainLibraryStorageEnvelope = (value: unknown): value is BrainLibraryStorageEnvelope =>
+const isBrainLibraryStorageEnvelope = (
+  value: unknown,
+  worldRegistry: WorldRegistry
+): value is BrainLibraryStorageEnvelope =>
   isObject(value) &&
   value.storageVersion === 1 &&
   typeof value.savedAt === 'string' &&
   Array.isArray(value.brains) &&
-  value.brains.every(isBrainLibraryStoredRecord);
+  value.brains.every((brain) => isBrainLibraryStoredRecord(brain, worldRegistry));
 
-const createStorageEnvelope = (brains: BrainLibraryRecord[]): BrainLibraryStorageEnvelope => ({
+const createStorageEnvelope = (
+  brains: BrainLibraryRecord[],
+  worldRegistry: WorldRegistry
+): BrainLibraryStorageEnvelope => ({
   storageVersion: 1,
   savedAt: new Date().toISOString(),
   brains: brains.map((brain: BrainLibraryRecord) => {
@@ -53,7 +60,7 @@ const createStorageEnvelope = (brains: BrainLibraryRecord[]): BrainLibraryStorag
     });
     const brainName = normalized.agent.metadata.name;
 
-    if (!isValidBrainLibraryAgentPayload(normalized.agent)) {
+    if (!isValidBrainLibraryAgentPayload(normalized.agent, worldRegistry)) {
       throw new Error(`Brain "${brainName}" 无法保存：AgentIR 校验失败。`);
     }
 
@@ -98,7 +105,7 @@ const consumeStoredStatusMessage = (): string | null => {
   }
 };
 
-export const loadBrainLibraryWithStatus = (): BrainLibraryLoadResult => {
+export const loadBrainLibraryWithStatus = (worldRegistry: WorldRegistry): BrainLibraryLoadResult => {
   if (typeof window === 'undefined') {
     return {
       brains: [],
@@ -119,7 +126,7 @@ export const loadBrainLibraryWithStatus = (): BrainLibraryLoadResult => {
 
   try {
     const parsed = JSON.parse(rawValue);
-    if (isBrainLibraryStorageEnvelope(parsed)) {
+    if (isBrainLibraryStorageEnvelope(parsed, worldRegistry)) {
       const records = parsed.brains.map((brain) =>
         normalizeCanonicalBrainLibraryRecord(brain.agent, {
           ...brain.agent.metadata,
@@ -130,7 +137,7 @@ export const loadBrainLibraryWithStatus = (): BrainLibraryLoadResult => {
       );
 
       if (shouldRewriteStorage) {
-        saveBrainLibrary(records);
+        saveBrainLibrary(records, worldRegistry);
       }
 
       return {
@@ -159,15 +166,19 @@ export const loadBrainLibraryWithStatus = (): BrainLibraryLoadResult => {
   }
 };
 
-export const loadBrainLibrary = (): BrainLibraryRecord[] => loadBrainLibraryWithStatus().brains;
+export const loadBrainLibrary = (worldRegistry: WorldRegistry): BrainLibraryRecord[] =>
+  loadBrainLibraryWithStatus(worldRegistry).brains;
 
-export const saveBrainLibrary = (brains: BrainLibraryRecord[]): void => {
+export const saveBrainLibrary = (brains: BrainLibraryRecord[], worldRegistry: WorldRegistry): void => {
   if (typeof window === 'undefined') {
     return;
   }
 
   try {
-    window.localStorage.setItem(BRAIN_LIBRARY_STORAGE_KEY, JSON.stringify(createStorageEnvelope(brains)));
+    window.localStorage.setItem(
+      BRAIN_LIBRARY_STORAGE_KEY,
+      JSON.stringify(createStorageEnvelope(brains, worldRegistry))
+    );
     window.localStorage.removeItem(BRAIN_LIBRARY_STATUS_STORAGE_KEY);
   } catch (error) {
     throw new Error(

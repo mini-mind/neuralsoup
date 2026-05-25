@@ -1154,16 +1154,16 @@
     {
       "id": "task-031",
       "title": "World registry Phase 2：显式注入 registry，移除全局 default singleton",
-      "status": "pending",
+      "status": "completed",
       "priority": "P0",
       "depends_on": [
         "task-024",
         "task-025",
         "task-026"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "max_attempts": 3,
-      "started_at_commit": null,
+      "started_at_commit": "working-tree",
       "validation": {
         "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"body ir|graph view\"",
         "timeout_seconds": 1500
@@ -1186,7 +1186,7 @@
           "message": "Further task-031 cleanup lifted default action-adapter ownership to the SimulationEngine composition root: AgentController no longer silently constructs the default host adapter itself, domain/compat test callers now choose the default adapter explicitly, and the host-lowering seam is narrower before the upcoming registry injection cutover."
         }
       ],
-      "completed_at": null
+      "completed_at": "2026-05-23T21:09:08Z"
     },
     {
       "id": "task-032",
@@ -1237,7 +1237,7 @@
           "message": "Closed the remaining task-032 structural P1: canonical BodyIR/storage/exchange no longer persists visionCellCount, host-projected coverage is now passed explicitly in main-path preview/view-model logic, compat import/export keeps legacy coverage recovery behind explicit compat helpers, and type-check plus domain/compat validation are green again."
         }
       ],
-      "completed_at": "2026-05-23T22:51:25Z"
+      "completed_at": "2026-05-24T05:10:00Z"
     },
     {
       "id": "task-033",
@@ -1270,13 +1270,13 @@
     {
       "id": "task-034",
       "title": "BrainIR 编辑约束收口：把 root/ownership/cycle/id 不变量前移到图编辑命令层",
-      "status": "pending",
+      "status": "completed",
       "priority": "P1",
       "depends_on": [
         "task-008",
         "task-030"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "max_attempts": 3,
       "started_at_commit": null,
       "validation": {
@@ -1287,13 +1287,18 @@
         "cleanup": null
       },
       "error_log": [],
-      "checkpoints": [],
-      "completed_at": null
+      "checkpoints": [
+        {
+          "at": "2026-05-25T01:00:23Z",
+          "message": "Closed BrainIR graph-edit structural guardrails: added canonical structural preflight for root/ownership/cycle/id invariants, moved graph edit commands to fail-closed updater-time checks, kept diagnostics on the existing draftStatus channel instead of graph pseudo-nodes, and aligned graph-view traversal/tests with canonical root and cycle-safe child refs."
+        }
+      ],
+      "completed_at": "2026-05-25T01:00:23Z"
     },
     {
       "id": "task-035",
       "title": "全局复审 Phase 5：围绕 world registry Phase 2、runtime API 收口和 BrainIR 编辑约束做交叉复审",
-      "status": "pending",
+      "status": "completed",
       "priority": "P1",
       "depends_on": [
         "task-031",
@@ -1301,9 +1306,9 @@
         "task-033",
         "task-034"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "max_attempts": 3,
-      "started_at_commit": null,
+      "started_at_commit": "working-tree",
       "validation": {
         "command": "npm run type-check && npm run test:domain && npm run test:compat && npm run test:e2e -- --grep \"graph view|brain library|body|simulation lifecycle\"",
         "timeout_seconds": 1800
@@ -1312,10 +1317,19 @@
         "cleanup": null
       },
       "error_log": [],
-      "checkpoints": [],
-      "completed_at": null
+      "checkpoints": [
+        {
+          "at": "2026-05-25T02:30:00Z",
+          "message": "Final cross-review loop closed the reported GraphView, host/runtime, and harness findings and reopened remaining residual seams around Brain Library registry injection and custom host-profile seed bindings for follow-up closure."
+        },
+        {
+          "at": "2026-05-25T03:10:00Z",
+          "message": "Final multi-gpt-5.4 cross-review after GraphView, host/runtime, Brain Library, compat, and harness cleanup found no remaining P0-P2 findings in the current workspace; residual risk is limited to missing non-default host-profile UI-level E2E coverage."
+        }
+      ],
+      "completed_at": "2026-05-25T03:10:00Z"
     }
   ],
-  "session_count": 10,
-  "last_session": "2026-05-23T21:01:25Z"
+  "session_count": 16,
+  "last_session": "2026-05-25T03:10:00Z"
 }

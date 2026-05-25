@@ -1,4 +1,4 @@
-import type { AgentIR, AgentMetadata } from '../domain/brain';
+import type { AgentIR, AgentMetadata, WorldRegistry } from '../domain/brain';
 import {
   createBrainLibraryItemFromAgent,
   isValidBrainLibraryAgentPayload,
@@ -15,11 +15,16 @@ export interface BrainLibraryExchangeDocument {
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-export const isBrainLibraryExchangeDocument = (value: unknown): value is BrainLibraryExchangeDocument =>
+export const isBrainLibraryExchangeDocument = (_value: unknown): _value is BrainLibraryExchangeDocument => false;
+
+export const isBrainLibraryExchangeDocumentWithRegistry = (
+  value: unknown,
+  worldRegistry: WorldRegistry
+): value is BrainLibraryExchangeDocument =>
   isObject(value) &&
   value.version === 1 &&
   value.kind === 'neuralsoup-agent' &&
-  isValidBrainLibraryAgentPayload((value as { agent?: unknown }).agent);
+  isValidBrainLibraryAgentPayload((value as { agent?: unknown }).agent, worldRegistry);
 
 export const encodeBrainLibraryRecordForExchange = (
   record: BrainLibraryRecord
@@ -37,6 +42,7 @@ export const encodeBrainLibraryRecordForExchange = (
 
 const createImportedRecord = (
   agent: AgentIR,
+  worldRegistry: WorldRegistry,
   options?: {
     name?: string;
     existingIds?: Iterable<string>;
@@ -45,7 +51,7 @@ const createImportedRecord = (
   const trimmedName = options?.name?.trim();
   const existingIds = new Set(options?.existingIds ?? []);
   const nextId = existingIds.has(agent.metadata.id)
-    ? createBrainLibraryItemFromAgent(trimmedName || agent.metadata.name, agent).agent.metadata.id
+    ? createBrainLibraryItemFromAgent(trimmedName || agent.metadata.name, agent, worldRegistry).agent.metadata.id
     : agent.metadata.id;
   const nextMetadata: AgentMetadata = {
     ...agent.metadata,
@@ -58,14 +64,15 @@ const createImportedRecord = (
 
 export const normalizeImportedBrainExchange = (
   candidate: unknown,
+  worldRegistry: WorldRegistry,
   options?: {
     name?: string;
     existingIds?: Iterable<string>;
   }
 ): BrainLibraryRecord | null => {
-  if (!isBrainLibraryExchangeDocument(candidate)) {
+  if (!isBrainLibraryExchangeDocumentWithRegistry(candidate, worldRegistry)) {
     return null;
   }
 
-  return createImportedRecord(candidate.agent, options);
+  return createImportedRecord(candidate.agent, worldRegistry, options);
 };

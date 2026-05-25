@@ -1,11 +1,9 @@
 import {
   type AgentIR,
   type AgentMetadata,
+  type WorldRegistry,
   validateAgentIR,
 } from '../domain/brain';
-import { createVisionActionWorldRegistry } from '../host';
-
-const DEFAULT_WORLD_REGISTRY = createVisionActionWorldRegistry();
 
 export interface BrainLibraryRecord {
   agent: AgentIR;
@@ -62,7 +60,8 @@ export const isAgentMetadata = (value: unknown): value is AgentMetadataShape =>
   typeof value.updatedAt === 'string';
 
 export const isValidBrainLibraryAgentPayload = (
-  agent: unknown
+  agent: unknown,
+  worldRegistry: WorldRegistry
 ): agent is AgentIR =>
   isObject(agent) &&
   agent.version === 1 &&
@@ -152,13 +151,16 @@ export const isValidBrainLibraryAgentPayload = (
     (isObject(agent.layout) &&
       agent.layout.version === 1 &&
       isObject(agent.layout.nodes))) &&
-  validateAgentIR(agent as unknown as AgentIR, DEFAULT_WORLD_REGISTRY).length === 0;
+  validateAgentIR(agent as unknown as AgentIR, worldRegistry).length === 0;
 
-export const isBrainLibraryStoredRecord = (value: unknown): value is BrainLibraryRecord =>
+export const isBrainLibraryStoredRecord = (
+  value: unknown,
+  worldRegistry: WorldRegistry
+): value is BrainLibraryRecord =>
   isObject(value) &&
   (value as { packageVersion?: unknown }).packageVersion === undefined &&
   (value as { metadata?: unknown }).metadata === undefined &&
-  isValidBrainLibraryAgentPayload((value as { agent?: unknown }).agent);
+  isValidBrainLibraryAgentPayload((value as { agent?: unknown }).agent, worldRegistry);
 
 export const normalizeCanonicalBrainLibraryRecord = (
   agent: AgentIR,
@@ -180,8 +182,12 @@ export const normalizeCanonicalBrainLibraryRecord = (
   };
 };
 
-const assertValidBrainLibraryAgent = (agent: AgentIR, context: string): void => {
-  const issues = validateAgentIR(agent, DEFAULT_WORLD_REGISTRY);
+const assertValidBrainLibraryAgent = (
+  agent: AgentIR,
+  worldRegistry: WorldRegistry,
+  context: string
+): void => {
+  const issues = validateAgentIR(agent, worldRegistry);
   if (issues.length === 0) {
     return;
   }
@@ -191,8 +197,12 @@ const assertValidBrainLibraryAgent = (agent: AgentIR, context: string): void => 
   );
 };
 
-export const createBrainLibraryItemFromAgent = (name: string, agent: AgentIR): BrainLibraryRecord => {
-  assertValidBrainLibraryAgent(agent, '保存');
+export const createBrainLibraryItemFromAgent = (
+  name: string,
+  agent: AgentIR,
+  worldRegistry: WorldRegistry
+): BrainLibraryRecord => {
+  assertValidBrainLibraryAgent(agent, worldRegistry, '保存');
   const timestamp = new Date().toISOString();
   return normalizeCanonicalBrainLibraryRecord(agent, {
     ...agent.metadata,
@@ -207,9 +217,10 @@ export const upsertBrainLibraryItemAgent = (
   brains: BrainLibraryRecord[],
   brainId: string,
   agent: AgentIR,
+  worldRegistry: WorldRegistry,
   updatedAt?: string
 ): BrainLibraryRecord[] => {
-  assertValidBrainLibraryAgent(agent, '写入');
+  assertValidBrainLibraryAgent(agent, worldRegistry, '写入');
   const nextUpdatedAt = updatedAt ?? new Date().toISOString();
   return brains.map((brain) =>
     brain.agent.metadata.id === brainId

@@ -22,6 +22,269 @@ const withLayoutNodePosition = (agent: AgentIR, nodeId: string, position: Positi
   },
 });
 
+export type AgentGraphEditingIssueCode =
+  | 'missing-root-container'
+  | 'missing-parent-container'
+  | 'missing-target-container'
+  | 'duplicate-node-id'
+  | 'missing-node-reference'
+  | 'insufficient-selection'
+  | 'child-not-owned-by-parent'
+  | 'multiple-owners'
+  | 'root-has-parent'
+  | 'orphan-container'
+  | 'cycle-detected'
+  | 'unreachable-container';
+
+export interface AgentGraphEditingIssue {
+  code: AgentGraphEditingIssueCode;
+  message: string;
+}
+
+export type AgentGraphEditingResult =
+  | {
+      ok: true;
+      agent: AgentIR;
+    }
+  | {
+      ok: false;
+      reason: AgentGraphEditingIssueCode;
+      issues: AgentGraphEditingIssue[];
+    };
+
+const acceptAgentGraphEdit = (agent: AgentIR): AgentGraphEditingResult => ({
+  ok: true,
+  agent,
+});
+
+const rejectAgentGraphEdit = (issues: AgentGraphEditingIssue[]): AgentGraphEditingResult => ({
+  ok: false,
+  reason: issues[0].code,
+  issues,
+});
+
+const createAgentGraphEditingIssue = (
+  code: AgentGraphEditingIssueCode,
+  message: string
+): AgentGraphEditingIssue => ({
+  code,
+  message,
+});
+
+const hasBrainNodeIdCollision = (agent: AgentIR, nodeId: string): boolean =>
+  agent.brain.neurons.some((neuron) => neuron.id === nodeId) ||
+  agent.brain.containers.some((container) => container.id === nodeId);
+
+const collectBrainStructureIssues = (agent: AgentIR): AgentGraphEditingIssue[] => {
+  const issues: AgentGraphEditingIssue[] = [];
+  const neuronIds = new Set<string>();
+  const containerIds = new Set<string>();
+  const neuronOwners = new Map<string, string[]>();
+  const containerOwners = new Map<string, string[]>();
+  const containersById = new Map<string, BrainContainerNode>();
+
+  for (const neuron of agent.brain.neurons) {
+    if (neuronIds.has(neuron.id)) {
+      issues.push(
+        createAgentGraphEditingIssue('duplicate-node-id', `Brain neuron id "${neuron.id}" is duplicated.`)
+      );
+      continue;
+    }
+
+    neuronIds.add(neuron.id);
+  }
+
+  for (const container of agent.brain.containers) {
+    if (neuronIds.has(container.id)) {
+      issues.push(
+        createAgentGraphEditingIssue(
+          'duplicate-node-id',
+          `Brain container id "${container.id}" collides with neuron id "${container.id}".`
+        )
+      );
+      continue;
+    }
+
+    if (containerIds.has(container.id)) {
+      issues.push(
+        createAgentGraphEditingIssue('duplicate-node-id', `Brain container id "${container.id}" is duplicated.`)
+      );
+      continue;
+    }
+
+    containerIds.add(container.id);
+    containersById.set(container.id, container);
+  }
+
+  if (!containerIds.has(agent.brain.rootContainerId)) {
+    issues.push(
+      createAgentGraphEditingIssue(
+        'missing-root-container',
+        `Brain root container "${agent.brain.rootContainerId}" is missing.`
+      )
+    );
+  }
+
+  for (const container of agent.brain.containers) {
+    for (const child of container.children) {
+      if (child.scope === 'brain') {
+        if (!neuronIds.has(child.nodeId)) {
+          issues.push(
+            createAgentGraphEditingIssue(
+              'missing-node-reference',
+              `Brain container "${container.id}" references missing neuron "${child.nodeId}".`
+            )
+          );
+          continue;
+        }
+
+        const owners = neuronOwners.get(child.nodeId) ?? [];
+        owners.push(container.id);
+        neuronOwners.set(child.nodeId, owners);
+        continue;
+      }
+
+      if (!containerIds.has(child.nodeId)) {
+        issues.push(
+          createAgentGraphEditingIssue(
+            'missing-node-reference',
+            `Brain container "${container.id}" references missing child container "${child.nodeId}".`
+          )
+        );
+        continue;
+      }
+
+      const owners = containerOwners.get(child.nodeId) ?? [];
+      owners.push(container.id);
+      containerOwners.set(child.nodeId, owners);
+    }
+  }
+
+  for (const neuronId of neuronIds) {
+    const owners = neuronOwners.get(neuronId) ?? [];
+    if (owners.length === 0) {
+      issues.push(
+        createAgentGraphEditingIssue(
+          'multiple-owners',
+          `Brain neuron "${neuronId}" is not attached to any container.`
+        )
+      );
+      continue;
+    }
+
+    if (owners.length > 1) {
+      issues.push(
+        createAgentGraphEditingIssue(
+          'multiple-owners',
+          `Brain neuron "${neuronId}" is attached to multiple containers: ${owners.join(', ')}.`
+        )
+      );
+    }
+  }
+
+  for (const containerId of containerIds) {
+    const owners = containerOwners.get(containerId) ?? [];
+    if (containerId === agent.brain.rootContainerId) {
+      if (owners.length > 0) {
+        issues.push(
+          createAgentGraphEditingIssue(
+            'root-has-parent',
+            `Brain root container "${containerId}" cannot be nested under another container.`
+          )
+        );
+      }
+      continue;
+    }
+
+    if (owners.length === 0) {
+      issues.push(
+        createAgentGraphEditingIssue(
+          'orphan-container',
+          `Brain container "${containerId}" is not attached to any parent container.`
+        )
+      );
+      continue;
+    }
+
+    if (owners.length > 1) {
+      issues.push(
+        createAgentGraphEditingIssue(
+          'multiple-owners',
+          `Brain container "${containerId}" is attached to multiple parent containers: ${owners.join(', ')}.`
+        )
+      );
+    }
+  }
+
+  const visitState = new Map<string, 'visiting' | 'visited'>();
+  const visitContainer = (containerId: string, path: string[]): void => {
+    const state = visitState.get(containerId);
+    if (state === 'visiting') {
+      issues.push(
+        createAgentGraphEditingIssue('cycle-detected', `Brain container cycle detected: ${[...path, containerId].join(' -> ')}.`)
+      );
+      return;
+    }
+
+    if (state === 'visited') {
+      return;
+    }
+
+    const container = containersById.get(containerId);
+    if (!container) {
+      return;
+    }
+
+    visitState.set(containerId, 'visiting');
+    for (const child of container.children) {
+      if (child.scope === 'container') {
+        visitContainer(child.nodeId, [...path, containerId]);
+      }
+    }
+    visitState.set(containerId, 'visited');
+  };
+
+  if (containerIds.has(agent.brain.rootContainerId)) {
+    visitContainer(agent.brain.rootContainerId, []);
+  }
+
+  for (const containerId of containerIds) {
+    if (!visitState.has(containerId)) {
+      issues.push(
+        createAgentGraphEditingIssue(
+          'unreachable-container',
+          `Brain container "${containerId}" is unreachable from root container "${agent.brain.rootContainerId}".`
+        )
+      );
+    }
+  }
+
+  return issues;
+};
+
+const validateAgentGraphEdit = (
+  agent: AgentIR,
+  buildNextAgent: () => AgentIR,
+  preconditions: AgentGraphEditingIssue[] = []
+): AgentGraphEditingResult => {
+  const currentIssues = collectBrainStructureIssues(agent);
+  if (currentIssues.length > 0) {
+    return rejectAgentGraphEdit(currentIssues);
+  }
+
+  if (preconditions.length > 0) {
+    return rejectAgentGraphEdit(preconditions);
+  }
+
+  const nextAgent = buildNextAgent();
+  const nextIssues = collectBrainStructureIssues(nextAgent);
+  if (nextIssues.length > 0) {
+    return rejectAgentGraphEdit(nextIssues);
+  }
+
+  return acceptAgentGraphEdit(nextAgent);
+};
+
 export interface AggregateAgentNodesInput {
   parentContainerId: string;
   selectedNodeIds: string[];
@@ -31,7 +294,7 @@ export interface AggregateAgentNodesInput {
   childPositionsById: Record<string, Position>;
 }
 
-export const aggregateAgentNodesIntoGroup = (
+export const tryAggregateAgentNodesIntoGroup = (
   agent: AgentIR,
   {
     parentContainerId,
@@ -41,120 +304,183 @@ export const aggregateAgentNodesIntoGroup = (
     nextGroupPosition,
     childPositionsById,
   }: AggregateAgentNodesInput
-): AgentIR => {
-  const selectedNodeIdSet = new Set(selectedNodeIds);
+): AgentGraphEditingResult => {
   const parentContainer = agent.brain.containers.find((container) => container.id === parentContainerId);
   if (!parentContainer) {
-    return agent;
+    return rejectAgentGraphEdit([
+      createAgentGraphEditingIssue(
+        'missing-parent-container',
+        `Cannot aggregate nodes into missing parent container "${parentContainerId}".`
+      ),
+    ]);
   }
 
-  const selectedChildren = parentContainer.children.filter((child) => selectedNodeIdSet.has(child.nodeId));
-  if (selectedChildren.length < 2) {
-    return agent;
+  const selectedNodeIdsUnique = [...new Set(selectedNodeIds)];
+  const preconditions: AgentGraphEditingIssue[] = [];
+  if (selectedNodeIdsUnique.length < 2) {
+    preconditions.push(
+      createAgentGraphEditingIssue('insufficient-selection', 'Cannot aggregate fewer than two selected child nodes.')
+    );
   }
 
-  const nextParentChildren: BrainContainerNode['children'] = [];
-  let inserted = false;
-  for (const child of parentContainer.children) {
-    if (selectedNodeIdSet.has(child.nodeId)) {
-      if (!inserted) {
-        nextParentChildren.push({ scope: 'container', nodeId: nextGroupId });
-        inserted = true;
+  const parentChildIds = new Set(parentContainer.children.map((child) => child.nodeId));
+  const missingSelectedNodeId = selectedNodeIdsUnique.find((nodeId) => !parentChildIds.has(nodeId));
+  if (missingSelectedNodeId) {
+    preconditions.push(
+      createAgentGraphEditingIssue(
+        'child-not-owned-by-parent',
+        `Cannot aggregate node "${missingSelectedNodeId}" because it is not a child of container "${parentContainerId}".`
+      )
+    );
+  }
+
+  if (hasBrainNodeIdCollision(agent, nextGroupId)) {
+    preconditions.push(
+      createAgentGraphEditingIssue(
+        'duplicate-node-id',
+        `Cannot create group "${nextGroupId}" because that brain node id already exists.`
+      )
+    );
+  }
+
+  const selectedNodeIdSet = new Set(selectedNodeIdsUnique);
+  return validateAgentGraphEdit(agent, () => {
+    const selectedChildren = parentContainer.children.filter((child) => selectedNodeIdSet.has(child.nodeId));
+    const nextParentChildren: BrainContainerNode['children'] = [];
+    let inserted = false;
+    for (const child of parentContainer.children) {
+      if (selectedNodeIdSet.has(child.nodeId)) {
+        if (!inserted) {
+          nextParentChildren.push({ scope: 'container', nodeId: nextGroupId });
+          inserted = true;
+        }
+        continue;
       }
-      continue;
+
+      nextParentChildren.push(child);
     }
 
-    nextParentChildren.push(child);
-  }
+    let nextAgent: AgentIR = {
+      ...agent,
+      brain: {
+        ...agent.brain,
+        containers: [
+          ...updateBrainContainerById(agent.brain.containers, parentContainerId, (container) => ({
+            ...container,
+            children: nextParentChildren,
+          })),
+          {
+            id: nextGroupId,
+            label: nextGroupLabel,
+            children: selectedChildren.map((child) => ({ ...child })),
+          },
+        ],
+      },
+    };
 
-  let nextAgent: AgentIR = {
-    ...agent,
-    brain: {
-      ...agent.brain,
-      containers: [
-        ...updateBrainContainerById(agent.brain.containers, parentContainerId, (container) => ({
-          ...container,
-          children: nextParentChildren,
-        })),
-        {
-          id: nextGroupId,
-          label: nextGroupLabel,
-          children: selectedChildren.map((child) => ({ ...child })),
-        },
-      ],
-    },
-  };
+    nextAgent = withLayoutNodePosition(nextAgent, nextGroupId, nextGroupPosition);
+    for (const child of selectedChildren) {
+      const childPosition = childPositionsById[child.nodeId];
+      if (!childPosition) {
+        continue;
+      }
 
-  nextAgent = withLayoutNodePosition(nextAgent, nextGroupId, nextGroupPosition);
-  for (const child of selectedChildren) {
-    const childPosition = childPositionsById[child.nodeId];
-    if (!childPosition) {
-      continue;
+      nextAgent = withLayoutNodePosition(nextAgent, child.nodeId, childPosition);
     }
 
-    nextAgent = withLayoutNodePosition(nextAgent, child.nodeId, childPosition);
-  }
-
-  return nextAgent;
+    return nextAgent;
+  }, preconditions);
 };
 
-export const ungroupAgentContainer = (
+export const aggregateAgentNodesIntoGroup = (agent: AgentIR, input: AggregateAgentNodesInput): AgentIR => {
+  const result = tryAggregateAgentNodesIntoGroup(agent, input);
+  return result.ok ? result.agent : agent;
+};
+
+export const tryUngroupAgentContainer = (
   agent: AgentIR,
   parentContainerId: string,
   targetGroupId: string
-): AgentIR => {
+): AgentGraphEditingResult => {
   const parentContainer = agent.brain.containers.find((container) => container.id === parentContainerId);
+  if (!parentContainer) {
+    return rejectAgentGraphEdit([
+      createAgentGraphEditingIssue(
+        'missing-parent-container',
+        `Cannot ungroup from missing parent container "${parentContainerId}".`
+      ),
+    ]);
+  }
+
   const targetContainer = agent.brain.containers.find((container) => container.id === targetGroupId);
-  if (!parentContainer || !targetContainer) {
-    return agent;
+  if (!targetContainer) {
+    return rejectAgentGraphEdit([
+      createAgentGraphEditingIssue(
+        'missing-target-container',
+        `Cannot ungroup missing target container "${targetGroupId}".`
+      ),
+    ]);
   }
 
   const targetIndex = parentContainer.children.findIndex(
     (child) => child.scope === 'container' && child.nodeId === targetGroupId
   );
-  if (targetIndex < 0) {
-    return agent;
-  }
-
-  const nextParentChildren = [
-    ...parentContainer.children.slice(0, targetIndex),
-    ...targetContainer.children.map((child) => ({ ...child })),
-    ...parentContainer.children.slice(targetIndex + 1),
-  ];
-  const targetGroupPosition = agent.layout?.nodes[targetGroupId]?.position ?? { x: 0, y: 0 };
-
-  let nextAgent: AgentIR = {
-    ...agent,
-    brain: {
-      ...agent.brain,
-      containers: updateBrainContainerById(
-        agent.brain.containers.filter((container) => container.id !== targetGroupId),
-        parentContainerId,
-        (container) => ({
-          ...container,
-          children: nextParentChildren,
-        })
-      ),
-    },
-    layout: agent.layout
-      ? {
-          ...agent.layout,
-          nodes: Object.fromEntries(
-            Object.entries(agent.layout.nodes).filter(([nodeId]) => nodeId !== targetGroupId)
+  const preconditions =
+    targetIndex < 0
+      ? [
+          createAgentGraphEditingIssue(
+            'child-not-owned-by-parent',
+            `Cannot ungroup container "${targetGroupId}" because it is not nested under "${parentContainerId}".`
           ),
-        }
-      : undefined,
-  };
+        ]
+      : [];
 
-  for (const child of targetContainer.children) {
-    const childPosition = nextAgent.layout?.nodes[child.nodeId]?.position ?? { x: 0, y: 0 };
-    nextAgent = withLayoutNodePosition(nextAgent, child.nodeId, {
-      x: targetGroupPosition.x + childPosition.x,
-      y: targetGroupPosition.y + childPosition.y,
-    });
-  }
+  return validateAgentGraphEdit(agent, () => {
+    const nextParentChildren = [
+      ...parentContainer.children.slice(0, targetIndex),
+      ...targetContainer.children.map((child) => ({ ...child })),
+      ...parentContainer.children.slice(targetIndex + 1),
+    ];
+    const targetGroupPosition = agent.layout?.nodes[targetGroupId]?.position ?? { x: 0, y: 0 };
 
-  return nextAgent;
+    let nextAgent: AgentIR = {
+      ...agent,
+      brain: {
+        ...agent.brain,
+        containers: updateBrainContainerById(
+          agent.brain.containers.filter((container) => container.id !== targetGroupId),
+          parentContainerId,
+          (container) => ({
+            ...container,
+            children: nextParentChildren,
+          })
+        ),
+      },
+      layout: agent.layout
+        ? {
+            ...agent.layout,
+            nodes: Object.fromEntries(
+              Object.entries(agent.layout.nodes).filter(([nodeId]) => nodeId !== targetGroupId)
+            ),
+          }
+        : undefined,
+    };
+
+    for (const child of targetContainer.children) {
+      const childPosition = nextAgent.layout?.nodes[child.nodeId]?.position ?? { x: 0, y: 0 };
+      nextAgent = withLayoutNodePosition(nextAgent, child.nodeId, {
+        x: targetGroupPosition.x + childPosition.x,
+        y: targetGroupPosition.y + childPosition.y,
+      });
+    }
+
+    return nextAgent;
+  }, preconditions);
+};
+
+export const ungroupAgentContainer = (agent: AgentIR, parentContainerId: string, targetGroupId: string): AgentIR => {
+  const result = tryUngroupAgentContainer(agent, parentContainerId, targetGroupId);
+  return result.ok ? result.agent : agent;
 };
 
 export interface CreateNeuronAndConnectInput {
@@ -165,7 +491,7 @@ export interface CreateNeuronAndConnectInput {
   connections: AgentIR['connections'];
 }
 
-export const createNeuronAndConnectInContainer = (
+export const tryCreateNeuronAndConnectInContainer = (
   agent: AgentIR,
   {
     parentContainerId,
@@ -174,42 +500,63 @@ export const createNeuronAndConnectInContainer = (
     nextNeuronPosition,
     connections,
   }: CreateNeuronAndConnectInput
-): AgentIR => {
+): AgentGraphEditingResult => {
   const parentContainer = agent.brain.containers.find((container) => container.id === parentContainerId);
   if (!parentContainer) {
-    return agent;
+    return rejectAgentGraphEdit([
+      createAgentGraphEditingIssue(
+        'missing-parent-container',
+        `Cannot create neuron inside missing parent container "${parentContainerId}".`
+      ),
+    ]);
   }
 
-  let nextAgent: AgentIR = {
-    ...agent,
-    brain: {
-      ...agent.brain,
-      neurons: [
-        ...agent.brain.neurons,
-        {
-          id: nextNeuronId,
-          label: nextNeuronLabel,
-          model: 'izhikevich',
-          params: {
-            a: 0.02,
-            b: 0.2,
-            c: -65,
-            d: 8,
-            threshold: 30,
-          },
-          initialState: {
-            v: -65,
-          },
-        },
-      ],
-      containers: updateBrainContainerById(agent.brain.containers, parentContainerId, (container) => ({
-        ...container,
-        children: [...container.children, { scope: 'brain', nodeId: nextNeuronId }],
-      })),
-    },
-    connections: [...agent.connections, ...connections],
-  };
+  const preconditions = hasBrainNodeIdCollision(agent, nextNeuronId)
+    ? [
+        createAgentGraphEditingIssue(
+          'duplicate-node-id',
+          `Cannot create neuron "${nextNeuronId}" because that brain node id already exists.`
+        ),
+      ]
+    : [];
 
-  nextAgent = withLayoutNodePosition(nextAgent, nextNeuronId, nextNeuronPosition);
-  return nextAgent;
+  return validateAgentGraphEdit(agent, () => {
+    let nextAgent: AgentIR = {
+      ...agent,
+      brain: {
+        ...agent.brain,
+        neurons: [
+          ...agent.brain.neurons,
+          {
+            id: nextNeuronId,
+            label: nextNeuronLabel,
+            model: 'izhikevich',
+            params: {
+              a: 0.02,
+              b: 0.2,
+              c: -65,
+              d: 8,
+              threshold: 30,
+            },
+            initialState: {
+              v: -65,
+            },
+          },
+        ],
+        containers: updateBrainContainerById(agent.brain.containers, parentContainerId, (container) => ({
+          ...container,
+          children: [...container.children, { scope: 'brain', nodeId: nextNeuronId }],
+        })),
+      },
+      connections: [...agent.connections, ...connections],
+    };
+
+    nextAgent = withLayoutNodePosition(nextAgent, nextNeuronId, nextNeuronPosition);
+    return nextAgent;
+  }, preconditions);
+};
+
+export const createNeuronAndConnectInContainer = (agent: AgentIR, input: CreateNeuronAndConnectInput): AgentIR => {
+  const result = tryCreateNeuronAndConnectInContainer(agent, input);
+  return result.ok ? result.agent : agent;
 };

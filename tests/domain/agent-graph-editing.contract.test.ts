@@ -1,7 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { AgentIR } from '../../src/domain/brain';
-import { aggregateAgentNodesIntoGroup, ungroupAgentContainer } from '../../src/components/editor/graph/agentGraphEditing';
+import {
+  aggregateAgentNodesIntoGroup,
+  createNeuronAndConnectInContainer,
+  tryAggregateAgentNodesIntoGroup,
+  tryCreateNeuronAndConnectInContainer,
+  tryUngroupAgentContainer,
+  ungroupAgentContainer,
+} from '../../src/components/editor/graph/agentGraphEditing';
 
 const createEditingAgent = (): AgentIR => ({
   version: 1,
@@ -65,21 +72,28 @@ const createEditingAgent = (): AgentIR => ({
   },
 });
 
-test('aggregateAgentNodesIntoGroup rewrites parent children and stores child positions relative to the new group', () => {
-  const next = aggregateAgentNodesIntoGroup(createEditingAgent(), {
-    parentContainerId: 'root-group',
-    selectedNodeIds: ['neuron-1', 'neuron-2'],
-    nextGroupId: 'group-1',
-    nextGroupLabel: '神经元组1',
-    nextGroupPosition: { x: 120, y: 80 },
-    childPositionsById: {
-      'neuron-1': { x: 0, y: 0 },
-      'neuron-2': { x: 80, y: 60 },
-    },
-  });
+const createAggregateInput = () => ({
+  parentContainerId: 'root-group',
+  selectedNodeIds: ['neuron-1', 'neuron-2'],
+  nextGroupId: 'group-1',
+  nextGroupLabel: '神经元组1',
+  nextGroupPosition: { x: 120, y: 80 },
+  childPositionsById: {
+    'neuron-1': { x: 0, y: 0 },
+    'neuron-2': { x: 80, y: 60 },
+  },
+});
 
-  const root = next.brain.containers.find((container) => container.id === 'root-group');
-  const group = next.brain.containers.find((container) => container.id === 'group-1');
+test('tryAggregateAgentNodesIntoGroup returns an updated agent on the happy path', () => {
+  const result = tryAggregateAgentNodesIntoGroup(createEditingAgent(), createAggregateInput());
+
+  assert.equal(result.ok, true);
+  if (!result.ok) {
+    return;
+  }
+
+  const root = result.agent.brain.containers.find((container) => container.id === 'root-group');
+  const group = result.agent.brain.containers.find((container) => container.id === 'group-1');
 
   assert.ok(root);
   assert.ok(group);
@@ -91,23 +105,13 @@ test('aggregateAgentNodesIntoGroup rewrites parent children and stores child pos
     { scope: 'brain', nodeId: 'neuron-1' },
     { scope: 'brain', nodeId: 'neuron-2' },
   ]);
-  assert.deepEqual(next.layout?.nodes['group-1']?.position, { x: 120, y: 80 });
-  assert.deepEqual(next.layout?.nodes['neuron-1']?.position, { x: 0, y: 0 });
-  assert.deepEqual(next.layout?.nodes['neuron-2']?.position, { x: 80, y: 60 });
+  assert.deepEqual(result.agent.layout?.nodes['group-1']?.position, { x: 120, y: 80 });
+  assert.deepEqual(result.agent.layout?.nodes['neuron-1']?.position, { x: 0, y: 0 });
+  assert.deepEqual(result.agent.layout?.nodes['neuron-2']?.position, { x: 80, y: 60 });
 });
 
 test('ungroupAgentContainer restores grouped children into parent scope and reprojects absolute positions', () => {
-  const aggregated = aggregateAgentNodesIntoGroup(createEditingAgent(), {
-    parentContainerId: 'root-group',
-    selectedNodeIds: ['neuron-1', 'neuron-2'],
-    nextGroupId: 'group-1',
-    nextGroupLabel: '神经元组1',
-    nextGroupPosition: { x: 120, y: 80 },
-    childPositionsById: {
-      'neuron-1': { x: 0, y: 0 },
-      'neuron-2': { x: 80, y: 60 },
-    },
-  });
+  const aggregated = aggregateAgentNodesIntoGroup(createEditingAgent(), createAggregateInput());
   const next = ungroupAgentContainer(aggregated, 'root-group', 'group-1');
 
   const root = next.brain.containers.find((container) => container.id === 'root-group');
@@ -123,4 +127,225 @@ test('ungroupAgentContainer restores grouped children into parent scope and repr
   assert.equal(next.layout?.nodes['group-1'], undefined);
   assert.deepEqual(next.layout?.nodes['neuron-1']?.position, { x: 120, y: 80 });
   assert.deepEqual(next.layout?.nodes['neuron-2']?.position, { x: 200, y: 140 });
+});
+
+test('tryCreateNeuronAndConnectInContainer appends the neuron, parent child ref, connections, and layout', () => {
+  const result = tryCreateNeuronAndConnectInContainer(createEditingAgent(), {
+    parentContainerId: 'root-group',
+    nextNeuronId: 'neuron-4',
+    nextNeuronLabel: 'Neuron 4',
+    nextNeuronPosition: { x: 400, y: 320 },
+    connections: [
+      {
+        id: 'link-1',
+        from: { scope: 'brain', nodeId: 'neuron-1', portId: 'output' },
+        to: { scope: 'brain', nodeId: 'neuron-4', portId: 'input' },
+        weight: 0.8,
+      },
+    ],
+  });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) {
+    return;
+  }
+
+  assert.equal(result.agent.brain.neurons.some((neuron) => neuron.id === 'neuron-4'), true);
+  assert.deepEqual(result.agent.brain.containers[0]?.children.at(-1), { scope: 'brain', nodeId: 'neuron-4' });
+  assert.deepEqual(result.agent.connections.at(-1), {
+    id: 'link-1',
+    from: { scope: 'brain', nodeId: 'neuron-1', portId: 'output' },
+    to: { scope: 'brain', nodeId: 'neuron-4', portId: 'input' },
+    weight: 0.8,
+  });
+  assert.deepEqual(result.agent.layout?.nodes['neuron-4']?.position, { x: 400, y: 320 });
+});
+
+test('tryAggregateAgentNodesIntoGroup rejects insufficient selection and legacy wrapper stays no-op', () => {
+  const agent = createEditingAgent();
+  const result = tryAggregateAgentNodesIntoGroup(agent, {
+    ...createAggregateInput(),
+    selectedNodeIds: ['neuron-1'],
+  });
+
+  assert.deepEqual(result, {
+    ok: false,
+    reason: 'insufficient-selection',
+    issues: [
+      {
+        code: 'insufficient-selection',
+        message: 'Cannot aggregate fewer than two selected child nodes.',
+      },
+    ],
+  });
+  assert.equal(
+    aggregateAgentNodesIntoGroup(agent, {
+      ...createAggregateInput(),
+      selectedNodeIds: ['neuron-1'],
+    }),
+    agent
+  );
+});
+
+test('tryAggregateAgentNodesIntoGroup rejects when a selected child is not owned by the parent', () => {
+  const result = tryAggregateAgentNodesIntoGroup(createEditingAgent(), {
+    ...createAggregateInput(),
+    selectedNodeIds: ['neuron-1', 'group-foreign'],
+  });
+
+  assert.equal(result.ok, false);
+  if (result.ok) {
+    return;
+  }
+
+  assert.equal(result.reason, 'child-not-owned-by-parent');
+  assert.match(result.issues[0]?.message ?? '', /group-foreign/);
+});
+
+test('tryAggregateAgentNodesIntoGroup rejects id collisions before rewriting containers', () => {
+  const agent = createEditingAgent();
+  const result = tryAggregateAgentNodesIntoGroup(agent, {
+    ...createAggregateInput(),
+    nextGroupId: 'neuron-3',
+  });
+
+  assert.equal(result.ok, false);
+  if (result.ok) {
+    return;
+  }
+
+  assert.equal(result.reason, 'duplicate-node-id');
+  assert.equal(aggregateAgentNodesIntoGroup(agent, { ...createAggregateInput(), nextGroupId: 'neuron-3' }), agent);
+});
+
+test('tryCreateNeuronAndConnectInContainer rejects duplicate node ids and legacy wrapper stays no-op', () => {
+  const agent = createEditingAgent();
+  const result = tryCreateNeuronAndConnectInContainer(agent, {
+    parentContainerId: 'root-group',
+    nextNeuronId: 'neuron-2',
+    nextNeuronLabel: 'Neuron 2 clone',
+    nextNeuronPosition: { x: 0, y: 0 },
+    connections: [],
+  });
+
+  assert.equal(result.ok, false);
+  if (result.ok) {
+    return;
+  }
+
+  assert.equal(result.reason, 'duplicate-node-id');
+  assert.equal(
+    createNeuronAndConnectInContainer(agent, {
+      parentContainerId: 'root-group',
+      nextNeuronId: 'neuron-2',
+      nextNeuronLabel: 'Neuron 2 clone',
+      nextNeuronPosition: { x: 0, y: 0 },
+      connections: [],
+    }),
+    agent
+  );
+});
+
+test('tryUngroupAgentContainer rejects missing parent ownership and legacy wrapper stays no-op', () => {
+  const aggregated = aggregateAgentNodesIntoGroup(createEditingAgent(), createAggregateInput());
+  const result = tryUngroupAgentContainer(aggregated, 'root-group', 'group-missing');
+
+  assert.equal(result.ok, false);
+  if (result.ok) {
+    return;
+  }
+
+  assert.equal(result.reason, 'missing-target-container');
+  assert.equal(ungroupAgentContainer(aggregated, 'root-group', 'group-missing'), aggregated);
+});
+
+test('tryAggregateAgentNodesIntoGroup rejects malformed source graphs with missing root containers', () => {
+  const invalidAgent: AgentIR = {
+    ...createEditingAgent(),
+    brain: {
+      ...createEditingAgent().brain,
+      rootContainerId: 'root-missing',
+    },
+  };
+
+  const result = tryAggregateAgentNodesIntoGroup(invalidAgent, createAggregateInput());
+
+  assert.equal(result.ok, false);
+  if (result.ok) {
+    return;
+  }
+
+  assert.equal(result.reason, 'missing-root-container');
+  assert.equal(aggregateAgentNodesIntoGroup(invalidAgent, createAggregateInput()), invalidAgent);
+});
+
+test('tryAggregateAgentNodesIntoGroup rejects malformed source graphs with multiple owners', () => {
+  const baseAgent = createEditingAgent();
+  const invalidAgent: AgentIR = {
+    ...baseAgent,
+    brain: {
+      ...baseAgent.brain,
+      containers: [
+        ...baseAgent.brain.containers,
+        {
+          id: 'group-foreign',
+          label: 'Foreign',
+          children: [{ scope: 'brain', nodeId: 'neuron-1' }],
+        },
+      ],
+    },
+  };
+
+  const result = tryAggregateAgentNodesIntoGroup(invalidAgent, createAggregateInput());
+
+  assert.equal(result.ok, false);
+  if (result.ok) {
+    return;
+  }
+
+  assert.equal(result.reason, 'multiple-owners');
+  assert.match(result.issues[0]?.message ?? '', /multiple containers|not attached/);
+});
+
+test('tryAggregateAgentNodesIntoGroup rejects malformed source graphs with container cycles', () => {
+  const baseAgent = createEditingAgent();
+  const invalidAgent: AgentIR = {
+    ...baseAgent,
+    brain: {
+      ...baseAgent.brain,
+      containers: [
+        {
+          id: 'root-group',
+          label: 'Root',
+          children: [
+            { scope: 'brain', nodeId: 'neuron-1' },
+            { scope: 'brain', nodeId: 'neuron-3' },
+            { scope: 'container', nodeId: 'group-1' },
+          ],
+        },
+        {
+          id: 'group-1',
+          label: 'Group 1',
+          children: [
+            { scope: 'brain', nodeId: 'neuron-2' },
+            { scope: 'container', nodeId: 'root-group' },
+          ],
+        },
+      ],
+    },
+  };
+
+  const result = tryAggregateAgentNodesIntoGroup(invalidAgent, {
+    ...createAggregateInput(),
+    selectedNodeIds: ['neuron-1', 'neuron-3'],
+    nextGroupId: 'group-2',
+  });
+
+  assert.equal(result.ok, false);
+  if (result.ok) {
+    return;
+  }
+
+  assert.equal(result.reason, 'root-has-parent');
+  assert.equal(result.issues.some((issue) => issue.code === 'cycle-detected'), true);
 });

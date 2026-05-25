@@ -298,7 +298,7 @@ test('agent controller consumes runtime outputs through the injected world actio
   assert.equal(controlledAgent.velocity.x > 0, true);
 });
 
-test('default world action adapter projects any action.* target into commands by slug', () => {
+test('default world action adapter only projects host-supported movement action targets', () => {
   const adapter = createVisionActionOutputAdapter();
 
   assert.deepEqual(
@@ -343,9 +343,40 @@ test('default world action adapter projects any action.* target into commands by
       { kind: 'turn-left', value: 0.25 },
       { kind: 'move-forward', value: 0.75 },
       { kind: 'turn-right', value: 0.5 },
-      { kind: 'strafe-left', value: 1 },
     ] satisfies WorldControlCommand[]
   );
+});
+
+test('snn keyboard override keeps stepping runtime state while overriding applied movement commands', () => {
+  const controller = new AgentController(
+    createVisionActionOutputAdapter(),
+    createVisionActionInputSignalProvider(),
+    createVisionActionCommandApplier(),
+    VISION_ACTION_MOVEMENT_BINDINGS
+  );
+  const session = createSimulationSession(controller);
+
+  session.initialize();
+  session.setControlMode('snn');
+  const mainAgent = expectMainAgentProgramInstalled(session);
+  const controlledAgent = createAgent({
+    id: mainAgent.id,
+    visionCells: createVisionCells(mainAgent.visionCells.length, { r: 1, g: 1, b: 1 }),
+  });
+
+  controller.updateAgent(controlledAgent, 1, {
+    controlMode: 'snn',
+    keyboardInputState: {
+      turnLeft: false,
+      moveForward: true,
+      turnRight: false,
+    },
+  });
+
+  assert.equal(controlledAgent.velocity.x, 60);
+  assert.equal(controlledAgent.velocity.y, 0);
+  assert.equal(controller.getActiveLeafNodeIds(mainAgent.id).length > 0, true);
+  assert.equal(controller.getActiveLeafNodeIds(mainAgent.id).includes('output-move-forward'), true);
 });
 
 test('vision-cell world input provider ignores legacy visualInput and only uses visionCells as source of truth', () => {

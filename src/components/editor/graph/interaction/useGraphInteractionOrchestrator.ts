@@ -194,6 +194,26 @@ export const useGraphInteractionOrchestrator = ({
     [getNodeById, sceneRef]
   );
 
+  const resolveNodeHitIncludingSources = useCallback(
+    (target: EventTarget | null, clientPoint: GraphPoint) => {
+      const targetElement = target instanceof Element ? target : null;
+      const domNodeId = targetElement?.closest<HTMLElement>('[data-topology-view-node-id]')?.dataset.topologyViewNodeId;
+      if (domNodeId) {
+        return getNodeById(domNodeId);
+      }
+
+      const hitNode = findSceneNodeAtClientPoint(
+        nodesRef.current,
+        clientPoint,
+        sceneRef.current?.getBoundingClientRect() ?? null,
+        scaleRef.current
+      );
+
+      return hitNode ? getNodeById(hitNode.id) : null;
+    },
+    [getNodeById, sceneRef]
+  );
+
   const beginCanvasContextGesture = useCallback(
     (startClient: GraphPoint) => {
       closeContextMenu();
@@ -628,17 +648,23 @@ export const useGraphInteractionOrchestrator = ({
       }
 
       if (currentInteraction?.type === 'linking') {
+        const releaseClientPoint = { x: event.clientX, y: event.clientY };
+        const releasedOnSourceNode = currentInteraction.sourceNodeIds.includes(
+          resolveNodeHitIncludingSources(event.target, releaseClientPoint)?.id ?? ''
+        );
         const targetNode =
-          resolveNodeHit(event.target, { x: event.clientX, y: event.clientY }) ??
-          findSceneNodeAtClientPoint(
-            nodesRef.current,
-            { x: event.clientX, y: event.clientY },
-            sceneRef.current?.getBoundingClientRect() ?? null,
-            scaleRef.current,
-            {
-              excludeNodeIds: currentInteraction.sourceNodeIds,
-            }
-          );
+          releasedOnSourceNode
+            ? null
+            : resolveNodeHit(event.target, releaseClientPoint) ??
+              findSceneNodeAtClientPoint(
+                nodesRef.current,
+                releaseClientPoint,
+                sceneRef.current?.getBoundingClientRect() ?? null,
+                scaleRef.current,
+                {
+                  excludeNodeIds: currentInteraction.sourceNodeIds,
+                }
+              );
         const targetNodeId = targetNode?.id ?? null;
 
         if (targetNodeId && !currentInteraction.sourceNodeIds.includes(targetNodeId)) {
@@ -647,8 +673,8 @@ export const useGraphInteractionOrchestrator = ({
           return;
         }
 
-        if (currentInteraction.mode === 'multi' && canCreateNeuronHere) {
-          const scenePoint = getScenePoint({ x: event.clientX, y: event.clientY });
+        if (!releasedOnSourceNode && currentInteraction.mode === 'multi' && canCreateNeuronHere) {
+          const scenePoint = getScenePoint(releaseClientPoint);
           createNeuronAndConnectAt(currentInteraction.sourceNodeIds, scenePoint.x + sceneOriginRef.current.x, scenePoint.y + sceneOriginRef.current.y);
           setInteractionState(null);
           return;
@@ -684,6 +710,7 @@ export const useGraphInteractionOrchestrator = ({
     getScenePoint,
     isActive,
     resolveNodeHit,
+    resolveNodeHitIncludingSources,
     sceneRef,
     selectedNodeIds,
     setInteractionState,

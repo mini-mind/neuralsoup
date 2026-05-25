@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createVisionActionSeedAgentIR } from '../../src/host';
+import {
+  createVisionActionHostProfile,
+  createVisionActionSeedAgentIR,
+  createVisionActionWorldRegistry,
+} from '../../src/host';
 import {
   encodeBrainLibraryRecordAsLegacyAgentPackage,
   isLegacyBrainLibraryStorageEnvelope,
@@ -17,6 +21,8 @@ import {
 } from '../../src/storage/brainLibraryStorage';
 import type { AgentPackage as AgentLibraryItem } from '../../src/compat/legacyBrainPackage';
 
+const WORLD_REGISTRY = createVisionActionWorldRegistry();
+
 const createAgentPackage = (name: string, visionCells: number): AgentLibraryItem => {
   const agent = createVisionActionSeedAgentIR(visionCells, name);
   return {
@@ -28,7 +34,7 @@ const createAgentPackage = (name: string, visionCells: number): AgentLibraryItem
 
 test('explicit compat import normalization accepts legacy AgentPackage envelopes', () => {
   const brain = createAgentPackage('Import Source', 1);
-  const normalized = normalizeImportedLegacyBrainExchange(brain, {
+  const normalized = normalizeImportedLegacyBrainExchange(brain, WORLD_REGISTRY, {
     name: 'Imported Brain',
     existingIds: [brain.agent.metadata.id],
   });
@@ -43,7 +49,7 @@ test('explicit compat import normalization accepts legacy envelopes without top-
   const normalized = normalizeImportedLegacyBrainExchange({
     packageVersion: 1,
     agent: brain.agent,
-  });
+  }, WORLD_REGISTRY);
 
   assert.ok(normalized);
   assert.equal(normalized.agent.metadata.name, 'Import Without Envelope Metadata');
@@ -60,7 +66,7 @@ test('explicit compat storage loader migrates legacy AgentPackage payloads missi
     storageVersion: 1,
     savedAt: new Date().toISOString(),
     brains: [legacyBrain],
-  });
+  }, WORLD_REGISTRY);
 
   assert.ok(loaded);
   assert.equal(loaded.length, 1);
@@ -82,7 +88,7 @@ test('explicit compat storage loader preserves sparse legacy vision-cell counts 
     storageVersion: 1,
     savedAt: new Date().toISOString(),
     brains: [brain],
-  });
+  }, WORLD_REGISTRY);
   assert.ok(loaded);
   assert.equal(deriveAgentIRVisionCellCount(loaded[0].agent), 36);
   assert.equal('visionCellCount' in JSON.parse(JSON.stringify(loaded[0])).agent.body, false);
@@ -103,7 +109,7 @@ test('explicit compat storage loader preserves explicit legacy body visionCellCo
     storageVersion: 1,
     savedAt: new Date().toISOString(),
     brains: [brain],
-  });
+  }, WORLD_REGISTRY);
 
   assert.ok(loaded);
   assert.equal('visionCellCount' in (loaded[0]?.agent.body ?? {}), false);
@@ -133,7 +139,7 @@ test('explicit compat storage loader normalizes legacy top-level metadata to age
     storageVersion: 1,
     savedAt: new Date().toISOString(),
     brains: [inconsistentBrain],
-  });
+  }, WORLD_REGISTRY);
 
   assert.ok(loaded);
   assert.equal(loaded[0].agent.metadata.id, 'agent-level-id');
@@ -151,7 +157,7 @@ test('explicit compat storage loader accepts legacy payloads without top-level m
     storageVersion: 1,
     savedAt: new Date().toISOString(),
     brains: [brainWithoutTopLevelMetadata],
-  });
+  }, WORLD_REGISTRY);
 
   assert.ok(loaded);
   assert.equal(loaded[0].agent.metadata.name, 'Metadata Optional Brain');
@@ -186,7 +192,7 @@ test('production Brain Library storage entrypoint rejects legacy storage envelop
   try {
     localStorageMock.setItem(BRAIN_LIBRARY_STORAGE_KEY, JSON.stringify(legacyEnvelope));
 
-    const loaded = loadBrainLibraryWithStatus();
+    const loaded = loadBrainLibraryWithStatus(WORLD_REGISTRY);
 
     assert.deepEqual(loaded.brains, []);
     assert.equal(loaded.status.state, 'recovered');
@@ -204,19 +210,43 @@ test('production Brain Library storage entrypoint rejects legacy storage envelop
 
 test('legacy Brain Library storage envelope detection remains available as explicit compat surface', () => {
   const brain = createAgentPackage('Legacy Storage Shape', 1);
-  assert.equal(
-    isLegacyBrainLibraryStorageEnvelope({
-      storageVersion: 1,
-      savedAt: new Date().toISOString(),
-      brains: [brain],
-    }),
+    assert.equal(
+      isLegacyBrainLibraryStorageEnvelope({
+        storageVersion: 1,
+        savedAt: new Date().toISOString(),
+        brains: [brain],
+    }, WORLD_REGISTRY),
     true
+  );
+});
+
+test('explicit compat Brain Library import respects the caller registry instead of a hidden default registry', () => {
+  const customHost = createVisionActionHostProfile({
+    turnLeft: 'yaw-left',
+    moveForward: 'thrust',
+    turnRight: 'yaw-right',
+  });
+  const legacyAgent = customHost.createSeedAgentIR(1, 'Compat Custom Host');
+  const legacyPackage = {
+    packageVersion: 1,
+    metadata: { ...legacyAgent.metadata },
+    agent: legacyAgent,
+  };
+
+  const normalized = normalizeImportedLegacyBrainExchange(legacyPackage, customHost.worldRegistry, {
+    existingIds: [],
+  });
+
+  assert.ok(normalized);
+  assert.deepEqual(
+    normalized.agent.body.outputRules.map((rule) => rule.nodeIdPattern),
+    ['^output-(yaw-left|thrust|yaw-right)$']
   );
 });
 
 test('Brain Library legacy export codec remains available as explicit compat surface', () => {
   const brain = createAgentPackage('Legacy Export Brain', 1);
-  const record = createBrainLibraryItemFromAgent('Legacy Export Brain', brain.agent);
+  const record = createBrainLibraryItemFromAgent('Legacy Export Brain', brain.agent, WORLD_REGISTRY);
   const exported = encodeBrainLibraryRecordAsLegacyAgentPackage(record);
 
   assert.equal(exported.packageVersion, 1);

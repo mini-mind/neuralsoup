@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Page, TestInfo } from '@playwright/test';
-import { createDefaultAgentIR } from '../src/domain/brain/agent-defaults';
+import { createVisionActionSeedAgentIR } from '../src/host';
 
 const selectors = {
   simulationCanvas: '[data-testid="simulation-canvas"]',
@@ -121,7 +121,7 @@ const diagnosticsExpectationsByPage = new WeakMap<Page, DiagnosticsExpectation>(
 
 const degradedRendererProjectName = 'chromium-webgl-disabled';
 const expectedRenderInitErrorPrefix = 'Failed to initialize simulation canvas:';
-const DEFAULT_AGENT_CONNECTION_COUNT = createDefaultAgentIR(36).connections.length;
+const DEFAULT_AGENT_CONNECTION_COUNT = createVisionActionSeedAgentIR(36).connections.length;
 
 const installStartupDiagnostics = (page: Page) => {
   const diagnostics: StartupDiagnostics = {
@@ -541,6 +541,26 @@ const getNodeViewId = async (page: Page, selector: string) => {
 const injectInvalidGraphDraft = async (page: Page) => {
   await page.evaluate(() => {
     window.__NEURALSOUP_TEST_API__?.injectInvalidGraphDraft();
+  });
+};
+
+const injectInvalidStructureDraft = async (page: Page) => {
+  await page.evaluate(() => {
+    window.__NEURALSOUP_TEST_API__?.injectInvalidStructureDraft();
+  });
+};
+
+const importAgentDocument = async (page: Page, agent: unknown, name = 'imported-agent.json') => {
+  await page.setInputFiles(selectors.brainLibraryImportFile, {
+    name,
+    mimeType: 'application/json',
+    buffer: Buffer.from(
+      JSON.stringify({
+        version: 1,
+        kind: 'neuralsoup-agent',
+        agent,
+      })
+    ),
   });
 };
 
@@ -1625,23 +1645,13 @@ test('brain import resets graph view path to root and installs the imported sess
   await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
   await expect.poll(async () => getGraphPathIds(page)).toEqual(['root', 'root-container']);
 
-  const importedAgent = createDefaultAgentIR(24);
+  const importedAgent = createVisionActionSeedAgentIR(24);
   importedAgent.metadata.name = 'Imported Reset Brain';
 
   await page.locator(selectors.brainLibraryButton).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
   page.once('dialog', (dialog) => dialog.accept());
-  await page.setInputFiles(selectors.brainLibraryImportFile, {
-    name: 'imported-reset-brain.json',
-    mimeType: 'application/json',
-    buffer: Buffer.from(
-      JSON.stringify({
-        version: 1,
-        kind: 'neuralsoup-agent',
-        agent: importedAgent,
-      })
-    ),
-  });
+  await importAgentDocument(page, importedAgent, 'imported-reset-brain.json');
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
   await page.locator(selectors.brainLibraryClose).click();
   await expect(page.locator(selectors.brainLibraryModal)).toHaveCount(0);
@@ -2152,6 +2162,137 @@ test('graph view diagnostics expose invalid draft divergence through the real dr
   await expect(page.locator(selectors.topologyCanonicalConnectionCount)).toHaveText(baseRuntimeConnectionCount);
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(baseRuntimeConnectionCount);
   await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
+});
+
+test('graph view rejects structural edit commands while an invalid structural draft is present and keeps UI state stable', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect(page.locator(selectors.topologyDraftValidationCount)).toHaveText('0');
+
+  const beforePath = await getGraphPathIds(page);
+  const beforeNodeCount = await page.locator(selectors.topologyNodeCount).innerText();
+  const beforeSelectedCount = await page.locator(selectors.topologySelectedCount).innerText();
+
+  await injectInvalidStructureDraft(page);
+
+  await expect(page.locator(selectors.topologyDraftState)).toHaveText('invalid');
+  await expect.poll(() => getDraftDiagnostics(page).then((value) => value.message)).toContain('unreachable');
+
+  await page.locator(selectors.nodeNeuronOne).click();
+  await page.locator(selectors.nodeNeuronTwo).click({ modifiers: ['Shift'] });
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('2');
+
+  const nodeTwoCenter = await getLocatorCenter(page, selectors.nodeNeuronTwo);
+  await rightClickAt(page, nodeTwoCenter);
+  await expect(page.locator(selectors.topologyContextMenu)).toBeVisible();
+  await page.locator(selectors.topologyContextAggregate).click();
+
+  await expect(page.locator('[data-testid^="topology-node-group-"]')).toHaveCount(0);
+  await expect(page.locator(selectors.topologyNodeCount)).toHaveText(beforeNodeCount);
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('2');
+  await expect(page.locator(selectors.topologyPendingLink)).toHaveCount(0);
+  await expect.poll(() => getGraphPathIds(page)).toEqual(beforePath);
+  await expect(page.locator(selectors.topologyDraftValidationCount)).not.toHaveText('0');
+  await expect(page.locator(selectors.topologySelectedCount)).not.toHaveText(beforeSelectedCount);
+});
+
+test('graph view fails closed for node dragging while an invalid structural draft is present', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+
+  const neuronOneViewId = await getNodeViewId(page, selectors.nodeNeuronOne);
+  const beforePosition = await getNodeViewPositionFromSummary(page, neuronOneViewId);
+  const beforeCenter = await getLocatorCenter(page, selectors.nodeNeuronOne);
+
+  await injectInvalidStructureDraft(page);
+  await expect(page.locator(selectors.topologyDraftState)).toHaveText('invalid');
+
+  await dragOnCanvas(page, beforeCenter, {
+    x: beforeCenter.x + 72,
+    y: beforeCenter.y + 36,
+  });
+
+  await expect.poll(() => getNodeViewPositionFromSummary(page, neuronOneViewId)).toEqual(beforePosition);
+  await expect.poll(() => getLocatorCenter(page, selectors.nodeNeuronOne)).toEqual(beforeCenter);
+});
+
+test('graph view multi-source right-drag released on a source node does not create a new neuron', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+
+  const beforeNodeCount = await getNumericLocatorText(page, selectors.topologyRuntimeNeuronCount);
+  const beforeConnectionCount = await getNumericLocatorText(page, selectors.topologyRuntimeConnectionCount);
+
+  await page.locator(selectors.nodeNeuronOne).click();
+  await page.locator(selectors.nodeNeuronTwo).click({ modifiers: ['Shift'] });
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('2');
+
+  const neuronOneCenter = await getLocatorCenter(page, selectors.nodeNeuronOne);
+  const neuronTwoCenter = await getLocatorCenter(page, selectors.nodeNeuronTwo);
+  await page.mouse.move(neuronTwoCenter.x, neuronTwoCenter.y);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.move(neuronOneCenter.x, neuronOneCenter.y, { steps: 12 });
+  await page.mouse.up({ button: 'right' });
+
+  await expect(page.locator('[data-testid="topology-node-neuron-3"]')).toHaveCount(0);
+  await expect(page.locator(selectors.topologyPendingLink)).toHaveCount(0);
+  await expect(page.locator(selectors.topologyRuntimeNeuronCount)).toHaveText(String(beforeNodeCount));
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(beforeConnectionCount));
+});
+
+test('graph view deduplicates imported legacy-style links when reconnecting the same semantic edge', async ({ page }, testInfo) => {
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  const importedAgent = createVisionActionSeedAgentIR(24);
+  importedAgent.metadata.name = 'Legacy Portless Dedup';
+  importedAgent.connections = importedAgent.connections.map((connection) => {
+    if (
+      connection.from.scope === 'brain' &&
+      connection.from.nodeId === 'neuron-1' &&
+      connection.to.scope === 'brain' &&
+      connection.to.nodeId === 'neuron-2'
+    ) {
+      return {
+        ...connection,
+        from: { scope: connection.from.scope, nodeId: connection.from.nodeId },
+        to: { scope: connection.to.scope, nodeId: connection.to.nodeId },
+      };
+    }
+
+    return connection;
+  });
+
+  await page.locator(selectors.brainLibraryButton).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
+  page.once('dialog', (dialog) => dialog.accept());
+  await importAgentDocument(page, importedAgent, 'legacy-portless-dedup.json');
+  await page.locator(selectors.brainLibraryClose).click();
+  await expect(page.locator(selectors.brainLibraryModal)).toHaveCount(0);
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  await expect(page.locator('[data-testid="topology-link-link-neuron-1-neuron-2"]')).toHaveCount(1);
+
+  const beforeConnectionCount = await getNumericLocatorText(page, selectors.topologyRuntimeConnectionCount);
+  await rightDragBetweenNodes(page, selectors.nodeNeuronOne, selectors.nodeNeuronTwo);
+
+  await expect(page.locator('[data-testid="topology-link-link-neuron-1-neuron-2"]')).toHaveCount(1);
+  await expect(page.locator(selectors.topologySelectedLink)).toHaveText(/neuron-1-neuron-2/);
+  await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(beforeConnectionCount));
 });
 
 test('graph view boundary aggregate links are inspectable but remain read-only', async ({ page }, testInfo) => {

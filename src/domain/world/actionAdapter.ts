@@ -1,3 +1,5 @@
+import type { MovementWorldControlBindings } from './runtimeAdapter';
+
 export interface WorldOutputSignal {
   id: string;
   target: string;
@@ -17,23 +19,32 @@ export interface WorldActionOutputAdapter {
 
 const ACTION_TARGET_PATTERN = /^action\.([a-z0-9-]+)$/;
 
-export const createDefaultWorldActionOutputAdapter = (): WorldActionOutputAdapter => ({
-  resolve(outputSignals) {
-    const commandsByKind = new Map<string, number>();
+const createSupportedActionKinds = (bindings: MovementWorldControlBindings): Set<string> =>
+  new Set(Object.values(bindings));
 
-    for (const signal of outputSignals) {
-      if (signal.worldPort !== 'action') {
-        continue;
+export const createDefaultWorldActionOutputAdapter = (
+  bindings: MovementWorldControlBindings
+): WorldActionOutputAdapter => {
+  const supportedActionKinds = createSupportedActionKinds(bindings);
+
+  return {
+    resolve(outputSignals) {
+      const commandsByKind = new Map<string, number>();
+
+      for (const signal of outputSignals) {
+        if (signal.worldPort !== 'action') {
+          continue;
+        }
+
+        const commandMatch = signal.normalizedTarget.match(ACTION_TARGET_PATTERN);
+        if (!commandMatch || !supportedActionKinds.has(commandMatch[1])) {
+          continue;
+        }
+
+        commandsByKind.set(commandMatch[1], signal.value);
       }
 
-      const commandMatch = signal.normalizedTarget.match(ACTION_TARGET_PATTERN);
-      if (!commandMatch) {
-        continue;
-      }
-
-      commandsByKind.set(commandMatch[1], signal.value);
-    }
-
-    return [...commandsByKind.entries()].map(([kind, value]) => ({ kind, value }));
-  },
-});
+      return [...commandsByKind.entries()].map(([kind, value]) => ({ kind, value }));
+    },
+  };
+};

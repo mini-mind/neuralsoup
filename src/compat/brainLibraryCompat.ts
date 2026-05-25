@@ -1,4 +1,4 @@
-import type { AgentIR, AgentMetadata } from '../domain/brain';
+import type { AgentIR, AgentMetadata, WorldRegistry } from '../domain/brain';
 import type { AgentPackage as AgentLibraryItem } from './legacyBrainPackage';
 import { withVisionCellLayoutMarkers } from './legacyVisionCellCount';
 import {
@@ -73,7 +73,7 @@ const normalizeImportedBrainLibraryRecord = (
   return normalizeCanonicalBrainLibraryRecord(nextAgent, metadataOverride);
 };
 
-const isValidLegacyAgentPayload = (agent: unknown): agent is AgentIR => {
+const isValidLegacyAgentPayload = (agent: unknown, worldRegistry: WorldRegistry): agent is AgentIR => {
   if (!isObject(agent)) {
     return false;
   }
@@ -90,7 +90,7 @@ const isValidLegacyAgentPayload = (agent: unknown): agent is AgentIR => {
       body: {
         ...candidateBody,
       },
-    });
+    }, worldRegistry);
   }
 
   return isValidBrainLibraryAgentPayload({
@@ -98,14 +98,17 @@ const isValidLegacyAgentPayload = (agent: unknown): agent is AgentIR => {
     body: {
       ...candidateBody,
     },
-  });
+  }, worldRegistry);
 };
 
-export const isLegacyAgentPackage = (value: unknown): value is AgentLibraryItem =>
+export const isLegacyAgentPackage = (
+  value: unknown,
+  worldRegistry: WorldRegistry
+): value is AgentLibraryItem =>
   isObject(value) &&
   value.packageVersion === 1 &&
   hasValidOptionalTopLevelMetadata((value as LegacyAgentPackageLike).metadata) &&
-  isValidLegacyAgentPayload((value as LegacyAgentPackageLike).agent);
+  isValidLegacyAgentPayload((value as LegacyAgentPackageLike).agent, worldRegistry);
 
 export const encodeBrainLibraryRecordAsLegacyAgentPackage = (
   record: BrainLibraryRecord
@@ -130,12 +133,13 @@ const normalizeLegacyAgentPackageMetadata = (candidate: AgentLibraryItem): Agent
 
 export const normalizeImportedLegacyBrainExchange = (
   candidate: unknown,
+  worldRegistry: WorldRegistry,
   options?: {
     name?: string;
     existingIds?: Iterable<string>;
   }
 ): BrainLibraryRecord | null => {
-  if (!isLegacyAgentPackage(candidate)) {
+  if (!isLegacyAgentPackage(candidate, worldRegistry)) {
     return null;
   }
 
@@ -150,7 +154,11 @@ export const normalizeImportedLegacyBrainExchange = (
   const trimmedName = options?.name?.trim();
   const existingIds = new Set(options?.existingIds ?? []);
   const nextId = existingIds.has(canonicalAgent.metadata.id)
-    ? createBrainLibraryItemFromAgent(trimmedName || canonicalAgent.metadata.name, canonicalAgent).agent.metadata.id
+    ? createBrainLibraryItemFromAgent(
+        trimmedName || canonicalAgent.metadata.name,
+        canonicalAgent,
+        worldRegistry
+      ).agent.metadata.id
     : canonicalAgent.metadata.id;
   const nextMetadata: AgentMetadata = {
     ...canonicalAgent.metadata,
@@ -162,20 +170,24 @@ export const normalizeImportedLegacyBrainExchange = (
 };
 
 export const isLegacyBrainLibraryStorageEnvelope = (
-  value: unknown
+  value: unknown,
+  worldRegistry: WorldRegistry
 ): value is LegacyBrainLibraryStorageEnvelope =>
   isObject(value) &&
   value.storageVersion === 1 &&
   typeof value.savedAt === 'string' &&
   Array.isArray(value.brains) &&
-  value.brains.every(isLegacyAgentPackage);
+  value.brains.every((brain) => isLegacyAgentPackage(brain, worldRegistry));
 
-export const loadLegacyBrainLibraryStorageEnvelope = (value: unknown): BrainLibraryRecord[] | null => {
-  if (!isLegacyBrainLibraryStorageEnvelope(value)) {
+export const loadLegacyBrainLibraryStorageEnvelope = (
+  value: unknown,
+  worldRegistry: WorldRegistry
+): BrainLibraryRecord[] | null => {
+  if (!isLegacyBrainLibraryStorageEnvelope(value, worldRegistry)) {
     return null;
   }
 
   return value.brains
-    .map((brain) => normalizeImportedLegacyBrainExchange(brain))
+    .map((brain) => normalizeImportedLegacyBrainExchange(brain, worldRegistry))
     .filter((brain): brain is BrainLibraryRecord => brain !== null);
 };

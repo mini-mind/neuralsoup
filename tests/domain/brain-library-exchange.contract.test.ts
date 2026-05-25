@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createVisionActionSeedAgentIR } from '../../src/host';
+import { createVisionActionSeedAgentIR, createVisionActionWorldRegistry } from '../../src/host';
 import { createBrainLibraryItemFromAgent } from '../../src/storage/brainLibraryRecord';
 import {
   encodeBrainLibraryRecordForExchange,
   normalizeImportedBrainExchange,
 } from '../../src/storage/brainLibraryExchange';
+
+const WORLD_REGISTRY = createVisionActionWorldRegistry();
 
 const createAgentPackage = (name: string, visionCells: number) => {
   const agent = createVisionActionSeedAgentIR(visionCells, name);
@@ -18,9 +20,9 @@ const createAgentPackage = (name: string, visionCells: number) => {
 
 test('Brain Library default exchange payload is AgentIR-native and round-trips through import normalization', () => {
   const brain = createAgentPackage('Roundtrip Brain', 1);
-  const record = createBrainLibraryItemFromAgent('Roundtrip Brain', brain.agent);
+  const record = createBrainLibraryItemFromAgent('Roundtrip Brain', brain.agent, WORLD_REGISTRY);
   const exported = encodeBrainLibraryRecordForExchange(record);
-  const normalized = normalizeImportedBrainExchange(exported, {
+  const normalized = normalizeImportedBrainExchange(exported, WORLD_REGISTRY, {
     existingIds: [],
   });
 
@@ -34,7 +36,7 @@ test('Brain Library default exchange payload is AgentIR-native and round-trips t
 
 test('Brain Library default import normalization rejects legacy AgentPackage compat payloads', () => {
   const brain = createAgentPackage('Import Source', 1);
-  const normalized = normalizeImportedBrainExchange(brain, {
+  const normalized = normalizeImportedBrainExchange(brain, WORLD_REGISTRY, {
     name: 'Imported Brain',
     existingIds: [brain.agent.metadata.id],
   });
@@ -47,7 +49,7 @@ test('Brain Library default import normalization rejects legacy envelopes withou
   const normalized = normalizeImportedBrainExchange({
     packageVersion: 1,
     agent: brain.agent,
-  });
+  }, WORLD_REGISTRY);
 
   assert.equal(normalized, null);
 });
