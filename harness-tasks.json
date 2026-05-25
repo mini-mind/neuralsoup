@@ -1357,7 +1357,7 @@
     {
       "id": "task-037",
       "title": "WorldRegistry phase 1b: move body rule binding and endpoint enumeration fully behind registry interfaces",
-      "status": "pending",
+      "status": "completed",
       "priority": "P0",
       "depends_on": [
         "task-036"
@@ -1373,13 +1373,18 @@
         "cleanup": null
       },
       "error_log": [],
-      "checkpoints": [],
-      "completed_at": null
+      "checkpoints": [
+        {
+          "timestamp": "2026-05-25T08:17:08.915Z",
+          "note": "superseded by completed WorldRegistry authority cleanup tasks task-042/task-043/task-044/task-046 and the new no-compat AgentIR freeze"
+        }
+      ],
+      "completed_at": "2026-05-25T08:17:08.915Z"
     },
     {
       "id": "task-038",
       "title": "Runtime binding cleanup: convert body runtime ports to registry-normalized binding metadata and remove residual host-specific fields from the main path",
-      "status": "pending",
+      "status": "completed",
       "priority": "P1",
       "depends_on": [
         "task-037"
@@ -1395,13 +1400,18 @@
         "cleanup": null
       },
       "error_log": [],
-      "checkpoints": [],
-      "completed_at": null
+      "checkpoints": [
+        {
+          "timestamp": "2026-05-25T08:17:08.915Z",
+          "note": "superseded by completed runtime binding cleanup tasks task-042/task-044/task-045 and the new SynapseModelIR/ConnectionIR runtime plan"
+        }
+      ],
+      "completed_at": "2026-05-25T08:17:08.915Z"
     },
     {
       "id": "task-039",
       "title": "Compat surface sweep: push remaining legacy storage/import/export helpers and naming leakage behind explicit compat modules",
-      "status": "pending",
+      "status": "completed",
       "priority": "P1",
       "depends_on": [
         "task-037"
@@ -1417,13 +1427,18 @@
         "cleanup": null
       },
       "error_log": [],
-      "checkpoints": [],
-      "completed_at": null
+      "checkpoints": [
+        {
+          "timestamp": "2026-05-25T08:17:08.915Z",
+          "note": "superseded by completed compat cleanup task-045 and the new explicit no-legacy-compat acceptance boundary"
+        }
+      ],
+      "completed_at": "2026-05-25T08:17:08.915Z"
     },
     {
       "id": "task-040",
       "title": "IR extension prep: document and minimally scaffold model-registry, endpoint-portId, and viewport persistence future seams without changing canonical schema",
-      "status": "pending",
+      "status": "completed",
       "priority": "P2",
       "depends_on": [
         "task-038",
@@ -1440,13 +1455,18 @@
         "cleanup": null
       },
       "error_log": [],
-      "checkpoints": [],
-      "completed_at": null
+      "checkpoints": [
+        {
+          "timestamp": "2026-05-25T08:17:08.915Z",
+          "note": "superseded by docs/GRAPH_IR_REFACTOR_PLAN.md frozen AgentIR model registry and layout design committed in c791c66"
+        }
+      ],
+      "completed_at": "2026-05-25T08:17:08.915Z"
     },
     {
       "id": "task-041",
       "title": "Final review loop: run self-review plus multi-gpt-5.4 cross-review on WorldRegistry/compat cleanup and close residual P0-P2 findings",
-      "status": "pending",
+      "status": "completed",
       "priority": "P0",
       "depends_on": [
         "task-038",
@@ -1464,8 +1484,13 @@
         "cleanup": null
       },
       "error_log": [],
-      "checkpoints": [],
-      "completed_at": null
+      "checkpoints": [
+        {
+          "timestamp": "2026-05-25T08:17:08.915Z",
+          "note": "superseded by the new final cross-review task after AgentIR v2 implementation tasks complete"
+        }
+      ],
+      "completed_at": "2026-05-25T08:17:08.915Z"
     },
     {
       "id": "task-042",
@@ -1631,8 +1656,166 @@
         }
       ],
       "completed_at": "2026-05-25T03:24:42Z"
+    },
+    {
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null,
+      "id": "task-048",
+      "title": "AgentIR v2 schema cutover: introduce NeuronModelIR, SynapseModelIR, ConnectionIR and remove weight/delay as connection-level truth",
+      "status": "pending",
+      "priority": "P0",
+      "depends_on": [],
+      "validation": {
+        "command": "npm run type-check && npm run test:domain",
+        "timeout_seconds": 600
+      },
+      "on_failure": {
+        "cleanup": null
+      }
+    },
+    {
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null,
+      "id": "task-049",
+      "title": "Default seed and storage rewrite: generate no-compat AgentIR v2 with model registries, synapse templates, and body rules as the only persisted truth",
+      "status": "pending",
+      "priority": "P0",
+      "depends_on": [
+        "task-048"
+      ],
+      "validation": {
+        "command": "npm run type-check && npm run test:domain",
+        "timeout_seconds": 600
+      },
+      "on_failure": {
+        "cleanup": null
+      }
+    },
+    {
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null,
+      "id": "task-050",
+      "title": "Compiler/runtime cutover: lower ConnectionIR through SynapseModelIR into runtime synapse instances and keep transient state out of IR",
+      "status": "pending",
+      "priority": "P0",
+      "depends_on": [
+        "task-048",
+        "task-049"
+      ],
+      "validation": {
+        "command": "npm run type-check && npm run test:domain",
+        "timeout_seconds": 600
+      },
+      "on_failure": {
+        "cleanup": null
+      }
+    },
+    {
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null,
+      "id": "task-051",
+      "title": "GraphView editor cutover: edit neuron model references, synapse model references, initial membrane potential, and connection overrides without legacy fields",
+      "status": "pending",
+      "priority": "P1",
+      "depends_on": [
+        "task-048",
+        "task-050"
+      ],
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npx playwright test e2e/app.spec.ts --project=chromium --grep \"graph view|brain library|import|export\"",
+        "timeout_seconds": 900
+      },
+      "on_failure": {
+        "cleanup": null
+      }
+    },
+    {
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null,
+      "id": "task-052",
+      "title": "Layout and expanded-group projection cleanup: derive group-local positions from canvas positions and keep size, viewport, selection, and modal state out of AgentIR",
+      "status": "pending",
+      "priority": "P1",
+      "depends_on": [
+        "task-051"
+      ],
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npx playwright test e2e/app.spec.ts --project=chromium --grep \"graph view\"",
+        "timeout_seconds": 900
+      },
+      "on_failure": {
+        "cleanup": null
+      }
+    },
+    {
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null,
+      "id": "task-053",
+      "title": "No-legacy-compat cleanup: remove old GraphIR/BrainPackage/BodyDefinition import-export-storage-runtime fallback paths from the production surface",
+      "status": "pending",
+      "priority": "P0",
+      "depends_on": [
+        "task-049",
+        "task-050",
+        "task-051"
+      ],
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run build",
+        "timeout_seconds": 900
+      },
+      "on_failure": {
+        "cleanup": null
+      }
+    },
+    {
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": null,
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null,
+      "id": "task-054",
+      "title": "Final acceptance review: self-review plus multi-gpt-5.4 cross-review for AgentIR v2 and fix all remaining P0-P2 findings",
+      "status": "pending",
+      "priority": "P0",
+      "depends_on": [
+        "task-050",
+        "task-052",
+        "task-053"
+      ],
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run build && npm run test:e2e",
+        "timeout_seconds": 1500
+      },
+      "on_failure": {
+        "cleanup": null
+      }
     }
   ],
   "session_count": 16,
-  "last_session": "2026-05-25T03:50:13.821Z"
+  "last_session": "2026-05-25T08:17:08.915Z"
 }
