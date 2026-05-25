@@ -21,9 +21,9 @@ export const createVisionCellWorldInputSignalProvider = (): WorldInputSignalProv
     const sensoryInputs: AgentWorldInputSignalMap = {};
 
     for (const [cellIndex, cell] of agent.visionCells.entries()) {
-      sensoryInputs[`vision-R-${cellIndex}`] = cell.color.r;
-      sensoryInputs[`vision-G-${cellIndex}`] = cell.color.g;
-      sensoryInputs[`vision-B-${cellIndex}`] = cell.color.b;
+      sensoryInputs[`vision.R.${cellIndex}`] = cell.color.r;
+      sensoryInputs[`vision.G.${cellIndex}`] = cell.color.g;
+      sensoryInputs[`vision.B.${cellIndex}`] = cell.color.b;
     }
 
     return sensoryInputs;

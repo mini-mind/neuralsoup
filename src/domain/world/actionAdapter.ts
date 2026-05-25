@@ -5,6 +5,7 @@ export interface WorldOutputSignal {
   target: string;
   normalizedTarget: string;
   worldPort: string;
+  commandKind: string;
   value: number;
 }
 
@@ -16,8 +17,6 @@ export interface WorldControlCommand {
 export interface WorldActionOutputAdapter {
   resolve(outputSignals: WorldOutputSignal[]): WorldControlCommand[];
 }
-
-const ACTION_TARGET_PATTERN = /^action\.([a-z0-9-]+)$/;
 
 const createSupportedActionKinds = (bindings: MovementWorldControlBindings): Set<string> =>
   new Set(Object.values(bindings));
@@ -36,12 +35,11 @@ export const createDefaultWorldActionOutputAdapter = (
           continue;
         }
 
-        const commandMatch = signal.normalizedTarget.match(ACTION_TARGET_PATTERN);
-        if (!commandMatch || !supportedActionKinds.has(commandMatch[1])) {
+        if (!supportedActionKinds.has(signal.commandKind)) {
           continue;
         }
 
-        commandsByKind.set(commandMatch[1], signal.value);
+        commandsByKind.set(signal.commandKind, signal.value);
       }
 
       return [...commandsByKind.entries()].map(([kind, value]) => ({ kind, value }));

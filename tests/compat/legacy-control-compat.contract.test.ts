@@ -9,9 +9,9 @@ import { CollisionDetector } from '../../src/engine/CollisionDetector';
 import { SimulationSession } from '../../src/runtime/SimulationSession';
 import { createLegacySimulationSessionAdapter } from '../../src/compat/legacySimulationSessionAdapter';
 import {
-  exportLegacyGraphIRDocument,
-  inspectLegacyGraphIRExport,
-  setLegacyGraphIRDocument,
+  exportLegacyGraphIRDocument as exportLegacyGraphIRDocumentWithContext,
+  inspectLegacyGraphIRExport as inspectLegacyGraphIRExportWithContext,
+  setLegacyGraphIRDocument as setLegacyGraphIRDocumentWithContext,
 } from '../../src/compat/legacySimulationSession';
 import {
   type AgentIR,
@@ -25,6 +25,7 @@ import {
   VISION_ACTION_MOVEMENT_BINDINGS,
 } from '../../src/host';
 import { compileLegacyBrainDefinition } from '../../src/compat/legacyBrainCompiler';
+import { createLegacyCompatContext } from '../../src/compat/legacyCompatContext';
 import { createDefaultGraphIRDocument } from '../../src/compat/legacyGraphDefaults';
 import { summarizeGraphIRDocument, type GraphIRDocument, type NeuronNode } from '../../src/compat/legacyGraphIR';
 import { createDefaultLegacyBodyDefinition, type LegacyBodyDefinition } from '../../src/compat/legacyBrainPackage';
@@ -33,8 +34,8 @@ import { createLegacyBrainProgramRuntimeState, stepLegacyBrainProgram } from '..
 import { createLegacyVisualInputSignalProvider } from '../../src/compat/legacyWorldInputSignalProvider';
 import type { Agent } from '../../src/types/simulation';
 import {
-  deriveAgentIRVisionCellCount,
-  withDerivedBodyVisionCellCount,
+  deriveAgentIRVisionCellCount as deriveAgentIRVisionCellCountWithContext,
+  withDerivedBodyVisionCellCount as withDerivedBodyVisionCellCountWithContext,
   withVisionCellLayoutMarkers,
 } from '../../src/compat/legacyVisionCellCount';
 import {
@@ -44,6 +45,7 @@ import {
 } from '../helpers/sessionControlAssertions';
 
 const WORLD_REGISTRY = createVisionActionWorldRegistry();
+const LEGACY_COMPAT_CONTEXT = createLegacyCompatContext(WORLD_REGISTRY);
 
 const createSimulationSession = (
   agentController: AgentController = new AgentController(
@@ -66,7 +68,29 @@ const createSimulationSession = (
 const createLegacyCompatSession = (session: SimulationSession) =>
   createLegacySimulationSessionAdapter(session);
 
-function createAgent(overrides: Partial<Agent> = {}): Agent {
+const exportLegacyGraphIRDocument = (target: ReturnType<typeof createLegacyCompatSession>) =>
+  exportLegacyGraphIRDocumentWithContext(target, LEGACY_COMPAT_CONTEXT);
+
+const inspectLegacyGraphIRExport = (target: ReturnType<typeof createLegacyCompatSession>) =>
+  inspectLegacyGraphIRExportWithContext(target, LEGACY_COMPAT_CONTEXT);
+
+const setLegacyGraphIRDocument = (
+  target: ReturnType<typeof createLegacyCompatSession>,
+  document: GraphIRDocument,
+  body?: LegacyBodyDefinition
+) => setLegacyGraphIRDocumentWithContext(target, document, LEGACY_COMPAT_CONTEXT, body);
+
+const deriveAgentIRVisionCellCount = (agent: AgentIR) =>
+  deriveAgentIRVisionCellCountWithContext(agent, LEGACY_COMPAT_CONTEXT);
+
+const withDerivedBodyVisionCellCount = (agent: AgentIR) =>
+  withDerivedBodyVisionCellCountWithContext(agent, LEGACY_COMPAT_CONTEXT);
+
+type LegacyVisualInputAgent = Agent & {
+  visualInput?: number[];
+};
+
+function createAgent(overrides: Partial<LegacyVisualInputAgent> = {}): LegacyVisualInputAgent {
   return {
     id: overrides.id ?? 0,
     x: overrides.x ?? 0,
@@ -97,7 +121,11 @@ const getRootVisionCells = (document: GraphIRDocument) => {
 };
 
 const compileDefaultBrain = (document: GraphIRDocument) =>
-  compileLegacyBrainDefinition(document, createDefaultLegacyBodyDefinition(getRootVisionCells(document)));
+  compileLegacyBrainDefinition(
+    document,
+    createDefaultLegacyBodyDefinition(getRootVisionCells(document)),
+    LEGACY_COMPAT_CONTEXT
+  );
 
 const createValidCompatBoundaryDocument = (): GraphIRDocument => ({
   version: 1,

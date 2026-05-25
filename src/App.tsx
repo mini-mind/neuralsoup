@@ -4,6 +4,7 @@ import {
   preflightBrainStructure,
   buildAgentBodyRulePreviewModel,
   resolveCompiledAgentBodyEndpointIds,
+  resolveBodyInputVisionCellIndex,
   summarizeAgentIR,
   validateAgentIR,
   type WorldRegistry,
@@ -75,6 +76,11 @@ const INITIAL_STATS: SimulationState['stats'] = {
 const STACKED_LAYOUT_BREAKPOINT = 768;
 const SPLIT_DIVIDER_SIZE = 8;
 const MIN_PANEL_SIZE = 280;
+const DEFAULT_AGENT_PARAMETERS: AgentParameters = {
+  visionCells: 36,
+  visionRange: 250,
+  visionAngle: 120,
+};
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
@@ -157,10 +163,50 @@ const serializeBrainLibrarySnapshot = (brains: BrainLibraryRecord[]): string =>
 
 const ROOT_GRAPH_PATH: GraphPathItem[] = [{ id: 'root', label: 'root' }];
 
+const deriveProjectedVisionCellCountFromAgent = (
+  agent: AgentIR,
+  worldRegistry: Pick<WorldRegistry, 'resolveInputRuleBinding'>,
+  fallback: number
+): number => {
+  let maxVisionCellIndex = -1;
+
+  const recordVisionNode = (nodeId: string) => {
+    const cellIndex = resolveBodyInputVisionCellIndex(nodeId, agent.body.inputRules, worldRegistry);
+    if (cellIndex != null && cellIndex >= 0) {
+      maxVisionCellIndex = Math.max(maxVisionCellIndex, cellIndex);
+    }
+  };
+
+  for (const connection of agent.connections) {
+    if (connection.from.scope === 'bodyInput') {
+      recordVisionNode(connection.from.nodeId);
+    }
+    if (connection.to.scope === 'bodyInput') {
+      recordVisionNode(connection.to.nodeId);
+    }
+  }
+
+  for (const nodeId of Object.keys(agent.layout?.nodes ?? {})) {
+    recordVisionNode(nodeId);
+  }
+
+  return maxVisionCellIndex >= 0 ? maxVisionCellIndex + 1 : fallback;
+};
+
+const deriveAgentParametersFromBrain = (
+  agent: AgentIR,
+  currentParameters: AgentParameters,
+  worldRegistry: Pick<WorldRegistry, 'resolveInputRuleBinding'>
+): AgentParameters => ({
+  ...currentParameters,
+  visionCells: deriveProjectedVisionCellCountFromAgent(agent, worldRegistry, currentParameters.visionCells),
+});
+
 const applyBrainRecordToEditorState = (
   brain: BrainLibraryRecord,
   options: {
     resetRuntimeForBrainSwitch: () => void;
+    syncAgentParametersFromBrain: (agent: AgentIR) => void;
     setIsBrainLibraryOpen: React.Dispatch<React.SetStateAction<boolean>>;
     setActiveBrainId: React.Dispatch<React.SetStateAction<string | null>>;
     setCurrentAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
@@ -172,6 +218,7 @@ const applyBrainRecordToEditorState = (
   }
 ): void => {
   options.resetRuntimeForBrainSwitch();
+  options.syncAgentParametersFromBrain(brain.agent);
   options.setIsBrainLibraryOpen(true);
   options.setActiveBrainId(brain.agent.metadata.id);
   options.setCurrentAgentDocument(brain.agent);
@@ -185,6 +232,7 @@ const applyBrainRecordToEditorState = (
 const applyBrainRecordIdentityToCurrentState = (
   brain: BrainLibraryRecord,
   options: {
+    syncAgentParametersFromBrain: (agent: AgentIR) => void;
     setActiveBrainId: React.Dispatch<React.SetStateAction<string | null>>;
     setCurrentAgentDocument: React.Dispatch<React.SetStateAction<AgentIR>>;
     setRuntimeInstallRequest: React.Dispatch<React.SetStateAction<AgentIR>>;
@@ -193,6 +241,7 @@ const applyBrainRecordIdentityToCurrentState = (
     setDraftGraphStatusOverride: React.Dispatch<React.SetStateAction<AgentDraftStatus | null>>;
   }
 ): void => {
+  options.syncAgentParametersFromBrain(brain.agent);
   options.setActiveBrainId(brain.agent.metadata.id);
   options.setCurrentAgentDocument(brain.agent);
   options.setRuntimeInstallRequest(brain.agent);
@@ -234,16 +283,8 @@ const App: React.FC = () => {
   );
   const [canvasWidth, setCanvasWidth] = useState(1);
   const [canvasHeight, setCanvasHeight] = useState(1);
-  const [agentParameters, setAgentParameters] = useState<AgentParameters>({
-    visionCells: 36,
-    visionRange: 250,
-    visionAngle: 120
-  });
-  const [draftAgentParameters, setDraftAgentParameters] = useState<AgentParameters>({
-    visionCells: 36,
-    visionRange: 250,
-    visionAngle: 120
-  });
+  const [agentParameters, setAgentParameters] = useState<AgentParameters>(DEFAULT_AGENT_PARAMETERS);
+  const [draftAgentParameters, setDraftAgentParameters] = useState<AgentParameters>(DEFAULT_AGENT_PARAMETERS);
   const [splitRatio, setSplitRatio] = useState(0.6);
   const [isStackedLayout, setIsStackedLayout] = useState<boolean>(() => (
     typeof window !== 'undefined' ? window.innerWidth <= STACKED_LAYOUT_BREAKPOINT : false
@@ -255,6 +296,7 @@ const App: React.FC = () => {
   const requestedLifecycleStateRef = useRef<SimulationLifecycleState>('idle');
   const draftAgentDocumentRef = useRef(draftAgentDocument);
   const draftBodyDocumentRef = useRef(draftBodyDocument);
+  const agentParametersRef = useRef(agentParameters);
   const draftProjectedVisionCellCount = draftAgentParameters.visionCells;
   const bodyPreviewAgent = useMemo<AgentIR>(
     () => ({
@@ -545,6 +587,12 @@ const App: React.FC = () => {
     setAgentParameters((current) => (areAgentParametersEqual(current, params) ? current : params));
   }, []);
 
+  const syncAgentParametersFromBrain = useCallback((agent: AgentIR) => {
+    const nextParameters = deriveAgentParametersFromBrain(agent, agentParametersRef.current, worldRegistry);
+    setAgentParameters((current) => (areAgentParametersEqual(current, nextParameters) ? current : nextParameters));
+    setDraftAgentParameters((current) => (areAgentParametersEqual(current, nextParameters) ? current : nextParameters));
+  }, [worldRegistry]);
+
   useEffect(() => {
     setDraftAgentParameters(agentParameters);
   }, [agentParameters]);
@@ -560,6 +608,10 @@ const App: React.FC = () => {
   useEffect(() => {
     currentAgentDocumentRef.current = currentAgentDocument;
   }, [currentAgentDocument]);
+
+  useEffect(() => {
+    agentParametersRef.current = agentParameters;
+  }, [agentParameters]);
 
   const handleAgentChange = useCallback((
     updater: (current: AgentIR) => AgentIR,
@@ -652,11 +704,7 @@ const App: React.FC = () => {
   }, [draftAgentParameters, handleAgentParametersApply]);
 
   const resetDraftAgentParameters = useCallback(() => {
-    setDraftAgentParameters({
-      visionCells: 36,
-      visionRange: 250,
-      visionAngle: 120
-    });
+    setDraftAgentParameters(DEFAULT_AGENT_PARAMETERS);
   }, []);
 
   const graphEditorSessionToken = currentAgentDocument.metadata.id;
@@ -698,6 +746,7 @@ const App: React.FC = () => {
     setBrainLibrary((currentLibrary) => [...currentLibrary, nextBrain]);
     setIsBrainLibraryOpen(true);
     applyBrainRecordIdentityToCurrentState(nextBrain, {
+      syncAgentParametersFromBrain,
       setActiveBrainId,
       setCurrentAgentDocument,
       setRuntimeInstallRequest,
@@ -705,7 +754,7 @@ const App: React.FC = () => {
       setDraftBodyDocument,
       setDraftGraphStatusOverride,
     });
-  }, [worldRegistry]);
+  }, [syncAgentParametersFromBrain, worldRegistry]);
 
   const confirmUnsavedBrainReplacement = useCallback((): boolean => {
     if (!hasUnsavedDraftChanges) {
@@ -727,6 +776,7 @@ const App: React.FC = () => {
 
     applyBrainRecordToEditorState(selectedBrain, {
       resetRuntimeForBrainSwitch,
+      syncAgentParametersFromBrain,
       setIsBrainLibraryOpen,
       setActiveBrainId,
       setCurrentAgentDocument,
@@ -736,7 +786,7 @@ const App: React.FC = () => {
       setDraftGraphStatusOverride,
       setEditorTab,
     });
-  }, [brainLibrary, confirmUnsavedBrainReplacement, resetRuntimeForBrainSwitch]);
+  }, [brainLibrary, confirmUnsavedBrainReplacement, resetRuntimeForBrainSwitch, syncAgentParametersFromBrain]);
 
   const handleImportBrain = useCallback((name: string, payload: unknown) => {
     const nextBrain = normalizeImportedBrainExchange(
@@ -757,6 +807,7 @@ const App: React.FC = () => {
     setBrainLibrary((currentLibrary) => [...currentLibrary, nextBrain]);
     applyBrainRecordToEditorState(nextBrain, {
       resetRuntimeForBrainSwitch,
+      syncAgentParametersFromBrain,
       setIsBrainLibraryOpen,
       setActiveBrainId,
       setCurrentAgentDocument,
@@ -766,7 +817,7 @@ const App: React.FC = () => {
       setDraftGraphStatusOverride,
       setEditorTab,
     });
-  }, [brainLibrary, confirmUnsavedBrainReplacement, resetRuntimeForBrainSwitch, worldRegistry]);
+  }, [brainLibrary, confirmUnsavedBrainReplacement, resetRuntimeForBrainSwitch, syncAgentParametersFromBrain, worldRegistry]);
 
   const handleExportBrain = useCallback((brainId: string) => {
     const selectedBrain = brainLibrary.find((brain) => brain.agent.metadata.id === brainId);

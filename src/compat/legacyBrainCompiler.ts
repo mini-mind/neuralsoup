@@ -5,7 +5,6 @@ import {
 } from './legacyGraphIR';
 import { AgentValidationError, compileAgentIR } from '../domain/brain/agent-compiler';
 import { createAgentIRFromLegacyGraphDetailed } from './legacyGraphBridge';
-import { createVisionActionWorldRegistry } from '../host';
 import type {
   LeafLink,
   LiteralValue,
@@ -32,6 +31,7 @@ import type {
 } from '../compat/legacyBrainProgram';
 import { attachLegacyBrainProgramRuntimePayload } from '../compat/legacyBrainProgram';
 import type { BrainInputChannel } from '../domain/brain/shared';
+import type { LegacyCompatContext } from './legacyCompatContext';
 
 const INPUT_CHANNEL_OFFSET = {
   R: 0,
@@ -46,8 +46,6 @@ const DEFAULT_IZHIKEVICH_PARAMETERS = {
   d: 8,
   threshold: 30,
 } as const;
-const DEFAULT_WORLD_REGISTRY = createVisionActionWorldRegistry();
-
 const isRecord = (value: LiteralValue | undefined): value is Record<string, LiteralValue> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
@@ -230,7 +228,8 @@ const assertBodyBindingsTargetRootAdapterSignals = (
 
 const compileLegacyAgentProgram = (
   document: LegacyBrainDefinition,
-  body: LegacyBodyDefinition
+  body: LegacyBodyDefinition,
+  context: LegacyCompatContext
 ) => {
   const bridgeResult = createAgentIRFromLegacyGraphDetailed('legacy-graph-bridge', document, body);
   if (bridgeResult.droppedLinkIds.length > 0) {
@@ -242,7 +241,7 @@ const compileLegacyAgentProgram = (
     );
   }
 
-  return compileAgentIR(bridgeResult.agent, DEFAULT_WORLD_REGISTRY);
+  return compileAgentIR(bridgeResult.agent, context.worldRegistry);
 };
 
 interface LegacyCompileAnalysis {
@@ -329,15 +328,17 @@ const analyzeLegacyCompileBindings = (
 
 export const assertLegacyBrainDefinitionCompilable = (
   document: LegacyBrainDefinition,
-  body: LegacyBodyDefinition
+  body: LegacyBodyDefinition,
+  context: LegacyCompatContext
 ): void => {
   analyzeLegacyCompileBindings(document, body);
-  compileLegacyAgentProgram(document, body);
+  compileLegacyAgentProgram(document, body, context);
 };
 
 export const compileLegacyBrainDefinition = (
   document: LegacyBrainDefinition,
-  body: LegacyBodyDefinition
+  body: LegacyBodyDefinition,
+  context: LegacyCompatContext
 ): LegacyGraphProgram => {
   const analysis = analyzeLegacyCompileBindings(document, body);
   const modelsById = new Map<string, ModelDefinition>(document.models.map((model) => [model.id, model]));
@@ -382,7 +383,7 @@ export const compileLegacyBrainDefinition = (
     targetNode.inputConnections.push(connection);
   }
 
-  const compiledAgentProgram = compileLegacyAgentProgram(document, body);
+  const compiledAgentProgram = compileLegacyAgentProgram(document, body, context);
 
   const program: LegacyGraphProgram = {
     inputPorts,

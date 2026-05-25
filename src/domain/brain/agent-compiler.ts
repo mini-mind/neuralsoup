@@ -375,6 +375,7 @@ export const compileAgentIR = (agent: AgentIR, registry: WorldRegistry): AgentPr
         target: node.target,
         normalizedTarget: node.normalizedTarget,
         worldPort: node.worldPort,
+        commandKind: node.commandKind,
         decayPerSecond: node.decayPerSecond,
       })),
     neuronNodes,

@@ -11,6 +11,7 @@ import {
   loadLegacyBrainLibraryStorageEnvelope,
   normalizeImportedLegacyBrainExchange,
 } from '../../src/compat/brainLibraryCompat';
+import { createLegacyCompatContext } from '../../src/compat/legacyCompatContext';
 import { deriveAgentIRVisionCellCount } from '../../src/compat/legacyVisionCellCount';
 import { createBrainLibraryItemFromAgent } from '../../src/storage/brainLibraryRecord';
 import {
@@ -22,6 +23,7 @@ import {
 import type { AgentPackage as AgentLibraryItem } from '../../src/compat/legacyBrainPackage';
 
 const WORLD_REGISTRY = createVisionActionWorldRegistry();
+const LEGACY_COMPAT_CONTEXT = createLegacyCompatContext(WORLD_REGISTRY);
 
 const createAgentPackage = (name: string, visionCells: number): AgentLibraryItem => {
   const agent = createVisionActionSeedAgentIR(visionCells, name);
@@ -70,7 +72,7 @@ test('explicit compat storage loader migrates legacy AgentPackage payloads missi
 
   assert.ok(loaded);
   assert.equal(loaded.length, 1);
-  assert.equal(deriveAgentIRVisionCellCount(loaded[0].agent), 2);
+  assert.equal(deriveAgentIRVisionCellCount(loaded[0].agent, LEGACY_COMPAT_CONTEXT), 2);
 });
 
 test('explicit compat storage loader preserves sparse legacy vision-cell counts by upgrading to canonical body visionCellCount', () => {
@@ -90,7 +92,7 @@ test('explicit compat storage loader preserves sparse legacy vision-cell counts 
     brains: [brain],
   }, WORLD_REGISTRY);
   assert.ok(loaded);
-  assert.equal(deriveAgentIRVisionCellCount(loaded[0].agent), 36);
+  assert.equal(deriveAgentIRVisionCellCount(loaded[0].agent, LEGACY_COMPAT_CONTEXT), 36);
   assert.equal('visionCellCount' in JSON.parse(JSON.stringify(loaded[0])).agent.body, false);
 });
 
@@ -113,7 +115,7 @@ test('explicit compat storage loader preserves explicit legacy body visionCellCo
 
   assert.ok(loaded);
   assert.equal('visionCellCount' in (loaded[0]?.agent.body ?? {}), false);
-  assert.equal(deriveAgentIRVisionCellCount(loaded[0]!.agent), 36);
+  assert.equal(deriveAgentIRVisionCellCount(loaded[0]!.agent, LEGACY_COMPAT_CONTEXT), 36);
 });
 
 test('explicit compat storage loader normalizes legacy top-level metadata to agent metadata truth', () => {

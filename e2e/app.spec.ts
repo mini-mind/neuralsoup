@@ -914,12 +914,22 @@ test('graph view marks canonical-only body endpoints while settings show canonic
 
   await page.locator(selectors.editorTabSettings).click();
   await page.locator(selectors.settingsNavBodyIr).click();
-  await expect(page.locator('[data-testid="body-ir-preview-canonical-summary"]')).toContainText('canonical coverage');
+  await expect(page.locator('[data-testid="body-ir-preview-canonical-summary"]')).toContainText('host projected coverage 36 cells');
   await expect(page.locator('[data-testid="body-ir-preview-compiled-summary"]')).toContainText('compiled runtime shape');
   await expect(page.locator('[data-testid="body-ir-preview-canonical-summary"]')).toContainText('输入 endpoint 108 个');
   await expect(page.locator('[data-testid="body-ir-preview-compiled-summary"]')).toContainText('输入 endpoint 108 个');
 
-  await page.locator('[data-testid="body-ir-vision-cell-count"]').fill('37');
+  await expect(page.locator('[data-testid="body-ir-projected-vision-cell-count"]')).toHaveText('36');
+  await expect(page.locator(selectors.bodyIrSettingsPanel)).toContainText('不再由 BodyIR 草稿直接编辑');
+
+  await page.locator(selectors.settingsNavAgentParameters).click();
+  await page.locator(selectors.visionCellsInput).fill('37');
+  await page.locator(selectors.paramsApply).click();
+  await expect(page.locator(selectors.visionCellsValue)).toHaveText('37');
+
+  await page.locator(selectors.settingsNavBodyIr).click();
+  await expect(page.locator('[data-testid="body-ir-projected-vision-cell-count"]')).toHaveText('37');
+  await expect(page.locator('[data-testid="body-ir-preview-canonical-summary"]')).toContainText('host projected coverage 37 cells');
   await expect(page.locator('[data-testid="body-ir-preview-canonical-summary"]')).toContainText('输入 endpoint 111 个');
   await expect(page.locator('[data-testid="body-ir-preview-compiled-summary"]')).toContainText('输入 endpoint 108 个');
   await expect(page.locator('[data-testid="topology-draft-vision-cells"]')).toHaveText('37');
@@ -1596,7 +1606,7 @@ test('body-only draft changes trigger replacement confirmation and are included 
   expect(savedBodyDraftBrain?.agent.body?.outputRules?.[0]?.decayPerSecond).toBe(9);
 });
 
-test('body ir visionCellCount apply keeps runtime vision parameters aligned', async ({ page }, testInfo) => {
+test('body ir projected vision coverage is read-only and follows applied host agent parameters', async ({ page }, testInfo) => {
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
   }
@@ -1604,12 +1614,18 @@ test('body ir visionCellCount apply keeps runtime vision parameters aligned', as
   await page.locator(selectors.editorTabSettings).click();
   await page.locator(selectors.settingsNavBodyIr).click();
   await expect(page.locator(selectors.bodyIrSettingsPanel)).toBeVisible();
+  await expect(page.locator('[data-testid="body-ir-projected-vision-cell-count"]')).toHaveText('36');
+  await expect(page.locator(selectors.bodyIrSettingsPanel)).toContainText('不再由 BodyIR 草稿直接编辑');
 
-  await page.locator('[data-testid="body-ir-vision-cell-count"]').fill('24');
   await expect(page.locator(selectors.visionCellsValue)).toHaveText('36');
-  await page.locator('[data-testid="body-ir-apply"]').click();
+
+  await page.locator(selectors.settingsNavAgentParameters).click();
+  await page.locator(selectors.visionCellsInput).fill('24');
+  await page.locator(selectors.paramsApply).click();
 
   await expect(page.locator(selectors.visionCellsValue)).toHaveText('24');
+  await page.locator(selectors.settingsNavBodyIr).click();
+  await expect(page.locator('[data-testid="body-ir-projected-vision-cell-count"]')).toHaveText('24');
   await expect(page.locator(selectors.topologyRuntimeInputCount)).toHaveText('72');
 });
 

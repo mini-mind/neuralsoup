@@ -13,25 +13,11 @@ interface BodyIRSettingsSectionProps {
   onReset?: () => void;
 }
 
-const DEFAULT_BODY_IR_VALUE: BodyIR = {
+const createEmptyBodyIR = (): BodyIR => ({
   version: 1,
-  inputRules: [
-    {
-      id: 'input-rule-1',
-      nodeIdPattern: '^vision-([RGB])-(\\d+)$',
-      sourceTemplate: 'vision.$1.$2',
-      scale: 1
-    }
-  ],
-  outputRules: [
-    {
-      id: 'output-rule-1',
-      nodeIdPattern: '^output-(turn-left|move-forward|turn-right)$',
-      targetTemplate: 'action.$1',
-      decayPerSecond: 4
-    }
-  ]
-};
+  inputRules: [],
+  outputRules: []
+});
 
 const createRuleId = (prefix: 'input' | 'output') =>
   `${prefix}-rule-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
@@ -89,14 +75,12 @@ const BodyIRSettingsSection: React.FC<BodyIRSettingsSectionProps> = ({
   onApply,
   onReset,
 }) => {
-  const [localBody, setLocalBody] = useState<BodyIR>(() => body ?? DEFAULT_BODY_IR_VALUE);
+  const [localBody, setLocalBody] = useState<BodyIR>(() => body ?? createEmptyBodyIR());
   const inputRulesHeaderId = useId();
   const outputRulesHeaderId = useId();
 
   useEffect(() => {
-    if (body) {
-      setLocalBody(body);
-    }
+    setLocalBody(body ?? createEmptyBodyIR());
   }, [body]);
 
   const currentBody = body ?? localBody;

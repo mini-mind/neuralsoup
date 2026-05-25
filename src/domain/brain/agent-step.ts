@@ -16,6 +16,7 @@ export interface AgentProgramStepResult {
     target: string;
     normalizedTarget: string;
     worldPort: string;
+    commandKind: string;
     value: number;
   }>;
   outputsByTarget: Record<string, number>;
@@ -57,7 +58,7 @@ export const stepAgentProgram = (
       return 0;
     }
 
-    const rawValue = sensoryInputs[inputNode.id] ?? 0;
+    const rawValue = sensoryInputs[inputNode.source] ?? sensoryInputs[inputNode.id] ?? 0;
     const scaledValue = rawValue * inputNode.scale;
     if (Math.abs(scaledValue) > ACTIVE_SIGNAL_EPSILON) {
       activeLeafNodeIds.add(nodeId);
@@ -141,6 +142,7 @@ export const stepAgentProgram = (
     target: port.target,
     normalizedTarget: port.normalizedTarget,
     worldPort: port.worldPort,
+    commandKind: port.commandKind,
     value: clampUnit(nextBodyOutputs.get(port.id) ?? 0),
   }));
   const outputsByTarget: Record<string, number> = {};

@@ -108,6 +108,7 @@ test('compileAgentIR resolves BodyIR regex rules into runtime ports instead of r
       target: 'action.move-forward',
       normalizedTarget: 'action.move-forward',
       worldPort: 'action',
+      commandKind: 'move-forward',
       decayPerSecond: 3,
     }
   );
@@ -123,7 +124,7 @@ test('stepAgentProgram consumes rule-resolved input ports and activates rule-res
   const program = compileAgentIR(createRuleDrivenAgent(), WORLD_REGISTRY);
   const runtimeState = createAgentProgramRuntimeState(program);
   const sensoryInputs: Record<string, number> = {
-    'sensor-G-2': 0.5,
+    'vision.G.2': 0.5,
   };
 
   const result = stepAgentProgram(program, sensoryInputs, runtimeState, 1, 1);
@@ -136,6 +137,7 @@ test('stepAgentProgram consumes rule-resolved input ports and activates rule-res
       target: 'action.move-forward',
       normalizedTarget: 'action.move-forward',
       worldPort: 'action',
+      commandKind: 'move-forward',
       value: 1,
     }
   );
@@ -143,6 +145,24 @@ test('stepAgentProgram consumes rule-resolved input ports and activates rule-res
     new Set(result.runtimeState.activeLeafNodeIds),
     new Set(['sensor-G-2', 'neuron-1', 'effector-move-forward'])
   );
+});
+
+test('stepAgentProgram prefers normalized input source keys over legacy body node ids when both are present', () => {
+  const program = compileAgentIR(createRuleDrivenAgent(), WORLD_REGISTRY);
+  const runtimeState = createAgentProgramRuntimeState(program);
+
+  const result = stepAgentProgram(
+    program,
+    {
+      'sensor-G-2': 1,
+      'vision.G.2': 0,
+    },
+    runtimeState,
+    1,
+    1
+  );
+
+  assert.equal(result.runtimeState.activeLeafNodeIds.includes('sensor-G-2'), false);
 });
 
 test('validateAgentIR rejects body endpoints that do not match any BodyIR rule', () => {

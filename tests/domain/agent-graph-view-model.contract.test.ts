@@ -1,10 +1,57 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildAgentBodyRulePreviewModel, preflightBrainStructure, type AgentIR } from '../../src/domain/brain';
+import { buildAgentBodyRulePreviewModel, preflightBrainStructure, type AgentIR, type WorldRegistry } from '../../src/domain/brain';
 import { buildAgentGraphViewModel } from '../../src/components/editor/graph/agentGraphViewModel';
 import { createVisionActionWorldRegistry } from '../../src/host';
 
 const WORLD_REGISTRY = createVisionActionWorldRegistry();
+
+const createRuleAuthorityTestRegistry = (): WorldRegistry => ({
+  version: 1,
+  inputs: [{ id: 'vision', direction: 'input', kind: 'vision-array', enumerable: true }],
+  outputs: [{ id: 'action', direction: 'output', kind: 'action-map', enumerable: true }],
+  resolveInputBinding: () => null,
+  resolveOutputBinding: () => null,
+  resolveInputRuleBinding: (_rule, match) => {
+    const channel = match[1] ?? '';
+    const cellIndex = Number.parseInt(match[2] ?? '-1', 10);
+    const source = `vision.${channel}.${cellIndex}`;
+    return {
+      source,
+      binding:
+        channel.length === 0 || !Number.isFinite(cellIndex) || cellIndex < 0
+          ? null
+          : {
+              source,
+              worldPort: 'vision',
+              cellIndex,
+            },
+    };
+  },
+  resolveOutputRuleBinding: (_rule, match) => {
+    const action = match[1] ?? '';
+    const target = `action.${action}`;
+    return {
+      target,
+      binding:
+        action.length === 0
+          ? null
+          : {
+              target,
+              worldPort: 'action',
+              commandKind: action,
+            },
+    };
+  },
+  enumerateInputNodeIds: (_rule, projectedVisionCellCount) => {
+    const nodeIds: string[] = [];
+    for (let cellIndex = 0; cellIndex < projectedVisionCellCount; cellIndex += 1) {
+      nodeIds.push(`sensor-R-${cellIndex}`, `sensor-G-${cellIndex}`, `sensor-B-${cellIndex}`);
+    }
+    return nodeIds;
+  },
+  enumerateOutputNodeIds: () => ['effector-turn-left', 'effector-move-forward', 'effector-turn-right'],
+});
 
 const createTestAgent = (): AgentIR => ({
   version: 1,
@@ -537,4 +584,88 @@ test('agent graph view marks canonical-only body endpoints that are not installe
   assert.equal(installedInput.runtimeInstalled, true);
   assert.equal(canonicalOnlyInput.runtimeInstalled, false);
   assert.equal(canonicalOnlyInput.detail.includes('canonical-only'), true);
+});
+
+test('agent graph view, preview, and runtime counts share registry rule-binding authority', () => {
+  const agent = createTestAgent();
+  const authorityRegistry = createRuleAuthorityTestRegistry();
+  agent.body.inputRules = [
+    {
+      id: 'sensor-inputs',
+      nodeIdPattern: '^sensor-([RGB])-(\\d+)$',
+      sourceTemplate: 'unsupported.$1.$2',
+      scale: 1,
+    },
+  ];
+  agent.body.outputRules = [
+    {
+      id: 'effector-outputs',
+      nodeIdPattern: '^effector-(turn-left|move-forward|turn-right)$',
+      targetTemplate: 'unsupported.$1',
+      decayPerSecond: 2,
+    },
+  ];
+  agent.connections = [
+    ...agent.connections,
+    {
+      id: 'sensor-link',
+      from: { scope: 'bodyInput', nodeId: 'sensor-G-1' },
+      to: { scope: 'brain', nodeId: 'neuron-1' },
+      weight: 1,
+    },
+    {
+      id: 'effector-link',
+      from: { scope: 'brain', nodeId: 'neuron-2' },
+      to: { scope: 'bodyOutput', nodeId: 'effector-move-forward' },
+      weight: 1,
+    },
+  ];
+
+  const preview = buildAgentBodyRulePreviewModel(agent, authorityRegistry, 2);
+  const rootView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+    projectedVisionCellCount: 2,
+    worldRegistry: authorityRegistry,
+  });
+  const inputScopeView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: ['input-adapter'],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+    projectedVisionCellCount: 2,
+    worldRegistry: authorityRegistry,
+  });
+  const outputScopeView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: ['output-adapter'],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+    projectedVisionCellCount: 2,
+    worldRegistry: authorityRegistry,
+  });
+
+  assert.deepEqual(preview.issues, []);
+  const inputPreviewItems = preview.input.previewsByRuleId['sensor-inputs'] ?? [];
+  assert.equal(inputPreviewItems[inputPreviewItems.length - 1]?.resolved, 'vision.R.1');
+  assert.equal(preview.output.previewsByRuleId['effector-outputs']?.[1]?.resolved, 'action.turn-left');
+  assert.deepEqual(
+    inputScopeView.nodes.map((node) => node.refNodeId).sort(),
+    [...preview.input.endpointNodeIds].sort()
+  );
+  assert.deepEqual(
+    outputScopeView.nodes.map((node) => node.refNodeId).sort(),
+    [...preview.output.endpointNodeIds].sort()
+  );
+
+  const inputAdapter = rootView.nodes.find((node) => node.id === 'input-adapter');
+  const outputAdapter = rootView.nodes.find((node) => node.id === 'output-adapter');
+  assert.ok(inputAdapter);
+  assert.ok(outputAdapter);
+  assert.equal(inputAdapter.runtimeInstalledLeafCount, 1);
+  assert.equal(outputAdapter.runtimeInstalledLeafCount, 1);
+  assert.equal(inputAdapter.detail, '6 canonical / 1 installed');
+  assert.equal(outputAdapter.detail, '3 canonical / 1 installed');
 });

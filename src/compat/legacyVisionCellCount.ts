@@ -1,10 +1,9 @@
-import { createVisionActionWorldRegistry } from '../host';
 import type { AgentIR } from '../domain/brain/agent-ir';
 import { resolveBodyInputVisionCellIndex } from '../domain/brain/agent-ir';
+import type { LegacyCompatContext } from './legacyCompatContext';
 
 const VISION_LAYOUT_MARKER_PATTERN = /^__body-vision-cell-(\d+)$/;
 const VISION_LAYOUT_NODE_PATTERN = /^vision-[RGB]-(\d+)$/;
-const DEFAULT_WORLD_REGISTRY = createVisionActionWorldRegistry();
 
 type LegacyBodyIR = AgentIR['body'] & {
   visionCellCount?: unknown;
@@ -15,7 +14,10 @@ const normalizeVisionCellCount = (value: unknown): number | null =>
     ? Math.max(0, Math.floor(value))
     : null;
 
-const deriveLegacyAgentIRVisionCellCount = (agent: AgentIR): number => {
+const deriveLegacyAgentIRVisionCellCount = (
+  agent: AgentIR,
+  context: LegacyCompatContext
+): number => {
   let maxCellIndex = -1;
 
   for (const connection of agent.connections) {
@@ -23,7 +25,7 @@ const deriveLegacyAgentIRVisionCellCount = (agent: AgentIR): number => {
       const cellIndex = resolveBodyInputVisionCellIndex(
         connection.from.nodeId,
         agent.body.inputRules,
-        DEFAULT_WORLD_REGISTRY
+        context.worldRegistry
       );
       if (cellIndex != null) {
         maxCellIndex = Math.max(maxCellIndex, cellIndex);
@@ -34,7 +36,7 @@ const deriveLegacyAgentIRVisionCellCount = (agent: AgentIR): number => {
       const cellIndex = resolveBodyInputVisionCellIndex(
         connection.to.nodeId,
         agent.body.inputRules,
-        DEFAULT_WORLD_REGISTRY
+        context.worldRegistry
       );
       if (cellIndex != null) {
         maxCellIndex = Math.max(maxCellIndex, cellIndex);
@@ -69,14 +71,20 @@ export const parseVisionCellLayoutMarkerIndex = (nodeId: string): number | null 
   return Number.parseInt(match[1], 10);
 };
 
-export const deriveAgentIRVisionCellCount = (agent: AgentIR): number =>
+export const deriveAgentIRVisionCellCount = (
+  agent: AgentIR,
+  context: LegacyCompatContext
+): number =>
   Math.max(
-    deriveLegacyAgentIRVisionCellCount(agent),
+    deriveLegacyAgentIRVisionCellCount(agent, context),
     normalizeVisionCellCount((agent.body as LegacyBodyIR).visionCellCount) ?? 0
   );
 
-export const withDerivedBodyVisionCellCount = (agent: AgentIR): AgentIR => {
-  const derivedVisionCellCount = deriveLegacyAgentIRVisionCellCount(agent);
+export const withDerivedBodyVisionCellCount = (
+  agent: AgentIR,
+  context: LegacyCompatContext
+): AgentIR => {
+  const derivedVisionCellCount = deriveLegacyAgentIRVisionCellCount(agent, context);
   return {
     ...agent,
     body: {

@@ -2,11 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { type AgentIR } from '../../src/domain/brain';
 import { createLegacyGraphBridgeFromAgent } from '../../src/compat/legacyGraphBridge';
+import { createLegacyCompatContext } from '../../src/compat/legacyCompatContext';
 import {
   deriveAgentIRVisionCellCount,
   withDerivedBodyVisionCellCount,
   withVisionCellLayoutMarkers,
 } from '../../src/compat/legacyVisionCellCount';
+import { createVisionActionWorldRegistry } from '../../src/host';
+
+const LEGACY_COMPAT_CONTEXT = createLegacyCompatContext(createVisionActionWorldRegistry());
 
 const createRuleDrivenAgent = (): AgentIR =>
   withDerivedBodyVisionCellCount(
@@ -86,7 +90,8 @@ const createRuleDrivenAgent = (): AgentIR =>
         },
       },
       3
-    )
+    ),
+    LEGACY_COMPAT_CONTEXT
   );
 
 test('legacy graph bridge preserves explicit BodyIR visionCellCount even when only a sparse subset is connected', () => {
@@ -104,19 +109,20 @@ test('legacy graph bridge preserves explicit BodyIR visionCellCount even when on
         ],
       },
       36
-    )
+    ),
+    LEGACY_COMPAT_CONTEXT
   );
 
-  const bridge = createLegacyGraphBridgeFromAgent(sparseAgent);
+  const bridge = createLegacyGraphBridgeFromAgent(sparseAgent, LEGACY_COMPAT_CONTEXT);
 
   const inputAdapter = bridge.document.root.children.find((node) => node.id === 'input-adapter');
   assert.ok(inputAdapter && inputAdapter.kind === 'adapter');
   assert.equal(inputAdapter.children.length, 36 * 3);
-  assert.equal(deriveAgentIRVisionCellCount(sparseAgent), 36);
+  assert.equal(deriveAgentIRVisionCellCount(sparseAgent, LEGACY_COMPAT_CONTEXT), 36);
 });
 
 test('legacy graph bridge projects rule-driven body node ids onto legacy GraphIR signal nodes without dropping links', () => {
-  const bridge = createLegacyGraphBridgeFromAgent(createRuleDrivenAgent());
+  const bridge = createLegacyGraphBridgeFromAgent(createRuleDrivenAgent(), LEGACY_COMPAT_CONTEXT);
 
   assert.ok(
     bridge.document.root.links.some(
@@ -158,7 +164,7 @@ test('legacy graph bridge reports dropped compat links when multiple AgentIR edg
         weight: 0.5,
       },
     ],
-  });
+  }, LEGACY_COMPAT_CONTEXT);
 
   assert.deepEqual(bridge.droppedConnectionIds, ['input-connection-b']);
 });
@@ -223,7 +229,7 @@ test('legacy graph bridge does not treat lossless shared compat edges as dropped
         weight: 1,
       },
     ],
-  });
+  }, LEGACY_COMPAT_CONTEXT);
 
   assert.deepEqual(bridge.droppedConnectionIds, []);
 });
@@ -242,7 +248,7 @@ test('legacy graph bridge marks unbridgeable body endpoints as dropped connectio
         },
       ],
     },
-  });
+  }, LEGACY_COMPAT_CONTEXT);
 
   assert.deepEqual(bridge.droppedConnectionIds, ['input-connection']);
 });
@@ -295,7 +301,7 @@ test('legacy graph bridge reports document-only losses when BodyIR rules cannot 
         weight: 1,
       },
     ],
-  });
+  }, LEGACY_COMPAT_CONTEXT);
 
   assert.deepEqual(bridge.droppedConnectionIds, []);
   assert.ok(
@@ -334,7 +340,7 @@ test('legacy graph bridge reports document-only losses for unconnected BodyIR al
       ],
     },
     connections: [],
-  });
+  }, LEGACY_COMPAT_CONTEXT);
 
   assert.deepEqual(bridge.droppedConnectionIds, []);
   assert.ok(

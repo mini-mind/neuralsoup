@@ -112,19 +112,14 @@ export interface BodyOutputNodeRuntime {
   target: string;
   normalizedTarget: string;
   worldPort: string;
+  commandKind: string;
   decayPerSecond: number;
 }
-
-const applyRuleTemplate = (template: string, match: RegExpExecArray): string =>
-  template.replace(/\$(\d+)/g, (_token, rawGroupIndex: string) => {
-    const groupIndex = Number.parseInt(rawGroupIndex, 10);
-    return match[groupIndex] ?? '';
-  });
 
 export const resolveBodyInputVisionCellIndex = (
   nodeId: string,
   rules: BodyInputRule[],
-  registry: Pick<WorldRegistry, 'resolveInputBinding'>
+  registry: Pick<WorldRegistry, 'resolveInputRuleBinding'>
 ): number | null => {
   const matches = rules.flatMap((rule) => {
     try {
@@ -140,7 +135,6 @@ export const resolveBodyInputVisionCellIndex = (
     return null;
   }
 
-  const source = applyRuleTemplate(matches[0].rule.sourceTemplate, matches[0].match);
-  const binding = registry.resolveInputBinding(source);
-  return binding?.cellIndex ?? null;
+  const resolution = registry.resolveInputRuleBinding(matches[0].rule, matches[0].match);
+  return resolution.binding?.cellIndex ?? null;
 };

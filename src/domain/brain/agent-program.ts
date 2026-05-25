@@ -13,6 +13,7 @@ export interface AgentProgramOutputPort {
   target: string;
   normalizedTarget: string;
   worldPort: string;
+  commandKind: string;
   decayPerSecond: number;
 }
 

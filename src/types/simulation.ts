@@ -41,7 +41,6 @@ export interface Agent {
   
   // 视觉系统
   visionCells: VisionCell[]; // 运行时由 VisionSystem 配置决定数量，默认 36 格
-  visualInput?: number[]; // compat-only：legacy 扁平 RGB 输入投影，不是 production 运行时真源
   
   // 神经状态
   motivation: number; // 动机 [0, 1]

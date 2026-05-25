@@ -5,7 +5,7 @@ import type {
   BodyOutputNodeRuntime,
   BodyOutputRule,
 } from './agent-ir';
-import type { WorldRegistry } from './world-registry';
+import type { WorldInputBinding, WorldOutputBinding, WorldRegistry } from './world-registry';
 
 export type AgentBodyRuleScope = 'input' | 'output';
 export type AgentBodyRuleIssueKind = 'compile-error' | 'conflict' | 'unmatched';
@@ -56,12 +56,6 @@ interface BodyRuleResolution<RuntimeNode> {
   rules: AgentBodyRulePreviewGroup[];
 }
 
-const applyRuleTemplate = (template: string, match: RegExpExecArray): string =>
-  template.replace(/\$(\d+)/g, (_token, rawGroupIndex: string) => {
-    const groupIndex = Number.parseInt(rawGroupIndex, 10);
-    return match[groupIndex] ?? '';
-  });
-
 const executeRulePattern = (regex: RegExp, nodeId: string): RegExpExecArray | null => {
   regex.lastIndex = 0;
   return regex.exec(nodeId);
@@ -89,13 +83,7 @@ const compileRulePattern = (
   }
 };
 
-const parseBodyInputSource = (
-  registry: Pick<WorldRegistry, 'resolveInputBinding'>,
-  nodeId: string,
-  source: string,
-  scale: number
-): BodyInputNodeRuntime | null => {
-  const binding = registry.resolveInputBinding(source);
+const parseBodyInputSource = (nodeId: string, binding: WorldInputBinding | null, scale: number): BodyInputNodeRuntime | null => {
   if (!binding) {
     return null;
   }
@@ -108,12 +96,10 @@ const parseBodyInputSource = (
 };
 
 const parseBodyOutputTarget = (
-  registry: Pick<WorldRegistry, 'resolveOutputBinding'>,
   nodeId: string,
-  target: string,
+  binding: WorldOutputBinding | null,
   decayPerSecond: number
 ): BodyOutputNodeRuntime | null => {
-  const binding = registry.resolveOutputBinding(target);
   if (!binding) {
     return null;
   }
@@ -123,6 +109,7 @@ const parseBodyOutputTarget = (
     target: binding.target,
     normalizedTarget: binding.target,
     worldPort: binding.worldPort,
+    commandKind: binding.commandKind,
     decayPerSecond,
   };
 };
@@ -276,8 +263,8 @@ const resolveBodyInputRules = (
       .filter((candidate): candidate is { entry: CompiledBodyRule<BodyInputRule>; match: RegExpExecArray } => Boolean(candidate.match));
 
     for (const { entry, match } of matches) {
-      const resolved = applyRuleTemplate(entry.rule.sourceTemplate, match);
-      previewByRuleId.get(entry.rule.id)?.endpoints.push({ nodeId, resolved });
+      const resolution = registry.resolveInputRuleBinding(entry.rule, match);
+      previewByRuleId.get(entry.rule.id)?.endpoints.push({ nodeId, resolved: resolution.source });
     }
 
     if (matches.length === 0) {
@@ -304,16 +291,16 @@ const resolveBodyInputRules = (
     }
 
     const [{ entry, match }] = matches;
-    const source = applyRuleTemplate(entry.rule.sourceTemplate, match);
-    const parsed = parseBodyInputSource(registry, nodeId, source, entry.rule.scale);
+    const resolution = registry.resolveInputRuleBinding(entry.rule, match);
+    const parsed = parseBodyInputSource(nodeId, resolution.binding, entry.rule.scale);
     if (!parsed) {
       issues.push({
         scope: 'input',
         kind: 'compile-error',
         ruleId: entry.rule.id,
         nodeId,
-        resolved: source,
-        message: `Body input rule "${entry.rule.id}" resolved node "${nodeId}" to unsupported source "${source}".`,
+        resolved: resolution.source,
+        message: `Body input rule "${entry.rule.id}" resolved node "${nodeId}" to unsupported source "${resolution.source}".`,
       });
       continue;
     }
@@ -376,8 +363,8 @@ const resolveBodyOutputRules = (
       .filter((candidate): candidate is { entry: CompiledBodyRule<BodyOutputRule>; match: RegExpExecArray } => Boolean(candidate.match));
 
     for (const { entry, match } of matches) {
-      const resolved = applyRuleTemplate(entry.rule.targetTemplate, match);
-      previewByRuleId.get(entry.rule.id)?.endpoints.push({ nodeId, resolved });
+      const resolution = registry.resolveOutputRuleBinding(entry.rule, match);
+      previewByRuleId.get(entry.rule.id)?.endpoints.push({ nodeId, resolved: resolution.target });
     }
 
     if (matches.length === 0) {
@@ -404,16 +391,16 @@ const resolveBodyOutputRules = (
     }
 
     const [{ entry, match }] = matches;
-    const target = applyRuleTemplate(entry.rule.targetTemplate, match);
-    const parsed = parseBodyOutputTarget(registry, nodeId, target, entry.rule.decayPerSecond);
+    const resolution = registry.resolveOutputRuleBinding(entry.rule, match);
+    const parsed = parseBodyOutputTarget(nodeId, resolution.binding, entry.rule.decayPerSecond);
     if (!parsed) {
       issues.push({
         scope: 'output',
         kind: 'compile-error',
         ruleId: entry.rule.id,
         nodeId,
-        resolved: target,
-        message: `Body output rule "${entry.rule.id}" resolved node "${nodeId}" to unsupported target "${target}".`,
+        resolved: resolution.target,
+        message: `Body output rule "${entry.rule.id}" resolved node "${nodeId}" to unsupported target "${resolution.target}".`,
       });
       continue;
     }

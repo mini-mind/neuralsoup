@@ -6,6 +6,10 @@ import { compileLegacyBrainDefinition } from '../../src/compat/legacyBrainCompil
 import { createDefaultLegacyBodyDefinition, type LegacyBodyDefinition } from '../../src/compat/legacyBrainPackage';
 import { createLegacyBrainProgramRuntimeState, stepLegacyBrainProgram } from '../../src/compat/legacyBrainStep';
 import type { LegacyBrainProgram } from '../../src/compat/legacyBrainProgram';
+import { createLegacyCompatContext } from '../../src/compat/legacyCompatContext';
+import { createVisionActionWorldRegistry } from '../../src/host';
+
+const LEGACY_COMPAT_CONTEXT = createLegacyCompatContext(createVisionActionWorldRegistry());
 
 const getRootVisionCells = (document: GraphIRDocument) => {
   const inputAdapter = document.root.children.find((node) => node.id === 'input-adapter' && node.kind === 'adapter');
@@ -13,7 +17,11 @@ const getRootVisionCells = (document: GraphIRDocument) => {
 };
 
 const compileDefaultBrain = (document: GraphIRDocument) =>
-  compileLegacyBrainDefinition(document, createDefaultLegacyBodyDefinition(getRootVisionCells(document)));
+  compileLegacyBrainDefinition(
+    document,
+    createDefaultLegacyBodyDefinition(getRootVisionCells(document)),
+    LEGACY_COMPAT_CONTEXT
+  );
 
 const createValidGraphIRDocument = (): GraphIRDocument => ({
   version: 1,
@@ -280,7 +288,10 @@ test('compileLegacyBrainDefinition rejects invalid legacy compat body output bin
     bodySignalId: 'motor-turn-left',
   };
 
-  assert.throws(() => compileLegacyBrainDefinition(document, body), /non-root or non-output brain signal/);
+  assert.throws(
+    () => compileLegacyBrainDefinition(document, body, LEGACY_COMPAT_CONTEXT),
+    /non-root or non-output brain signal/
+  );
 });
 
 test('compileLegacyBrainDefinition honors legacy compat body bindings that use AgentIR-native signal node ids', () => {
@@ -324,7 +335,7 @@ test('compileLegacyBrainDefinition honors legacy compat body bindings that use A
     },
   };
 
-  const program = compileLegacyBrainDefinition(document, body);
+  const program = compileLegacyBrainDefinition(document, body, LEGACY_COMPAT_CONTEXT);
   const result = stepLegacyBrainProgram(program, [0, 0.5, 0], createLegacyBrainProgramRuntimeState(program), 1);
 
   assert.equal(program.inputBindings[0]?.nodeId, 'vision-in');

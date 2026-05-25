@@ -12,6 +12,10 @@ import { createDefaultGraphIRDocument } from '../../src/compat/legacyGraphDefaul
 import { compileLegacyBrainDefinition } from '../../src/compat/legacyBrainCompiler';
 import { createDefaultLegacyBodyDefinition } from '../../src/compat/legacyBrainPackage';
 import type { LegacyBrainProgram } from '../../src/compat/legacyBrainProgram';
+import { createLegacyCompatContext } from '../../src/compat/legacyCompatContext';
+import { createVisionActionHostProfile, createVisionActionWorldRegistry } from '../../src/host';
+
+const LEGACY_COMPAT_CONTEXT = createLegacyCompatContext(createVisionActionWorldRegistry());
 
 const getLegacyRootVisionCells = (document: GraphIRDocument) => {
   const inputAdapter = document.root.children.find((node) => node.id === 'input-adapter' && node.kind === 'adapter');
@@ -19,7 +23,11 @@ const getLegacyRootVisionCells = (document: GraphIRDocument) => {
 };
 
 const compileDefaultLegacyBrain = (document: GraphIRDocument) =>
-  compileLegacyBrainDefinition(document, createDefaultLegacyBodyDefinition(getLegacyRootVisionCells(document)));
+  compileLegacyBrainDefinition(
+    document,
+    createDefaultLegacyBodyDefinition(getLegacyRootVisionCells(document)),
+    LEGACY_COMPAT_CONTEXT
+  );
 
 test('legacy GraphIR document compiles into a compat runtime program with vision-aligned bindings', () => {
   const document = createDefaultGraphIRDocument(24);
@@ -112,5 +120,24 @@ test('legacy GraphIR validation rejects links that target output-only ports', ()
     (error: unknown) =>
       error instanceof GraphIRValidationError &&
       error.issues.some((issue) => issue.code === 'invalid-link-direction')
+  );
+});
+
+test('compileLegacyBrainDefinition respects the caller compat context registry instead of a hidden default host', () => {
+  const customHost = createVisionActionHostProfile({
+    turnLeft: 'yaw-left',
+    moveForward: 'thrust',
+    turnRight: 'yaw-right',
+  });
+  const document = createDefaultGraphIRDocument(1);
+
+  assert.throws(
+    () =>
+      compileLegacyBrainDefinition(
+        document,
+        createDefaultLegacyBodyDefinition(getLegacyRootVisionCells(document)),
+        createLegacyCompatContext(customHost.worldRegistry)
+      ),
+    /unsupported target "action\.turn-left"/
   );
 });

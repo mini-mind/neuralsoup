@@ -1,10 +1,15 @@
 import type { WorldInputSignalProvider } from '../domain/world';
 import type { AgentWorldInputSignalMap } from '../domain/brain';
+import type { Agent } from '../types/simulation';
+
+type LegacyVisualInputAgent = Agent & {
+  visualInput?: number[];
+};
 
 export const createLegacyVisualInputSignalProvider = (): WorldInputSignalProvider => ({
   resolve(agent) {
     const sensoryInputs: AgentWorldInputSignalMap = {};
-    const visualInput = agent.visualInput ?? [];
+    const visualInput = (agent as LegacyVisualInputAgent).visualInput ?? [];
     const visualCellCount = Math.floor(visualInput.length / 3);
 
     for (let cellIndex = 0; cellIndex < visualCellCount; cellIndex += 1) {

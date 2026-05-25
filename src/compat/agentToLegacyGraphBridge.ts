@@ -37,6 +37,7 @@ import {
   resolveLegacyOutputSignalNodeId,
 } from './legacyGraphBridgeShared';
 import { deriveAgentIRVisionCellCount } from './legacyVisionCellCount';
+import type { LegacyCompatContext } from './legacyCompatContext';
 
 const createNeuronNodeFromAgent = (neuron: BrainNeuronNode, position?: Position): NeuronNode => ({
   kind: 'neuron',
@@ -295,6 +296,7 @@ const compareCompatBodySemantics = (
 
 export const createLegacyGraphBridgeFromAgent = (
   agent: AgentIR,
+  context: LegacyCompatContext,
   options?: { visionCellCount?: number }
 ): LegacyGraphBridgeResult => {
   const visionCellIds = new Set<number>();
@@ -311,7 +313,7 @@ export const createLegacyGraphBridgeFromAgent = (
   }
 
   const visionCells = options?.visionCellCount ?? Math.max(
-    deriveAgentIRVisionCellCount(agent),
+    deriveAgentIRVisionCellCount(agent, context),
     visionCellIds.size > 0 ? Math.max(...visionCellIds) + 1 : 0,
     1
   );

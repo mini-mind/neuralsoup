@@ -1328,8 +1328,311 @@
         }
       ],
       "completed_at": "2026-05-25T03:10:00Z"
+    },
+    {
+      "id": "task-036",
+      "title": "WorldRegistry phase 1a: audit and centralize remaining host-grammar parsing and endpoint enumeration seams",
+      "status": "completed",
+      "priority": "P1",
+      "depends_on": [],
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "32afae5",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain",
+        "timeout_seconds": 420
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-25T02:46:29Z",
+          "message": "Completed cross-audit of remaining host-grammar, runtime binding, and compat leakage; implementation was split into smaller non-overlapping execution tasks."
+        }
+      ],
+      "completed_at": "2026-05-25T02:46:29Z"
+    },
+    {
+      "id": "task-037",
+      "title": "WorldRegistry phase 1b: move body rule binding and endpoint enumeration fully behind registry interfaces",
+      "status": "pending",
+      "priority": "P0",
+      "depends_on": [
+        "task-036"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": "32afae5",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"graph view|brain library\"",
+        "timeout_seconds": 900
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null
+    },
+    {
+      "id": "task-038",
+      "title": "Runtime binding cleanup: convert body runtime ports to registry-normalized binding metadata and remove residual host-specific fields from the main path",
+      "status": "pending",
+      "priority": "P1",
+      "depends_on": [
+        "task-037"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": "32afae5",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain",
+        "timeout_seconds": 420
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null
+    },
+    {
+      "id": "task-039",
+      "title": "Compat surface sweep: push remaining legacy storage/import/export helpers and naming leakage behind explicit compat modules",
+      "status": "pending",
+      "priority": "P1",
+      "depends_on": [
+        "task-037"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": "32afae5",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:compat",
+        "timeout_seconds": 900
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null
+    },
+    {
+      "id": "task-040",
+      "title": "IR extension prep: document and minimally scaffold model-registry, endpoint-portId, and viewport persistence future seams without changing canonical schema",
+      "status": "pending",
+      "priority": "P2",
+      "depends_on": [
+        "task-038",
+        "task-039"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": "32afae5",
+      "validation": {
+        "command": "npm run type-check && git diff --check",
+        "timeout_seconds": 240
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null
+    },
+    {
+      "id": "task-041",
+      "title": "Final review loop: run self-review plus multi-gpt-5.4 cross-review on WorldRegistry/compat cleanup and close residual P0-P2 findings",
+      "status": "pending",
+      "priority": "P0",
+      "depends_on": [
+        "task-038",
+        "task-039",
+        "task-040"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": "32afae5",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:compat && npm run test:e2e",
+        "timeout_seconds": 1200
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [],
+      "completed_at": null
+    },
+    {
+      "id": "task-042",
+      "title": "Runtime input normalization: make agent step and default input provider consume registry-normalized input keys instead of body node ids",
+      "status": "completed",
+      "priority": "P0",
+      "depends_on": [
+        "task-036"
+      ],
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "32afae5",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain",
+        "timeout_seconds": 420
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-25T03:24:42Z",
+          "message": "Completed runtime input normalization: runtime now prefers registry-normalized input source keys while preserving a compat fallback for legacy node ids."
+        }
+      ],
+      "completed_at": "2026-05-25T03:24:42Z"
+    },
+    {
+      "id": "task-043",
+      "title": "WorldRegistry authority cleanup: centralize body endpoint enumeration and binding semantics behind registry interfaces without UI/runtime drift",
+      "status": "completed",
+      "priority": "P0",
+      "depends_on": [
+        "task-036"
+      ],
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "32afae5",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"graph view|brain library\"",
+        "timeout_seconds": 900
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-25T03:24:42Z",
+          "message": "Completed WorldRegistry authority cleanup: rule binding resolution is now delegated to registry methods and GraphView/preview/runtime share the same binding authority."
+        }
+      ],
+      "completed_at": "2026-05-25T03:24:42Z"
+    },
+    {
+      "id": "task-044",
+      "title": "Runtime output cleanup: remove residual output-side action grammar re-parsing from runtime adapter paths",
+      "status": "completed",
+      "priority": "P1",
+      "depends_on": [
+        "task-043"
+      ],
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "32afae5",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain",
+        "timeout_seconds": 420
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-25T03:50:13.821Z",
+          "message": "Removed output-side action grammar re-parsing by threading registry-resolved commandKind through body/runtime/program outputs, then tightened the output binding contract to require commandKind and updated affected tests."
+        }
+      ],
+      "completed_at": "2026-05-25T03:50:13.821Z"
+    },
+    {
+      "id": "task-045",
+      "title": "Compat boundary cleanup: remove hidden default registries, fix legacy inferred-body dead branch, and isolate shared runtime compat fields",
+      "status": "completed",
+      "priority": "P1",
+      "depends_on": [
+        "task-042",
+        "task-043"
+      ],
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "32afae5",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:compat",
+        "timeout_seconds": 900
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-25T03:24:42Z",
+          "message": "Completed compat boundary cleanup: hidden default registries were replaced with explicit compat context injection, legacy inferred-body dead branch was removed, and visualInput was isolated away from production snapshot/type paths."
+        }
+      ],
+      "completed_at": "2026-05-25T03:24:42Z"
+    },
+    {
+      "id": "task-046",
+      "title": "UI/default-seed cleanup: remove residual hardcoded body grammar defaults outside the host-profile authority",
+      "status": "completed",
+      "priority": "P2",
+      "depends_on": [
+        "task-043"
+      ],
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "32afae5",
+      "validation": {
+        "command": "npm run type-check && npm run test:e2e -- --grep \"graph view|brain library\"",
+        "timeout_seconds": 900
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-25T03:50:13.821Z",
+          "message": "Removed host-specific fallback BodyIR defaults from the settings panel; uncontrolled mode now seeds an empty BodyIR shape instead of injecting vision/action grammar."
+        }
+      ],
+      "completed_at": "2026-05-25T03:50:13.821Z"
+    },
+    {
+      "id": "task-047",
+      "title": "Brain library host-parameter sync and E2E contract refresh: restore visionCells sync on save/select/import and update outdated BodyIR coverage expectations",
+      "status": "completed",
+      "priority": "P1",
+      "depends_on": [
+        "task-042",
+        "task-043",
+        "task-045"
+      ],
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "32afae5",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run test:e2e -- --grep \"graph view marks canonical-only body endpoints|brain library opens from the editor toolbar|brain import resets graph view path|applying agent parameters persists the current brain library layout\"",
+        "timeout_seconds": 1200
+      },
+      "on_failure": {
+        "cleanup": null
+      },
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-25T03:24:42Z",
+          "message": "Completed host-parameter sync and E2E refresh: Brain Library save/select/import now sync projected visionCells from the selected brain, and outdated BodyIR projected-coverage tests were updated to current product semantics."
+        }
+      ],
+      "completed_at": "2026-05-25T03:24:42Z"
     }
   ],
   "session_count": 16,
-  "last_session": "2026-05-25T03:10:00Z"
+  "last_session": "2026-05-25T03:50:13.821Z"
 }

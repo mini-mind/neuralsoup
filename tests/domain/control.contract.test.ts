@@ -49,7 +49,11 @@ const createSimulationSession = (
 const createSeedAgentForSession = (session: SimulationSession): AgentIR =>
   createVisionActionSeedAgentIR(expectMainAgent(session).visionCells.length, '默认 Agent');
 
-function createAgent(overrides: Partial<Agent> = {}): Agent {
+type LegacyVisualInputAgent = Agent & {
+  visualInput?: number[];
+};
+
+function createAgent(overrides: Partial<LegacyVisualInputAgent> = {}): LegacyVisualInputAgent {
   return {
     id: overrides.id ?? 0,
     x: overrides.x ?? 0,
@@ -206,7 +210,7 @@ test('simulation session keeps main-agent runtime status aligned across mode swi
   assert.equal(agent.y, 0);
 });
 
-test('default world action adapter consumes normalized action.* runtime targets', () => {
+test('default world action adapter consumes bound runtime command kinds', () => {
   const controller = new AgentController(
     createVisionActionOutputAdapter(),
     createVisionActionInputSignalProvider(),
@@ -223,9 +227,9 @@ test('default world action adapter consumes normalized action.* runtime targets'
   const result = stepAgentProgram(
     program,
     Object.fromEntries(mainAgent.visionCells.flatMap((_cell, cellIndex) => [
-      [`vision-R-${cellIndex}`, 1],
-      [`vision-G-${cellIndex}`, 1],
-      [`vision-B-${cellIndex}`, 1],
+      [`vision.R.${cellIndex}`, 1],
+      [`vision.G.${cellIndex}`, 1],
+      [`vision.B.${cellIndex}`, 1],
     ])) as Record<string, number>,
     createAgentProgramRuntimeState(program),
     1,
@@ -233,6 +237,12 @@ test('default world action adapter consumes normalized action.* runtime targets'
   );
 
   assert.equal(typeof result.outputsByTarget['action.move-forward'], 'number');
+  assert.equal(
+    result.outputSignals.some(
+      (signal) => signal.worldPort === 'action' && signal.commandKind === VISION_ACTION_MOVEMENT_BINDINGS.moveForward
+    ),
+    true
+  );
 
   const controlledAgent = createAgent({
     id: mainAgent.id,
@@ -257,6 +267,7 @@ test('agent controller consumes runtime outputs through the injected world actio
     target: string;
     normalizedTarget: string;
     worldPort: string;
+    commandKind: string;
     value: number;
   }>> = [];
   const controller = new AgentController({
@@ -289,7 +300,7 @@ test('agent controller consumes runtime outputs through the injected world actio
   assert.equal(
     adapterCalls[0].some(
       (signal) =>
-        signal.normalizedTarget === 'action.move-forward' &&
+        signal.commandKind === VISION_ACTION_MOVEMENT_BINDINGS.moveForward &&
         signal.worldPort === 'action' &&
         typeof signal.value === 'number'
     ),
@@ -308,6 +319,7 @@ test('default world action adapter only projects host-supported movement action 
         target: 'action.turn-left',
         normalizedTarget: 'action.turn-left',
         worldPort: 'action',
+        commandKind: 'turn-left',
         value: 0.25,
       },
       {
@@ -315,6 +327,7 @@ test('default world action adapter only projects host-supported movement action 
         target: 'action.move-forward',
         normalizedTarget: 'action.move-forward',
         worldPort: 'action',
+        commandKind: 'move-forward',
         value: 0.75,
       },
       {
@@ -322,6 +335,7 @@ test('default world action adapter only projects host-supported movement action 
         target: 'action.turn-right',
         normalizedTarget: 'action.turn-right',
         worldPort: 'action',
+        commandKind: 'turn-right',
         value: 0.5,
       },
       {
@@ -329,6 +343,7 @@ test('default world action adapter only projects host-supported movement action 
         target: 'action.strafe-left',
         normalizedTarget: 'action.strafe-left',
         worldPort: 'action',
+        commandKind: 'strafe-left',
         value: 1,
       },
       {
@@ -336,6 +351,7 @@ test('default world action adapter only projects host-supported movement action 
         target: 'thruster.forward',
         normalizedTarget: 'thruster.forward',
         worldPort: 'thruster',
+        commandKind: 'move-forward',
         value: 1,
       },
     ]),
@@ -387,12 +403,12 @@ test('vision-cell world input provider ignores legacy visualInput and only uses 
   });
 
   assert.deepEqual(provider.resolve(agent), {
-    'vision-R-0': 0.1,
-    'vision-G-0': 0.2,
-    'vision-B-0': 0.3,
-    'vision-R-1': 0.1,
-    'vision-G-1': 0.2,
-    'vision-B-1': 0.3,
+    'vision.R.0': 0.1,
+    'vision.G.0': 0.2,
+    'vision.B.0': 0.3,
+    'vision.R.1': 0.1,
+    'vision.G.1': 0.2,
+    'vision.B.1': 0.3,
   });
 });
 
