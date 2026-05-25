@@ -221,6 +221,7 @@ export const useGraphCanvasAssembly = ({
         local: node.local,
         connectableSource: node.connectableSource,
         ungroupable: node.kind === 'neuron-group' && node.local && !node.proxy && !node.expansionParentId,
+        contextMenuGroup: !node.leaf && node.local && !node.proxy && !node.expansionParentId,
         expanded: node.expanded,
         expansionParentId: node.expansionParentId,
       })),

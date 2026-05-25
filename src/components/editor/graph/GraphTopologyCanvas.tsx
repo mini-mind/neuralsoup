@@ -269,7 +269,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
               >
                 {scene.map.get(contextMenu.nodeIds[0])?.expanded ? '收起' : '展开'}
               </button>
-              {canUngroupNodesHere && (
+              {canUngroupNodesHere && scene.map.get(contextMenu.nodeIds[0])?.kind === 'neuron-group' && (
                 <button
                   type="button"
                   className="topology-context-menu-item"

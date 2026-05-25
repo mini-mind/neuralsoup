@@ -1,14 +1,14 @@
 # AgentIR 冻结设计
 
-本文档冻结下一代 IR 目标结构。后续重构不保留旧结构兼容，当前 `BrainPackage / GraphIRDocument / BodyDefinition` 仅作为迁移来源。
+本文档冻结下一阶段 `AgentIR` 目标结构。后续重构放弃旧版兼容，不再保留 `BrainPackage`、`GraphIRDocument`、`BodyDefinition`、`AdapterNode`、`SignalNode`、`LeafLink` 等旧结构作为导入、导出或运行主路径。
 
 ## 总体边界
 
 运行时语义分为三层：
 
-- `world`：环境、观测来源、动作作用点和宿主能力，不进入持久化 AgentIR。
-- `body`：world 与 brain 的适配层，记录输入/输出信号节点的映射规则。
-- `brain`：神经元节点及其组织结构，不记录 world 映射、不记录输入/输出 signal node。
+- `World`：环境、观测来源、动作作用点和宿主能力，不进入持久化 `AgentIR`。
+- `BodyIR`：简化的感受器和效应器，负责 `World -> Brain` 输入信号转换和 `Brain -> World` 输出信号转换。
+- `BrainIR`：神经元、神经元组、神经元模型、突触模型和 brain 内部拓扑，不记录 world 语义。
 
 持久化真源统一为 `AgentIR`：
 
@@ -18,27 +18,20 @@ export interface AgentIR {
   metadata: AgentMetadata;
   body: BodyIR;
   brain: BrainIR;
-  connections: AgentConnection[];
+  connections: ConnectionIR[];
   layout?: AgentLayoutIR;
 }
 ```
 
-`connections` 是唯一连接真源，覆盖 `body -> brain`、`brain -> brain`、`brain -> body` 三类连接。
+`connections` 是唯一拓扑连接真源，覆盖 `bodyInput -> brain`、`brain -> brain`、`brain -> bodyOutput` 三类连接。突触行为不再直接写在 connection 上，而是通过 `synapseModelId` 引用 `BrainIR.synapseModels`。
 
 ## BodyIR
 
-`BodyIR` 只保存规则，规则是真源。运行时或编辑器可按规则展开出实际 body input/output 节点，但展开结果不作为第二真源保存。
-
-当前实现中，`body.visionCellCount` 已是 canonical 持久化字段：
-
-- 默认 seed、storage normalization、summary、runtime install 和编辑器都直接读写该字段。
-- legacy 载荷若缺少该字段，只在 compat/import 归一化时结合结构证据补齐，然后写回 canonical `BodyIR.visionCellCount`。
-- domain 仍保留少量 legacy fallback 读取路径，用于显式 compat 边界和旧载荷迁移；后续仍应继续下沉，避免 AgentIR 域内长期保留双真源语义。
+`BodyIR` 只保存映射规则。规则是真源，按规则展开出的 input/output signal node 是编辑器和运行时投影，不作为第二真源保存。
 
 ```ts
 export interface BodyIR {
   version: 1;
-  visionCellCount: number;
   inputRules: BodyInputRule[];
   outputRules: BodyOutputRule[];
 }
@@ -60,110 +53,207 @@ export interface BodyOutputRule {
 
 规则语义：
 
-- `nodeIdPattern` 是正则表达式，用于匹配 body 节点 ID。
-- `sourceTemplate` 生成 world 输入路径，例如 `vision.$1.$2`，可得到 `vision.G.12`。
-- `targetTemplate` 生成 world 输出路径，例如 `action.$1`。
-- `scale` 用于把已归一化到 `[0, 1]` 的外界输入缩放成向后继神经元传递的信号强度。
+- `nodeIdPattern` 是正则表达式，用于匹配 body 输入或输出信号节点 ID。
+- `sourceTemplate` 生成 world 输入来源，例如 `vision.$1.$2`，可解析成 `vision.G.12`。
+- `targetTemplate` 生成 world 输出目标，例如 `action.$1`。
+- `scale` 用于把已归一化到 `[0, 1]` 的外界输入缩放为向后继神经元传递的信号强度。
 - `decayPerSecond` 表示输出动作激活值每秒衰退量；输出节点收到一次 brain 信号后激活值重置为 `1`，随后按 `max(0, value - decayPerSecond * deltaTime)` 衰退。
 
-当前 v1 runtime grammar 仍然是受限的 host contract，而不是完全通用的 world DSL：
-
-- 输入 `sourceTemplate` 目前必须解析成 `vision.<channel>.<cellIndex>`。
-- 输出 `targetTemplate` 目前必须解析成 `action.<turn-left|move-forward|turn-right>`。
-- 更通用的 source/target registry 仍是后续重构项，尚未完成下沉。
-- GraphView/preview 当前已经与 domain 规则解析链共用同一套 endpoint authority，但“主动枚举未连线 endpoint”仍受限于这套 host grammar，并不是完全通用的 world DSL。
-
-示例：
-
-```ts
-const body: BodyIR = {
-  version: 1,
-  inputRules: [
-    {
-      id: 'vision-rgb-cells',
-      nodeIdPattern: '^vision-([RGB])-(\\d+)$',
-      sourceTemplate: 'vision.$1.$2',
-      scale: 1
-    }
-  ],
-  outputRules: [
-    {
-      id: 'motor-actions',
-      nodeIdPattern: '^motor-(turn-left|move-forward|turn-right)$',
-      targetTemplate: 'action.$1',
-      decayPerSecond: 4
-    }
-  ]
-};
-```
+`BodyIR` 不保存 runtime 状态，不保存 world registry，不保存实际展开出的 signal node 列表。输入/输出 signal node 是否存在，以规则解析结果和 connection 引用共同决定。
 
 ## BrainIR
 
-`BrainIR` 只描述神经元及容器层级。通用神经元运行逻辑由引擎托管，节点 IR 只保留模型选择、关键参数和初始状态。
+`BrainIR` 描述 brain 内部结构和可复用模型注册表。通用神经元更新逻辑、突触运行时状态、学习 trace、delay queue 等由引擎托管，不进入 IR。
 
 ```ts
 export interface BrainIR {
   version: 1;
+  neuronModels: NeuronModelIR[];
+  synapseModels: SynapseModelIR[];
   neurons: BrainNeuronNode[];
   containers: BrainContainerNode[];
   rootContainerId: string;
 }
+```
 
+### NeuronModelIR
+
+神经元模型注册表是模板共享，不是参数量化。多个神经元可以引用同一模型模板，也可以在实例上做少量覆盖。
+
+第一阶段只要求支持 `izhikevich` family 的多 profile 混用，暂不引入 `LIF`、`AdEx`、`Hodgkin-Huxley` 等多 family 混用。
+
+```ts
+export interface NeuronModelIR {
+  id: string;
+  family: 'izhikevich';
+  label?: string;
+  params: IzhikevichNeuronParameters;
+}
+
+export interface IzhikevichNeuronParameters {
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+  threshold: number;
+}
+```
+
+### SynapseModelIR
+
+突触模型注册表描述连接行为。connection 只引用模型，不直接携带完整突触动力学。
+
+第一阶段建议支持轻量但具备放电和学习价值的模型集合：
+
+- `static-current`：最低成本基线。
+- `single-exp-conductance`：单指数电导突触。
+- `dual-exp-conductance`：默认推荐主力模型。
+- `dual-exp-stdp`：双指数电导加 trace-based STDP。
+- `dual-exp-stp`：双指数电导加短时程可塑性，默认只用于少量连接。
+
+```ts
+export type SynapseModelIR =
+  | StaticCurrentSynapseModelIR
+  | SingleExpConductanceSynapseModelIR
+  | DualExpConductanceSynapseModelIR
+  | DualExpStdPSynapseModelIR
+  | DualExpStpSynapseModelIR;
+
+export interface SynapseModelBaseIR {
+  id: string;
+  label?: string;
+  kind: string;
+}
+
+export interface StaticCurrentSynapseModelIR extends SynapseModelBaseIR {
+  kind: 'static-current';
+  defaults: {
+    weight: number;
+    delayMs: number;
+  };
+}
+
+export interface SingleExpConductanceSynapseModelIR extends SynapseModelBaseIR {
+  kind: 'single-exp-conductance';
+  defaults: {
+    weight: number;
+    delayMs: number;
+    gMax: number;
+    reversalPotential: number;
+    tauDecayMs: number;
+  };
+}
+
+export interface DualExpConductanceSynapseModelIR extends SynapseModelBaseIR {
+  kind: 'dual-exp-conductance';
+  defaults: {
+    weight: number;
+    delayMs: number;
+    gMax: number;
+    reversalPotential: number;
+    tauRiseMs: number;
+    tauDecayMs: number;
+  };
+}
+
+export interface DualExpStdPSynapseModelIR extends SynapseModelBaseIR {
+  kind: 'dual-exp-stdp';
+  defaults: {
+    weight: number;
+    delayMs: number;
+    gMax: number;
+    reversalPotential: number;
+    tauRiseMs: number;
+    tauDecayMs: number;
+    aPlus: number;
+    aMinus: number;
+    tauPlusMs: number;
+    tauMinusMs: number;
+    wMin: number;
+    wMax: number;
+  };
+}
+
+export interface DualExpStpSynapseModelIR extends SynapseModelBaseIR {
+  kind: 'dual-exp-stp';
+  defaults: {
+    weight: number;
+    delayMs: number;
+    gMax: number;
+    reversalPotential: number;
+    tauRiseMs: number;
+    tauDecayMs: number;
+    utilization: number;
+    tauFacilitationMs: number;
+    tauRecoveryMs: number;
+  };
+}
+```
+
+`NMDA voltage-dependent`、Markov 受体动力学和 calcium-based plasticity 暂不进入第一阶段 schema。后续如需支持，应作为新的 `SynapseModelIR.kind` 扩展，而不是改写 connection 语义。
+
+### BrainNeuronNode
+
+神经元实例只记录身份、模型引用、少量实例覆盖和初始状态。
+
+```ts
 export interface BrainNeuronNode {
   id: string;
-  label: string;
-  model: 'izhikevich';
-  params: {
-    a: number;
-    b: number;
-    c: number;
-    d: number;
-    threshold: number;
-  };
+  label?: string;
+  neuronModelId: string;
+  parameterOverrides?: Partial<IzhikevichNeuronParameters>;
   initialState: {
     v: number;
     u?: number;
   };
 }
+```
 
+`initialState.v` 是初始膜电位。`initialState.u` 未设置时由 runtime 使用模型默认规则推导，例如 `b * v`。
+
+### BrainContainerNode
+
+容器只表达层级。非叶子节点之间的连接是叶子连接的统计投影，不作为独立 semantic connection 保存。
+
+```ts
 export interface BrainContainerNode {
   id: string;
   label?: string;
-  children: Array<{ scope: 'brain'; nodeId: string } | { scope: 'container'; nodeId: string }>;
+  children: Array<
+    | { scope: 'brain'; nodeId: string }
+    | { scope: 'container'; nodeId: string }
+  >;
 }
 ```
 
-`label` 当前仍保留在 `BrainIR` 中，作为节点显示元数据随 IR 持久化；它不参与 world/runtime 语义判定，但当前编辑器和 compat bridge 仍依赖它保真 round-trip。
-
 约束：
 
-- BrainIR 不包含 adapter。
-- BrainIR 不包含 input/output signal node。
-- BrainIR 不包含 world-facing source/target。
-- BrainIR 不包含 layout 字段。
+- `BrainIR` 不包含 adapter 实例节点。
+- `BrainIR` 不包含 input/output signal node 的持久列表。
+- `BrainIR` 不包含 world-facing source/target。
 - `rootContainerId` 指向唯一根容器。
-- 每个 neuron 或 container 除 root container 外只能被一个 container 持有。
-- 第一阶段神经元模型可固定为 `izhikevich`，后续再扩展模型枚举或模型注册表。
-- `initialState.v` 是初始膜电位；`initialState.u` 未设置时由 runtime 使用模型默认规则推导，例如 `b * v`。
+- 每个 neuron 或非 root container 只能被一个 container 持有。
 
-## AgentConnection
+## ConnectionIR
 
-连接端点保留可扩展结构：
+`ConnectionIR` 只描述拓扑边和所使用的突触模型。
 
 ```ts
-export type AgentConnectionEndpoint =
+export type ConnectionEndpointIR =
   | { scope: 'bodyInput'; nodeId: string; portId?: string }
   | { scope: 'bodyOutput'; nodeId: string; portId?: string }
   | { scope: 'brain'; nodeId: string; portId?: string };
 
-export interface AgentConnection {
+export interface ConnectionIR {
   id: string;
-  from: AgentConnectionEndpoint;
-  to: AgentConnectionEndpoint;
-  weight: number;
-  delayMs?: number;
+  from: ConnectionEndpointIR;
+  to: ConnectionEndpointIR;
+  synapseModelId: string;
+  parameterOverrides?: SynapseParameterOverrides;
 }
 ```
+
+`parameterOverrides` 只用于少量实例例外。常规情况下，连接应复用 `synapseModelId` 对应模板参数。
 
 合法方向：
 
@@ -174,13 +264,9 @@ export interface AgentConnection {
 - 禁止 `brain -> bodyInput`。
 - 禁止 `bodyInput -> bodyOutput`。
 
-当前实现已按上述规则校验；`bodyInput -> bodyOutput` 会被 `validateAgentIR/compileAgentIR` 显式拒绝。
+## AgentLayoutIR
 
-`portId` 当前可选，第一阶段可以不使用；保留它是为了后续支持多端口神经元或更复杂模型。
-
-## Layout
-
-布局是编辑器状态，不属于语义 IR。
+布局是编辑器状态，不参与 runtime 语义，但作为 AgentIR 的可选持久化部分保存。
 
 ```ts
 export interface AgentLayoutIR {
@@ -194,185 +280,61 @@ export interface AgentLayoutNodeState {
 }
 ```
 
-layout 只影响 GraphView 展示，不参与 runtime 编译。
+布局原则：
 
-当前真实状态：
+- 节点画布位置是持久真源。
+- 组内局部位置可由子节点画布位置计算最大矩形包围盒后映射得到。
+- 组展开尺寸由子节点包围盒、padding 和最小尺寸计算，不作为语义字段保存。
+- viewport、scale、选择集、弹窗、拖拽中间态仍是 session state。
 
-- `position` 与 `collapsed` 是 `AgentLayoutIR` 的唯一持久真源。
-- viewport/scale 仍停留在 React session state，不进入 canonical `AgentIR`。
-- `size` / `expanded` 是视图计算态，不是稳定持久化真源。
+组局部坐标计算规则：
+
+```ts
+groupBounds = boundingBox(children.scenePositions).inflate(padding)
+childLocalPosition = childScenePosition - groupBounds.origin
+```
+
+组移动时，组内子节点随组整体平移；展开后拖动子节点时，先更新节点画布位置，再由包围盒重新投影组内局部布局。
 
 ## 编译边界
 
 目标入口：
 
 ```ts
-compileAgentIR(agent: AgentIR): AgentProgram
+compileAgentIR(agent: AgentIR, worldRegistry: WorldRegistry): AgentProgram
 ```
 
 编译流程：
 
-1. 校验 `body.inputRules` / `body.outputRules` 的正则和模板。
-2. 从 `connections` 中收集被引用的 `bodyInput` / `bodyOutput` 节点 ID。
-3. 用 body 规则解析这些 body 节点 ID，得到 world `source` / `target`、`scale` 和 `decayPerSecond`。
-4. 校验 brain neuron、container 引用和 root container。
-5. 校验连接方向和端点存在性。
-6. lower `bodyInput -> brain` 为 runtime input injection。
-7. lower `brain -> brain` 为 neuron connection。
-8. lower `brain -> bodyOutput` 为 runtime action output。
+1. 校验 `BodyIR` 规则正则和模板。
+2. 从 `connections` 收集被引用的 `bodyInput` / `bodyOutput` signal node ID。
+3. 通过 `WorldRegistry` 解析 body endpoint，得到输入来源、输出目标、端口能力、`scale` 和 `decayPerSecond`。
+4. 校验 `BrainIR` 的 neuron、container、model registry 和 root container。
+5. 校验每个 neuron 的 `neuronModelId` 存在。
+6. 校验每个 connection 的方向、端点存在性和 `synapseModelId` 存在。
+7. lower `bodyInput -> brain` 为 runtime input injection。
+8. lower `brain -> brain` 为 neuron-to-neuron synapse runtime。
+9. lower `brain -> bodyOutput` 为 runtime action output。
 
-runtime 不从节点命名、label 或模板以外的字段推断 world 语义。
+runtime 不从节点命名、label 或 layout 推断 world/brain 语义。
 
-compat 约束：
+## 重构任务
 
-- legacy `GraphIRDocument` setter 若需要超出当前 session 的 `visionCells`，必须返回 `invalid`，不能再做 silent reconcile。
-- legacy getter/setter 若无法无损保留 `BodyIR` 规则语义，必须显式报错，不能伪装成功 round-trip。
-
-## 当前实现迁移
-
-当前实现仍有兼容残留，但生产主路径已经完成以下切换：
-
-- 持久化与运行主结构已经是 `AgentIR`，不是旧的 `BrainPackage / BodyDefinition / LeafLink` 组合。
-- `GraphView` 直接编辑 `AgentIR.brain`、`AgentIR.connections` 与 `AgentIR.layout`，body signal node 不再作为 brain topology 真源持久化。
-- `position`、`collapsed` 已进入 `AgentLayoutIR`；`expanded`、`size` 和 viewport 保持 session/computed state，不再作为 canonical schema 目标。
-- legacy `GraphIRDocument`、legacy package envelope 和相关桥接器仍存在，但仅应视为 compat surface，而不是当前生产真源。
-
-当前 Brain Library 的真实边界如下：
-
-- LocalStorage 主格式是 canonical `BrainLibraryRecord` envelope，而不是 `AgentPackage`。
-- 默认导入/导出交换格式是 `neuralsoup-agent` envelope，核心载荷是 `AgentIR`。
-- legacy `AgentPackage` 仍作为兼容输入/显式兼容导出面保留。
-- legacy LocalStorage / legacy package 兼容仍存在，但应继续下沉到显式 migration/import 边界，而不是长期污染生产主路径。
-
-当前 Brain Library 额外约束：
-
-- 内存主态与编辑主态都以 `agent.metadata` 为身份真源。
-- “保存当前 Brain”会原子切换当前编辑/运行 Agent 到新建库条目的 `AgentIR`，避免当前 Agent 与库条目身份漂移。
-- legacy package/helper 仍有一部分类型面残留在 domain exports；运行主路径已切到 `AgentIR`，但目录/API 边界尚未完全收口。
-
-## 当前剩余缺口
-
-当前实现与冻结设计相比，仍有以下明确缺口：
-
-- `BodyIR` 已进入 schema、compiler、runtime、storage，并具备生产可用的规则编辑、endpoint 投影预览和可见 validation。
-- body endpoint 的主动投影与 preview/GraphView 已共用同一 authority；当前剩余限制在于 host grammar 仍是受限集合，而不是多套解释器并存。
-- GraphView 的 viewport/scale、expanded 和 size 仍是 session/computed state；若未来需要跨会话恢复，应以新 schema 单独设计，而不是复活旧字段。
-- compat bridge、legacy type export 与部分 migration 命名仍残留在 domain/storage/runtime 周边；它们不是主路径真源，但仍是后续收口对象。
-
-## World Registry 设计准备
-
-当前 `BodyIR` 已经是 canonical 真源，但 `sourceTemplate` / `targetTemplate` 仍被 runtime 和 preview 解释成受限 grammar：
-
-- 输入必须解析成 `vision.<channel>.<cellIndex>`。
-- 输出必须解析成 `action.<turn-left|move-forward|turn-right>`。
-- `visionCellCount`、`BrainInputChannel`、`BrainOutputChannel` 仍直接参与 endpoint 枚举和 runtime lower。
-
-这意味着当前系统虽然已经只有一套 authority，但 authority 本身仍是“规则 + 硬编码 host grammar”。
-
-下一阶段目标不是立刻引入完全开放的世界 DSL，而是先把“规则如何映射到宿主能力”的解释器注册化，让 canonical `BodyIR` 不再直接依赖 `vision.* / action.*` 这组字面协议。
-
-### 目标边界
-
-引入新的 registry-backed host contract：
-
-```ts
-export interface BodyInputBinding {
-  id: string;
-  source: string;
-  scale: number;
-  worldPort: string;
-  runtimeIndex?: number;
-}
-
-export interface BodyOutputBinding {
-  id: string;
-  target: string;
-  decayPerSecond: number;
-  worldPort: string;
-}
-
-export interface WorldPortDescriptor {
-  id: string;
-  direction: 'input' | 'output';
-  kind: string;
-  enumerable: boolean;
-}
-
-export interface WorldRegistry {
-  version: 1;
-  inputs: WorldPortDescriptor[];
-  outputs: WorldPortDescriptor[];
-  resolveInputBinding(source: string): {
-    worldPort: string;
-    runtimeIndex?: number;
-    normalizedSource: string;
-  } | null;
-  resolveOutputBinding(target: string): {
-    worldPort: string;
-    normalizedTarget: string;
-  } | null;
-  enumerateInputSources?(rule: BodyInputRule, body: BodyIR): string[];
-  enumerateOutputTargets?(rule: BodyOutputRule, body: BodyIR): string[];
-}
-```
-
-设计原则：
-
-- `BodyIR` 仍然只保存规则，不保存 registry state。
-- `WorldRegistry` 是 runtime/editor 的宿主描述，不进入持久化 `AgentIR`。
-- `sourceTemplate` / `targetTemplate` 在 canonical schema 中继续保留为字符串，不在本阶段改成 AST。
-- `BodyInputNodeRuntime` / `BodyOutputNodeRuntime` 后续要从“硬编码视觉/动作字段”收敛到“binding + registry metadata”。
-- `visionCellCount` 暂时继续保留在 `BodyIR`；它先作为默认 world registry 的输入覆盖范围参数，而不是直接等价于 `vision.*` grammar。
-
-### Phase 1 范围
-
-`task-024` 第一阶段只做接口抽象和默认 registry 落地，不做开放式 DSL：
-
-- 保留当前默认 world registry：
-  - 输入端口族仍是 `vision`
-  - 输出端口族仍是 `action`
-- 但把硬编码解析逻辑从 `agent-body-rules.ts` / `agent-compiler.ts` 挪到默认 registry 中。
-- preview、endpoint 枚举、compile、reconcile 共用同一个 registry 入口，而不是各自解析 `vision.* / action.*`。
-- `BrainOutputChannel` 不在第一阶段强制删除，但要从 canonical `BodyIR` 解释链中退出，只保留在默认 runtime/host adapter 层。
-
-### 非目标
-
-本阶段不做以下事情：
-
-- 不把 `BodyIR` 改写成完整 DSL 或 NESTML 风格 AST。
-- 不允许用户在 UI 中动态配置多套 registry。
-- 不引入新的持久化 schema 版本。
-- 不移除 `visionCellCount`。
-- 不在本阶段处理跨 world 的热插拔/插件协议。
-
-### 迁移边界
-
-本阶段迁移完成后，应满足：
-
-- `resolveAgentBodyInputRuleBindings` / `resolveAgentBodyOutputRuleBindings` 不再直接解析 `vision.* / action.*`。
-- `enumerateInputRuleNodeIds` / `enumerateOutputRuleNodeIds` 不再内嵌 `visionCellCount` 和动作集合推导，而是走默认 registry 的枚举接口。
-- `compileAgentIR` 不再直接依赖 `BrainOutputChannel` 解释 `BodyIR.targetTemplate`。
-- 默认 world/runtime adapter 仍可以把 registry 的 `worldPort` lower 到今天的视觉输入数组和动作输出槽位，因此用户可见行为不变。
-
-### task-024 切入点
-
-第一批代码落点应是：
-
-- 新增 `src/domain/brain/world-registry.ts`
-  - 定义 `WorldRegistry`、binding/result 类型
-  - 提供默认 `vision/action` registry
-- 改造 `agent-body-rules.ts`
-  - 将输入/输出解析与枚举委托给 registry
-- 改造 `agent-compiler.ts`
-  - `AgentProgramInputPort` / `AgentProgramOutputPort` 优先承载 registry-normalized data
-- 保持 `agent-step.ts` 和 runtime adapter 可兼容默认 registry，不在第一阶段扩展 UI
+1. 更新 TypeScript schema：新增 `NeuronModelIR`、`SynapseModelIR`、`ConnectionIR`，移除 connection 上的 `weight` / `delayMs` 主语义。
+2. 更新默认 seed：把现有 Izhikevich 参数迁移到 `brain.neuronModels`，把默认连接参数迁移到 `brain.synapseModels`。
+3. 更新 compiler/program：connection lower 时解析 `synapseModelId`，生成运行时突触实例。
+4. 更新 GraphView：连线详情编辑 synapse 模型引用和少量 override；节点详情编辑 neuron model 引用和初始膜电位。
+5. 更新 domain tests：覆盖模型缺失、连接方向、突触模板引用、实例 override、body endpoint 解析。
+6. 更新 e2e 关键链路：创建神经元、创建连接、切换/编辑模型、保存导入导出。
+7. 删除旧结构兼容路径：旧 schema 不再作为导入、导出、storage normalization 或 runtime fallback。
 
 ## 验收边界
 
-- 生产代码不再暴露 `BrainPackage`、`GraphIRDocument`、`BodyDefinition`、`AdapterNode`、`SignalNode`、`LeafLink` 作为持久化主结构。
-- 运行时入口收口为 `compileAgentIR(agent)` 或等价 AgentIR 编译边界。
-- GraphView 直接编辑 `AgentIR.brain`、`AgentIR.connections` 和 `AgentIR.layout`，不再把 body signal node 混入 brain topology。
-- BodyIR 需要具备生产可用的编辑与审查闭环：至少能编辑规则、查看 endpoint 投影，并在无效时展示可定位的 validation。
+- 生产代码不再暴露旧持久化结构作为主路径或兼容输入。
+- `AgentIR` 是保存、导入、导出、GraphView 编辑和 runtime 编译的唯一持久化协议。
+- `ConnectionIR` 不再直接承载完整突触动力学；突触行为来自 `SynapseModelIR`。
+- `BrainNeuronNode` 不再直接承载完整模型定义；神经元行为来自 `NeuronModelIR`。
+- `BodyIR` 只描述 world/body 映射规则，不保存展开 signal node 列表。
 - `npm run type-check` 通过。
 - `npm run test:domain` 通过。
-- 涉及 GraphView 或 Brain Library 行为时，`npm run test:e2e -- --grep "graph view|brain library"` 通过。
+- 涉及 GraphView、Brain Library 或导入导出行为时，运行对应 Playwright 关键链路测试。

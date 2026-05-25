@@ -10,6 +10,7 @@ interface GraphViewSessionControllerNode extends SceneNodeGeometry {
   local: boolean;
   connectableSource: boolean;
   ungroupable: boolean;
+  contextMenuGroup: boolean;
   expanded: boolean;
   expansionParentId: string | null;
 }
@@ -219,7 +220,18 @@ export const useGraphViewSessionController = ({
       return null;
     }
 
-    const menuItemCount = contextMenu.kind === 'group' ? 2 : contextMenu.kind === 'selection' ? 1 : 2;
+    const contextMenuNode =
+      contextMenu.kind === 'group' && contextMenu.nodeIds.length === 1
+        ? nodes.find((node) => node.id === contextMenu.nodeIds[0]) ?? null
+        : null;
+    const menuItemCount =
+      contextMenu.kind === 'group'
+        ? contextMenuNode?.ungroupable
+          ? 2
+          : 1
+        : contextMenu.kind === 'selection'
+          ? 1
+          : 2;
     const menuHeight = menuItemCount * CONTEXT_MENU_ITEM_HEIGHT + CONTEXT_MENU_VERTICAL_PADDING;
 
     return {

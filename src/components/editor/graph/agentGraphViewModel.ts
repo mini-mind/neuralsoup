@@ -99,6 +99,37 @@ const isLeafNode = (node: AgentGraphViewNodeRecord) => node.kind === 'neuron' ||
 
 const isContainerNode = (node: AgentGraphViewNodeRecord) => node.kind === 'adapter' || node.kind === 'neuron-group';
 
+const isInputAdapterId = (nodeId: string) => nodeId === BODY_INPUTS_GROUP_ID || nodeId === CORE_BODY_INPUTS_GROUP_ID;
+
+const isOutputAdapterId = (nodeId: string) => nodeId === BODY_OUTPUTS_GROUP_ID || nodeId === CORE_BODY_OUTPUTS_GROUP_ID;
+
+const getAdapterChildRecords = (
+  adapterId: string,
+  indexes: AgentGraphViewIndexes
+): AgentGraphViewNodeRecord[] => {
+  const nodeIds = isInputAdapterId(adapterId) ? indexes.bodyInputNodeIds : isOutputAdapterId(adapterId) ? indexes.bodyOutputNodeIds : [];
+  return nodeIds
+    .map((nodeId) => indexes.nodeById.get(nodeId))
+    .filter((node): node is AgentGraphViewNodeRecord => node != null);
+};
+
+const getContainerChildRecords = (
+  node: AgentGraphViewNodeRecord,
+  indexes: AgentGraphViewIndexes
+): AgentGraphViewNodeRecord[] => {
+  if (node.kind === 'adapter') {
+    return getAdapterChildRecords(node.id, indexes);
+  }
+
+  const containerId = node.container?.id ?? node.refNodeId;
+  return (indexes.childRefsByContainerId.get(containerId) ?? [])
+    .map((childRef) => indexes.nodeById.get(childRef.nodeId))
+    .filter((child): child is AgentGraphViewNodeRecord => child != null);
+};
+
+const isNodeExpanded = (agent: AgentIR, node: AgentGraphViewNodeRecord): boolean =>
+  isContainerNode(node) && agent.layout?.nodes[getLayoutNodeKey(node)]?.collapsed === false;
+
 const getLayoutNodeKey = (node: AgentGraphViewNodeRecord) => {
   if (node.kind === 'neuron-group' && node.container) {
     return node.container.id;
@@ -479,10 +510,8 @@ const collectLeafIds = (
     }
 
     if (candidate.kind === 'adapter') {
-      for (const child of indexes.nodeById.values()) {
-        if (indexes.parentContainerIdByNodeId.get(child.id) === candidate.id) {
-          visit(child);
-        }
+      for (const child of getAdapterChildRecords(candidate.id, indexes)) {
+        visit(child);
       }
       return;
     }
@@ -585,6 +614,13 @@ const collectBoundaryAggregateLinks = ({
   expandedContainerIds: Set<string>;
 }): AggregateLinkView[] => {
   const aggregateMap = new Map<string, AggregateLinkView>();
+  const projectBoundaryAdapterNodeId = (
+    scope: 'bodyInput' | 'bodyOutput',
+    leafNodeId: string
+  ) => {
+    const adapterId = scope === 'bodyInput' ? CORE_BODY_INPUTS_GROUP_ID : CORE_BODY_OUTPUTS_GROUP_ID;
+    return expandedContainerIds.has(adapterId) ? leafNodeId : adapterId;
+  };
 
   const append = (fromNodeId: string, toNodeId: string, connection: AgentConnection) => {
     if (fromNodeId === toNodeId) {
@@ -613,7 +649,7 @@ const collectBoundaryAggregateLinks = ({
     if (connection.from.scope === 'bodyInput' && connection.to.scope === 'brain') {
       const toNodeId = getScopeNodeIdForLeaf(connection.to.nodeId, pathById, currentPath, expandedContainerIds);
       if (toNodeId) {
-        append(CORE_BODY_INPUTS_GROUP_ID, toNodeId, connection);
+        append(projectBoundaryAdapterNodeId('bodyInput', connection.from.nodeId), toNodeId, connection);
       }
       continue;
     }
@@ -621,7 +657,7 @@ const collectBoundaryAggregateLinks = ({
     if (connection.from.scope === 'brain' && connection.to.scope === 'bodyOutput') {
       const fromNodeId = getScopeNodeIdForLeaf(connection.from.nodeId, pathById, currentPath, expandedContainerIds);
       if (fromNodeId) {
-        append(fromNodeId, CORE_BODY_OUTPUTS_GROUP_ID, connection);
+        append(fromNodeId, projectBoundaryAdapterNodeId('bodyOutput', connection.to.nodeId), connection);
       }
     }
   }
@@ -756,7 +792,7 @@ export const buildAgentGraphViewModel = ({
   );
   const expandedContainerIds = new Set(
     currentChildren
-      .filter((node) => node.kind === 'neuron-group' && agent.layout?.nodes[getLayoutNodeKey(node)]?.collapsed === false)
+      .filter((node) => isNodeExpanded(agent, node))
       .map((node) => node.id)
   );
   const aggregateLinks = collectAggregateLinks(containerConnections, indexes.pathById, currentPath, expandedContainerIds);
@@ -772,19 +808,13 @@ export const buildAgentGraphViewModel = ({
 
   for (const [index, node] of currentChildren.entries()) {
     const position = getLayoutPosition(agent, node, index, currentScope, draftNodePositions);
-    const expanded = node.kind === 'neuron-group' && agent.layout?.nodes[getLayoutNodeKey(node)]?.collapsed === false;
-    const groupChildren = (node.container ? indexes.childRefsByContainerId.get(node.container.id) ?? [] : [])
-      .map((childRef) => indexes.nodeById.get(childRef.nodeId))
-      .filter((child): child is AgentGraphViewNodeRecord => child != null) ?? [];
+    const expanded = isNodeExpanded(agent, node);
+    const groupChildren = getContainerChildRecords(node, indexes);
     const size = expanded ? getExpandedGroupSize(groupChildren, agent, draftNodePositions) : getNodeSize(node);
     const childCount =
-      node.kind === 'neuron-group'
-        ? indexes.childRefsByContainerId.get(node.container?.id ?? '')?.length ?? 0
-        : node.id === CORE_BODY_INPUTS_GROUP_ID
-          ? indexes.bodyInputNodeIds.length
-          : node.id === CORE_BODY_OUTPUTS_GROUP_ID
-            ? indexes.bodyOutputNodeIds.length
-        : [...indexes.nodeById.values()].filter((child) => indexes.parentContainerIdByNodeId.get(child.id) === node.id).length;
+      node.kind === 'adapter'
+        ? getAdapterChildRecords(node.id, indexes).length
+        : groupChildren.length;
     const runtimeInstalledLeafCount =
       node.kind === 'signal'
         ? node.endpoint?.scope === 'bodyInput'
@@ -844,7 +874,7 @@ export const buildAgentGraphViewModel = ({
       adapterNavigable: node.kind !== 'adapter' || node.id === BODY_INPUTS_GROUP_ID || node.id === BODY_OUTPUTS_GROUP_ID,
     });
 
-    if (!expanded || node.kind !== 'neuron-group') {
+    if (!expanded || !isContainerNode(node)) {
       continue;
     }
 

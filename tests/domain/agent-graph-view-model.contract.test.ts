@@ -333,6 +333,60 @@ test('agent graph root scope exposes canonical body endpoints even before any co
   );
 });
 
+test('agent graph root adapters can expand in place and expose their signal children', () => {
+  const agent = createTestAgent();
+  agent.body.inputRules = [
+    {
+      id: 'vision-inputs',
+      nodeIdPattern: '^vision-([RGB])-(\\d+)$',
+      sourceTemplate: 'vision.$1.$2',
+      scale: 1,
+    },
+  ];
+  agent.body.outputRules = [
+    {
+      id: 'motor-outputs',
+      nodeIdPattern: '^output-(turn-left|move-forward|turn-right)$',
+      targetTemplate: 'action.$1',
+      decayPerSecond: 4,
+    },
+  ];
+  agent.layout = {
+    version: 1,
+    nodes: {
+      ...agent.layout?.nodes,
+      'input-adapter': {
+        position: { x: 24, y: 180 },
+        collapsed: false,
+      },
+      'output-adapter': {
+        position: { x: 644, y: 200 },
+        collapsed: false,
+      },
+      'vision-R-0': { position: { x: 0, y: 0 } },
+      'vision-G-0': { position: { x: 0, y: 24 } },
+      'vision-B-0': { position: { x: 0, y: 48 } },
+      'output-turn-left': { position: { x: 320, y: 0 } },
+      'output-move-forward': { position: { x: 320, y: 24 } },
+      'output-turn-right': { position: { x: 320, y: 48 } },
+    },
+  };
+
+  const rootView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+    projectedVisionCellCount: 1,
+    worldRegistry: WORLD_REGISTRY,
+  });
+
+  assert.equal(rootView.nodes.find((node) => node.id === 'input-adapter')?.expanded, true);
+  assert.equal(rootView.nodes.find((node) => node.id === 'output-adapter')?.expanded, true);
+  assert.equal(rootView.nodes.some((node) => node.viewId === 'input-adapter::vision-R-0'), true);
+  assert.equal(rootView.nodes.some((node) => node.viewId === 'output-adapter::output-move-forward'), true);
+});
+
 test('agent graph root adapters report installed counts from compiled runtime truth', () => {
   const agent = createTestAgent();
   agent.body.inputRules = [
@@ -384,6 +438,89 @@ test('agent graph root adapters report installed counts from compiled runtime tr
   assert.equal(outputAdapter.runtimeInstalledLeafCount, 1);
   assert.equal(inputAdapter.detail, '3 canonical / 1 installed');
   assert.equal(outputAdapter.detail, '3 canonical / 1 installed');
+});
+
+test('expanded core boundary adapters project links to concrete signal children instead of the adapter group', () => {
+  const agent = createTestAgent();
+  agent.body.inputRules = [
+    {
+      id: 'vision-inputs',
+      nodeIdPattern: '^vision-([RGB])-(\\d+)$',
+      sourceTemplate: 'vision.$1.$2',
+      scale: 1,
+    },
+  ];
+  agent.body.outputRules = [
+    {
+      id: 'motor-outputs',
+      nodeIdPattern: '^output-(turn-left|move-forward|turn-right)$',
+      targetTemplate: 'action.$1',
+      decayPerSecond: 4,
+    },
+  ];
+  agent.connections = [
+    ...agent.connections,
+    {
+      id: 'body-input-to-neuron',
+      from: { scope: 'bodyInput', nodeId: 'vision-G-0' },
+      to: { scope: 'brain', nodeId: 'neuron-1' },
+      weight: 1,
+    },
+    {
+      id: 'neuron-to-body-output',
+      from: { scope: 'brain', nodeId: 'neuron-2' },
+      to: { scope: 'bodyOutput', nodeId: 'output-move-forward' },
+      weight: 1,
+    },
+  ];
+  agent.layout = {
+    version: 1,
+    nodes: {
+      ...agent.layout?.nodes,
+      'core-input-adapter': {
+        position: { x: 40, y: 180 },
+        collapsed: false,
+      },
+      'core-output-adapter': {
+        position: { x: 520, y: 180 },
+        collapsed: false,
+      },
+      'vision-R-0': { position: { x: 0, y: 0 } },
+      'vision-G-0': { position: { x: 0, y: 24 } },
+      'vision-B-0': { position: { x: 0, y: 48 } },
+      'output-turn-left': { position: { x: 320, y: 0 } },
+      'output-move-forward': { position: { x: 320, y: 24 } },
+      'output-turn-right': { position: { x: 320, y: 48 } },
+    },
+  };
+
+  const viewModel = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [agent.brain.rootContainerId],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+    projectedVisionCellCount: 1,
+    worldRegistry: WORLD_REGISTRY,
+  });
+
+  assert.equal(viewModel.nodes.some((node) => node.viewId === 'core-input-adapter::vision-G-0'), true);
+  assert.equal(viewModel.nodes.some((node) => node.viewId === 'core-output-adapter::output-move-forward'), true);
+  assert.equal(viewModel.links.some((link) => link.fromNodeId === 'core-input-adapter'), false);
+  assert.equal(viewModel.links.some((link) => link.toNodeId === 'core-output-adapter'), false);
+  assert.equal(
+    viewModel.links.some(
+      (link) =>
+        link.fromNodeId === 'core-input-adapter::vision-G-0' && link.toNodeId === 'expanded-group::neuron-1'
+    ),
+    true
+  );
+  assert.equal(
+    viewModel.links.some(
+      (link) =>
+        link.fromNodeId === 'expanded-group::neuron-2' && link.toNodeId === 'core-output-adapter::output-move-forward'
+    ),
+    true
+  );
 });
 
 test('agent graph root scope uses the canonical rootContainerId as the top-level brain node id', () => {

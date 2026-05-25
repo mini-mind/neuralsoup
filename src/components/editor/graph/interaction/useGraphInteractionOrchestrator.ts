@@ -29,6 +29,7 @@ interface OrchestratorNode extends SceneNodeGeometry {
   local: boolean;
   connectableSource: boolean;
   ungroupable: boolean;
+  contextMenuGroup: boolean;
   expanded: boolean;
   expansionParentId: string | null;
 }
@@ -239,7 +240,7 @@ export const useGraphInteractionOrchestrator = ({
       focusSurface();
       const sourceNodeIds = getNodeContextSourceNodeIds(node);
       const selectionGesture = selectedNodeIds.length > 1 && selectedNodeIds.includes(node.id);
-      const singleGroupGesture = !selectionGesture && node.ungroupable;
+      const singleGroupGesture = !selectionGesture && node.contextMenuGroup;
 
       if (!selectionGesture && !singleGroupGesture && sourceNodeIds.length > 0) {
         const sourceScenePoint = getSourceScenePoint(sourceNodeIds);
@@ -383,7 +384,7 @@ export const useGraphInteractionOrchestrator = ({
           });
         } else if (currentInteraction.contextTarget === 'group' && currentInteraction.contextNodeIds.length === 1) {
           const contextNode = getNodeById(currentInteraction.contextNodeIds[0]);
-          if (!contextNode?.ungroupable) {
+          if (!contextNode?.contextMenuGroup) {
             setInteractionState(null);
             return;
           }

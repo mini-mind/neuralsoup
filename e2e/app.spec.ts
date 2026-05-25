@@ -311,19 +311,6 @@ const getLocatorCenter = async (page: Page, selector: string) => {
 };
 
 const getVisibleLocatorCenterInCanvas = async (page: Page, selector: string) => {
-  const locator = page.locator(selector).first();
-  const viewNodeId = await locator.getAttribute('data-topology-view-node-id');
-  if (viewNodeId) {
-    const [center, canvasBox] = await Promise.all([
-      getLocatorCenter(page, selector),
-      getCanvasBox(page),
-    ]);
-    return {
-      x: Math.max(canvasBox.x + 2, Math.min(center.x, canvasBox.x + canvasBox.width - 2)),
-      y: Math.max(canvasBox.y + 2, Math.min(center.y, canvasBox.y + canvasBox.height - 2)),
-    };
-  }
-
   const [box, canvasBox] = await Promise.all([
     getLocatorBox(page, selector),
     getCanvasBox(page),
@@ -438,10 +425,23 @@ const aggregateDefaultNeuronsIntoGroup = async (page: Page) => {
 };
 
 const expandGroupInPlace = async (page: Page, groupSelector: string) => {
-  const groupCenter = await getLocatorCenter(page, groupSelector);
-  await rightClickAt(page, groupCenter);
-  await expect(page.locator(selectors.topologyContextToggleGroup)).toHaveText('展开');
-  await page.locator(selectors.topologyContextToggleGroup).click();
+  const [groupBox, canvasBox] = await Promise.all([
+    getLocatorBox(page, groupSelector),
+    getCanvasBox(page),
+  ]);
+  const targetPoint = {
+    x: Math.min(groupBox.x + groupBox.width - 8, Math.max(groupBox.x + 12, canvasBox.x + 8)),
+    y: Math.min(groupBox.y + groupBox.height - 8, Math.max(groupBox.y + 12, canvasBox.y + 8)),
+  };
+  await rightClickAt(page, targetPoint);
+  const toggle = page.locator(selectors.topologyContextToggleGroup);
+  await expect(toggle).toBeVisible();
+  const toggleText = await toggle.innerText();
+  if (toggleText.trim() === '展开') {
+    await toggle.click();
+  } else {
+    await page.keyboard.press('Escape');
+  }
   await expect(page.locator(groupSelector)).toHaveClass(/is-expanded/);
 };
 
