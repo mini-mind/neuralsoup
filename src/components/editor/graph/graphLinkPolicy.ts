@@ -4,6 +4,7 @@ export interface GraphLinkPolicyNode {
   leaf: boolean;
   proxy: boolean;
   local: boolean;
+  previewOnly?: boolean;
   direction: 'input' | 'output' | 'internal';
 }
 
@@ -16,7 +17,8 @@ export const getGraphLinkCapabilities = (
   node: GraphLinkPolicyNode,
   currentScope: 'root' | 'child'
 ): GraphLinkCapabilities => {
-  if (currentScope !== 'child' || !node.leaf) {
+  const interactiveLeaf = node.leaf && (currentScope === 'child' || node.previewOnly === true);
+  if (!interactiveLeaf) {
     return {
       canSource: false,
       canTarget: false,

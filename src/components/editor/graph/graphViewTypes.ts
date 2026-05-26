@@ -24,6 +24,7 @@ export interface GraphViewNode {
   proxy: boolean;
   movable: boolean;
   local: boolean;
+  previewOnly: boolean;
   direction: 'input' | 'output' | 'internal';
   connectableSource: boolean;
   connectableTarget: boolean;
@@ -43,11 +44,41 @@ export interface GraphViewLink {
   fromRefNodeId: string;
   toRefNodeId: string;
   weight: number;
+  weightDisplay?: string;
   count: number;
   aggregate: boolean;
   leafLinkIds: string[];
   inspectable: boolean;
   editable: boolean;
+  synapse?: {
+    resolutionStatus:
+      | 'resolved'
+      | 'missing-synapse-model-id'
+      | 'missing-synapse-model'
+      | 'missing-effective-weight'
+      | 'missing-effective-delay';
+    synapseModelId: string | null;
+    synapseModelLabel: string | null;
+    synapseKind:
+      | 'static-current'
+      | 'single-exp-conductance'
+      | 'dual-exp-conductance'
+      | 'dual-exp-stdp'
+      | 'dual-exp-stp'
+      | null;
+    defaults: Record<string, number>;
+    parameterOverrides: Record<string, number>;
+    effectiveParameters: Record<string, number>;
+    effectiveWeight: number | null;
+    effectiveDelayMs: number | null;
+    effectiveDelayMsDisplay: string;
+  } | null;
+  synapseSummary?: {
+    synapseModelIds: string[];
+    resolvedWeightCount: number;
+    unresolvedWeightCount: number;
+    resolvedWeightTotal: number;
+  } | null;
 }
 
 export interface GraphTopologyIndexes<Node> {

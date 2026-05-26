@@ -1,4 +1,4 @@
-import { resolveBodyInputVisionCellIndex, type AgentConnection, type AgentIR, type BodyInputRule } from './agent-ir';
+import { resolveBodyInputVisionCellIndex, type AgentConnection, type AgentIR, type BodyIR } from './agent-ir';
 import type { WorldRegistry } from './world-registry';
 
 const LEGACY_VISION_LAYOUT_MARKER_PATTERN = /^__body-vision-cell-(\d+)$/;
@@ -7,23 +7,12 @@ const LEGACY_VISION_SIGNAL_PATTERN = /^vision-[RGB]-(\d+)$/;
 const reconcileConnectionsForVisionCells = (
   connections: AgentConnection[],
   visionCells: number,
-  inputRules: BodyInputRule[],
-  registry: WorldRegistry
+  body: BodyIR
 ): AgentConnection[] => {
-  const referencedInputNodeIds = new Set<string>();
-  for (const connection of connections) {
-    if (connection.from.scope === 'bodyInput') {
-      referencedInputNodeIds.add(connection.from.nodeId);
-    }
-    if (connection.to.scope === 'bodyInput') {
-      referencedInputNodeIds.add(connection.to.nodeId);
-    }
-  }
-
   return connections.filter((connection) => {
     const fromCellIndex =
       connection.from.scope === 'bodyInput'
-        ? resolveBodyInputVisionCellIndex(connection.from.nodeId, inputRules, registry)
+        ? resolveBodyInputVisionCellIndex(connection.from.nodeId, body)
         : null;
     if (fromCellIndex != null && fromCellIndex >= visionCells) {
       return false;
@@ -31,7 +20,7 @@ const reconcileConnectionsForVisionCells = (
 
     const toCellIndex =
       connection.to.scope === 'bodyInput'
-        ? resolveBodyInputVisionCellIndex(connection.to.nodeId, inputRules, registry)
+        ? resolveBodyInputVisionCellIndex(connection.to.nodeId, body)
         : null;
     if (toCellIndex != null && toCellIndex >= visionCells) {
       return false;
@@ -44,11 +33,11 @@ const reconcileConnectionsForVisionCells = (
 export const reconcileAgentIRVisionCells = (
   agent: AgentIR,
   visionCells: number,
-  registry: WorldRegistry
+  _registry: WorldRegistry
 ): AgentIR =>
   ({
     ...agent,
-    connections: reconcileConnectionsForVisionCells(agent.connections, visionCells, agent.body.inputRules, registry),
+    connections: reconcileConnectionsForVisionCells(agent.connections, visionCells, agent.body),
     layout: agent.layout
       ? {
           ...agent.layout,

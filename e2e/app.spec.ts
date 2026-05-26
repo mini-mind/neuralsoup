@@ -1,102 +1,9 @@
 import { expect, test } from '@playwright/test';
 import type { Page, TestInfo } from '@playwright/test';
 import { createVisionActionSeedAgentIR } from '../src/host';
-
-const selectors = {
-  simulationCanvas: '[data-testid="simulation-canvas"]',
-  appSplitter: '[data-testid="app-splitter"]',
-  simulationPanel: '[data-testid="simulation-panel"]',
-  controlPanel: '[data-testid="control-panel"]',
-  renderError: '[data-testid="simulation-render-error"]',
-  runState: '[data-testid="simulation-run-state"]',
-  controlModeValue: '[data-testid="control-mode-value"]',
-  editorTabValue: '[data-testid="editor-tab-value"]',
-  settingsSectionValue: '[data-testid="settings-section-value"]',
-  brainLibraryButton: '[data-testid="brain-library-button"]',
-  brainLibraryModal: '[data-testid="brain-library-modal"]',
-  brainLibrarySaveName: '[data-testid="brain-library-save-name"]',
-  brainLibrarySaveCurrent: '[data-testid="brain-library-save-current"]',
-  brainLibraryList: '[data-testid="brain-library-list"]',
-  brainLibraryClose: '[data-testid="brain-library-close"]',
-  brainLibraryImportTrigger: '[data-testid="brain-library-import-trigger"]',
-  brainLibraryImportFile: '[data-testid="brain-library-import-file"]',
-  brainLibraryError: '[data-testid="brain-library-error"]',
-  brainLibraryStatusMessage: '[data-testid="brain-library-status-message"]',
-  editorTabSettings: '[data-testid="editor-tab-settings"]',
-  editorTabGraph: '[data-testid="editor-tab-graph"]',
-  startPauseButton: '[data-testid="start-pause-button"]',
-  resetButton: '[data-testid="reset-button"]',
-  settingsPanel: '[data-testid="settings-panel"]',
-  settingsSidebar: '[data-testid="settings-sidebar"]',
-  settingsNavAgentParameters: '[data-testid="settings-nav-agent-parameters"]',
-  settingsNavBodyIr: '[data-testid="settings-nav-body-ir"]',
-  settingsNavKeyboardInputs: '[data-testid="settings-nav-keyboard-inputs"]',
-  agentParamsPanel: '[data-testid="agent-params-panel"]',
-  bodyIrSettingsPanel: '[data-testid="body-ir-settings-panel"]',
-  bodyIrPreviewPanel: '[data-testid="body-ir-preview-panel"]',
-  bodyIrValidationCount: '[data-testid="body-ir-validation-count"]',
-  bodyIrInputRulePattern0: '[data-testid="body-ir-input-rule-pattern-0"]',
-  bodyIrOutputRuleTargetTemplate0: '[data-testid="body-ir-output-rule-target-template-0"]',
-  visionCellsInput: '[data-testid="vision-cells-input"]',
-  visionRangeInput: '[data-testid="vision-range-input"]',
-  visionAngleInput: '[data-testid="vision-angle-input"]',
-  visionCellsValue: '[data-testid="vision-cells-value"]',
-  visionRangeValue: '[data-testid="vision-range-value"]',
-  visionAngleValue: '[data-testid="vision-angle-value"]',
-  paramsApply: '[data-testid="agent-params-apply"]',
-  paramsResetDefaults: '[data-testid="agent-params-reset-defaults"]',
-  keyboardInputPanel: '[data-testid="keyboard-input-panel"]',
-  topologyEditor: '[data-testid="topology-editor"]',
-  topologyViewport: '[data-testid="topology-viewport"]',
-  topologyCanvas: '[data-testid="topology-canvas"]',
-  topologyScene: '[data-testid="topology-scene"]',
-  topologyNodeCount: '[data-testid="topology-node-count"]',
-  topologySelectedCount: '[data-testid="topology-selected-count"]',
-  topologySelectedLink: '[data-testid="topology-selected-link"]',
-  topologyNodeCenters: '[data-testid="topology-node-centers"]',
-  topologyCanvasOffset: '[data-testid="topology-canvas-offset"]',
-  topologyCanvasScale: '[data-testid="topology-canvas-scale"]',
-  topologyContextMenu: '[data-testid="topology-context-menu"]',
-  topologyContextNewNeuron: '[data-testid="topology-context-new-neuron"]',
-  topologyContextNewGroup: '[data-testid="topology-context-new-group"]',
-  topologyContextAggregate: '[data-testid="topology-context-aggregate"]',
-  topologyContextToggleGroup: '[data-testid="topology-context-toggle-group"]',
-  topologyContextUngroup: '[data-testid="topology-context-ungroup"]',
-  topologyDetailModal: '[data-testid="topology-detail-modal"]',
-  topologyDetailModalOverlay: '[data-testid="topology-detail-modal-overlay"]',
-  topologyDetailClose: '[data-testid="topology-detail-close"]',
-  topologyBreadcrumbRoot: '[data-testid="topology-breadcrumb-root"]',
-  topologyPendingLink: '[data-testid="topology-pending-link"]',
-  topologyCanonicalInputCount: '[data-testid="topology-canonical-input-count"]',
-  topologyCanonicalOutputCount: '[data-testid="topology-canonical-output-count"]',
-  topologyCanonicalNeuronCount: '[data-testid="topology-canonical-neuron-count"]',
-  topologyCanonicalConnectionCount: '[data-testid="topology-canonical-connection-count"]',
-  topologyDraftValidationCount: '[data-testid="topology-draft-validation-count"]',
-  topologyDraftState: '[data-testid="topology-draft-state"]',
-  topologyDraftMessage: '[data-testid="topology-draft-message"]',
-  topologyRuntimeState: '[data-testid="topology-runtime-state"]',
-  topologyRuntimeValidationCount: '[data-testid="topology-runtime-validation-count"]',
-  topologyRuntimeInputCount: '[data-testid="topology-runtime-input-count"]',
-  topologyRuntimeOutputCount: '[data-testid="topology-runtime-output-count"]',
-  topologyRuntimeNeuronCount: '[data-testid="topology-runtime-neuron-count"]',
-  topologyRuntimeConnectionCount: '[data-testid="topology-runtime-connection-count"]',
-  graphInstalledAgentId: '[data-testid="graph-ir-installed-agent-id"]',
-  topologyCanonicalValidationCount: '[data-testid="topology-canonical-validation-count"]',
-  neuronLabelInput: '[data-testid="neuron-label-input"]',
-  neuronInitialStateVInput: '[data-testid="neuron-initial-state-v-input"]',
-  neuronInitialStateUInput: '[data-testid="neuron-initial-state-u-input"]',
-  connectionWeightInput: '[data-testid="connection-weight-input"]',
-  inputAdapterNode: '[data-testid="topology-node-input-adapter"]',
-  coreGroupNode: '[data-topology-root-container="true"]',
-  outputAdapterNode: '[data-testid="topology-node-output-adapter"]',
-  coreInputAdapterNode: '[data-testid="topology-node-core-input-adapter"]',
-  coreOutputAdapterNode: '[data-testid="topology-node-core-output-adapter"]',
-  aggregateLinkDetail: '[data-testid="topology-aggregate-link-detail"]',
-  aggregateLinkCount: '[data-testid="topology-aggregate-link-count"]',
-  aggregateLinkReadonly: '[data-testid="topology-aggregate-link-readonly"]',
-  nodeNeuronOne: '[data-testid="topology-node-neuron-1"]',
-  nodeNeuronTwo: '[data-testid="topology-node-neuron-2"]'
-} as const;
+import { dragOnCanvas, getLocatorBox, getLocatorCenter, getNodeCenterFromSummary, getNodeViewPosition, getVisibleLocatorCenterInCanvas, rightClickAt, rightDragBetweenNodes } from './support/canvas';
+import { getActiveAgentId, getActiveBrainId, getBrainLibrarySelectButton, getGraphPathIds, getRenderOutcome, getStoredBrainByName, importAgentDocument } from './support/simulation';
+import { BRAIN_LIBRARY_STORAGE_KEY, DEFAULT_NEURON_MODEL_ID, DEFAULT_SYNAPSE_MODEL_ID, selectors } from './support/selectors';
 
 type E2EStoredBrain = {
   agent: {
@@ -107,7 +14,6 @@ type E2EStoredBrain = {
   packageVersion?: never;
 };
 
-const BRAIN_LIBRARY_STORAGE_KEY = 'neuralsoup.brain-library.v1';
 
 type StartupDiagnostics = {
   consoleErrors: string[];
@@ -174,28 +80,6 @@ const disableWebGLContexts = async (page: Page) => {
       return originalGetContext.call(this, contextType, ...(args as []));
     };
   });
-};
-
-const waitForRenderOutcome = async (page: Page) =>
-  expect
-    .poll(
-      async () => {
-        if (await page.locator(selectors.renderError).isVisible().catch(() => false)) {
-          return 'render-error';
-        }
-
-        return await page.locator(selectors.simulationCanvas).getAttribute('data-engine-ready');
-      },
-      {
-        timeout: 10_000,
-        message: 'expected simulation renderer to become ready or show an explicit render error'
-      }
-    )
-    .toMatch(/^(true|render-error)$/);
-
-const getRenderOutcome = async (page: Page) => {
-  await waitForRenderOutcome(page);
-  return (await page.locator(selectors.renderError).isVisible().catch(() => false)) ? 'render-error' : 'ready';
 };
 
 const expectDegradedRenderErrorUI = async (page: Page) => {
@@ -270,15 +154,6 @@ const getCanvasBox = async (page: Page) => {
   return box;
 };
 
-const getLocatorBox = async (page: Page, selector: string) => {
-  const box = await page.locator(selector).boundingBox();
-  if (!box) {
-    throw new Error(`Bounding box not available for selector: ${selector}`);
-  }
-
-  return box;
-};
-
 const getSceneClientPoint = async (page: Page, scenePoint: { x: number; y: number }) => {
   const [sceneBox, scaleText] = await Promise.all([
     getLocatorBox(page, selectors.topologyScene),
@@ -292,44 +167,6 @@ const getSceneClientPoint = async (page: Page, scenePoint: { x: number; y: numbe
   return {
     x: sceneBox.x + scenePoint.x * scale,
     y: sceneBox.y + scenePoint.y * scale,
-  };
-};
-
-const getLocatorCenter = async (page: Page, selector: string) => {
-  const locator = page.locator(selector).first();
-  const viewNodeId = await locator.getAttribute('data-topology-view-node-id');
-  if (viewNodeId) {
-    const sceneCenter = await getNodeCenterFromSummary(page, viewNodeId);
-    return getSceneClientPoint(page, sceneCenter);
-  }
-
-  const box = await getLocatorBox(page, selector);
-  return {
-    x: box.x + box.width / 2,
-    y: box.y + box.height / 2
-  };
-};
-
-const getVisibleLocatorCenterInCanvas = async (page: Page, selector: string) => {
-  const [box, canvasBox] = await Promise.all([
-    getLocatorBox(page, selector),
-    getCanvasBox(page),
-  ]);
-  const left = Math.max(box.x, canvasBox.x);
-  const top = Math.max(box.y, canvasBox.y);
-  const right = Math.min(box.x + box.width, canvasBox.x + canvasBox.width);
-  const bottom = Math.min(box.y + box.height, canvasBox.y + canvasBox.height);
-
-  if (right <= left || bottom <= top) {
-    return {
-      x: box.x + box.width / 2,
-      y: box.y + box.height / 2
-    };
-  }
-
-  return {
-    x: left + (right - left) / 2,
-    y: top + (bottom - top) / 2
   };
 };
 
@@ -370,9 +207,6 @@ const getAggregateLinkLocator = (page: Page) =>
     .locator('g.topology-link.is-aggregate[data-topology-link-from-node-id][data-topology-link-to-node-id]')
     .first();
 
-const getBrainLibrarySelectButton = (page: Page, brainId: string) =>
-  page.locator(`[data-testid="brain-library-select-${brainId}"]`);
-
 const doubleClickNode = async (page: Page, selector: string) => {
   const center = await getVisibleLocatorCenterInCanvas(page, selector);
   await page.mouse.dblclick(center.x, center.y);
@@ -383,32 +217,10 @@ const doubleClickAtCenter = async (page: Page, selector: string) => {
   await page.mouse.dblclick(center.x, center.y);
 };
 
-const closeTopologyDetailModal = async (page: Page) => {
-  await page.keyboard.press('Escape');
-  await expect(page.locator(selectors.topologyDetailModal)).toHaveCount(0);
-};
-
-const rightDragBetweenNodes = async (page: Page, fromSelector: string, toSelector: string) => {
-  await expect(page.locator(fromSelector)).toBeVisible();
-  await expect(page.locator(toSelector)).toBeVisible();
-  const from = await getLocatorCenter(page, fromSelector);
-  const to = await getLocatorCenter(page, toSelector);
-  await page.mouse.move(from.x, from.y);
-  await page.mouse.down({ button: 'right' });
-  await page.mouse.move(to.x, to.y, { steps: 12 });
-  await page.mouse.up({ button: 'right' });
-};
-
 const beginRightLinkFromNode = async (page: Page, selector: string) => {
   const from = await getLocatorCenter(page, selector);
   await page.mouse.move(from.x, from.y);
   await page.mouse.down({ button: 'right' });
-};
-
-const rightClickAt = async (page: Page, point: { x: number; y: number }) => {
-  await page.mouse.move(point.x, point.y);
-  await page.mouse.down({ button: 'right' });
-  await page.mouse.up({ button: 'right' });
 };
 
 const aggregateDefaultNeuronsIntoGroup = async (page: Page) => {
@@ -468,66 +280,7 @@ const zoomCanvasAtCenter = async (page: Page, deltaY: number) => {
   await page.mouse.wheel(0, deltaY);
 };
 
-const dragOnCanvas = async (
-  page: Page,
-  from: { x: number; y: number },
-  to: { x: number; y: number },
-  options?: { button?: 'left' | 'right' }
-) => {
-  const button = options?.button ?? 'left';
-  await page.mouse.move(from.x, from.y);
-  await page.mouse.down({ button });
-  await page.mouse.move(to.x, to.y, { steps: 12 });
-  await page.mouse.up({ button });
-};
-
-const getNodeCenterFromSummary = async (page: Page, nodeId: string) => {
-  const summary = await page.locator(selectors.topologyNodeCenters).innerText();
-  const entry = summary
-    .split('|')
-    .map((item) => item.trim())
-    .find((item) => item.startsWith(`${nodeId}:`));
-
-  if (!entry) {
-    throw new Error(`Node center summary missing node ${nodeId}`);
-  }
-
-  const [, coordinates] = entry.split(':');
-  const [x, y] = coordinates.split(',').map((value) => Number.parseInt(value, 10));
-  return { x, y };
-};
-
-const getNodeCenterFromSummaryMatching = async (page: Page, nodeId: string) => {
-  const summary = await page.locator(selectors.topologyNodeCenters).innerText();
-  const entries = summary.split('|').map((item) => item.trim());
-  const entry =
-    entries.find((item) => item.startsWith(`${nodeId}:`)) ??
-    entries.find((item) => item.split(':', 1)[0]?.endsWith(nodeId));
-
-  if (!entry) {
-    throw new Error(`Node center summary missing node ${nodeId}`);
-  }
-
-  const [, coordinates] = entry.split(':');
-  const [x, y] = coordinates.split(',').map((value) => Number.parseInt(value, 10));
-  return { x, y };
-};
-
-const getNodeViewPositionFromSummary = async (page: Page, nodeId: string) => {
-  const summary = await page.locator('[data-testid="topology-node-view-positions"]').innerText();
-  const entry = summary
-    .split('|')
-    .map((item) => item.trim())
-    .find((item) => item.startsWith(`${nodeId}:`));
-
-  if (!entry) {
-    throw new Error(`Node view position summary missing node ${nodeId}`);
-  }
-
-  const [, coordinates] = entry.split(':');
-  const [x, y] = coordinates.split(',').map((value) => Number.parseInt(value, 10));
-  return { x, y };
-};
+const getNodeViewPositionFromSummary = (page: Page, nodeId: string) => getNodeViewPosition(page, nodeId);
 
 const getNodeViewId = async (page: Page, selector: string) => {
   const viewId = await page.locator(selector).getAttribute('data-topology-view-node-id');
@@ -550,37 +303,15 @@ const injectInvalidStructureDraft = async (page: Page) => {
   });
 };
 
-const importAgentDocument = async (page: Page, agent: unknown, name = 'imported-agent.json') => {
-  await page.setInputFiles(selectors.brainLibraryImportFile, {
-    name,
-    mimeType: 'application/json',
-    buffer: Buffer.from(
-      JSON.stringify({
-        version: 1,
-        kind: 'neuralsoup-agent',
-        agent,
-      })
-    ),
-  });
-};
-
 const injectValidDraftOnly = async (page: Page) => {
   await page.evaluate(() => {
     window.__NEURALSOUP_TEST_API__?.injectValidDraftOnly();
   });
 };
 
-const getActiveAgentId = async (page: Page) =>
-  page.evaluate(() => window.__NEURALSOUP_TEST_API__?.getActiveAgentId() ?? null);
-
-const getActiveBrainId = async (page: Page) =>
-  page.evaluate(() => window.__NEURALSOUP_TEST_API__?.getActiveBrainId() ?? null);
-
 const getDraftAgentId = async (page: Page) =>
   page.evaluate(() => window.__NEURALSOUP_TEST_API__?.getDraftAgentId() ?? null);
 
-const getGraphPathIds = async (page: Page) =>
-  page.evaluate(() => window.__NEURALSOUP_TEST_API__?.getGraphPathIds() ?? []);
 
 const dispatchCanvasMouseSequence = async (
   page: Page,
@@ -616,21 +347,6 @@ const getDraftDiagnostics = async (page: Page) => ({
   validationCount: await page.locator(selectors.topologyDraftValidationCount).innerText(),
   message: await page.locator(selectors.topologyDraftMessage).innerText()
 });
-
-const getStoredBrains = async (page: Page): Promise<E2EStoredBrain[]> =>
-  page.evaluate((storageKey) => {
-    const rawValue = window.localStorage.getItem(storageKey);
-    if (!rawValue) {
-      return [];
-    }
-
-    return ((JSON.parse(rawValue) as { brains?: E2EStoredBrain[] }).brains ?? []);
-  }, BRAIN_LIBRARY_STORAGE_KEY);
-
-const getStoredBrainByName = async (page: Page, name: string): Promise<E2EStoredBrain | null> => {
-  const storedBrains = await getStoredBrains(page);
-  return storedBrains.find((brain) => brain.agent?.metadata?.name === name) ?? null;
-};
 
 const getNumericLocatorText = async (page: Page, selector: string) =>
   Number.parseInt(await page.locator(selector).innerText(), 10);
@@ -869,7 +585,7 @@ test('settings page persists applied agent parameter values and supports reset d
   await expect(page.locator(selectors.visionAngleValue)).toHaveText('120');
 });
 
-test('body ir settings shows preview panel, surfaces validation after rule edits, and clears it after repair', async ({ page }, testInfo) => {
+test('body ir settings shows preview panel, surfaces validation after endpoint edits, and clears it after repair', async ({ page }, testInfo) => {
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
   }
@@ -893,18 +609,18 @@ test('body ir settings shows preview panel, surfaces validation after rule edits
   await expect(page.locator(selectors.topologyCanonicalOutputCount)).toHaveText('3');
   await expect(page.locator(selectors.topologyRuntimeOutputCount)).toHaveText('3');
 
-  await expect(page.locator(selectors.bodyIrInputRulePattern0)).toHaveValue('^vision-([RGB])-(\\d+)$');
-  await page.locator(selectors.bodyIrOutputRuleTargetTemplate0).fill('unsupported.$1');
+  await expect(page.locator(selectors.bodyIrInputEndpointSource0)).toHaveValue('vision.R.0');
+  await page.locator(selectors.bodyIrOutputEndpointTarget0).fill('unsupported.$1');
 
   await expect(page.locator(selectors.bodyIrValidationCount)).not.toHaveText('0');
-  await expect(page.locator('[data-testid^="body-ir-output-rule-message-0-"]').first()).toBeVisible();
-  await expect(page.locator('[data-testid^="body-ir-output-rule-message-0-"]').first()).toContainText('unsupported target');
+  await expect(page.locator('[data-testid^="body-ir-output-endpoint-message-0-"]').first()).toBeVisible();
+  await expect(page.locator('[data-testid^="body-ir-output-endpoint-message-0-"]').first()).toContainText('unsupported target');
 
-  await page.locator(selectors.bodyIrOutputRuleTargetTemplate0).fill('action.$1');
+  await page.locator(selectors.bodyIrOutputEndpointTarget0).fill('action.$1');
 
   await expect(page.locator(selectors.bodyIrValidationCount)).toHaveText('0');
-  await expect(page.locator('[data-testid^="body-ir-output-rule-message-0-"]')).toHaveCount(0);
-  await expect(page.locator(selectors.bodyIrOutputRuleTargetTemplate0)).toHaveValue('action.$1');
+  await expect(page.locator('[data-testid^="body-ir-output-endpoint-message-0-"]')).toHaveCount(0);
+  await expect(page.locator(selectors.bodyIrOutputEndpointTarget0)).toHaveValue('action.$1');
 });
 
 test('graph view marks canonical-only body endpoints while settings show canonical and compiled summaries separately', async ({ page }, testInfo) => {
@@ -955,9 +671,9 @@ test('body ir edits stay draft-only until apply, then affect runtime/install sta
   const runtimeInputCountBefore = await page.locator(selectors.topologyRuntimeInputCount).innerText();
   const runtimeStateBefore = await page.locator(selectors.topologyRuntimeState).innerText();
 
-  await page.locator(selectors.bodyIrOutputRuleTargetTemplate0).fill('thruster.$1');
+  await page.locator(selectors.bodyIrOutputEndpointTarget0).fill('thruster.$1');
   await expect(page.locator(selectors.bodyIrValidationCount)).not.toHaveText('0');
-  await expect(page.locator('[data-testid^="body-ir-output-rule-message-0-"]').first()).toBeVisible();
+  await expect(page.locator('[data-testid^="body-ir-output-endpoint-message-0-"]').first()).toBeVisible();
   await expect(page.locator('[data-testid="body-ir-apply"]')).toBeEnabled();
   await expect(page.locator('[data-testid="body-ir-reset"]')).toBeEnabled();
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText(runtimeStateBefore);
@@ -965,11 +681,11 @@ test('body ir edits stay draft-only until apply, then affect runtime/install sta
 
   await page.locator('[data-testid="body-ir-reset"]').click();
   await expect(page.locator(selectors.bodyIrValidationCount)).toHaveText('0');
-  await expect(page.locator(selectors.bodyIrOutputRuleTargetTemplate0)).toHaveValue('action.$1');
+  await expect(page.locator(selectors.bodyIrOutputEndpointTarget0)).toHaveValue('action.$1');
   await expect(page.locator('[data-testid="body-ir-apply"]')).toBeDisabled();
   await expect(page.locator('[data-testid="body-ir-reset"]')).toBeDisabled();
 
-  await page.locator(selectors.bodyIrOutputRuleTargetTemplate0).fill('thruster.$1');
+  await page.locator(selectors.bodyIrOutputEndpointTarget0).fill('thruster.$1');
   await expect(page.locator('[data-testid="body-ir-apply"]')).toBeEnabled();
 
   await page.locator('[data-testid="body-ir-apply"]').click();
@@ -987,7 +703,7 @@ test('brain library refuses to save an invalid current brain instead of persisti
   await page.locator(selectors.settingsNavBodyIr).click();
   await expect(page.locator(selectors.bodyIrSettingsPanel)).toBeVisible();
 
-  await page.locator(selectors.bodyIrOutputRuleTargetTemplate0).fill('thruster.$1');
+  await page.locator(selectors.bodyIrOutputEndpointTarget0).fill('thruster.$1');
   await expect(page.locator(selectors.bodyIrValidationCount)).not.toHaveText('0');
   await page.locator('[data-testid="body-ir-apply"]').click();
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('invalid');
@@ -1147,7 +863,7 @@ test('brain library manages saved items and reports import errors', async ({ pag
 
     return Buffer.concat(chunks).toString('utf8');
   })) as { version?: number; kind?: string; metadata?: { name?: string }; agent?: { metadata?: { name?: string } } };
-  expect(downloadedBrain.version).toBe(1);
+  expect(downloadedBrain.version).toBe(2);
   expect(downloadedBrain.kind).toBe('neuralsoup-agent');
   expect(downloadedBrain.metadata).toBeUndefined();
   expect(downloadedBrain.agent?.metadata?.name).toBe('Renamed Brain');
@@ -1174,6 +890,19 @@ test('brain library manages saved items and reports import errors', async ({ pag
     buffer: Buffer.from(JSON.stringify(downloadedBrain)),
   });
   await expect(page.locator(selectors.brainLibraryList)).toContainText('Renamed Brain');
+
+  await page.setInputFiles(selectors.brainLibraryImportFile, {
+    name: 'old-envelope.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(
+      JSON.stringify({
+        version: 1,
+        kind: 'neuralsoup-agent',
+        agent: downloadedBrain.agent,
+      })
+    ),
+  });
+  await expect(page.locator(selectors.brainLibraryError)).toContainText('当前支持的 Brain JSON 格式');
 
   await page.setInputFiles(selectors.brainLibraryImportFile, {
     name: 'broken.json',
@@ -1514,7 +1243,7 @@ test('brain library confirms before replacing a saved brain with draft-only chan
     mimeType: 'application/json',
     buffer: Buffer.from(
       JSON.stringify({
-        version: 1,
+        version: 2,
         kind: 'neuralsoup-agent',
         agent: savedBrain?.agent,
       })
@@ -1585,7 +1314,7 @@ test('body-only draft changes trigger replacement confirmation and are included 
 
   await page.locator(selectors.editorTabSettings).click();
   await page.locator(selectors.settingsNavBodyIr).click();
-  await page.locator('[data-testid="body-ir-output-rule-decay-0"]').fill('9');
+  await page.locator(selectors.bodyIrOutputEndpointDecay0).fill('9');
   await expect(page.locator(selectors.bodyIrValidationCount)).toHaveText('0');
 
   await page.locator(selectors.brainLibraryButton).click();
@@ -1599,11 +1328,11 @@ test('body-only draft changes trigger replacement confirmation and are included 
   });
   await getBrainLibrarySelectButton(page, targetBrain!.agent.metadata!.id!).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
-  await expect(page.locator('[data-testid="body-ir-output-rule-decay-0"]')).toHaveValue('9');
+  await expect(page.locator(selectors.bodyIrOutputEndpointDecay0)).toHaveValue('9');
 
   await saveCurrentBrainToLibrary(page, 'Body Draft Saved');
   const savedBodyDraftBrain = await getStoredBrainByName(page, 'Body Draft Saved');
-  expect(savedBodyDraftBrain?.agent.body?.outputRules?.[0]?.decayPerSecond).toBe(9);
+  expect(savedBodyDraftBrain?.agent.body?.outputEndpoints?.[0]?.decayPerSecond).toBe(9);
 });
 
 test('body ir projected vision coverage is read-only and follows applied host agent parameters', async ({ page }, testInfo) => {
@@ -1636,7 +1365,7 @@ test('applying agent parameters preserves unapplied body draft instead of silent
 
   await page.locator(selectors.editorTabSettings).click();
   await page.locator(selectors.settingsNavBodyIr).click();
-  await page.locator(selectors.bodyIrOutputRuleTargetTemplate0).fill('thruster.$1');
+  await page.locator(selectors.bodyIrOutputEndpointTarget0).fill('thruster.$1');
   await expect(page.locator(selectors.bodyIrValidationCount)).not.toHaveText('0');
   await expect(page.locator('[data-testid="body-ir-apply"]')).toBeEnabled();
 
@@ -1646,7 +1375,7 @@ test('applying agent parameters preserves unapplied body draft instead of silent
 
   await expect(page.locator(selectors.visionCellsValue)).toHaveText('24');
   await page.locator(selectors.settingsNavBodyIr).click();
-  await expect(page.locator(selectors.bodyIrOutputRuleTargetTemplate0)).toHaveValue('thruster.$1');
+  await expect(page.locator(selectors.bodyIrOutputEndpointTarget0)).toHaveValue('thruster.$1');
   await expect(page.locator(selectors.bodyIrValidationCount)).not.toHaveText('0');
   await expect(page.locator(selectors.topologyRuntimeState)).toHaveText('applied');
 });
@@ -1854,7 +1583,7 @@ test('graph view preserves active highlight when dragging a node after runtime a
   await expect(activeNode).toHaveClass(/is-active/);
 });
 
-test('graph view edits leaf params and leaf link weights through Graph IR inspectors', async ({ page }, testInfo) => {
+test('graph view edits leaf params and leaf link weights through topology inspectors', async ({ page }, testInfo) => {
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
   }
@@ -1867,18 +1596,21 @@ test('graph view edits leaf params and leaf link weights through Graph IR inspec
   await doubleClickNode(page, selectors.nodeNeuronOne);
   await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
   await page.locator(selectors.neuronLabelInput).fill('已编辑神经元');
+  await page.locator(selectors.neuronModelIdInput).fill(DEFAULT_NEURON_MODEL_ID);
   await page.locator(selectors.neuronInitialStateVInput).fill('-62');
   await page.locator(selectors.neuronInitialStateUInput).fill('-11');
   await closeTopologyDetailModal(page);
   await doubleClickNode(page, selectors.nodeNeuronOne);
   await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
   await expect(page.locator(selectors.neuronLabelInput)).toHaveValue('已编辑神经元');
+  await expect(page.locator(selectors.neuronModelIdInput)).toHaveValue(DEFAULT_NEURON_MODEL_ID);
   await expect(page.locator(selectors.neuronInitialStateVInput)).toHaveValue('-62');
   await expect(page.locator(selectors.neuronInitialStateUInput)).toHaveValue('-11');
   await page.locator(selectors.neuronInitialStateUInput).fill('');
   await closeTopologyDetailModal(page);
   await doubleClickNode(page, selectors.nodeNeuronOne);
   await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
+  await expect(page.locator(selectors.neuronModelIdInput)).toHaveValue(DEFAULT_NEURON_MODEL_ID);
   await expect(page.locator(selectors.neuronInitialStateVInput)).toHaveValue('-62');
   await expect(page.locator(selectors.neuronInitialStateUInput)).toHaveValue('');
   await closeTopologyDetailModal(page);
@@ -1893,8 +1625,18 @@ test('graph view edits leaf params and leaf link weights through Graph IR inspec
   );
   await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
   await page.locator(selectors.connectionWeightInput).fill('1.25');
+  await page.locator(selectors.connectionSynapseModelIdInput).fill(DEFAULT_SYNAPSE_MODEL_ID);
+  await page.locator(selectors.connectionDelayMsInput).fill('7');
   await closeTopologyDetailModal(page);
   await expect(getLeafLinkLocator(page, 'neuron-1', 'neuron-2')).toContainText('1.25');
+  await doubleClickAtCenter(
+    page,
+    `[data-topology-link-from-node-id="neuron-1"][data-topology-link-to-node-id="neuron-2"]`
+  );
+  await expect(page.locator(selectors.topologyDetailModal)).toBeVisible();
+  await expect(page.locator(selectors.connectionSynapseModelIdInput)).toHaveValue(DEFAULT_SYNAPSE_MODEL_ID);
+  await expect(page.locator(selectors.connectionDelayMsInput)).toHaveValue('7');
+  await closeTopologyDetailModal(page);
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(runtimeConnectionCount));
 });
 
@@ -2268,7 +2010,7 @@ test('graph view multi-source right-drag released on a source node does not crea
   await expect(page.locator(selectors.topologyRuntimeConnectionCount)).toHaveText(String(beforeConnectionCount));
 });
 
-test('graph view deduplicates imported legacy-style links when reconnecting the same semantic edge', async ({ page }, testInfo) => {
+test('graph view deduplicates imported portless links when reconnecting the same semantic edge', async ({ page }, testInfo) => {
   if (!(await expectInteractiveRenderReady(page, testInfo))) {
     return;
   }
@@ -2295,7 +2037,7 @@ test('graph view deduplicates imported legacy-style links when reconnecting the 
   await page.locator(selectors.brainLibraryButton).click();
   await expect(page.locator(selectors.brainLibraryModal)).toBeVisible();
   page.once('dialog', (dialog) => dialog.accept());
-  await importAgentDocument(page, importedAgent, 'legacy-portless-dedup.json');
+  await importAgentDocument(page, importedAgent, 'portless-dedup.json');
   await page.locator(selectors.brainLibraryClose).click();
   await expect(page.locator(selectors.brainLibraryModal)).toHaveCount(0);
 
@@ -2668,6 +2410,170 @@ test('graph view keeps expanded group child links editable and child deletion co
   await expect(page.locator('[data-topology-link-from-node-id*="neuron-1"]')).toHaveCount(0);
   await expect(page.locator('[data-topology-link-to-node-id*="neuron-1"]')).toHaveCount(0);
   await expect(page.locator(selectors.nodeNeuronTwo)).toBeVisible();
+});
+
+test('graph view keeps expanded-group child drag ownership stable', async ({ page }, testInfo) => {
+  test.slow();
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  const groupSelector = await aggregateDefaultNeuronsIntoGroup(page);
+  await expandGroupInPlace(page, groupSelector);
+  const expandedChildOneSelector = `${selectors.nodeNeuronOne}.is-expanded-child`;
+  await expect(page.locator(expandedChildOneSelector)).toBeVisible();
+
+  const getScenePositionFromSelector = async (selector: string) =>
+    page.evaluate((nodeSelector) => {
+      const node = document.querySelector<HTMLElement>(nodeSelector);
+      if (!node) {
+        return null;
+      }
+      return {
+        x: Number.parseFloat(node.style.left || '0'),
+        y: Number.parseFloat(node.style.top || '0'),
+      };
+    }, selector);
+  const waitForScenePosition = async (selector: string) => {
+    await expect.poll(async () => getScenePositionFromSelector(selector)).not.toBeNull();
+    return (await getScenePositionFromSelector(selector))!;
+  };
+  const getClientCenterFromSelector = async (selector: string) =>
+    page.evaluate((nodeSelector) => {
+      const node = document.querySelector<HTMLElement>(nodeSelector);
+      if (!node) {
+        return null;
+      }
+      const rect = node.getBoundingClientRect();
+      return {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      };
+    }, selector);
+  const waitForClientCenter = async (selector: string) => {
+    await expect.poll(async () => getClientCenterFromSelector(selector)).not.toBeNull();
+    return (await getClientCenterFromSelector(selector))!;
+  };
+
+  const beforeGroupPos = await waitForScenePosition(groupSelector);
+  const beforeChildPos = await waitForScenePosition(expandedChildOneSelector);
+  const groupCenter = await waitForClientCenter(groupSelector);
+  await dragOnCanvas(page, groupCenter, {
+    x: groupCenter.x + 84,
+    y: groupCenter.y + 38,
+  });
+
+  await page.waitForTimeout(40);
+  const afterGroupMoveGroupPos = await waitForScenePosition(groupSelector);
+  const afterGroupMoveChildPos = await waitForScenePosition(expandedChildOneSelector);
+  const groupDx = afterGroupMoveGroupPos.x - beforeGroupPos.x;
+  const groupDy = afterGroupMoveGroupPos.y - beforeGroupPos.y;
+  const childDxFromGroupMove = afterGroupMoveChildPos.x - beforeChildPos.x;
+  const childDyFromGroupMove = afterGroupMoveChildPos.y - beforeChildPos.y;
+
+  expect(Math.abs(groupDx)).toBeGreaterThan(10);
+  expect(Math.abs(groupDy)).toBeGreaterThan(5);
+  expect(Math.abs(childDxFromGroupMove - groupDx)).toBeLessThanOrEqual(1);
+  expect(Math.abs(childDyFromGroupMove - groupDy)).toBeLessThanOrEqual(1);
+
+  const childCenter = await waitForClientCenter(expandedChildOneSelector);
+  await dragOnCanvas(page, childCenter, {
+    x: childCenter.x + 34,
+    y: childCenter.y + 22,
+  });
+
+  await page.waitForTimeout(40);
+  const afterChildMoveGroupPos = await waitForScenePosition(groupSelector);
+  const afterChildMoveChildPos = await waitForScenePosition(expandedChildOneSelector);
+  const childDeltaAfterChildMove = {
+    x: Math.abs(afterChildMoveChildPos.x - afterGroupMoveChildPos.x),
+    y: Math.abs(afterChildMoveChildPos.y - afterGroupMoveChildPos.y),
+  };
+  expect(Math.abs(afterChildMoveGroupPos.x - afterGroupMoveGroupPos.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(afterChildMoveGroupPos.y - afterGroupMoveGroupPos.y)).toBeLessThanOrEqual(1);
+  expect(
+    childDeltaAfterChildMove.x > 8 ||
+      childDeltaAfterChildMove.y > 4
+  ).toBe(true);
+});
+
+test('graph view keeps expanded-group child relative geometry stable across viewport resize', async ({ page }, testInfo) => {
+  test.slow();
+  if (!(await expectInteractiveRenderReady(page, testInfo))) {
+    return;
+  }
+
+  await page.locator(selectors.editorTabGraph).click();
+  await doubleClickNode(page, selectors.coreGroupNode);
+  const groupSelector = await aggregateDefaultNeuronsIntoGroup(page);
+  await expandGroupInPlace(page, groupSelector);
+  const expandedChildOneSelector = `${selectors.nodeNeuronOne}.is-expanded-child`;
+  await expect(page.locator(expandedChildOneSelector)).toBeVisible();
+
+  const getScenePositionFromSelector = async (selector: string) =>
+    page.evaluate((nodeSelector) => {
+      const node = document.querySelector<HTMLElement>(nodeSelector);
+      if (!node) {
+        return null;
+      }
+      return {
+        x: Number.parseFloat(node.style.left || '0'),
+        y: Number.parseFloat(node.style.top || '0'),
+      };
+    }, selector);
+  const waitForScenePosition = async (selector: string) => {
+    await expect.poll(async () => getScenePositionFromSelector(selector)).not.toBeNull();
+    return (await getScenePositionFromSelector(selector))!;
+  };
+  const getClientCenterFromSelector = async (selector: string) =>
+    page.evaluate((nodeSelector) => {
+      const node = document.querySelector<HTMLElement>(nodeSelector);
+      if (!node) {
+        return null;
+      }
+      const rect = node.getBoundingClientRect();
+      return {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      };
+    }, selector);
+  const waitForClientCenter = async (selector: string) => {
+    await expect.poll(async () => getClientCenterFromSelector(selector)).not.toBeNull();
+    return (await getClientCenterFromSelector(selector))!;
+  };
+
+  const groupCenter = await waitForClientCenter(groupSelector);
+  await dragOnCanvas(page, groupCenter, {
+    x: groupCenter.x + 84,
+    y: groupCenter.y + 38,
+  });
+
+  const childCenter = await waitForClientCenter(expandedChildOneSelector);
+  await dragOnCanvas(page, childCenter, {
+    x: childCenter.x + 34,
+    y: childCenter.y + 22,
+  });
+
+  await page.waitForTimeout(40);
+  const afterMoveGroupPos = await waitForScenePosition(groupSelector);
+  const afterMoveChildPos = await waitForScenePosition(expandedChildOneSelector);
+  const childRelativeToGroupAfterChildMove = {
+    x: afterMoveChildPos.x - afterMoveGroupPos.x,
+    y: afterMoveChildPos.y - afterMoveGroupPos.y,
+  };
+
+  await page.setViewportSize({ width: 420, height: 900 });
+  await page.waitForTimeout(40);
+  const afterResizeGroupPos = await waitForScenePosition(groupSelector);
+  const afterResizeChildPos = await waitForScenePosition(expandedChildOneSelector);
+  const childRelativeAfterResize = {
+    x: afterResizeChildPos.x - afterResizeGroupPos.x,
+    y: afterResizeChildPos.y - afterResizeGroupPos.y,
+  };
+  expect(Math.abs(childRelativeAfterResize.x - childRelativeToGroupAfterChildMove.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(childRelativeAfterResize.y - childRelativeToGroupAfterChildMove.y)).toBeLessThanOrEqual(1);
 });
 
 test('graph view keeps multi-selection when dragging an already selected node', async ({ page }, testInfo) => {

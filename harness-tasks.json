@@ -1658,164 +1658,1348 @@
       "completed_at": "2026-05-25T03:24:42Z"
     },
     {
-      "attempts": 0,
+      "status": "completed",
+      "attempts": 1,
       "max_attempts": 3,
-      "started_at_commit": null,
+      "started_at_commit": "08e418b",
       "error_log": [],
-      "checkpoints": [],
-      "completed_at": null,
-      "id": "task-048",
-      "title": "AgentIR v2 schema cutover: introduce NeuronModelIR, SynapseModelIR, ConnectionIR and remove weight/delay as connection-level truth",
-      "status": "pending",
-      "priority": "P0",
-      "depends_on": [],
-      "validation": {
-        "command": "npm run type-check && npm run test:domain",
-        "timeout_seconds": 600
-      },
+      "checkpoints": [
+        {
+          "at": "2026-05-25T08:56:50.614140Z",
+          "message": "Landed AgentIR v2 domain cutover baseline: BrainIR now carries neuronModels/synapseModels, compiler lowers neuronModelId/synapseModelId with static-current runtime parity, summary exposes connectionCount while retaining transitional leafLinkCount, and domain tests cover missing model refs plus invalid override shape. Validation passed with npm run type-check, npm run test:domain, and git diff --check."
+        }
+      ],
+      "completed_at": "2026-05-25T08:56:50.614140Z",
       "on_failure": {
         "cleanup": null
-      }
+      },
+      "id": "task-048",
+      "priority": "P0",
+      "title": "AgentIR v2 schema cutover: model registries, ConnectionIR, override types, and summary naming",
+      "depends_on": [],
+      "scope": [
+        "src/domain/brain/agent-ir.ts",
+        "src/domain/brain/agent-program.ts",
+        "src/domain/brain/agent-summary.ts",
+        "tests/domain/*agent*contract.test.ts"
+      ],
+      "description": "Introduce NeuronModelIR, SynapseModelIR, ConnectionIR, neuronModelId, synapseModelId, and explicit override types. Keep the repository compiling at task end; any temporary bridge must be private to the changed modules and scheduled for removal by task-058.",
+      "non_goals": [
+        "Do not implement new conductance/STDP/STP math in this task.",
+        "Do not preserve old GraphIR/BrainPackage import compatibility.",
+        "Do not let connection-level weight/delay remain the documented canonical truth."
+      ],
+      "acceptance": [
+        "AgentIR exports contain BrainIR.neuronModels and BrainIR.synapseModels.",
+        "ConnectionIR references synapseModelId and no public canonical connection type requires weight/delayMs.",
+        "BrainNeuronNode references neuronModelId and keeps initialState.v/u.",
+        "Summary/test naming distinguishes connection count from synapse model count where relevant.",
+        "Domain tests cover missing neuron model, missing synapse model, duplicate model id, and invalid override shape."
+      ],
+      "self_review": [
+        "grep for \"weight:\" on canonical connection literals and confirm remaining uses are runtime/test transitional or model defaults.",
+        "grep for \"delayMs\" and confirm remaining canonical ownership is SynapseModelIR defaults or runtime-lowered state.",
+        "Confirm docs/GRAPH_IR_REFACTOR_PLAN.md still matches exported names."
+      ],
+      "delegation": "Good gpt-5.4 task: bounded domain schema and tests; main agent should review public exports and downstream compile pressure.",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && git diff --check",
+        "timeout_seconds": 700
+      },
+      "claimed_by": "SESSION-20",
+      "lease_expires_at": null
     },
     {
+      "status": "completed",
       "attempts": 0,
       "max_attempts": 3,
-      "started_at_commit": null,
+      "started_at_commit": "08e418b",
       "error_log": [],
-      "checkpoints": [],
-      "completed_at": null,
+      "checkpoints": [
+        {
+          "at": "2026-05-25T09:39:47Z",
+          "message": "Completed AgentIR v2 seed/storage cutover: canonical AgentIR/BodyIR/BrainIR/AgentLayoutIR no longer carry version fields, default host seed now emits model registries plus synapseModelId/neuronModelId references, Brain Library storage/import/export fail closed for non-canonical payloads, import treats the current editing session id as reserved so graph-session reset is triggered on self-id collisions, and Brain Library e2e fixtures/assertions were aligned to exchange envelope version 2."
+        }
+      ],
+      "completed_at": "2026-05-25T09:39:47Z",
+      "on_failure": {
+        "cleanup": null
+      },
       "id": "task-049",
-      "title": "Default seed and storage rewrite: generate no-compat AgentIR v2 with model registries, synapse templates, and body rules as the only persisted truth",
-      "status": "pending",
       "priority": "P0",
+      "title": "Default AgentIR v2 seed and storage policy: create only v2 records and reject abandoned legacy payloads explicitly",
       "depends_on": [
         "task-048"
       ],
+      "scope": [
+        "src/domain/brain/*default*",
+        "src/domain/brain/agent-defaults*",
+        "src/domain/brain/agent-reconcile.ts",
+        "src/domain/storage*",
+        "src/components/editor/*BrainLibrary*",
+        "tests/domain/brain-library*.test.ts"
+      ],
+      "description": "Rewrite default brain/agent creation and LocalStorage library persistence to emit AgentIR v2 with model registries. Since old compatibility is abandoned, old envelopes must be rejected, reset, or surfaced as invalid with a clear internal error path instead of silently normalized.",
+      "non_goals": [
+        "Do not add a legacy migration path for GraphIRDocument, BrainPackage, BodyDefinition, AdapterNode, SignalNode, or LeafLink.",
+        "Do not infer missing v2 registries from old connection weight/delay fields."
+      ],
+      "acceptance": [
+        "Fresh default AgentIR includes at least one Izhikevich NeuronModelIR and one static-current SynapseModelIR.",
+        "Every default neuron references neuronModelId; every default connection references synapseModelId.",
+        "Brain library save/load/export writes v2 AgentIR only.",
+        "Old library/import payloads are not silently accepted; behavior is covered by domain tests.",
+        "Host parameter changes still preserve current brain identity and layout where supported by v2 schema."
+      ],
+      "self_review": [
+        "Search for legacy package/type names in storage/import/export paths and list any remaining references with justification.",
+        "Verify localStorage invalid-data path does not crash app boot.",
+        "Verify README/docs mention no old compat path."
+      ],
+      "delegation": "Good gpt-5.4 task: storage/default seed and tests; main agent should review no-compat user-facing failure behavior.",
       "validation": {
-        "command": "npm run type-check && npm run test:domain",
-        "timeout_seconds": 600
+        "command": "npm run type-check && npm run test:domain && npx playwright test e2e/app.spec.ts --project=chromium --grep \"brain library|import|export\" && git diff --check",
+        "timeout_seconds": 1000
       },
-      "on_failure": {
-        "cleanup": null
-      }
+      "claimed_by": "SESSION-20",
+      "lease_expires_at": null
     },
     {
+      "status": "completed",
       "attempts": 0,
       "max_attempts": 3,
       "started_at_commit": null,
       "error_log": [],
-      "checkpoints": [],
-      "completed_at": null,
+      "checkpoints": [
+        {
+          "at": "2026-05-25T10:15:00Z",
+          "message": "Completed compiler validation cutover: compileAgentIR now fails closed for missing neuronModelId/synapseModelId, unsupported synapse kinds, and unresolved static-current parameters; lowering resolves runtime neuron params and static-current defaults/overrides without depending on canonical connection.weight/delayMs, and domain fixtures/tests were aligned to explicit registry-backed v2 semantics."
+        }
+      ],
+      "completed_at": "2026-05-25T10:15:00Z",
+      "on_failure": {
+        "cleanup": null
+      },
       "id": "task-050",
-      "title": "Compiler/runtime cutover: lower ConnectionIR through SynapseModelIR into runtime synapse instances and keep transient state out of IR",
-      "status": "pending",
       "priority": "P0",
+      "title": "Compiler validation cutover: resolve model registries, endpoint directions, and v2 body endpoint references",
       "depends_on": [
         "task-048",
         "task-049"
       ],
+      "scope": [
+        "src/domain/brain/agent-compiler.ts",
+        "src/domain/brain/agent-body-rules.ts",
+        "src/domain/brain/brain-structural-preflight.ts",
+        "tests/domain/agent-ir-runtime.contract.test.ts",
+        "tests/domain/agent-body-rules.contract.test.ts"
+      ],
+      "description": "Make compileAgentIR validate and lower v2 structure without relying on old connection fields. This task establishes semantic fail-closed behavior before adding heavier synapse math.",
+      "non_goals": [
+        "Do not implement dual-exp/STDP/STP runtime equations here.",
+        "Do not allow missing model ids to fall back to a default model.",
+        "Do not parse world semantics from node labels or layout."
+      ],
+      "acceptance": [
+        "compileAgentIR rejects missing/duplicate neuron model ids and synapse model ids.",
+        "compileAgentIR rejects connections whose endpoint direction is illegal.",
+        "compileAgentIR rejects unsupported synapse kind unless task-051/052/053 has implemented it.",
+        "AgentProgram carries resolved neuron model params and resolved synapse model defaults/overrides in runtime-only structures.",
+        "BodyInput/BodyOutput endpoints remain rule/registry driven and are not stored as brain topology nodes."
+      ],
+      "self_review": [
+        "Inspect AgentProgram type for any canonical-storage-only fields leaking into runtime state.",
+        "Check validation issue messages identify the broken model/connection id.",
+        "Run targeted domain tests before broad domain test."
+      ],
+      "delegation": "Good gpt-5.4 task: compiler and validation; main agent should review semantic boundaries and error messages.",
       "validation": {
-        "command": "npm run type-check && npm run test:domain",
-        "timeout_seconds": 600
-      },
-      "on_failure": {
-        "cleanup": null
+        "command": "npm run type-check && node --import tsx --test tests/domain/agent-ir-runtime.contract.test.ts tests/domain/agent-body-rules.contract.test.ts && npm run test:domain && git diff --check",
+        "timeout_seconds": 900
       }
     },
     {
+      "status": "completed",
       "attempts": 0,
       "max_attempts": 3,
       "started_at_commit": null,
       "error_log": [],
-      "checkpoints": [],
-      "completed_at": null,
+      "checkpoints": [
+        {
+          "at": "2026-05-25T10:30:00Z",
+          "message": "Accepted as completed by evidence after task-050 integration: runtime main path now consumes only lowered AgentProgram static-current weights/delayMs, control/runtime tests confirm seed behavior remains stable, and synapse defaults/overrides are resolved before stepping rather than read from canonical AgentIR connection top-level fields."
+        }
+      ],
+      "completed_at": "2026-05-25T10:30:00Z",
+      "on_failure": {
+        "cleanup": null
+      },
       "id": "task-051",
-      "title": "GraphView editor cutover: edit neuron model references, synapse model references, initial membrane potential, and connection overrides without legacy fields",
-      "status": "pending",
-      "priority": "P1",
+      "priority": "P0",
+      "title": "Runtime parity slice: lower static-current SynapseModelIR and preserve existing simulation behavior",
       "depends_on": [
-        "task-048",
         "task-050"
       ],
+      "scope": [
+        "src/domain/brain/agent-program.ts",
+        "src/domain/brain/agent-step.ts",
+        "src/runtime/**",
+        "src/engine/**",
+        "tests/domain/control.contract.test.ts",
+        "tests/domain/agent-ir-runtime.contract.test.ts"
+      ],
+      "description": "Implement the first runtime slice by making static-current synapse models reproduce the previous weight/delay behavior through v2 runtime structures. This gives a stable baseline before conductance and learning models.",
+      "non_goals": [
+        "Do not keep reading connection.weight or connection.delayMs.",
+        "Do not add UI for model editing yet.",
+        "Do not implement conductance/STDP/STP equations here."
+      ],
+      "acceptance": [
+        "Existing movement/control tests pass using static-current SynapseModelIR.",
+        "Runtime output action values remain behaviorally equivalent to pre-v2 defaults within existing tests.",
+        "Delay defaults come from synapse model defaults or overrides, not connection top-level fields.",
+        "Runtime state for active weights/delay queues is not persisted into AgentIR."
+      ],
+      "self_review": [
+        "grep for connection.weight and connection.delayMs in runtime/domain main paths and justify or remove every hit.",
+        "Verify default seed still produces a controllable agent after install.",
+        "Confirm no test fixture is masking old fields by casting any."
+      ],
+      "delegation": "Good gpt-5.4 task: runtime parity; main agent should review behavior equivalence and old-field removal.",
       "validation": {
-        "command": "npm run type-check && npm run test:domain && npx playwright test e2e/app.spec.ts --project=chromium --grep \"graph view|brain library|import|export\"",
+        "command": "npm run type-check && node --import tsx --test tests/domain/control.contract.test.ts tests/domain/agent-ir-runtime.contract.test.ts && npm run test:domain && git diff --check",
         "timeout_seconds": 900
-      },
-      "on_failure": {
-        "cleanup": null
       }
     },
     {
+      "status": "completed",
       "attempts": 0,
       "max_attempts": 3,
       "started_at_commit": null,
       "error_log": [],
-      "checkpoints": [],
-      "completed_at": null,
+      "checkpoints": [
+        {
+          "at": "2026-05-25T11:05:00Z",
+          "message": "Completed lightweight conductance runtime: compiler lowering now accepts single-exp-conductance and dual-exp-conductance, runtime state tracks single-exp and dual-exp conductance traces without persisting them into AgentIR, invalid conductance parameters fail closed, and domain tests prove deterministic behavior plus expected differences from static-current while dual-exp-stdp/stp remain explicitly rejected."
+        }
+      ],
+      "completed_at": "2026-05-25T11:05:00Z",
+      "on_failure": {
+        "cleanup": null
+      },
       "id": "task-052",
-      "title": "Layout and expanded-group projection cleanup: derive group-local positions from canvas positions and keep size, viewport, selection, and modal state out of AgentIR",
-      "status": "pending",
       "priority": "P1",
+      "title": "Lightweight conductance runtime: implement single-exp and dual-exp synapse models with deterministic tests",
       "depends_on": [
         "task-051"
       ],
+      "scope": [
+        "src/domain/brain/agent-compiler.ts",
+        "src/domain/brain/agent-step.ts",
+        "src/domain/brain/agent-program.ts",
+        "tests/domain/agent-ir-runtime.contract.test.ts"
+      ],
+      "description": "Add the low-cost conductance models selected in the IR design. Keep the implementation deterministic and cheap; this task should make single-exp and dual-exp usable, not merely accepted by schema.",
+      "non_goals": [
+        "Do not implement STDP or STP in this task.",
+        "Do not add NMDA, Markov, calcium-based, or Hodgkin-Huxley-level dynamics.",
+        "Do not expose conductance runtime state in persisted AgentIR."
+      ],
+      "acceptance": [
+        "single-exp-conductance updates one conductance state and applies reversalPotential-driven current/equivalent input.",
+        "dual-exp-conductance updates rise/decay state and applies reversalPotential-driven current/equivalent input.",
+        "Unsupported or numerically invalid tau/gMax/reversalPotential parameters fail validation or are safely clamped with documented rationale.",
+        "Domain tests prove conductance output differs from static-current in the expected direction and remains deterministic."
+      ],
+      "self_review": [
+        "Estimate per-step state count and operations in comments/tests only where useful, matching design constraints.",
+        "Check no per-frame allocations are introduced on hot paths for every connection if avoidable.",
+        "Confirm disabled advanced kinds still fail closed until implemented."
+      ],
+      "delegation": "Good gpt-5.4 task if bounded to math/runtime tests; main agent should review numerical stability.",
       "validation": {
-        "command": "npm run type-check && npm run test:domain && npx playwright test e2e/app.spec.ts --project=chromium --grep \"graph view\"",
+        "command": "npm run type-check && node --import tsx --test tests/domain/agent-ir-runtime.contract.test.ts && npm run test:domain && git diff --check",
         "timeout_seconds": 900
-      },
-      "on_failure": {
-        "cleanup": null
       }
     },
     {
-      "attempts": 0,
+      "status": "completed",
+      "attempts": 1,
       "max_attempts": 3,
-      "started_at_commit": null,
+      "started_at_commit": "working-tree",
       "error_log": [],
-      "checkpoints": [],
-      "completed_at": null,
+      "checkpoints": [
+        {
+          "at": "2026-05-25T13:22:31Z",
+          "message": "Integrated delegated runtime/compiler slices for dual-exp-stdp, confirmed learning state remains runtime-only, and corrected tests to assert potentiation/depression/clamp against runtimeState.stdp.effectiveWeightByConnectionId rather than immutable compiled program weights."
+        }
+      ],
+      "completed_at": "2026-05-25T13:22:31Z",
+      "on_failure": {
+        "cleanup": null
+      },
       "id": "task-053",
-      "title": "No-legacy-compat cleanup: remove old GraphIR/BrainPackage/BodyDefinition import-export-storage-runtime fallback paths from the production surface",
-      "status": "pending",
-      "priority": "P0",
+      "priority": "P1",
+      "title": "Learning runtime slice: implement trace-based STDP with bounded weights and tests",
+      "depends_on": [
+        "task-052"
+      ],
+      "scope": [
+        "src/domain/brain/agent-step.ts",
+        "src/domain/brain/agent-program.ts",
+        "tests/domain/agent-ir-runtime.contract.test.ts"
+      ],
+      "description": "Implement dual-exp-stdp as the first learning model. Learning state is runtime-only; AgentIR stores defaults and optional overrides only.",
+      "non_goals": [
+        "Do not implement STP in this task.",
+        "Do not persist learned runtime weights back into AgentIR unless a later explicit save-learning feature is designed.",
+        "Do not introduce calcium-based or voltage-based plasticity."
+      ],
+      "acceptance": [
+        "pre/post trace state is initialized in runtime and decays deterministically.",
+        "Weight updates respect aPlus/aMinus/tauPlus/tauMinus and stay within wMin/wMax.",
+        "Repeated runtime steps do not mutate the source AgentIR object.",
+        "Tests cover potentiation, depression, bounds, and no-learning behavior for static/dual-exp models."
+      ],
+      "self_review": [
+        "Inspect mutation boundaries to ensure AgentIR remains immutable during stepping.",
+        "Check test fixture uses explicit spike ordering, not timing assumptions hidden in wall clock.",
+        "Confirm operation/state costs remain proportional to active modeled synapses."
+      ],
+      "delegation": "Good gpt-5.4 task for runtime math; main agent should review immutability and bounds behavior.",
+      "validation": {
+        "command": "npm run type-check && node --import tsx --test tests/domain/agent-ir-runtime.contract.test.ts && npm run test:domain && git diff --check",
+        "timeout_seconds": 900
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-25T13:39:00Z",
+          "message": "Kept dual-exp-stp explicitly fail-closed, tightened the design doc to mark it schema-reserved/not runtime-supported, and added default-seed contract coverage proving the host seed does not expose dual-exp-stp as an active default model."
+        }
+      ],
+      "completed_at": "2026-05-25T13:39:00Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-054",
+      "priority": "P2",
+      "title": "Optional short-term plasticity slice: implement dual-exp-stp or fail it closed with explicit documented deferral",
+      "depends_on": [
+        "task-052"
+      ],
+      "scope": [
+        "src/domain/brain/agent-compiler.ts",
+        "src/host/visionActionProfile.ts",
+        "docs/GRAPH_IR_REFACTOR_PLAN.md",
+        "tests/domain/agent-ir-runtime.contract.test.ts",
+        "tests/domain/agent-defaults.contract.test.ts"
+      ],
+      "description": "Defer dual-exp-stp explicitly for now. Keep compiler fail-closed, document it as schema-reserved/not runtime-supported, and prove default host seed does not surface unsupported STP models as active defaults.",
+      "non_goals": [
+        "Do not silently accept dual-exp-stp without runtime semantics.",
+        "Do not combine STDP and STP into an undocumented hybrid model."
+      ],
+      "acceptance": [
+        "dual-exp-stp is explicitly rejected at compile time with targeted coverage.",
+        "Default host seed and default runtime-facing model catalog do not surface dual-exp-stp as an active selectable default.",
+        "Docs, compiler behavior, and tests agree that dual-exp-stp is schema-reserved and not yet runtime-supported."
+      ],
+      "self_review": [
+        "Search for dual-exp-stp and confirm every acceptance/rejection path is intentional.",
+        "Confirm final task-062 review will not discover schema/runtime drift for STP."
+      ],
+      "delegation": "Can be delegated, but main agent should make the implement-vs-defer decision before starting.",
+      "validation": {
+        "command": "npm run type-check && node --import tsx --test tests/domain/agent-ir-runtime.contract.test.ts && npm run test:domain && git diff --check",
+        "timeout_seconds": 900
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-25T14:08:00Z",
+          "message": "GraphView read-model links now resolve synapse display parameters from synapseModelId plus overrides instead of trusting canonical connection.weight, aggregate links summarize resolved effective weights, and GraphView contract fixtures/assertions were upgraded to v2 model-reference semantics."
+        }
+      ],
+      "completed_at": "2026-05-25T14:08:00Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-055",
+      "priority": "P1",
+      "title": "GraphView view-model cutover: render v2 nodes and links from model references without old connection fields",
       "depends_on": [
         "task-049",
-        "task-050",
         "task-051"
       ],
+      "scope": [
+        "src/components/editor/graph/agentGraphViewModel.ts",
+        "src/components/editor/graph/graphViewTypes.ts",
+        "src/components/editor/graph/graphLinkPolicy.ts",
+        "tests/domain/agent-graph-view-model.contract.test.ts"
+      ],
+      "description": "Update GraphView read models so links display resolved synapse information and nodes display resolved neuron model information while preserving current navigation, adapter projection, grouping, and selection behavior.",
+      "non_goals": [
+        "Do not add editor forms in this task.",
+        "Do not reintroduce body signal nodes as BrainIR persisted children.",
+        "Do not show non-current-scope nodes in the canvas."
+      ],
+      "acceptance": [
+        "GraphView links are built from ConnectionIR.synapseModelId and resolved model defaults/overrides.",
+        "Aggregate links summarize count and effective weights without assuming connection.weight.",
+        "Expanded adapters and groups still project concrete child links correctly.",
+        "Contract tests cover adapter expansion, aggregate links, and direct leaf link details under v2 schema."
+      ],
+      "self_review": [
+        "Run graph view contract tests alone before full domain test.",
+        "grep GraphView code for connection.weight/delayMs and remove old-field dependencies.",
+        "Manually inspect link detail shape for aggregate vs leaf links."
+      ],
+      "delegation": "Good gpt-5.4 task for view-model; main agent should review current interaction regressions.",
       "validation": {
-        "command": "npm run type-check && npm run test:domain && npm run build",
+        "command": "npm run type-check && node --import tsx --test tests/domain/agent-graph-view-model.contract.test.ts && npm run test:domain && git diff --check",
         "timeout_seconds": 900
-      },
-      "on_failure": {
-        "cleanup": null
       }
     },
     {
-      "attempts": 0,
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "08e418b",
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-25T16:31:13Z",
+          "message": "Completed the GraphView editor v2 cutover: neuron and connection inspectors now write model references plus overrides through AgentIR-native command paths, create-neuron/create-connection fail closed when model ids are unavailable, and the focused Playwright inspector flow now proves neuronModelId, synapseModelId, delay override, and initial state edits persist after reopening."
+        }
+      ],
+      "completed_at": "2026-05-25T16:31:13Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-056",
+      "priority": "P1",
+      "title": "GraphView editor cutover: edit neuron model references, initial membrane potential, synapse model references, and overrides",
+      "depends_on": [
+        "task-055"
+      ],
+      "scope": [
+        "src/components/editor/graph/GraphDetailModal.tsx",
+        "src/components/editor/graph/*Editor*.tsx",
+        "src/components/editor/graph/agentGraphEditing.ts",
+        "e2e/app.spec.ts"
+      ],
+      "description": "Update editing commands and detail modals for v2 model references. The UI should support selecting existing model templates and editing allowed overrides without exposing old connection-level weight/delay as canonical fields.",
+      "non_goals": [
+        "Do not build a full model registry management UI unless required for the key flow.",
+        "Do not let a user create a connection without synapseModelId.",
+        "Do not persist unsupported runtime model selection silently."
+      ],
+      "acceptance": [
+        "Creating a neuron assigns a valid neuronModelId and initialState.v.",
+        "Creating a connection assigns a valid synapseModelId.",
+        "Double-click leaf node detail can inspect/edit model reference and initial membrane potential.",
+        "Double-click link detail can inspect/edit synapse model reference and allowed overrides.",
+        "E2E covers create neuron, create connection, edit one model-related field, save, reload/import-export if applicable."
+      ],
+      "self_review": [
+        "Check all graph editing commands fail closed when model ids are missing.",
+        "Verify labels remain UI metadata and not runtime semantics.",
+        "Inspect Playwright selectors for stability and avoid viewport-flaky coordinates where possible."
+      ],
+      "delegation": "Good gpt-5.4 task for UI implementation and E2E; main agent should review UX and schema boundaries.",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npx playwright test e2e/app.spec.ts --project=chromium --grep \"graph view|brain library|import|export\" && git diff --check",
+        "timeout_seconds": 1200
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "08e418b",
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-25T17:39:26Z",
+          "message": "Completed the layout projection cleanup: expanded group bounds/local child projection now derive from persisted child positions only, expanded-child pointer ownership no longer gets shadowed by selected parent groups, and targeted E2E now covers group drag ownership plus resize-stable relative geometry without persisting transient canvas state into AgentIR."
+        }
+      ],
+      "completed_at": "2026-05-25T17:39:26Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-057",
+      "priority": "P1",
+      "title": "Layout projection cleanup: derive expanded group-local positions from canvas positions and keep transient view state out of AgentIR",
+      "depends_on": [
+        "task-055"
+      ],
+      "scope": [
+        "src/components/editor/graph/agentGraphViewModel.ts",
+        "src/components/editor/graph/interaction/**",
+        "src/components/editor/graph/useGraphCanvasAssembly.ts",
+        "tests/domain/agent-graph-view-model.contract.test.ts",
+        "e2e/app.spec.ts"
+      ],
+      "description": "Implement the layout rule from the frozen design: persisted node positions are the source, expanded group bounds/local positions are computed from child bounding boxes, and viewport/selection/modal state stays session-only.",
+      "non_goals": [
+        "Do not persist group size as semantic state.",
+        "Do not persist viewport/scale/selection/modal state into AgentIR.",
+        "Do not regress ComfyUI-style free canvas movement and left/up dragging."
+      ],
+      "acceptance": [
+        "Expanded group size is computed from child bounds plus padding/minimum size.",
+        "Dragging expanded group moves contained child positions consistently.",
+        "Dragging child inside expanded group updates persisted canvas position and recomputed local projection.",
+        "Canvas resize does not unexpectedly move nodes.",
+        "E2E covers expanded group movement and at least one resize/drag regression path."
+      ],
+      "self_review": [
+        "Inspect layout persistence object and confirm only position/collapsed remain.",
+        "Check right-click menus and multi-select interactions still work after layout changes.",
+        "Run targeted graph E2E before broad E2E."
+      ],
+      "delegation": "Good gpt-5.4 task for canvas interaction; main agent should review gesture regressions carefully.",
+      "validation": {
+        "command": "npm run type-check && node --import tsx --test tests/domain/agent-graph-view-model.contract.test.ts && npx playwright test e2e/app.spec.ts --project=chromium --grep \"graph view\" && git diff --check",
+        "timeout_seconds": 1200
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-26T00:13:00Z",
+          "message": "Completed no-legacy production cleanup phase 1: Brain Library exchange is now strict v2-only with exact top-level key validation and no legacy normalize branch, runtime input stepping no longer consumes legacy body-node-id sensory keys, and domain tests now express legacy payload handling as explicit rejection/no-op semantics instead of supported compatibility."
+        }
+      ],
+      "completed_at": "2026-05-26T00:13:00Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-058",
+      "priority": "P0",
+      "title": "No-legacy production cleanup phase 1: remove abandoned schema exports and production fallback references",
+      "depends_on": [
+        "task-049",
+        "task-051",
+        "task-056"
+      ],
+      "scope": [
+        "src/domain/**",
+        "src/runtime/**",
+        "src/types/**",
+        "tests/domain/**"
+      ],
+      "description": "Sweep production domain/runtime exports for old GraphIR/BrainPackage/BodyDefinition/AdapterNode/SignalNode/LeafLink compatibility. Remove or quarantine remaining references so production code only speaks AgentIR v2.",
+      "non_goals": [
+        "Do not remove unrelated dead code outside the AgentIR v2 migration unless it blocks validation.",
+        "Do not leave compatibility helpers in generic domain exports."
+      ],
+      "acceptance": [
+        "Old persistent schema names are absent from production exports or exist only in explicitly named test fixtures if still unavoidable.",
+        "No runtime path imports old compat helpers.",
+        "No storage normalization path silently upgrades old payloads.",
+        "Domain tests are updated to v2 fixtures and old compat assertions are deleted or replaced by explicit rejection tests."
+      ],
+      "self_review": [
+        "Run rg for BrainPackage, GraphIRDocument, BodyDefinition, AdapterNode, SignalNode, LeafLink and classify every hit.",
+        "Run rg for legacy, compat, normalize, migrate and check no hidden fallback remains in production path.",
+        "Confirm package exports do not expose old schema as first-class API."
+      ],
+      "delegation": "Good gpt-5.4 repo-sweep task; main agent should review deletions to avoid removing active v2 logic.",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run build && git diff --check",
+        "timeout_seconds": 1200
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
       "max_attempts": 3,
       "started_at_commit": null,
       "error_log": [],
-      "checkpoints": [],
-      "completed_at": null,
-      "id": "task-054",
-      "title": "Final acceptance review: self-review plus multi-gpt-5.4 cross-review for AgentIR v2 and fix all remaining P0-P2 findings",
-      "status": "pending",
-      "priority": "P0",
-      "depends_on": [
-        "task-050",
-        "task-052",
-        "task-053"
+      "checkpoints": [
+        "step=0/2 Decomposed into UI/storage v2-only boundary work plus docs/E2E no-compat alignment.",
+        "step=2/2 Accepted strict v2-only Brain Library/import-export behavior, no-compat docs wording, and targeted rejection-path E2E coverage."
       ],
-      "validation": {
-        "command": "npm run type-check && npm run test:domain && npm run build && npm run test:e2e",
-        "timeout_seconds": 1500
-      },
+      "completed_at": "2026-05-25T17:57:09Z",
       "on_failure": {
         "cleanup": null
+      },
+      "id": "task-059",
+      "priority": "P0",
+      "title": "No-legacy production cleanup phase 2: import/export, Brain Library, docs, and E2E rejection paths",
+      "depends_on": [
+        "task-058"
+      ],
+      "scope": [
+        "src/components/editor/**BrainLibrary**",
+        "src/components/editor/**Import**",
+        "src/components/editor/**Export**",
+        "README.md",
+        "docs/GRAPH_IR_REFACTOR_PLAN.md",
+        "e2e/app.spec.ts"
+      ],
+      "description": "Finish user-visible no-compat behavior: import/export and Brain Library should accept v2 AgentIR only, reject old abandoned payloads without app crashes, and docs should state the boundary plainly.",
+      "non_goals": [
+        "Do not add a migration wizard for old payloads.",
+        "Do not weaken the no-compat decision with silent repair."
+      ],
+      "acceptance": [
+        "Exported JSON contains AgentIR v2 model registries and ConnectionIR.synapseModelId.",
+        "Importing an old or malformed payload shows a controlled failure path and does not mutate current good brain.",
+        "Brain Library list/select/save/delete remains usable with v2 records.",
+        "README and IR doc match actual behavior and no longer reference old compat as supported."
+      ],
+      "self_review": [
+        "Check E2E old-payload rejection does not depend on browser-specific dialog timing.",
+        "Inspect exported JSON fixture manually for v2 fields.",
+        "Confirm LocalStorage stale data path is deterministic."
+      ],
+      "delegation": "Good gpt-5.4 UI/storage task; main agent should review user-visible failure semantics.",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npx playwright test e2e/app.spec.ts --project=chromium --grep \"brain library|import|export\" && git diff --check",
+        "timeout_seconds": 1200
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "08e418b",
+      "error_log": [],
+      "checkpoints": [
+        "step=0/2 Decomposed into two bounded delegated critical-path E2E specs: simulation/library and graph editor.",
+        "step=2/2 Accepted focused critical coverage after stabilizing modal-close/focus semantics, node double-click timing, and serial Playwright validation to avoid port-contention false failures."
+      ],
+      "completed_at": "2026-05-25T18:32:36Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-060",
+      "priority": "P1",
+      "title": "Targeted E2E hardening for AgentIR v2: critical graph, runtime, library, and import/export flows only",
+      "depends_on": [
+        "task-056",
+        "task-057",
+        "task-059"
+      ],
+      "scope": [
+        "e2e/app.spec.ts",
+        "playwright.config.*"
+      ],
+      "description": "Keep E2E focused on critical chains: app boot, simulation start/pause/reset, GraphView create/edit/connect/group, Brain Library save/select, export/import v2, and old payload rejection.",
+      "non_goals": [
+        "Do not attempt exhaustive cross-product UI coverage.",
+        "Do not add flaky pixel-perfect canvas assertions.",
+        "Do not reintroduce phase-by-phase cross reviews; this task is targeted E2E only."
+      ],
+      "acceptance": [
+        "E2E covers the minimum critical user path for v2 AgentIR without relying on brittle coordinates where avoidable.",
+        "Tests skip or stabilize known canvas timing hazards with explicit helpers.",
+        "Full targeted grep suite passes locally."
+      ],
+      "self_review": [
+        "Run the targeted E2E at least twice if a new canvas gesture helper is added.",
+        "Review selectors for stable test ids instead of text that may change.",
+        "Keep slow tests bounded and documented."
+      ],
+      "delegation": "Good gpt-5.4 task for E2E hardening; main agent should review flake risk.",
+      "validation": {
+        "command": "npm run type-check && npx playwright test e2e/app.spec.ts --project=chromium --grep \"graph view|brain library|import|export|simulation\" && git diff --check",
+        "timeout_seconds": 1500
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "08e418b",
+      "error_log": [],
+      "checkpoints": [
+        "step=0/3 Decomposed into production grep/classification, model/schema/runtime consistency audit, and targeted fixes plus final validation.",
+        "step=1/3 Accepted audit findings: no production compat import leakage, but link detail editing incorrectly solidified resolved parameters into overrides and connection top-level weight/delayMs remained a second source of truth.",
+        "step=2/3 Removed canonical ConnectionIR top-level weight/delayMs ownership, synchronized compat/domain surfaces, and revalidated combined critical E2E, domain, build, and type-check paths."
+      ],
+      "completed_at": "2026-05-26T00:00:00Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-061",
+      "priority": "P0",
+      "title": "Final repo audit: grep old schema fields, hidden compatibility, runtime mutation leaks, and model/schema drift",
+      "depends_on": [
+        "task-053",
+        "task-054",
+        "task-058",
+        "task-060"
+      ],
+      "scope": [
+        "entire repository"
+      ],
+      "description": "Perform a repo-sweeper-style audit before final review. This task is not for broad refactors; it closes concrete P0-P2 findings from grep, tests, and code review.",
+      "non_goals": [
+        "Do not start unrelated styling or architecture rewrites.",
+        "Do not mark complete with known P0-P2 findings still open."
+      ],
+      "acceptance": [
+        "rg audit for old schema names has no production hits or every remaining hit is documented as test-only rejection fixture.",
+        "rg audit for connection.weight/delayMs confirms no canonical connection ownership remains.",
+        "compile/runtime/UI docs agree on supported synapse model kinds.",
+        "AgentIR is not mutated by runtime stepping.",
+        "All targeted tests from prior tasks pass together."
+      ],
+      "self_review": [
+        "Record grep commands and findings in harness-progress.txt.",
+        "Classify every P0-P2 finding as fixed or explicitly out of scope with user-visible rationale.",
+        "Check working tree before final cross-review."
+      ],
+      "delegation": "Main agent should own audit orchestration; bounded grep/classification can be delegated to multiple gpt-5.4 reviewers.",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run build && npx playwright test e2e/app.spec.ts --project=chromium --grep \"graph view|brain library|import|export|simulation\" && git diff --check",
+        "timeout_seconds": 1800
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "08e418b",
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-25T20:05:12Z",
+          "message": "Final cross-review closed all remaining P1/P2 findings: runtime now executes delayMs, canonical neuron instances use neuronModelId + parameterOverrides as the only parameter source, GraphView/editor no longer commits preview-only body edits or invalid intermediate numeric states, Brain Library storage/import paths are fail-closed, and compat/host/test fixtures were aligned to the tightened canonical schema. Final validation passed with npm run type-check, npm run test:domain, npm run build, compat contract tests, targeted critical Playwright specs, and git diff --check."
+        }
+      ],
+      "completed_at": "2026-05-25T20:05:12Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-062",
+      "priority": "P0",
+      "title": "Final multi-gpt-5.4 cross-review and closure: fix all remaining AgentIR v2 P0-P2 findings",
+      "depends_on": [
+        "task-061"
+      ],
+      "scope": [
+        "entire repository",
+        "harness-tasks.json",
+        "harness-progress.txt"
+      ],
+      "description": "Run final self-review plus multiple gpt-5.4 cross-reviews across schema/domain/runtime/GraphView/storage/E2E. Fix every P0-P2 issue before marking the AgentIR v2 rework complete.",
+      "non_goals": [
+        "Do not run intermediate cross-review loops after every task; this is the final cross-review gate.",
+        "Do not close unused subagents only after forgetting their results; wait for bounded review output, then close unneeded sessions to release quota."
+      ],
+      "acceptance": [
+        "At least schema/domain/runtime, GraphView/UI, storage/import/export, and tests/E2E review angles are covered.",
+        "All P0-P2 findings from final review are fixed and revalidated.",
+        "Harness queue has no pending/in_progress AgentIR v2 implementation tasks except explicitly user-approved follow-ups.",
+        "Final validation suite passes."
+      ],
+      "self_review": [
+        "Ensure subagents are given bounded prompts and enough time to respond.",
+        "Record review findings and disposition in harness-progress.txt.",
+        "Close unused subagents after their work is no longer needed to release quota."
+      ],
+      "delegation": "Required multi-gpt-5.4 review task. Main agent owns synthesis, fixes, validation, and final status.",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run build && npm run test:e2e && git diff --check",
+        "timeout_seconds": 2400
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "08e418b",
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-26T03:44:05Z",
+          "message": "Froze BodyIR redesign in docs/GRAPH_IR_REFACTOR_PLAN.md: explicit input/output endpoints plus mapping edges are now the only production truth, generators are tooling-only, no-compat legacy rule semantics were rejected, and the main codebase audit recorded the concrete schema/runtime/storage/editor/test seams to cut in tasks 064-070."
+        }
+      ],
+      "completed_at": "2026-05-26T03:44:05Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-063",
+      "priority": "P0",
+      "title": "BodyIR truth-source redesign freeze: document explicit mapping edges as canonical body semantics",
+      "depends_on": [],
+      "scope": [
+        "docs/GRAPH_IR_REFACTOR_PLAN.md",
+        "src/domain/brain/agent-ir.ts",
+        "harness-tasks.json",
+        "harness-progress.txt"
+      ],
+      "description": "Freeze the new BodyIR direction where explicit input/output mapping edges become the only runtime truth source, and regex/template rules are demoted to optional batch-generation helpers. Record exact schema intent, invariants, and migration boundaries before implementation begins.",
+      "non_goals": [
+        "Do not preserve old BodyIR regex-rule runtime semantics as a co-equal canonical path.",
+        "Do not start implementation before the new canonical BodyIR shape, invariants, and non-goals are written down."
+      ],
+      "acceptance": [
+        "The IR/design doc describes BodyIR as explicit world/body endpoint sets plus mapping edges, with optional generators only as tooling.",
+        "The doc states that runtime/compiler/storage/UI all consume explicit mappings, not regex/template rule projections.",
+        "Migration boundaries and rejected old-semantics compatibility goals are explicit."
+      ],
+      "self_review": [
+        "Check that the frozen semantics are specific enough to guide compiler, storage, and UI cutover without reinterpretation.",
+        "Record the exact design freeze decision and file locations in harness-progress.txt."
+      ],
+      "delegation": "May delegate doc drafting, but main agent must approve the final frozen semantics.",
+      "validation": {
+        "command": "npm run type-check && git diff --check",
+        "timeout_seconds": 600
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 0,
+      "max_attempts": 3,
+      "started_at_commit": "08e418b",
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-26T04:48:53Z",
+          "message": "Canonical BodyIR schema cutover landed across domain, host, App/body-editor compile surfaces, and domain tests. type-check and test:domain pass; remaining failures are compat-only."
+        }
+      ],
+      "completed_at": "2026-05-26T04:48:53Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-064",
+      "priority": "P0",
+      "title": "BodyIR schema cutover: replace regex-rule truth with explicit endpoint and mapping-edge types",
+      "depends_on": [
+        "task-063"
+      ],
+      "scope": [
+        "src/domain/brain/agent-ir.ts",
+        "src/domain/brain/**",
+        "tests/domain/**"
+      ],
+      "description": "Replace BodyIR's canonical schema from inputRules/outputRules to explicit endpoint collections and mapping edges. Introduce any optional generator/helper IR in a non-canonical role only if the frozen doc requires it.",
+      "non_goals": [
+        "Do not keep runtime/domain APIs centered on BodyInputRule/BodyOutputRule once the canonical schema changes.",
+        "Do not add fallback implicit rule expansion inside the schema layer."
+      ],
+      "acceptance": [
+        "AgentIR/BodyIR types expose explicit mapping-edge truth and no longer model regex rules as the canonical body contract.",
+        "Domain tests cover new schema invariants, including uniqueness/conflict expectations for explicit mappings.",
+        "No production type still assumes BodyIR preview/runtime truth comes from inputRules/outputRules."
+      ],
+      "self_review": [
+        "Grep for old canonical BodyIR rule types after schema changes and classify each remaining reference as migration helper, compat-only, or bug.",
+        "Keep test additions focused on schema truth, not UI behavior."
+      ],
+      "delegation": "Recommended subagent task split: canonical types/tests first, then main-agent review and integration.",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && git diff --check",
+        "timeout_seconds": 900
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-26T04:48:53Z",
+          "message": "Compiler/runtime body lowering now consumes explicit endpoints+mappings only; runtime/domain tests passed under canonical BodyIR semantics."
+        }
+      ],
+      "completed_at": "2026-05-26T04:48:53Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-065",
+      "priority": "P0",
+      "title": "BodyIR compiler/runtime cutover: consume explicit mapping edges only",
+      "depends_on": [
+        "task-064"
+      ],
+      "scope": [
+        "src/domain/brain/agent-body-rules.ts",
+        "src/domain/brain/agent-compiler.ts",
+        "src/domain/brain/agent-summary.ts",
+        "src/runtime/**",
+        "tests/domain/**"
+      ],
+      "description": "Refactor body endpoint resolution, compiler entrypoints, and runtime-facing summaries so they compile from explicit mappings and endpoint sets. Any rule-generator helper path must terminate into explicit mappings before compilation.",
+      "non_goals": [
+        "Do not keep regex matching in the main runtime compilation path.",
+        "Do not allow compiler/runtime to silently synthesize missing mappings from naming conventions."
+      ],
+      "acceptance": [
+        "Compiled body inputs/outputs come exclusively from explicit mappings and validated endpoint references.",
+        "Conflict/error reporting is redefined around explicit mapping invalidity rather than regex matching ambiguity.",
+        "Domain/runtime tests cover input scaling, output decay, unsupported endpoint references, and duplicate-target failure semantics."
+      ],
+      "self_review": [
+        "Trace one input and one output mapping end-to-end from IR to compiled runtime node.",
+        "Remove dead regex/template resolution code unless it is still used by a dedicated generator helper."
+      ],
+      "delegation": "Recommended subagent scope: compiler/runtime resolution only, with main agent auditing dead-code cleanup.",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && git diff --check",
+        "timeout_seconds": 1200
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-26T05:20:45Z",
+          "message": "Legacy Brain Library import/storage compat and legacy GraphIR session compat were aligned to canonical explicit BodyIR. type-check, domain tests, and targeted compat suites are all green."
+        }
+      ],
+      "completed_at": "2026-05-26T05:20:45Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-066",
+      "priority": "P1",
+      "title": "BodyIR storage and exchange cutover: persist explicit mappings and retire old canonical rule fields",
+      "depends_on": [
+        "task-064",
+        "task-065"
+      ],
+      "scope": [
+        "src/storage/**",
+        "tests/compat/**",
+        "tests/domain/**"
+      ],
+      "description": "Update local storage, Brain Library import/export, and any exchange normalization paths so persisted AgentIR uses explicit BodyIR mappings. Keep compatibility handling, if any, as isolated import-time translation only.",
+      "non_goals": [
+        "Do not preserve old rule fields inside canonical saved records.",
+        "Do not let compat normalization leak old rule semantics back into production-path runtime APIs."
+      ],
+      "acceptance": [
+        "New saves/exports contain explicit BodyIR mappings as canonical truth.",
+        "If legacy imports remain supported, they translate once into explicit mappings and never re-enter canonical storage.",
+        "Compat tests document the exact import-time boundary."
+      ],
+      "self_review": [
+        "Check Brain Library round-trip behavior with explicit mappings only.",
+        "Verify all remaining legacy-rule references are compat-only and named as such."
+      ],
+      "delegation": "Good subagent task once schema/runtime are stable; main agent must inspect compat boundaries carefully.",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && node --import tsx --test tests/compat/brain-library-exchange-compat.contract.test.ts && git diff --check",
+        "timeout_seconds": 1200
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-26T05:32:53Z",
+          "message": "BodyIR editor selection/model identity is now persisted-id driven, canvas entities come directly from explicit endpoints+mappings, and reorder-stability contracts are covered by domain tests."
+        }
+      ],
+      "completed_at": "2026-05-26T05:32:53Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-067",
+      "priority": "P0",
+      "title": "BodyIR editor cutover phase 1: drive canvas from explicit mappings and endpoint sets",
+      "depends_on": [
+        "task-064",
+        "task-065"
+      ],
+      "scope": [
+        "src/components/editor/BodyMappingPanel.tsx",
+        "src/components/editor/graph/**",
+        "src/App.tsx"
+      ],
+      "description": "Refactor the BodyIR graph page so every visible node and edge comes directly from explicit endpoint and mapping-edge IR, not preview projections derived from regex rules.",
+      "non_goals": [
+        "Do not keep the current graph as a projection of rule preview output once explicit mappings exist.",
+        "Do not let UI state invent hidden mappings that are not persisted in AgentIR."
+      ],
+      "acceptance": [
+        "BodyIR canvas renders from explicit endpoints and mappings only.",
+        "Selecting nodes/edges identifies concrete persisted mapping records.",
+        "Applying edits mutates the underlying mapping records and the canvas updates without any regex-projection intermediary."
+      ],
+      "self_review": [
+        "Check that UI detail state points at stable mapping ids rather than fragile derived rule indexes.",
+        "Keep the shared canvas base generic; do not re-couple BodyIR specifics into the common layer."
+      ],
+      "delegation": "Recommended subagent scope: BodyIR panel/model projection only; main agent reviews shared canvas abstractions.",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && git diff --check",
+        "timeout_seconds": 1200
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-26T05:38:21Z",
+          "message": "User decision accepted: generator tooling will not be retained. The IR design doc now explicitly rejects productized generator support and keeps explicit endpoints+mappings as the only editor/runtime/storage truth."
+        }
+      ],
+      "completed_at": "2026-05-26T05:38:21Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-068",
+      "priority": "P1",
+      "title": "BodyIR editor cutover phase 2: optional rule generator tooling on top of explicit mappings",
+      "depends_on": [
+        "task-067"
+      ],
+      "scope": [
+        "src/components/editor/BodyMappingPanel.tsx",
+        "src/domain/brain/**",
+        "tests/domain/**"
+      ],
+      "description": "If the frozen design keeps batch rule generators, reintroduce them only as explicit-mapping creation/rewrite tools in the BodyIR editor. They must not be runtime truth.",
+      "non_goals": [
+        "Do not block the main explicit-mapping cutover on generator tooling.",
+        "Do not let generators become a second canonical persistence form."
+      ],
+      "acceptance": [
+        "Generator tooling, if present, creates or rewrites explicit mapping edges and endpoint nodes.",
+        "Deleting generator definitions does not invalidate existing explicit mappings.",
+        "Tests cover that runtime behavior depends only on mappings after generation."
+      ],
+      "self_review": [
+        "Be explicit whether generators are retained or intentionally deferred; either outcome must be documented.",
+        "Avoid mixing generator preview state with canonical mapping state."
+      ],
+      "delegation": "Optional subagent task after main explicit cutover is stable.",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && git diff --check",
+        "timeout_seconds": 900
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-26T05:45:06Z",
+          "message": "Repository audit reduced remaining legacy-rule references to explicit compat-only negative coverage and deprecated compatibility aliases only. Production-path schema/runtime/storage/editor drift was not found."
+        }
+      ],
+      "completed_at": "2026-05-26T05:45:06Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-069",
+      "priority": "P1",
+      "title": "BodyIR cleanup and audit: remove old rule-truth codepaths and verify no production drift remains",
+      "depends_on": [
+        "task-066",
+        "task-067"
+      ],
+      "scope": [
+        "src/**",
+        "tests/**",
+        "docs/GRAPH_IR_REFACTOR_PLAN.md"
+      ],
+      "description": "Sweep the repository for production code that still treats regex/template body rules as canonical truth. Remove or isolate those paths and update docs/tests to match the explicit-mapping model.",
+      "non_goals": [
+        "Do not delete clearly-labeled compat import translators without replacing their test coverage.",
+        "Do not keep dead preview-only rule machinery around 'just in case'."
+      ],
+      "acceptance": [
+        "No production-path compiler/runtime/editor/storage code still depends on old BodyIR canonical rule truth.",
+        "Any remaining legacy-rule references are either generator-only tools or explicit compat import translators.",
+        "Docs and tests describe the new truth-source model accurately."
+      ],
+      "self_review": [
+        "Use grep-based audit and record findings/disposition in harness-progress.txt.",
+        "Classify each surviving old-rule reference as tool-only, compat-only, or bug."
+      ],
+      "delegation": "Good repo-sweeper subagent task after implementation phases land.",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run build && git diff --check",
+        "timeout_seconds": 1500
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-26T05:48:34Z",
+          "message": "Final closure audit found no remaining P0-P2 findings. Explicit endpoint+mappings are the only production BodyIR truth; surviving legacy references are compat-only negatives or deprecated compatibility aliases."
+        }
+      ],
+      "completed_at": "2026-05-26T05:48:34Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-070",
+      "priority": "P0",
+      "title": "Final BodyIR explicit-mapping audit and closure",
+      "depends_on": [
+        "task-069"
+      ],
+      "scope": [
+        "entire repository",
+        "harness-tasks.json",
+        "harness-progress.txt"
+      ],
+      "description": "Run a final self-audit of the BodyIR truth-source cutover across schema, compiler/runtime, storage, and editor behavior. Fix any remaining P0-P2 issues before closure.",
+      "non_goals": [
+        "Do not declare completion while production paths still have mixed rule-truth semantics.",
+        "Do not rely on historical task closure as proof; verify the current workspace state."
+      ],
+      "acceptance": [
+        "Schema, runtime, storage, and editor all use explicit mappings as the only production truth source.",
+        "Remaining rule-related code is either generator tooling or compat import translation only.",
+        "Targeted validation passes and the audit records any residual non-P0-P2 risk explicitly."
+      ],
+      "self_review": [
+        "Review by angle: schema/types, compiler/runtime, storage/import/export, BodyIR editor/UI, and repository cleanup.",
+        "Record the audit findings and disposition in harness-progress.txt."
+      ],
+      "delegation": "Main agent owns final synthesis; subagents may be used for bounded review angles and must be given enough time.",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run build && git diff --check",
+        "timeout_seconds": 1800
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-26T06:24:17Z",
+          "message": "Deleted src/compat and tests/compat, removed compat-only package script, and rewrote docs/README to state AgentIR canonical no-compat mainline only."
+        }
+      ],
+      "completed_at": "2026-05-26T06:24:17Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-071",
+      "priority": "P0",
+      "title": "Compat removal wave: delete legacy compat modules, compat tests, and compat-only scripts/docs references",
+      "depends_on": [],
+      "scope": [
+        "src/compat/**",
+        "tests/compat/**",
+        "package.json",
+        "docs/GRAPH_IR_REFACTOR_PLAN.md",
+        "README.md"
+      ],
+      "description": "User explicitly requires no transition code and no compatibility code. Remove the entire legacy compat surface, delete compat-only tests and commands, and update docs to state the canonical no-compat boundary only.",
+      "non_goals": [
+        "Do not preserve legacy import/export/storage acceptance paths.",
+        "Do not keep compat-only negative tests or helper wrappers."
+      ],
+      "acceptance": [
+        "src/compat and tests/compat are removed.",
+        "No package script or doc still treats compat as a supported path.",
+        "Repository references to compat are limited to historical wording that is not a live code path, or are removed entirely."
+      ],
+      "self_review": [
+        "Re-run a repository grep for compat references after deletion.",
+        "Confirm no production import still points at deleted compat modules."
+      ],
+      "delegation": "Bounded worker task with isolated ownership over compat directories plus package/docs references.",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run build && git diff --check",
+        "timeout_seconds": 1800
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-26T06:24:17Z",
+          "message": "Removed rule-based aliases and deprecated fields from body endpoint domain preview/resolution APIs; domain contracts now assert endpoint/mapping terminology only."
+        }
+      ],
+      "completed_at": "2026-05-26T06:24:17Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-072",
+      "priority": "P1",
+      "title": "Domain naming closure: remove rule-based aliases and deprecated fields from body endpoint domain APIs",
+      "depends_on": [
+        "task-071"
+      ],
+      "scope": [
+        "src/domain/brain/agent-body-rules.ts",
+        "src/domain/brain/index.ts",
+        "tests/domain/agent-body-rules.contract.test.ts",
+        "tests/domain/agent-graph-view-model.contract.test.ts"
+      ],
+      "description": "Remove deprecated rule-shaped aliases from the body endpoint preview/resolution domain API and rename remaining consumers to endpoint-based canonical naming.",
+      "non_goals": [
+        "Do not keep deprecated alias exports or deprecated preview fields.",
+        "Do not preserve rule-based terminology in canonical domain test names or assertions."
+      ],
+      "acceptance": [
+        "Domain API exports only endpoint/mapping terminology.",
+        "Preview models and issue payloads no longer carry deprecated rule aliases.",
+        "Affected domain tests assert endpoint-based semantics only."
+      ],
+      "self_review": [
+        "Search for buildAgentBodyRulePreviewModel and resolveAgentBody*Rule* after the change.",
+        "Keep the data model internally consistent; no mixed endpoint/rule field duplication."
+      ],
+      "delegation": "Bounded worker task with isolated ownership over domain naming files and related domain tests.",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && git diff --check",
+        "timeout_seconds": 1200
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-26T06:24:17Z",
+          "message": "Removed rule-based naming/fallbacks from App and BodyIR editor types/surfaces, updated endpoint-based test ids, and cleaned residual endpoint-facing nomenclature."
+        }
+      ],
+      "completed_at": "2026-05-26T06:24:17Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-073",
+      "priority": "P1",
+      "title": "UI naming closure: remove rule-based naming and fallback logic from App and BodyIR editor surfaces",
+      "depends_on": [
+        "task-072"
+      ],
+      "scope": [
+        "src/App.tsx",
+        "src/components/editor/types.ts",
+        "src/components/editor/BodyIRSettingsSection.tsx",
+        "src/components/editor/BodyMappingPanel.tsx"
+      ],
+      "description": "Rename the remaining BodyIR editor/App code from rule terminology to endpoint terminology and remove deprecated fallback fields and selectors.",
+      "non_goals": [
+        "Do not preserve input-rule/output-rule scopes or ruleId/ruleIndex shadow fields.",
+        "Do not leave rule-shaped test ids or local variables in canonical UI surfaces."
+      ],
+      "acceptance": [
+        "App and BodyIR editor consume endpoint-based preview/validation types only.",
+        "Editor type definitions no longer expose deprecated rule fields.",
+        "BodyIR settings/test ids/local naming reflect endpoint semantics only."
+      ],
+      "self_review": [
+        "Search for ruleId, ruleIndex, input-rule, and output-rule in owned files after the change.",
+        "Avoid changing unrelated editor interaction behavior while renaming data flow."
+      ],
+      "delegation": "Bounded worker task with isolated ownership over App and BodyIR editor files.",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && git diff --check",
+        "timeout_seconds": 1200
+      }
+    },
+    {
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "started_at_commit": "working-tree",
+      "error_log": [],
+      "checkpoints": [
+        {
+          "at": "2026-05-26T06:24:17Z",
+          "message": "Final no-compat audit passed: repository grep found no remaining compat/rule alias codepaths, type-check/domain/build/diff-check passed, and only the pre-existing build chunk-size warning remains."
+        }
+      ],
+      "completed_at": "2026-05-26T06:24:17Z",
+      "on_failure": {
+        "cleanup": null
+      },
+      "id": "task-074",
+      "priority": "P0",
+      "title": "No-compat closure audit: verify the repository has no transition or compatibility code left",
+      "depends_on": [
+        "task-071",
+        "task-072",
+        "task-073"
+      ],
+      "scope": [
+        "entire repository",
+        "harness-tasks.json",
+        "harness-progress.txt"
+      ],
+      "description": "Run a final repo-sweeper audit for compat/transition leftovers, fix any remaining P0-P2 findings, and record the final no-compat closure status.",
+      "non_goals": [
+        "Do not declare closure while deleted compat symbols are still referenced.",
+        "Do not keep deprecated aliases because tests once used them."
+      ],
+      "acceptance": [
+        "No production, test, script, or doc path preserves the old compat surface as supported behavior.",
+        "Repository-wide grep for compat/rule alias leftovers yields only intentional non-runtime wording or zero results.",
+        "Validation passes after the cleanup wave."
+      ],
+      "self_review": [
+        "Review by angle: scripts/docs, domain API, UI/editor, storage/import/export, residual grep.",
+        "Record residual non-blocking risks explicitly if any remain."
+      ],
+      "delegation": "Main agent owns final synthesis and acceptance after delegated tasks land.",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && npm run build && git diff --check",
+        "timeout_seconds": 1800
       }
     }
   ],
-  "session_count": 16,
-  "last_session": "2026-05-25T08:17:08.915Z"
+  "session_count": 21,
+  "last_session": "2026-05-26T03:41:13Z"
 }

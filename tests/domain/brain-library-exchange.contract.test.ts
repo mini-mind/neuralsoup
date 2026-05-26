@@ -27,14 +27,14 @@ test('Brain Library default exchange payload is AgentIR-native and round-trips t
   });
 
   assert.ok(normalized);
-  assert.equal(exported.version, 1);
+  assert.equal(exported.version, 2);
   assert.equal(exported.kind, 'neuralsoup-agent');
   assert.equal(normalized.agent.metadata.name, 'Roundtrip Brain');
   assert.equal('visionCellCount' in normalized.agent.body, false);
   assert.equal('visionCellCount' in JSON.parse(JSON.stringify(exported)).agent.body, false);
 });
 
-test('Brain Library default import normalization rejects legacy AgentPackage compat payloads', () => {
+test('Brain Library default import normalization rejects non-current package envelopes', () => {
   const brain = createAgentPackage('Import Source', 1);
   const normalized = normalizeImportedBrainExchange(brain, WORLD_REGISTRY, {
     name: 'Imported Brain',
@@ -44,10 +44,22 @@ test('Brain Library default import normalization rejects legacy AgentPackage com
   assert.equal(normalized, null);
 });
 
-test('Brain Library default import normalization rejects legacy envelopes without top-level metadata', () => {
+test('Brain Library default import normalization rejects envelopes without required top-level metadata', () => {
   const brain = createAgentPackage('Import Without Envelope Metadata', 1);
   const normalized = normalizeImportedBrainExchange({
     packageVersion: 1,
+    agent: brain.agent,
+  }, WORLD_REGISTRY);
+
+  assert.equal(normalized, null);
+});
+
+test('Brain Library default import normalization rejects envelopes that mix current shape with unrelated top-level metadata', () => {
+  const brain = createAgentPackage('Hybrid Legacy Metadata', 1);
+  const normalized = normalizeImportedBrainExchange({
+    version: 2,
+    kind: 'neuralsoup-agent',
+    metadata: { ...brain.agent.metadata },
     agent: brain.agent,
   }, WORLD_REGISTRY);
 

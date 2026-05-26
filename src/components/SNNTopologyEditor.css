@@ -181,14 +181,21 @@
 
 .topology-node.is-expanded {
   z-index: 1;
+  pointer-events: none;
 }
 
 .topology-node.is-expanded-child {
   z-index: 3;
+  pointer-events: auto;
 }
 
 .topology-node.is-selected {
   z-index: 6;
+}
+
+.topology-node.is-group.is-expanded.is-selected {
+  z-index: 2;
+  pointer-events: none;
 }
 
 .topology-node.is-selected.is-expanded-child {
@@ -244,10 +251,62 @@
   background: rgba(63, 120, 158, 0.22);
   border-color: #3f789e;
   box-shadow: none;
+  pointer-events: auto;
 }
 
-.topology-node.is-group.is-expanded .topology-node-label,
-.topology-node.is-group.is-expanded .topology-node-detail {
+.topology-node-titlebar {
+  display: none;
+}
+
+.topology-node.is-group:not(.is-expanded) .topology-node-titlebar {
+  display: none;
+}
+
+.topology-node.is-group.is-expanded .topology-node-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(63, 120, 158, 0.85);
+  background: rgba(34, 34, 34, 0.92);
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.topology-node.is-group.is-expanded .topology-node-titlebar:active {
+  cursor: grabbing;
+}
+
+.topology-node.is-group.is-expanded .topology-node-titlebar .topology-node-label,
+.topology-node.is-group.is-expanded .topology-node-titlebar .topology-node-detail {
+  display: block;
+}
+
+.topology-node.is-group.is-expanded > .topology-node-shape > .topology-node-label,
+.topology-node.is-group.is-expanded > .topology-node-shape > .topology-node-detail {
+  display: none;
+}
+
+.topology-node.is-expanded-child.is-neuron .topology-node-shape,
+.topology-node.is-expanded-child.is-signal .topology-node-shape {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  padding: 0;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  box-shadow: none;
+  background: #c8c8c8;
+  border-color: #fff;
+}
+
+.topology-node.is-expanded-child.is-neuron .topology-node-titlebar,
+.topology-node.is-expanded-child.is-neuron .topology-node-label,
+.topology-node.is-expanded-child.is-neuron .topology-node-detail,
+.topology-node.is-expanded-child.is-signal .topology-node-titlebar,
+.topology-node.is-expanded-child.is-signal .topology-node-label,
+.topology-node.is-expanded-child.is-signal .topology-node-detail {
   display: none;
 }
 

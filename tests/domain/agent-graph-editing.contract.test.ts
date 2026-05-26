@@ -11,7 +11,6 @@ import {
 } from '../../src/components/editor/graph/agentGraphEditing';
 
 const createEditingAgent = (): AgentIR => ({
-  version: 1,
   metadata: {
     id: 'agent-editing-test',
     name: 'Agent Editing Test',
@@ -19,33 +18,48 @@ const createEditingAgent = (): AgentIR => ({
     updatedAt: '2026-01-01T00:00:00.000Z',
   },
   body: {
-    version: 1,
-    inputRules: [],
-    outputRules: [],
+    inputEndpoints: [],
+    outputEndpoints: [],
+    mappings: [],
   },
   brain: {
-    version: 1,
+    neuronModels: [
+      {
+        id: 'izhikevich-default',
+        family: 'izhikevich',
+        label: 'Default Izhikevich',
+        params: { a: 0.02, b: 0.2, c: -65, d: 8, threshold: 30 },
+      },
+    ],
+    synapseModels: [
+      {
+        id: 'static_current',
+        kind: 'static-current',
+        label: 'Static Current',
+        defaults: { weight: 1, delayMs: 1 },
+      },
+    ],
     rootContainerId: 'root-group',
     neurons: [
       {
         id: 'neuron-1',
         label: 'Neuron 1',
-        model: 'izhikevich',
-        params: { a: 0.02, b: 0.2, c: -65, d: 8, threshold: 30 },
+        neuronModelId: 'izhikevich-default',
+        parameterOverrides: { a: 0.02, b: 0.2, c: -65, d: 8, threshold: 30 },
         initialState: { v: -65 },
       },
       {
         id: 'neuron-2',
         label: 'Neuron 2',
-        model: 'izhikevich',
-        params: { a: 0.02, b: 0.2, c: -65, d: 8, threshold: 30 },
+        neuronModelId: 'izhikevich-default',
+        parameterOverrides: { a: 0.02, b: 0.2, c: -65, d: 8, threshold: 30 },
         initialState: { v: -65 },
       },
       {
         id: 'neuron-3',
         label: 'Neuron 3',
-        model: 'izhikevich',
-        params: { a: 0.02, b: 0.2, c: -65, d: 8, threshold: 30 },
+        neuronModelId: 'izhikevich-default',
+        parameterOverrides: { a: 0.02, b: 0.2, c: -65, d: 8, threshold: 30 },
         initialState: { v: -65 },
       },
     ],
@@ -63,7 +77,6 @@ const createEditingAgent = (): AgentIR => ({
   },
   connections: [],
   layout: {
-    version: 1,
     nodes: {
       'neuron-1': { position: { x: 120, y: 80 } },
       'neuron-2': { position: { x: 200, y: 140 } },
@@ -140,7 +153,10 @@ test('tryCreateNeuronAndConnectInContainer appends the neuron, parent child ref,
         id: 'link-1',
         from: { scope: 'brain', nodeId: 'neuron-1', portId: 'output' },
         to: { scope: 'brain', nodeId: 'neuron-4', portId: 'input' },
-        weight: 0.8,
+        synapseModelId: 'static_current',
+        parameterOverrides: {
+          weight: 0.8,
+        },
       },
     ],
   });
@@ -152,16 +168,20 @@ test('tryCreateNeuronAndConnectInContainer appends the neuron, parent child ref,
 
   assert.equal(result.agent.brain.neurons.some((neuron) => neuron.id === 'neuron-4'), true);
   assert.deepEqual(result.agent.brain.containers[0]?.children.at(-1), { scope: 'brain', nodeId: 'neuron-4' });
-  assert.deepEqual(result.agent.connections.at(-1), {
-    id: 'link-1',
-    from: { scope: 'brain', nodeId: 'neuron-1', portId: 'output' },
-    to: { scope: 'brain', nodeId: 'neuron-4', portId: 'input' },
+  const createdConnection = result.agent.connections.at(-1);
+  assert.ok(createdConnection);
+  assert.equal(createdConnection.id, 'link-1');
+  assert.deepEqual(createdConnection.from, { scope: 'brain', nodeId: 'neuron-1', portId: 'output' });
+  assert.deepEqual(createdConnection.to, { scope: 'brain', nodeId: 'neuron-4', portId: 'input' });
+  assert.equal(createdConnection.synapseModelId, 'static_current');
+  assert.deepEqual(createdConnection.parameterOverrides, {
     weight: 0.8,
+    delayMs: 0,
   });
   assert.deepEqual(result.agent.layout?.nodes['neuron-4']?.position, { x: 400, y: 320 });
 });
 
-test('tryAggregateAgentNodesIntoGroup rejects insufficient selection and legacy wrapper stays no-op', () => {
+test('tryAggregateAgentNodesIntoGroup rejects insufficient selection and keeps safe wrapper as no-op', () => {
   const agent = createEditingAgent();
   const result = tryAggregateAgentNodesIntoGroup(agent, {
     ...createAggregateInput(),
@@ -218,7 +238,7 @@ test('tryAggregateAgentNodesIntoGroup rejects id collisions before rewriting con
   assert.equal(aggregateAgentNodesIntoGroup(agent, { ...createAggregateInput(), nextGroupId: 'neuron-3' }), agent);
 });
 
-test('tryCreateNeuronAndConnectInContainer rejects duplicate node ids and legacy wrapper stays no-op', () => {
+test('tryCreateNeuronAndConnectInContainer rejects duplicate node ids and keeps safe wrapper as no-op', () => {
   const agent = createEditingAgent();
   const result = tryCreateNeuronAndConnectInContainer(agent, {
     parentContainerId: 'root-group',
@@ -246,7 +266,7 @@ test('tryCreateNeuronAndConnectInContainer rejects duplicate node ids and legacy
   );
 });
 
-test('tryUngroupAgentContainer rejects missing parent ownership and legacy wrapper stays no-op', () => {
+test('tryUngroupAgentContainer rejects missing parent ownership and keeps safe wrapper as no-op', () => {
   const aggregated = aggregateAgentNodesIntoGroup(createEditingAgent(), createAggregateInput());
   const result = tryUngroupAgentContainer(aggregated, 'root-group', 'group-missing');
 

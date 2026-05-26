@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef, type CSSPrope
 import SimulationCanvas, { type RuntimeInstallReceipt } from './components/SimulationCanvas';
 import {
   preflightBrainStructure,
-  buildAgentBodyRulePreviewModel,
+  buildAgentBodyEndpointPreviewModel,
   resolveCompiledAgentBodyEndpointIds,
   resolveBodyInputVisionCellIndex,
   summarizeAgentIR,
@@ -16,6 +16,7 @@ import type { SimulationLifecycleState } from './engine/SimulationEngine';
 import type { AgentDraftStatus, AgentRuntimeActivitySnapshot, AgentRuntimeStatus } from './types/agentRuntime';
 import type { SimulationState } from './types/simulation';
 import BrainLibraryModal from './components/editor/BrainLibraryModal';
+import BodyMappingPanel from './components/editor/BodyMappingPanel';
 import EditorToolbar from './components/editor/EditorToolbar';
 import GraphEditorPanel from './components/editor/GraphEditorPanel';
 import { isEditableOrInteractiveTarget } from './components/editor/graph/isEditableOrInteractiveTarget';
@@ -165,13 +166,12 @@ const ROOT_GRAPH_PATH: GraphPathItem[] = [{ id: 'root', label: 'root' }];
 
 const deriveProjectedVisionCellCountFromAgent = (
   agent: AgentIR,
-  worldRegistry: Pick<WorldRegistry, 'resolveInputRuleBinding'>,
   fallback: number
 ): number => {
   let maxVisionCellIndex = -1;
 
   const recordVisionNode = (nodeId: string) => {
-    const cellIndex = resolveBodyInputVisionCellIndex(nodeId, agent.body.inputRules, worldRegistry);
+    const cellIndex = resolveBodyInputVisionCellIndex(nodeId, agent.body);
     if (cellIndex != null && cellIndex >= 0) {
       maxVisionCellIndex = Math.max(maxVisionCellIndex, cellIndex);
     }
@@ -195,11 +195,10 @@ const deriveProjectedVisionCellCountFromAgent = (
 
 const deriveAgentParametersFromBrain = (
   agent: AgentIR,
-  currentParameters: AgentParameters,
-  worldRegistry: Pick<WorldRegistry, 'resolveInputRuleBinding'>
+  currentParameters: AgentParameters
 ): AgentParameters => ({
   ...currentParameters,
-  visionCells: deriveProjectedVisionCellCountFromAgent(agent, worldRegistry, currentParameters.visionCells),
+  visionCells: deriveProjectedVisionCellCountFromAgent(agent, currentParameters.visionCells),
 });
 
 const applyBrainRecordToEditorState = (
@@ -336,92 +335,57 @@ const App: React.FC = () => {
     lastAppliedRuntimeInstallReceipt.requestKey !== currentRuntimeInstallRequestKey;
   const hasUnsavedDraftChanges =
     hasDraftEditingChanges || hasPendingRuntimeInstall || bodyDraftStatus.hasChanges;
-  const bodyRulePreviewModel = useMemo(
-    () => buildAgentBodyRulePreviewModel(bodyPreviewAgent, worldRegistry, draftProjectedVisionCellCount),
+  const bodyEndpointPreviewModel = useMemo(
+    () => buildAgentBodyEndpointPreviewModel(bodyPreviewAgent, worldRegistry, draftProjectedVisionCellCount),
     [bodyPreviewAgent, draftProjectedVisionCellCount, worldRegistry]
   );
-  const bodyRulePreview = useMemo<BodyIRPreviewData>(() => {
-    const inputRuleById = new Map(draftBodyDocument.inputRules.map((rule, index) => [rule.id, { rule, index }]));
-    const outputRuleById = new Map(draftBodyDocument.outputRules.map((rule, index) => [rule.id, { rule, index }]));
-    const inputMatches = bodyRulePreviewModel.input.rules.flatMap((previewGroup) => {
-      const entry = inputRuleById.get(previewGroup.ruleId);
-      return previewGroup.endpoints.map((endpoint) => ({
-        nodeId: endpoint.nodeId,
-        resolvedSource: endpoint.resolved,
-        scale: entry?.rule.scale,
-        ruleIndex: entry?.index,
+  const bodyEndpointPreview = useMemo<BodyIRPreviewData>(() => {
+    const inputEndpointById = new Map(draftBodyDocument.inputEndpoints.map((endpoint) => [endpoint.id, endpoint]));
+    const outputEndpointById = new Map(draftBodyDocument.outputEndpoints.map((endpoint) => [endpoint.id, endpoint]));
+
+    const inputMatches = bodyEndpointPreviewModel.input.endpointMappings.flatMap((previewGroup) => {
+      const endpointEntry = inputEndpointById.get(previewGroup.endpointId);
+      return previewGroup.mappings.map((previewEndpoint) => ({
+        endpointId: previewGroup.endpointId,
+        endpointIndex: draftBodyDocument.inputEndpoints.findIndex((endpoint) => endpoint.id === previewGroup.endpointId),
+        nodeId: previewEndpoint.nodeId,
+        resolvedSource: previewEndpoint.resolved,
+        scale: endpointEntry?.scale,
       }));
     });
-    const outputMatches = bodyRulePreviewModel.output.rules.flatMap((previewGroup) => {
-      const entry = outputRuleById.get(previewGroup.ruleId);
-      return previewGroup.endpoints.map((endpoint) => ({
-        nodeId: endpoint.nodeId,
-        resolvedTarget: endpoint.resolved,
-        decayPerSecond: entry?.rule.decayPerSecond,
-        ruleIndex: entry?.index,
+    const outputMatches = bodyEndpointPreviewModel.output.endpointMappings.flatMap((previewGroup) => {
+      const endpointEntry = outputEndpointById.get(previewGroup.endpointId);
+      return previewGroup.mappings.map((previewEndpoint) => ({
+        endpointId: previewGroup.endpointId,
+        endpointIndex: draftBodyDocument.outputEndpoints.findIndex((endpoint) => endpoint.id === previewGroup.endpointId),
+        nodeId: previewEndpoint.nodeId,
+        resolvedTarget: previewEndpoint.resolved,
+        decayPerSecond: endpointEntry?.decayPerSecond,
       }));
     });
 
     const compiledEndpointIds = resolveCompiledAgentBodyEndpointIds(bodyPreviewAgent, worldRegistry);
 
     return {
-      canonicalSummary: `host projected coverage ${draftProjectedVisionCellCount} cells；输入 endpoint ${bodyRulePreviewModel.input.endpointNodeIds.length} 个，输出 endpoint ${bodyRulePreviewModel.output.endpointNodeIds.length} 个。`,
+      canonicalSummary: `host projected coverage ${draftProjectedVisionCellCount} cells；输入 endpoint ${bodyEndpointPreviewModel.input.endpointNodeIds.length} 个，输出 endpoint ${bodyEndpointPreviewModel.output.endpointNodeIds.length} 个。`,
       compiledSummary: `compiled runtime shape：输入 endpoint ${compiledEndpointIds.bodyInputNodeIds.length} 个，输出 endpoint ${compiledEndpointIds.bodyOutputNodeIds.length} 个。`,
       inputMatches,
       outputMatches,
     };
-  }, [bodyRulePreviewModel, bodyPreviewAgent, draftProjectedVisionCellCount]);
-  const bodyRuleValidation = useMemo<BodyIRValidationMessage[]>(() => {
-    const inputRuleIndexById = new Map(draftBodyDocument.inputRules.map((rule, index) => [rule.id, index]));
-    const outputRuleIndexById = new Map(draftBodyDocument.outputRules.map((rule, index) => [rule.id, index]));
-    const messages: BodyIRValidationMessage[] = [];
-
-    for (const issue of bodyRulePreviewModel.issues) {
-      const level = issue.kind === 'compile-error' || issue.kind === 'conflict' ? 'error' : 'warning';
-      const scope = issue.scope === 'input' ? 'input-rule' : 'output-rule';
-      const ruleIndex =
-        issue.scope === 'input'
-          ? (issue.ruleId ? inputRuleIndexById.get(issue.ruleId) : undefined)
-          : (issue.ruleId ? outputRuleIndexById.get(issue.ruleId) : undefined);
-
-      if (ruleIndex != null && ruleIndex >= 0) {
-        messages.push({
-          level,
-          message: issue.message,
-          scope,
-          ruleIndex,
-        });
-        continue;
-      }
-
-      messages.push({
-        level,
-        message: issue.message,
-        scope: 'body',
-      });
-
-      if (issue.kind === 'conflict' && issue.relatedRuleIds?.length) {
-        for (const relatedRuleId of issue.relatedRuleIds) {
-          const relatedRuleIndex =
-            issue.scope === 'input'
-              ? inputRuleIndexById.get(relatedRuleId)
-              : outputRuleIndexById.get(relatedRuleId);
-          if (relatedRuleIndex == null || relatedRuleIndex < 0) {
-            continue;
-          }
-
-          messages.push({
-            level,
-            message: issue.message,
-            scope,
-            ruleIndex: relatedRuleIndex,
-          });
-        }
-      }
-    }
-
-    return messages;
-  }, [bodyRulePreviewModel.issues, draftBodyDocument]);
+  }, [bodyEndpointPreviewModel, bodyPreviewAgent, draftProjectedVisionCellCount, draftBodyDocument.inputEndpoints, draftBodyDocument.outputEndpoints, worldRegistry]);
+  const bodyEndpointValidation = useMemo<BodyIRValidationMessage[]>(() => {
+    return bodyEndpointPreviewModel.issues.map((issue) => ({
+      level: issue.kind === 'compile-error' || issue.kind === 'conflict' ? 'error' : 'warning',
+      message: issue.message,
+      scope: issue.scope === 'input' ? 'input-endpoint' : 'output-endpoint',
+      endpointId: issue.endpointId,
+      endpointIndex: issue.scope === 'input'
+        ? draftBodyDocument.inputEndpoints.findIndex((endpoint) => endpoint.id === issue.endpointId)
+        : issue.scope === 'output'
+          ? draftBodyDocument.outputEndpoints.findIndex((endpoint) => endpoint.id === issue.endpointId)
+          : undefined,
+    }));
+  }, [bodyEndpointPreviewModel.issues, draftBodyDocument.inputEndpoints, draftBodyDocument.outputEndpoints]);
 
   useEffect(() => {
     const nextSnapshot = serializeBrainLibrarySnapshot(brainLibrary);
@@ -588,10 +552,10 @@ const App: React.FC = () => {
   }, []);
 
   const syncAgentParametersFromBrain = useCallback((agent: AgentIR) => {
-    const nextParameters = deriveAgentParametersFromBrain(agent, agentParametersRef.current, worldRegistry);
+    const nextParameters = deriveAgentParametersFromBrain(agent, agentParametersRef.current);
     setAgentParameters((current) => (areAgentParametersEqual(current, nextParameters) ? current : nextParameters));
     setDraftAgentParameters((current) => (areAgentParametersEqual(current, nextParameters) ? current : nextParameters));
-  }, [worldRegistry]);
+  }, []);
 
   useEffect(() => {
     setDraftAgentParameters(agentParameters);
@@ -630,24 +594,13 @@ const App: React.FC = () => {
     updater: (current: AgentIR) => AgentIR,
     options?: GraphDocumentChangeOptions
   ) => {
-    const currentPreviewAgent: AgentIR = {
-      ...draftAgentDocumentRef.current,
-      body: draftBodyDocumentRef.current,
-    };
-    const nextPreviewAgent = updater(currentPreviewAgent);
-    if (nextPreviewAgent === currentPreviewAgent) {
+    const currentDraftAgent = draftAgentDocumentRef.current;
+    const nextDraftAgent = updater(currentDraftAgent);
+    if (nextDraftAgent === currentDraftAgent) {
       return;
     }
 
-    const shouldInstallToRuntime = options?.installToRuntime !== false;
-    const nextAgentDocument = shouldInstallToRuntime
-      ? {
-          ...nextPreviewAgent,
-          body: draftAgentDocumentRef.current.body,
-        }
-      : nextPreviewAgent;
-
-    commitEditedAgentDocument(nextAgentDocument, options);
+    commitEditedAgentDocument(nextDraftAgent, options);
   }, [commitEditedAgentDocument]);
 
   const handleAgentParametersApply = useCallback((params: AgentParameters) => {
@@ -789,12 +742,16 @@ const App: React.FC = () => {
   }, [brainLibrary, confirmUnsavedBrainReplacement, resetRuntimeForBrainSwitch, syncAgentParametersFromBrain]);
 
   const handleImportBrain = useCallback((name: string, payload: unknown) => {
+    const existingIds = Array.from(new Set([
+      ...brainLibrary.map((brain) => brain.agent.metadata.id),
+      currentAgentDocumentRef.current.metadata.id,
+    ]));
     const nextBrain = normalizeImportedBrainExchange(
       payload,
       worldRegistry,
       {
         name,
-        existingIds: brainLibrary.map((brain) => brain.agent.metadata.id),
+        existingIds,
       }
     );
     if (!nextBrain) {
@@ -1017,7 +974,10 @@ const App: React.FC = () => {
                   nodeId: 'neuron-2',
                   portId: 'dendrite',
                 },
-                weight: 1,
+                synapseModelId: 'seed.synapse.static-current.v1',
+                parameterOverrides: {
+                  weight: 1,
+                },
               },
             ],
           }),
@@ -1050,7 +1010,10 @@ const App: React.FC = () => {
                   nodeId: firstConnection.to.scope === 'brain' ? firstConnection.to.nodeId : 'neuron-1',
                   portId: 'dendrite',
                 },
-                weight: 1,
+                synapseModelId: 'seed.synapse.static-current.v1',
+                parameterOverrides: {
+                  weight: 1,
+                },
               },
             ],
           }),
@@ -1164,7 +1127,7 @@ const App: React.FC = () => {
           <span data-testid="vision-cells-value">{agentParameters.visionCells}</span>
           <span data-testid="vision-range-value">{agentParameters.visionRange}</span>
           <span data-testid="vision-angle-value">{agentParameters.visionAngle}</span>
-          <span data-testid="body-ir-validation-count">{bodyRuleValidation.length}</span>
+          <span data-testid="body-ir-validation-count">{bodyEndpointValidation.length}</span>
           <span data-testid="graph-ir-validation-count">{agentDraftStatus.issues.length}</span>
           <span data-testid="graph-ir-runtime-state">{agentRuntimeStatus.state}</span>
           <span data-testid="graph-ir-runtime-validation-count">{agentRuntimeStatus.issues.length}</span>
@@ -1176,10 +1139,27 @@ const App: React.FC = () => {
           <span data-testid="graph-ir-installed-link-count">{installedGraphSummary.leafLinkCount}</span>
         </div>
 
-        <div className={`content-area ${editorTab === 'graph' ? 'snn-mode' : 'settings-mode'}`}>
+        <div className={`content-area ${editorTab === 'settings' ? 'settings-mode' : 'snn-mode'}`}>
+          <div
+            className={`content-panel settings-control ${editorTab === 'body' ? 'is-active' : 'is-hidden'}`}
+            aria-hidden={editorTab !== 'body'}
+          >
+            <BodyMappingPanel
+              agent={bodyPreviewAgent}
+              worldRegistry={worldRegistry}
+              bodyDraftStatus={bodyDraftStatus}
+              preview={bodyEndpointPreview}
+              validation={bodyEndpointValidation}
+              onBodyChange={(updater) => {
+                setDraftBodyDocument((currentBody) => updater(currentBody));
+              }}
+              onApply={handleBodyApply}
+              onReset={handleBodyReset}
+            />
+          </div>
           <GraphEditorPanel
             isActive={editorTab === 'graph'}
-            agent={bodyPreviewAgent}
+            agent={draftAgentDocument}
             graphSessionToken={graphEditorSessionToken}
             visionCells={draftProjectedVisionCellCount}
             installedSummary={installedGraphSummary}
@@ -1198,21 +1178,10 @@ const App: React.FC = () => {
             <SettingsPanel
               agentParameters={agentParameters}
               draftAgentParameters={draftAgentParameters}
-              body={draftAgentDocument.body}
-              draftBody={draftBodyDocument}
-              projectedVisionCellCount={draftProjectedVisionCellCount}
               settingsSection={settingsSection}
-              bodyDraftStatus={bodyDraftStatus}
-              bodyRulePreview={bodyRulePreview}
-              bodyRuleValidation={bodyRuleValidation}
               onSettingsSectionChange={setSettingsSection}
               onDraftAgentParametersChange={handleDraftAgentParametersChange}
-              onDraftBodyChange={(updater) => {
-                setDraftBodyDocument((currentBody) => updater(currentBody));
-              }}
               onApplyAgentParameters={applyDraftAgentParameters}
-              onApplyBody={handleBodyApply}
-              onResetBody={handleBodyReset}
               onResetDefaults={resetDraftAgentParameters}
             />
           </div>

@@ -2,7 +2,10 @@ import React, { useCallback } from 'react';
 import type { GraphViewLink } from './graphViewTypes';
 import type { GraphInteractionState, GraphContextMenuState } from './interaction/interactionSession';
 import type { GraphSceneProjection } from './graphSceneProjection';
-import { getNodeCenter, normalizeRect } from './tools/canvasGeometry';
+import { getNodeCenter } from './tools/canvasGeometry';
+import TopologyCanvasSurface from './TopologyCanvasSurface';
+import TopologyLinkLayer from './TopologyLinkLayer';
+import TopologyNodeLayer from './TopologyNodeLayer';
 
 interface GraphTopologyCanvasProps {
   surfaceRef: React.RefObject<HTMLDivElement>;
@@ -179,249 +182,156 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
     [canvasScale, links, scene.map, sceneRef]
   );
 
-  const normalizedSelectionRect = selectionRect ? normalizeRect(selectionRect) : null;
   const pendingNodeIds = interaction?.type === 'linking' ? interaction.sourceNodeIds : [];
+  const renderLabel = (link: GraphViewLink): string => (link.aggregate ? `${link.count}` : formatWeight(link.weight));
 
   return (
-    <div
-      ref={surfaceRef}
-      className={[
-        'topology-surface',
-        interaction?.type === 'panning' ? 'is-panning' : '',
-        interaction?.type === 'selecting' ? 'is-marqueeing' : '',
-        interaction?.type === 'linking' ? 'is-linking' : '',
-      ].join(' ')}
-      data-testid="topology-canvas"
-      tabIndex={0}
-      style={{
-        width: Math.max(width, 1),
-        height: Math.max(height, 1),
-      }}
-      onContextMenu={onCanvasContextMenu}
-      onMouseDown={onCanvasMouseDown}
-    >
-      {interaction?.type === 'linking' && (
-        <div className="topology-pending-link" data-testid="topology-pending-link">
-          右键拖到目标叶子节点完成连接
-        </div>
-      )}
+    <TopologyCanvasSurface
+      surfaceRef={surfaceRef}
+      sceneRef={sceneRef}
+      width={width}
+      height={height}
+      sceneWidth={scene.size.width}
+      sceneHeight={scene.size.height}
+      canvasViewport={canvasViewport}
+      canvasScale={canvasScale}
+      isPanning={interaction?.type === 'panning'}
+      isSelecting={interaction?.type === 'selecting'}
+      isLinking={interaction?.type === 'linking'}
+      selectionRect={selectionRect}
+      onCanvasContextMenu={onCanvasContextMenu}
+      onCanvasMouseDown={onCanvasMouseDown}
+      onSceneDoubleClick={(event) => {
+        const nearbyLink = findEditableLinkNearClientPoint(event.clientX, event.clientY);
+        if (!nearbyLink) {
+          return;
+        }
 
-      {contextMenu && contextMenuPosition && (
-        <div
-          className="topology-context-menu"
-          data-testid="topology-context-menu"
-          style={{
-            left: contextMenuPosition.x,
-            top: contextMenuPosition.y,
-          }}
-          onMouseDown={(event) => event.stopPropagation()}
-          onClick={(event) => event.stopPropagation()}
-        >
-          {contextMenu.kind === 'canvas' && canCreateNeuronHere && (
-            <>
-              <button
-                type="button"
-                className="topology-context-menu-item"
-                data-testid="topology-context-new-neuron"
-                onClick={() => {
-                  onAddNeuronAt(contextMenu.scene.x + scene.origin.x, contextMenu.scene.y + scene.origin.y);
-                  onCloseContextMenu();
-                }}
-              >
-                新建神经元
-              </button>
-              <button
-                type="button"
-                className="topology-context-menu-item"
-                data-testid="topology-context-new-group"
-                onClick={() => {
-                  onAddNeuronGroupAt(contextMenu.scene.x + scene.origin.x, contextMenu.scene.y + scene.origin.y);
-                  onCloseContextMenu();
-                }}
-              >
-                新建分组
-              </button>
-            </>
-          )}
-          {contextMenu.kind === 'selection' && canAggregateSelection && (
-            <button
-              type="button"
-              className="topology-context-menu-item"
-              data-testid="topology-context-aggregate"
-              onClick={() => {
-                onAggregateSelectedNodes();
-                onCloseContextMenu();
+        event.stopPropagation();
+        onOpenLinkDetail(nearbyLink.id);
+      }}
+      beforeScene={
+        <>
+          {interaction?.type === 'linking' ? (
+            <div className="topology-pending-link" data-testid="topology-pending-link">
+              右键拖到目标叶子节点完成连接
+            </div>
+          ) : null}
+
+          {contextMenu && contextMenuPosition ? (
+            <div
+              className="topology-context-menu"
+              data-testid="topology-context-menu"
+              style={{
+                left: contextMenuPosition.x,
+                top: contextMenuPosition.y,
               }}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
             >
-              聚合
-            </button>
-          )}
-          {contextMenu.kind === 'group' && contextMenu.nodeIds.length === 1 && (
-            <>
-              <button
-                type="button"
-                className="topology-context-menu-item"
-                data-testid="topology-context-toggle-group"
-                onClick={() => {
-                  onToggleGroupExpanded(contextMenu.nodeIds[0]);
-                  onCloseContextMenu();
-                }}
-              >
-                {scene.map.get(contextMenu.nodeIds[0])?.expanded ? '收起' : '展开'}
-              </button>
-              {canUngroupNodesHere && scene.map.get(contextMenu.nodeIds[0])?.kind === 'neuron-group' && (
+              {contextMenu.kind === 'canvas' && canCreateNeuronHere ? (
+                <>
+                  <button
+                    type="button"
+                    className="topology-context-menu-item"
+                    data-testid="topology-context-new-neuron"
+                    onClick={() => {
+                      onAddNeuronAt(contextMenu.scene.x + scene.origin.x, contextMenu.scene.y + scene.origin.y);
+                      onCloseContextMenu();
+                    }}
+                  >
+                    新建神经元
+                  </button>
+                  <button
+                    type="button"
+                    className="topology-context-menu-item"
+                    data-testid="topology-context-new-group"
+                    onClick={() => {
+                      onAddNeuronGroupAt(contextMenu.scene.x + scene.origin.x, contextMenu.scene.y + scene.origin.y);
+                      onCloseContextMenu();
+                    }}
+                  >
+                    新建分组
+                  </button>
+                </>
+              ) : null}
+              {contextMenu.kind === 'selection' && canAggregateSelection ? (
                 <button
                   type="button"
                   className="topology-context-menu-item"
-                  data-testid="topology-context-ungroup"
+                  data-testid="topology-context-aggregate"
                   onClick={() => {
-                    onUngroupNode(contextMenu.nodeIds[0]);
+                    onAggregateSelectedNodes();
                     onCloseContextMenu();
                   }}
                 >
-                  拆开组
+                  聚合
                 </button>
-              )}
-            </>
-          )}
-        </div>
-      )}
-
-      <div
-        ref={sceneRef}
-        className="topology-scene"
-        data-testid="topology-scene"
-        style={{
-          width: scene.size.width,
-          height: scene.size.height,
-          transform: `translate(${canvasViewport.x}px, ${canvasViewport.y}px) scale(${canvasScale})`,
-          transformOrigin: '0 0',
-        }}
-        onDoubleClick={(event) => {
-          const nearbyLink = findEditableLinkNearClientPoint(event.clientX, event.clientY);
-          if (!nearbyLink) {
-            return;
-          }
-
-          event.stopPropagation();
-          onOpenLinkDetail(nearbyLink.id);
-        }}
-      >
-        <svg
-          className="topology-links"
-          aria-hidden="true"
-          onDoubleClick={(event) => {
-            const nearbyLink = findEditableLinkNearClientPoint(event.clientX, event.clientY);
-            if (!nearbyLink) {
+              ) : null}
+              {contextMenu.kind === 'group' && contextMenu.nodeIds.length === 1 ? (
+                <>
+                  <button
+                    type="button"
+                    className="topology-context-menu-item"
+                    data-testid="topology-context-toggle-group"
+                    onClick={() => {
+                      onToggleGroupExpanded(contextMenu.nodeIds[0]);
+                      onCloseContextMenu();
+                    }}
+                  >
+                    {scene.map.get(contextMenu.nodeIds[0])?.expanded ? '收起' : '展开'}
+                  </button>
+                  {canUngroupNodesHere && scene.map.get(contextMenu.nodeIds[0])?.kind === 'neuron-group' ? (
+                    <button
+                      type="button"
+                      className="topology-context-menu-item"
+                      data-testid="topology-context-ungroup"
+                      onClick={() => {
+                        onUngroupNode(contextMenu.nodeIds[0]);
+                        onCloseContextMenu();
+                      }}
+                    >
+                      拆开组
+                    </button>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          ) : null}
+        </>
+      }
+    >
+      <TopologyLinkLayer
+        sceneNodeMap={scene.map}
+        links={links.map((link) => ({
+          id: link.id,
+          fromNodeId: link.fromNodeId,
+          toNodeId: link.toNodeId,
+          aggregate: link.aggregate,
+          selected: selectedLinkId === link.id,
+          inspectable: link.inspectable,
+          label: renderLabel(link),
+          onClick: (event) => {
+            event.stopPropagation();
+            if (link.aggregate && link.inspectable) {
+              onOpenLinkDetail(link.id);
               return;
             }
-
-            event.stopPropagation();
-            onOpenLinkDetail(nearbyLink.id);
-          }}
-        >
-          {links.map((link) => {
-            const fromNode = scene.map.get(link.fromNodeId);
-            const toNode = scene.map.get(link.toNodeId);
-            if (!fromNode || !toNode) {
-              return null;
+            if (link.inspectable) {
+              onSelectLink(link.id);
             }
-
-            const from = getNodeCenter({
-              x: fromNode.sceneX,
-              y: fromNode.sceneY,
-              width: fromNode.width,
-              height: fromNode.height,
-            });
-            const to = getNodeCenter({
-              x: toNode.sceneX,
-              y: toNode.sceneY,
-              width: toNode.width,
-              height: toNode.height,
-            });
-            const selected = selectedLinkId === link.id;
-
-            return (
-              <g
-                key={link.id}
-                className={`topology-link ${link.aggregate ? 'is-aggregate' : 'is-leaf'} ${selected ? 'is-selected' : ''}`}
-                data-testid={`topology-link-${link.id}`}
-                data-topology-link="true"
-                data-topology-link-id={link.id}
-                data-topology-link-from-node-id={link.fromNodeId}
-                data-topology-link-to-node-id={link.toNodeId}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (link.aggregate && link.inspectable) {
-                    onOpenLinkDetail(link.id);
-                    return;
-                  }
-                  if (link.inspectable) {
-                    onSelectLink(link.id);
-                  }
-                }}
-                onDoubleClick={(event) => {
-                  event.stopPropagation();
-                  if (link.inspectable) {
-                    onOpenLinkDetail(link.id);
-                  }
-                }}
-              >
-                <line
-                  className="topology-link-hit"
-                  x1={from.x}
-                  y1={from.y}
-                  x2={to.x}
-                  y2={to.y}
-                  onDoubleClick={(event) => {
-                    event.stopPropagation();
-                    if (link.inspectable) {
-                      onOpenLinkDetail(link.id);
-                    }
-                  }}
-                />
-                <line className="topology-link-stroke" x1={from.x} y1={from.y} x2={to.x} y2={to.y} />
-                <line className="topology-link-flow" x1={from.x} y1={from.y} x2={to.x} y2={to.y} />
-                <text
-                  x={(from.x + to.x) / 2}
-                  y={(from.y + to.y) / 2 - 8}
-                  onDoubleClick={(event) => {
-                    event.stopPropagation();
-                    if (link.inspectable) {
-                      onOpenLinkDetail(link.id);
-                    }
-                  }}
-                >
-                  {link.aggregate ? `${link.count}` : formatWeight(link.weight)}
-                </text>
-              </g>
-            );
-          })}
-
-          {pendingLinkLine && (
-            <line
-              className="topology-link-preview"
-              x1={pendingLinkLine.from.x}
-              y1={pendingLinkLine.from.y}
-              x2={pendingLinkLine.to.x}
-              y2={pendingLinkLine.to.y}
-            />
-          )}
-        </svg>
-
-        {normalizedSelectionRect && (
-          <div
-            className="topology-marquee"
-            style={{
-              left: normalizedSelectionRect.x,
-              top: normalizedSelectionRect.y,
-              width: normalizedSelectionRect.width,
-              height: normalizedSelectionRect.height,
-            }}
-          />
-        )}
-
-        {scene.list.map((node) => {
+          },
+          onDoubleClick: (event) => {
+            event.stopPropagation();
+            if (link.inspectable) {
+              onOpenLinkDetail(link.id);
+            }
+          },
+        }))}
+        pendingLinkLine={pendingLinkLine}
+      />
+      <TopologyNodeLayer
+        nodes={scene.list.map((node) => {
           const selected = selectedNodeIds.includes(node.viewId);
           const active = activeViewNodeIds.has(node.viewId);
           const pending = pendingNodeIds.includes(node.viewId);
@@ -439,56 +349,88 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
             canonicalOnly ? 'is-canonical-only' : '',
           ].join(' ');
 
-          return (
-            <div
-              key={node.viewId}
-              className={nodeClassName}
-              data-testid={`topology-node-${node.id}`}
-              data-topology-root-container={node.rootContainer ? 'true' : undefined}
-              data-topology-view-node-id={node.viewId}
-              data-topology-runtime-installed={node.runtimeInstalled ? 'true' : 'false'}
-              data-topology-canonical-only={canonicalOnly ? 'true' : undefined}
-              title={canonicalOnly ? `${node.detail}，当前未安装到 runtime` : node.leaf ? node.detail : undefined}
-              aria-label={canonicalOnly ? `${node.id} canonical-only` : undefined}
-              style={{
-                left: node.sceneX,
-                top: node.sceneY,
-                width: node.width,
-                height: node.height,
-              }}
-              onMouseDown={(event) => onNodeMouseDown(event, node.viewId)}
-              onContextMenu={onNodeContextMenu}
-              onDoubleClick={(event) => {
-                const action = getNodeDoubleClickAction(node.viewId);
-                if (!action) {
-                  return;
-                }
+          return {
+            id: node.viewId,
+            x: node.sceneX,
+            y: node.sceneY,
+            width: node.width,
+            height: node.height,
+            className: nodeClassName,
+            title: canonicalOnly ? `${node.detail}，当前未安装到 runtime` : node.leaf ? node.detail : undefined,
+            ariaLabel: canonicalOnly ? `${node.id} canonical-only` : undefined,
+            dataTestId: `topology-node-${node.id}`,
+            dataAttributes: {
+              'data-topology-root-container': node.rootContainer ? 'true' : undefined,
+              'data-topology-view-node-id': node.viewId,
+              'data-topology-runtime-installed': node.runtimeInstalled ? 'true' : 'false',
+              'data-topology-canonical-only': canonicalOnly ? 'true' : undefined,
+            },
+            onMouseDown:
+              node.kind === 'neuron-group' && node.expanded
+                ? undefined
+                : (event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>) => onNodeMouseDown(event as React.MouseEvent<HTMLDivElement>, node.viewId),
+            onContextMenu:
+              node.kind === 'neuron-group' && node.expanded
+                ? undefined
+                : (event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>) => onNodeContextMenu(event as React.MouseEvent<HTMLDivElement>),
+            onDoubleClick: (event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>) => {
+              if (node.kind === 'neuron-group' && node.expanded) {
+                return;
+              }
+              const action = getNodeDoubleClickAction(node.viewId);
+              if (!action) {
+                return;
+              }
 
-                event.stopPropagation();
-                if (action === 'navigate') {
-                  onNavigateToNode(node.viewId);
-                  return;
-                }
+              event.stopPropagation();
+              if (action === 'navigate') {
+                onNavigateToNode(node.viewId);
+                return;
+              }
 
-                if (action === 'edit') {
-                  onOpenNodeDetail(node.refNodeId);
-                }
-              }}
-            >
-              {node.leaf ? <>
-                <div className="topology-node-shape topology-node-dot" />
-                {canonicalOnly ? <div className="topology-node-canonical-badge" data-testid={`topology-node-canonical-only-${node.id}`}>C</div> : null}
-              </> : (
-                <div className="topology-node-shape">
+              if (action === 'edit') {
+                onOpenNodeDetail(node.refNodeId);
+              }
+            },
+            content: node.leaf ? <>
+              <div className="topology-node-shape topology-node-dot" />
+              {canonicalOnly ? <div className="topology-node-canonical-badge" data-testid={`topology-node-canonical-only-${node.id}`}>C</div> : null}
+            </> : (
+              <div
+                className="topology-node-shape"
+                data-testid={node.kind === 'neuron-group' && node.expanded ? `topology-node-body-${node.id}` : undefined}
+                data-topology-group-body={node.kind === 'neuron-group' && node.expanded ? 'true' : undefined}
+              >
+                <div
+                  className="topology-node-titlebar"
+                  data-testid={node.kind === 'neuron-group' ? `topology-node-title-${node.id}` : undefined}
+                  data-topology-group-title-handle={node.kind === 'neuron-group' && node.expanded ? 'true' : undefined}
+                  onMouseDown={node.kind === 'neuron-group' && node.expanded ? (event) => onNodeMouseDown(event, node.viewId) : undefined}
+                  onContextMenu={node.kind === 'neuron-group' && node.expanded ? onNodeContextMenu : undefined}
+                  onDoubleClick={
+                    node.kind === 'neuron-group' && node.expanded
+                      ? (event) => {
+                          event.stopPropagation();
+                          onToggleGroupExpanded(node.viewId);
+                        }
+                      : undefined
+                  }
+                >
                   <div className="topology-node-label">{node.label}</div>
                   <div className="topology-node-detail">{node.detail}</div>
                 </div>
-              )}
-            </div>
-          );
+                {node.kind !== 'neuron-group' || node.expanded ? null : (
+                  <>
+                    <div className="topology-node-label">{node.label}</div>
+                    <div className="topology-node-detail">{node.detail}</div>
+                  </>
+                )}
+              </div>
+            ),
+          };
         })}
-      </div>
-    </div>
+      />
+    </TopologyCanvasSurface>
   );
 };
 

@@ -1,49 +1,26 @@
 import React from 'react';
-import BodyIRSettingsSection from './BodyIRSettingsSection';
 import type {
   AgentParameters,
-  BodyIRDraftStatus,
-  BodyIRPreviewData,
-  BodyIRValidationMessage,
   SettingsSection,
 } from './types';
-import type { BodyIR } from '../../domain/brain';
 
 interface SettingsPanelProps {
   agentParameters: AgentParameters;
   draftAgentParameters: AgentParameters;
-  body: BodyIR;
-  draftBody: BodyIR;
-  projectedVisionCellCount: number;
   settingsSection: SettingsSection;
-  bodyDraftStatus: BodyIRDraftStatus;
-  bodyRulePreview?: BodyIRPreviewData;
-  bodyRuleValidation?: BodyIRValidationMessage[];
   onSettingsSectionChange: (section: SettingsSection) => void;
   onDraftAgentParametersChange: React.Dispatch<React.SetStateAction<AgentParameters>>;
-  onDraftBodyChange?: (updater: (current: BodyIR) => BodyIR) => void;
   onApplyAgentParameters: () => void;
-  onApplyBody: () => void;
-  onResetBody: () => void;
   onResetDefaults: () => void;
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
   agentParameters,
   draftAgentParameters,
-  body: _body,
-  draftBody,
-  projectedVisionCellCount,
   settingsSection,
-  bodyDraftStatus,
-  bodyRulePreview,
-  bodyRuleValidation,
   onSettingsSectionChange,
   onDraftAgentParametersChange,
-  onDraftBodyChange,
   onApplyAgentParameters,
-  onApplyBody,
-  onResetBody,
   onResetDefaults,
 }) => {
   const renderKeyboardInputGuide = () => (
@@ -264,15 +241,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </button>
         <button
           type="button"
-          className={`settings-sidebar-item ${settingsSection === 'body-ir' ? 'active' : ''}`}
-          data-testid="settings-nav-body-ir"
-          aria-pressed={settingsSection === 'body-ir'}
-          onClick={() => onSettingsSectionChange('body-ir')}
-        >
-          Body IR
-        </button>
-        <button
-          type="button"
           className={`settings-sidebar-item ${settingsSection === 'keyboard-inputs' ? 'active' : ''}`}
           data-testid="settings-nav-keyboard-inputs"
           aria-pressed={settingsSection === 'keyboard-inputs'}
@@ -284,20 +252,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       <div className="settings-content">
         {settingsSection === 'agent-parameters'
           ? renderAgentParameters()
-          : settingsSection === 'body-ir'
-            ? (
-                <BodyIRSettingsSection
-                  body={draftBody}
-                  projectedVisionCellCount={projectedVisionCellCount}
-                  hasBodyDraftChanges={bodyDraftStatus.hasChanges}
-                  onBodyChange={onDraftBodyChange}
-                  validation={bodyRuleValidation}
-                  preview={bodyRulePreview}
-                  onApply={onApplyBody}
-                  onReset={onResetBody}
-                />
-              )
-            : renderKeyboardInputGuide()}
+          : renderKeyboardInputGuide()}
       </div>
     </div>
   );

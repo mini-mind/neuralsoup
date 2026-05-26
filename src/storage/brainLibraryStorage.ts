@@ -1,7 +1,5 @@
 import {
-  isValidBrainLibraryAgentPayload,
   isBrainLibraryStoredRecord,
-  normalizeCanonicalBrainLibraryRecord,
   type BrainLibraryRecord,
 } from './brainLibraryRecord';
 import type { WorldRegistry } from '../domain/brain';
@@ -38,11 +36,15 @@ export interface BrainLibraryLoadResult {
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const hasOnlyKeys = (value: Record<string, unknown>, allowedKeys: readonly string[]): boolean =>
+  Object.keys(value).every((key) => allowedKeys.includes(key));
+
 const isBrainLibraryStorageEnvelope = (
   value: unknown,
   worldRegistry: WorldRegistry
 ): value is BrainLibraryStorageEnvelope =>
   isObject(value) &&
+  hasOnlyKeys(value, ['storageVersion', 'savedAt', 'brains']) &&
   value.storageVersion === 1 &&
   typeof value.savedAt === 'string' &&
   Array.isArray(value.brains) &&
@@ -55,16 +57,12 @@ const createStorageEnvelope = (
   storageVersion: 1,
   savedAt: new Date().toISOString(),
   brains: brains.map((brain: BrainLibraryRecord) => {
-    const normalized = normalizeCanonicalBrainLibraryRecord(brain.agent, {
-      ...brain.agent.metadata,
-    });
-    const brainName = normalized.agent.metadata.name;
-
-    if (!isValidBrainLibraryAgentPayload(normalized.agent, worldRegistry)) {
-      throw new Error(`Brain "${brainName}" 无法保存：AgentIR 校验失败。`);
+    const brainName = brain.agent.metadata.name;
+    if (!isBrainLibraryStoredRecord(brain, worldRegistry)) {
+      throw new Error(`Brain "${brainName}" 无法保存：存储记录仅允许顶层 agent 且必须为 canonical AgentIR。`);
     }
 
-    return normalized;
+    return brain;
   }),
 });
 
@@ -127,21 +125,8 @@ export const loadBrainLibraryWithStatus = (worldRegistry: WorldRegistry): BrainL
   try {
     const parsed = JSON.parse(rawValue);
     if (isBrainLibraryStorageEnvelope(parsed, worldRegistry)) {
-      const records = parsed.brains.map((brain) =>
-        normalizeCanonicalBrainLibraryRecord(brain.agent, {
-          ...brain.agent.metadata,
-        })
-      );
-      const shouldRewriteStorage = parsed.brains.some(
-        (brain, index) => JSON.stringify(brain) !== JSON.stringify(records[index])
-      );
-
-      if (shouldRewriteStorage) {
-        saveBrainLibrary(records, worldRegistry);
-      }
-
       return {
-        brains: records,
+        brains: parsed.brains,
         status: { state: 'ok', message: null },
       };
     }
@@ -151,7 +136,7 @@ export const loadBrainLibraryWithStatus = (worldRegistry: WorldRegistry): BrainL
       brains: [],
       status: {
         state: 'recovered',
-        message: 'Brain Library 存储格式无效，已隔离损坏数据并重置为空库。',
+        message: 'Brain Library 存储格式无效（仅支持当前 AgentIR 规范），已隔离并重置为空库。',
       },
     };
   } catch {

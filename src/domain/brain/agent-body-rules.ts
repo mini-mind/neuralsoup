@@ -1,92 +1,97 @@
 import type {
   AgentIR,
+  BodyIR,
+  BodyInputMappingIR,
   BodyInputNodeRuntime,
-  BodyInputRule,
+  BodyOutputMappingIR,
   BodyOutputNodeRuntime,
-  BodyOutputRule,
 } from './agent-ir';
 import type { WorldInputBinding, WorldOutputBinding, WorldRegistry } from './world-registry';
 
-export type AgentBodyRuleScope = 'input' | 'output';
-export type AgentBodyRuleIssueKind = 'compile-error' | 'conflict' | 'unmatched';
+export type AgentBodyEndpointScope = 'input' | 'output';
+export type AgentBodyEndpointIssueKind = 'compile-error' | 'conflict' | 'unmatched';
 
-export interface AgentBodyRulePreviewItem {
+export interface AgentBodyEndpointPreviewItem {
   nodeId: string;
   resolved: string;
 }
 
-export interface AgentBodyRulePreviewGroup {
-  ruleId: string;
-  nodeIdPattern: string;
+export interface AgentBodyEndpointPreviewGroup {
+  endpointId: string;
+  mappingSelector: string;
   template: string;
-  endpoints: AgentBodyRulePreviewItem[];
+  mappings: AgentBodyEndpointPreviewItem[];
 }
 
-export interface AgentBodyRuleIssueSummaryItem {
-  scope: AgentBodyRuleScope;
-  kind: AgentBodyRuleIssueKind;
+export interface AgentBodyEndpointIssueSummaryItem {
+  scope: AgentBodyEndpointScope;
+  kind: AgentBodyEndpointIssueKind;
   message: string;
-  ruleId?: string;
+  endpointId?: string;
   nodeId?: string;
-  relatedRuleIds?: string[];
+  relatedMappingIds?: string[];
   resolved?: string;
   target?: string;
 }
 
-export interface AgentBodyRuleScopePreview {
+export interface AgentBodyEndpointScopePreview {
   endpointNodeIds: string[];
-  rules: AgentBodyRulePreviewGroup[];
-  previewsByRuleId: Record<string, AgentBodyRulePreviewItem[]>;
+  endpointMappings: AgentBodyEndpointPreviewGroup[];
+  previewsByEndpointId: Record<string, AgentBodyEndpointPreviewItem[]>;
 }
 
-export interface AgentBodyRulePreviewModel {
-  input: AgentBodyRuleScopePreview;
-  output: AgentBodyRuleScopePreview;
-  issues: AgentBodyRuleIssueSummaryItem[];
+export interface AgentBodyEndpointPreviewModel {
+  input: AgentBodyEndpointScopePreview;
+  output: AgentBodyEndpointScopePreview;
+  issues: AgentBodyEndpointIssueSummaryItem[];
 }
 
-interface CompiledBodyRule<Rule> {
-  rule: Rule;
-  regex: RegExp;
-}
-
-interface BodyRuleResolution<RuntimeNode> {
+interface BodyResolutionResult<RuntimeNode> {
   nodesById: Map<string, RuntimeNode>;
-  issues: AgentBodyRuleIssueSummaryItem[];
-  rules: AgentBodyRulePreviewGroup[];
+  issues: AgentBodyEndpointIssueSummaryItem[];
+  endpointMappings: AgentBodyEndpointPreviewGroup[];
 }
 
-const executeRulePattern = (regex: RegExp, nodeId: string): RegExpExecArray | null => {
-  regex.lastIndex = 0;
-  return regex.exec(nodeId);
+const dedupeSorted = (values: Iterable<string>): string[] =>
+  [...new Set(values)].sort((left, right) => left.localeCompare(right));
+
+const buildEndpointPreviewRecord = (
+  endpointMappings: AgentBodyEndpointPreviewGroup[]
+): Record<string, AgentBodyEndpointPreviewItem[]> =>
+  Object.fromEntries(endpointMappings.map((mapping) => [mapping.endpointId, [...mapping.mappings]]));
+
+const sortPreviewItems = (items: AgentBodyEndpointPreviewItem[]): AgentBodyEndpointPreviewItem[] =>
+  items.sort((left, right) => left.nodeId.localeCompare(right.nodeId) || left.resolved.localeCompare(right.resolved));
+
+const collectEndpointNodeIdsFromConnections = (agent: AgentIR, scope: 'bodyInput' | 'bodyOutput'): Set<string> => {
+  const endpointIds = new Set<string>();
+  for (const connection of agent.connections) {
+    if (connection.from.scope === scope) {
+      endpointIds.add(connection.from.nodeId);
+    }
+    if (connection.to.scope === scope) {
+      endpointIds.add(connection.to.nodeId);
+    }
+  }
+
+  return endpointIds;
 };
 
-const compileRulePattern = (
-  nodeIdPattern: string,
-  ruleId: string,
-  scope: AgentBodyRuleScope
-): { regex: RegExp | null; issue: AgentBodyRuleIssueSummaryItem | null } => {
-  try {
-    return { regex: new RegExp(nodeIdPattern), issue: null };
-  } catch (error) {
-    return {
-      regex: null,
-      issue: {
-        scope,
-        kind: 'compile-error',
-        ruleId,
-        message: `body ${scope} rule "${ruleId}" has invalid nodeIdPattern "${nodeIdPattern}": ${
-          error instanceof Error ? error.message : 'Unknown regular expression error.'
-        }`,
-      },
-    };
-  }
-};
+const collectMappedInputNodeIds = (body: BodyIR): string[] =>
+  body.mappings
+    .filter((mapping): mapping is BodyInputMappingIR => mapping.kind === 'input')
+    .map((mapping) => mapping.nodeId);
+
+const collectMappedOutputNodeIds = (body: BodyIR): string[] =>
+  body.mappings
+    .filter((mapping): mapping is BodyOutputMappingIR => mapping.kind === 'output')
+    .map((mapping) => mapping.nodeId);
 
 const parseBodyInputSource = (nodeId: string, binding: WorldInputBinding | null, scale: number): BodyInputNodeRuntime | null => {
   if (!binding) {
     return null;
   }
+
   return {
     id: nodeId,
     source: binding.source,
@@ -114,193 +119,89 @@ const parseBodyOutputTarget = (
   };
 };
 
-const enumerateInputRuleNodeIds = (
-  registry: Pick<WorldRegistry, 'enumerateInputNodeIds'>,
-  rule: BodyInputRule,
-  visionCellCount: number
-): string[] => {
-  return registry.enumerateInputNodeIds(rule, visionCellCount);
-};
-
-const resolveProjectedVisionCellCount = (projectedVisionCellCount?: number): number =>
-  projectedVisionCellCount == null ? 0 : Math.max(0, Math.floor(projectedVisionCellCount));
-
-const enumerateOutputRuleNodeIds = (
-  registry: Pick<WorldRegistry, 'enumerateOutputNodeIds'>,
-  rule: BodyOutputRule
-): string[] => {
-  return registry.enumerateOutputNodeIds(rule);
-};
-
-const collectEndpointIdsFromConnections = (agent: AgentIR, scope: 'bodyInput' | 'bodyOutput'): Set<string> => {
-  const endpointIds = new Set<string>();
-  for (const connection of agent.connections) {
-    if (connection.from.scope === scope) {
-      endpointIds.add(connection.from.nodeId);
-    }
-    if (connection.to.scope === scope) {
-      endpointIds.add(connection.to.nodeId);
-    }
-  }
-
-  return endpointIds;
-};
-
-export interface AgentBodyEndpointIds {
-  bodyInputNodeIds: string[];
-  bodyOutputNodeIds: string[];
-}
-
-export interface AgentCompiledBodyEndpointIds {
-  bodyInputNodeIds: string[];
-  bodyOutputNodeIds: string[];
-}
-
-export interface AgentBodyEndpointResolution {
-  inputNodesById: Map<string, BodyInputNodeRuntime>;
-  outputNodesById: Map<string, BodyOutputNodeRuntime>;
-  issues: AgentBodyRuleIssueSummaryItem[];
-  endpointIds: AgentBodyEndpointIds;
-}
-
-export const resolveAgentBodyEndpointIds = (
-  agent: AgentIR,
+const resolveBodyInputMappings = (
   registry: WorldRegistry,
-  projectedVisionCellCount?: number
-): AgentBodyEndpointIds => {
-  const visionCellCount = resolveProjectedVisionCellCount(projectedVisionCellCount);
-  const bodyInputNodeIds = new Set<string>([
-    ...collectEndpointIdsFromConnections(agent, 'bodyInput'),
-    ...agent.body.inputRules.flatMap((rule) => enumerateInputRuleNodeIds(registry, rule, visionCellCount)),
-  ]);
-  const bodyOutputNodeIds = new Set<string>([
-    ...collectEndpointIdsFromConnections(agent, 'bodyOutput'),
-    ...agent.body.outputRules.flatMap((rule) => enumerateOutputRuleNodeIds(registry, rule)),
-  ]);
-
-  return {
-    bodyInputNodeIds: [...bodyInputNodeIds].sort(),
-    bodyOutputNodeIds: [...bodyOutputNodeIds].sort(),
-  };
-};
-
-export const resolveCompiledAgentBodyEndpointIds = (agent: AgentIR, registry: WorldRegistry): AgentCompiledBodyEndpointIds => {
-  const referencedBodyInputNodeIds = collectEndpointIdsFromConnections(agent, 'bodyInput');
-  const referencedBodyOutputNodeIds = collectEndpointIdsFromConnections(agent, 'bodyOutput');
-  const input = resolveBodyInputRules(registry, agent.body.inputRules, referencedBodyInputNodeIds);
-  const output = resolveBodyOutputRules(registry, agent.body.outputRules, referencedBodyOutputNodeIds);
-
-  return {
-    bodyInputNodeIds: [...input.nodesById.keys()].sort(),
-    bodyOutputNodeIds: [...output.nodesById.keys()].sort(),
-  };
-};
-
-export const resolveAgentBodyEndpointResolution = (agent: AgentIR, registry: WorldRegistry): AgentBodyEndpointResolution => {
-  const endpointIds = resolveAgentBodyEndpointIds(agent, registry);
-  const input = resolveBodyInputRules(registry, agent.body.inputRules, endpointIds.bodyInputNodeIds);
-  const output = resolveBodyOutputRules(registry, agent.body.outputRules, endpointIds.bodyOutputNodeIds);
-
-  return {
-    inputNodesById: input.nodesById,
-    outputNodesById: output.nodesById,
-    issues: [...input.issues, ...output.issues],
-    endpointIds,
-  };
-};
-
-const buildPreviewRecord = (rules: AgentBodyRulePreviewGroup[]): Record<string, AgentBodyRulePreviewItem[]> =>
-  Object.fromEntries(rules.map((rule) => [rule.ruleId, [...rule.endpoints]]));
-
-const sortPreviewItems = (items: AgentBodyRulePreviewItem[]): AgentBodyRulePreviewItem[] =>
-  items.sort((left, right) => left.nodeId.localeCompare(right.nodeId) || left.resolved.localeCompare(right.resolved));
-
-const buildInputPreviewGroups = (
-  rules: BodyInputRule[]
-): {
-  compiledRules: CompiledBodyRule<BodyInputRule>[];
-  issues: AgentBodyRuleIssueSummaryItem[];
-  previews: AgentBodyRulePreviewGroup[];
-} => {
-  const compiledRules: CompiledBodyRule<BodyInputRule>[] = [];
-  const issues: AgentBodyRuleIssueSummaryItem[] = [];
-  const previews = rules.map((rule) => ({
-    ruleId: rule.id,
-    nodeIdPattern: rule.nodeIdPattern,
-    template: rule.sourceTemplate,
-    endpoints: [],
+  body: BodyIR,
+  nodeIds: Iterable<string>
+): BodyResolutionResult<BodyInputNodeRuntime> => {
+  const nodesById = new Map<string, BodyInputNodeRuntime>();
+  const endpointById = new Map(body.inputEndpoints.map((endpoint) => [endpoint.id, endpoint]));
+  const mappingsByNodeId = new Map<string, BodyInputMappingIR[]>();
+  const endpointMappings: AgentBodyEndpointPreviewGroup[] = body.inputEndpoints.map((endpoint) => ({
+    endpointId: endpoint.id,
+    mappingSelector: `mapping.endpointId == "${endpoint.id}"`,
+    template: endpoint.source,
+    mappings: [],
   }));
-  const previewByRuleId = new Map(previews.map((preview) => [preview.ruleId, preview]));
+  const previewByEndpointId = new Map(endpointMappings.map((group) => [group.endpointId, group]));
+  const issues: AgentBodyEndpointIssueSummaryItem[] = [];
 
-  for (const rule of rules) {
-    const { regex, issue } = compileRulePattern(rule.nodeIdPattern, rule.id, 'input');
-    if (issue) {
-      issues.push(issue);
+  for (const mapping of body.mappings) {
+    if (mapping.kind !== 'input') {
       continue;
     }
-
-    if (regex) {
-      compiledRules.push({ rule, regex });
-    }
+    const current = mappingsByNodeId.get(mapping.nodeId) ?? [];
+    current.push(mapping);
+    mappingsByNodeId.set(mapping.nodeId, current);
   }
 
-  return { compiledRules, issues, previews: [...previewByRuleId.values()] };
-};
-
-const resolveBodyInputRules = (
-  registry: WorldRegistry,
-  rules: BodyInputRule[],
-  nodeIds: Iterable<string>
-): BodyRuleResolution<BodyInputNodeRuntime> => {
-  const nodesById = new Map<string, BodyInputNodeRuntime>();
-  const { compiledRules, issues, previews } = buildInputPreviewGroups(rules);
-  const previewByRuleId = new Map(previews.map((preview) => [preview.ruleId, preview]));
-  const nodeIdList = [...nodeIds];
-
-  for (const nodeId of nodeIdList) {
-    const matches = compiledRules
-      .map((entry) => ({ entry, match: executeRulePattern(entry.regex, nodeId) }))
-      .filter((candidate): candidate is { entry: CompiledBodyRule<BodyInputRule>; match: RegExpExecArray } => Boolean(candidate.match));
-
-    for (const { entry, match } of matches) {
-      const resolution = registry.resolveInputRuleBinding(entry.rule, match);
-      previewByRuleId.get(entry.rule.id)?.endpoints.push({ nodeId, resolved: resolution.source });
-    }
+  for (const nodeId of dedupeSorted(nodeIds)) {
+    const matches = mappingsByNodeId.get(nodeId) ?? [];
 
     if (matches.length === 0) {
       issues.push({
         scope: 'input',
         kind: 'unmatched',
         nodeId,
-        message: `Body input node "${nodeId}" does not match any BodyIR input rule.`,
+        message: `Body input node "${nodeId}" does not match any BodyIR input mapping.`,
       });
       continue;
     }
 
     if (matches.length > 1) {
+      const relatedMappingIds = matches.map((mapping) => mapping.id);
       issues.push({
         scope: 'input',
         kind: 'conflict',
         nodeId,
-        relatedRuleIds: matches.map((candidate) => candidate.entry.rule.id),
-        message: `Body input node "${nodeId}" matches multiple BodyIR input rules: ${matches
-          .map((candidate) => candidate.entry.rule.id)
+        relatedMappingIds,
+        message: `Body input node "${nodeId}" matches multiple BodyIR input mappings: ${matches
+          .map((mapping) => mapping.id)
           .join(', ')}.`,
       });
       continue;
     }
 
-    const [{ entry, match }] = matches;
-    const resolution = registry.resolveInputRuleBinding(entry.rule, match);
-    const parsed = parseBodyInputSource(nodeId, resolution.binding, entry.rule.scale);
+    const mapping = matches[0];
+    const endpoint = endpointById.get(mapping.endpointId);
+    if (!endpoint) {
+      issues.push({
+        scope: 'input',
+        kind: 'compile-error',
+        endpointId: mapping.endpointId,
+        nodeId,
+        relatedMappingIds: [mapping.id],
+        message: `Body input mapping "${mapping.id}" references missing endpoint "${mapping.endpointId}".`,
+      });
+      continue;
+    }
+
+    const previewGroup = previewByEndpointId.get(endpoint.id);
+    previewGroup?.mappings.push({
+      nodeId,
+      resolved: endpoint.source,
+    });
+
+    const binding = registry.resolveInputBinding(endpoint.source);
+    const parsed = parseBodyInputSource(nodeId, binding, endpoint.scale);
     if (!parsed) {
       issues.push({
         scope: 'input',
         kind: 'compile-error',
-        ruleId: entry.rule.id,
+        endpointId: endpoint.id,
         nodeId,
-        resolved: resolution.source,
-        message: `Body input rule "${entry.rule.id}" resolved node "${nodeId}" to unsupported source "${resolution.source}".`,
+        resolved: endpoint.source,
+        message: `Body input endpoint "${endpoint.id}" resolves node "${nodeId}" to unsupported source "${endpoint.source}".`,
       });
       continue;
     }
@@ -308,99 +209,97 @@ const resolveBodyInputRules = (
     nodesById.set(parsed.id, parsed);
   }
 
-  for (const preview of previews) {
-    sortPreviewItems(preview.endpoints);
+  for (const preview of endpointMappings) {
+    sortPreviewItems(preview.mappings);
   }
 
-  return { nodesById, issues, rules: previews };
+  return { nodesById, issues, endpointMappings };
 };
 
-const buildOutputPreviewGroups = (
-  rules: BodyOutputRule[]
-): {
-  compiledRules: CompiledBodyRule<BodyOutputRule>[];
-  issues: AgentBodyRuleIssueSummaryItem[];
-  previews: AgentBodyRulePreviewGroup[];
-} => {
-  const compiledRules: CompiledBodyRule<BodyOutputRule>[] = [];
-  const issues: AgentBodyRuleIssueSummaryItem[] = [];
-  const previews = rules.map((rule) => ({
-    ruleId: rule.id,
-    nodeIdPattern: rule.nodeIdPattern,
-    template: rule.targetTemplate,
-    endpoints: [],
+const resolveBodyOutputMappings = (
+  registry: WorldRegistry,
+  body: BodyIR,
+  nodeIds: Iterable<string>
+): BodyResolutionResult<BodyOutputNodeRuntime> => {
+  const nodesById = new Map<string, BodyOutputNodeRuntime>();
+  const endpointById = new Map(body.outputEndpoints.map((endpoint) => [endpoint.id, endpoint]));
+  const mappingsByNodeId = new Map<string, BodyOutputMappingIR[]>();
+  const endpointMappings: AgentBodyEndpointPreviewGroup[] = body.outputEndpoints.map((endpoint) => ({
+    endpointId: endpoint.id,
+    mappingSelector: `mapping.endpointId == "${endpoint.id}"`,
+    template: endpoint.target,
+    mappings: [],
   }));
+  const previewByEndpointId = new Map(endpointMappings.map((group) => [group.endpointId, group]));
+  const targetToNodeId = new Map<string, string>();
+  const issues: AgentBodyEndpointIssueSummaryItem[] = [];
 
-  for (const rule of rules) {
-    const { regex, issue } = compileRulePattern(rule.nodeIdPattern, rule.id, 'output');
-    if (issue) {
-      issues.push(issue);
+  for (const mapping of body.mappings) {
+    if (mapping.kind !== 'output') {
       continue;
     }
-
-    if (regex) {
-      compiledRules.push({ rule, regex });
-    }
+    const current = mappingsByNodeId.get(mapping.nodeId) ?? [];
+    current.push(mapping);
+    mappingsByNodeId.set(mapping.nodeId, current);
   }
 
-  return { compiledRules, issues, previews };
-};
-
-const resolveBodyOutputRules = (
-  registry: WorldRegistry,
-  rules: BodyOutputRule[],
-  nodeIds: Iterable<string>
-): BodyRuleResolution<BodyOutputNodeRuntime> => {
-  const nodesById = new Map<string, BodyOutputNodeRuntime>();
-  const { compiledRules, issues, previews } = buildOutputPreviewGroups(rules);
-  const previewByRuleId = new Map(previews.map((preview) => [preview.ruleId, preview]));
-  const targetToNodeId = new Map<string, string>();
-  const nodeIdList = [...nodeIds];
-
-  for (const nodeId of nodeIdList) {
-    const matches = compiledRules
-      .map((entry) => ({ entry, match: executeRulePattern(entry.regex, nodeId) }))
-      .filter((candidate): candidate is { entry: CompiledBodyRule<BodyOutputRule>; match: RegExpExecArray } => Boolean(candidate.match));
-
-    for (const { entry, match } of matches) {
-      const resolution = registry.resolveOutputRuleBinding(entry.rule, match);
-      previewByRuleId.get(entry.rule.id)?.endpoints.push({ nodeId, resolved: resolution.target });
-    }
+  for (const nodeId of dedupeSorted(nodeIds)) {
+    const matches = mappingsByNodeId.get(nodeId) ?? [];
 
     if (matches.length === 0) {
       issues.push({
         scope: 'output',
         kind: 'unmatched',
         nodeId,
-        message: `Body output node "${nodeId}" does not match any BodyIR output rule.`,
+        message: `Body output node "${nodeId}" does not match any BodyIR output mapping.`,
       });
       continue;
     }
 
     if (matches.length > 1) {
+      const relatedMappingIds = matches.map((mapping) => mapping.id);
       issues.push({
         scope: 'output',
         kind: 'conflict',
         nodeId,
-        relatedRuleIds: matches.map((candidate) => candidate.entry.rule.id),
-        message: `Body output node "${nodeId}" matches multiple BodyIR output rules: ${matches
-          .map((candidate) => candidate.entry.rule.id)
+        relatedMappingIds,
+        message: `Body output node "${nodeId}" matches multiple BodyIR output mappings: ${matches
+          .map((mapping) => mapping.id)
           .join(', ')}.`,
       });
       continue;
     }
 
-    const [{ entry, match }] = matches;
-    const resolution = registry.resolveOutputRuleBinding(entry.rule, match);
-    const parsed = parseBodyOutputTarget(nodeId, resolution.binding, entry.rule.decayPerSecond);
+    const mapping = matches[0];
+    const endpoint = endpointById.get(mapping.endpointId);
+    if (!endpoint) {
+      issues.push({
+        scope: 'output',
+        kind: 'compile-error',
+        endpointId: mapping.endpointId,
+        nodeId,
+        relatedMappingIds: [mapping.id],
+        message: `Body output mapping "${mapping.id}" references missing endpoint "${mapping.endpointId}".`,
+      });
+      continue;
+    }
+
+    const previewGroup = previewByEndpointId.get(endpoint.id);
+    previewGroup?.mappings.push({
+      nodeId,
+      resolved: endpoint.target,
+    });
+
+    const binding = registry.resolveOutputBinding(endpoint.target);
+    const parsed = parseBodyOutputTarget(nodeId, binding, endpoint.decayPerSecond);
     if (!parsed) {
       issues.push({
         scope: 'output',
         kind: 'compile-error',
-        ruleId: entry.rule.id,
+        endpointId: endpoint.id,
         nodeId,
-        resolved: resolution.target,
-        message: `Body output rule "${entry.rule.id}" resolved node "${nodeId}" to unsupported target "${resolution.target}".`,
+        resolved: endpoint.target,
+        message: `Body output endpoint "${endpoint.id}" resolves node "${nodeId}" to unsupported target "${endpoint.target}".`,
       });
       continue;
     }
@@ -421,44 +320,108 @@ const resolveBodyOutputRules = (
     nodesById.set(parsed.id, parsed);
   }
 
-  for (const preview of previews) {
-    sortPreviewItems(preview.endpoints);
+  for (const preview of endpointMappings) {
+    sortPreviewItems(preview.mappings);
   }
 
-  return { nodesById, issues, rules: previews };
+  return { nodesById, issues, endpointMappings };
 };
 
-export const resolveAgentBodyInputRuleBindings = (
-  registry: WorldRegistry,
-  rules: BodyInputRule[],
-  nodeIds: Iterable<string>
-): BodyRuleResolution<BodyInputNodeRuntime> => resolveBodyInputRules(registry, rules, nodeIds);
+export interface AgentBodyEndpointIds {
+  bodyInputNodeIds: string[];
+  bodyOutputNodeIds: string[];
+}
 
-export const resolveAgentBodyOutputRuleBindings = (
-  registry: WorldRegistry,
-  rules: BodyOutputRule[],
-  nodeIds: Iterable<string>
-): BodyRuleResolution<BodyOutputNodeRuntime> => resolveBodyOutputRules(registry, rules, nodeIds);
+export interface AgentCompiledBodyEndpointIds {
+  bodyInputNodeIds: string[];
+  bodyOutputNodeIds: string[];
+}
 
-export const buildAgentBodyRulePreviewModel = (
+export interface AgentBodyEndpointResolution {
+  inputNodesById: Map<string, BodyInputNodeRuntime>;
+  outputNodesById: Map<string, BodyOutputNodeRuntime>;
+  issues: AgentBodyEndpointIssueSummaryItem[];
+  endpointIds: AgentBodyEndpointIds;
+}
+
+export const resolveAgentBodyEndpointIds = (
+  agent: AgentIR,
+  _registry: WorldRegistry,
+  _projectedVisionCellCount?: number
+): AgentBodyEndpointIds => {
+  const bodyInputNodeIds = dedupeSorted([
+    ...collectEndpointNodeIdsFromConnections(agent, 'bodyInput'),
+    ...collectMappedInputNodeIds(agent.body),
+  ]);
+  const bodyOutputNodeIds = dedupeSorted([
+    ...collectEndpointNodeIdsFromConnections(agent, 'bodyOutput'),
+    ...collectMappedOutputNodeIds(agent.body),
+  ]);
+
+  return {
+    bodyInputNodeIds,
+    bodyOutputNodeIds,
+  };
+};
+
+export const resolveCompiledAgentBodyEndpointIds = (agent: AgentIR, registry: WorldRegistry): AgentCompiledBodyEndpointIds => {
+  const referencedBodyInputNodeIds = collectEndpointNodeIdsFromConnections(agent, 'bodyInput');
+  const referencedBodyOutputNodeIds = collectEndpointNodeIdsFromConnections(agent, 'bodyOutput');
+  const input = resolveBodyInputMappings(registry, agent.body, referencedBodyInputNodeIds);
+  const output = resolveBodyOutputMappings(registry, agent.body, referencedBodyOutputNodeIds);
+
+  return {
+    bodyInputNodeIds: dedupeSorted(input.nodesById.keys()),
+    bodyOutputNodeIds: dedupeSorted(output.nodesById.keys()),
+  };
+};
+
+export const resolveAgentBodyEndpointResolution = (agent: AgentIR, registry: WorldRegistry): AgentBodyEndpointResolution => {
+  const endpointIds = resolveAgentBodyEndpointIds(agent, registry);
+  const input = resolveBodyInputMappings(registry, agent.body, endpointIds.bodyInputNodeIds);
+  const output = resolveBodyOutputMappings(registry, agent.body, endpointIds.bodyOutputNodeIds);
+
+  return {
+    inputNodesById: input.nodesById,
+    outputNodesById: output.nodesById,
+    issues: [...input.issues, ...output.issues],
+    endpointIds,
+  };
+};
+
+export const resolveAgentBodyInputEndpointMappings = (
+  registry: WorldRegistry,
+  body: BodyIR,
+  nodeIds: Iterable<string>
+): BodyResolutionResult<BodyInputNodeRuntime> => resolveBodyInputMappings(registry, body, nodeIds);
+
+export const resolveAgentBodyOutputEndpointMappings = (
+  registry: WorldRegistry,
+  body: BodyIR,
+  nodeIds: Iterable<string>
+): BodyResolutionResult<BodyOutputNodeRuntime> => resolveBodyOutputMappings(registry, body, nodeIds);
+
+export const buildAgentBodyEndpointPreviewModel = (
   agent: AgentIR,
   registry: WorldRegistry,
   projectedVisionCellCount?: number
-): AgentBodyRulePreviewModel => {
+): AgentBodyEndpointPreviewModel => {
   const endpointIds = resolveAgentBodyEndpointIds(agent, registry, projectedVisionCellCount);
-  const input = resolveBodyInputRules(registry, agent.body.inputRules, endpointIds.bodyInputNodeIds);
-  const output = resolveBodyOutputRules(registry, agent.body.outputRules, endpointIds.bodyOutputNodeIds);
+  const input = resolveBodyInputMappings(registry, agent.body, endpointIds.bodyInputNodeIds);
+  const output = resolveBodyOutputMappings(registry, agent.body, endpointIds.bodyOutputNodeIds);
+  const inputPreviewByEndpointId = buildEndpointPreviewRecord(input.endpointMappings);
+  const outputPreviewByEndpointId = buildEndpointPreviewRecord(output.endpointMappings);
 
   return {
     input: {
       endpointNodeIds: [...endpointIds.bodyInputNodeIds],
-      rules: input.rules,
-      previewsByRuleId: buildPreviewRecord(input.rules),
+      endpointMappings: input.endpointMappings,
+      previewsByEndpointId: inputPreviewByEndpointId,
     },
     output: {
       endpointNodeIds: [...endpointIds.bodyOutputNodeIds],
-      rules: output.rules,
-      previewsByRuleId: buildPreviewRecord(output.rules),
+      endpointMappings: output.endpointMappings,
+      previewsByEndpointId: outputPreviewByEndpointId,
     },
     issues: [...input.issues, ...output.issues],
   };

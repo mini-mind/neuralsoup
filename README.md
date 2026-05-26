@@ -25,12 +25,14 @@ npm run build
 npm run test:e2e
 ```
 
+仓库主线仅支持当前 `AgentIR` 规范。
+
 ## 目录
 
 ```text
 src/
   App.tsx                 # 顶层 UI 编排
-  components/             # React 组件、Graph IR 拓扑编辑器和仿真画布
+  components/             # React 组件、拓扑编辑器和仿真画布
   components/editor/      # 右侧编辑区的标签页、设置面板和工具栏
   domain/                 # 纯领域模型和 brain/world 逻辑
   engine/                 # 仿真引擎、Pixi 入口和世界渲染
@@ -45,11 +47,11 @@ e2e/                      # Playwright 端到端测试
 - 左侧游戏区域负责仿真运行、奖励/FPS 展示和智能体观察。
 - 右侧编辑区顶部在 `Settings` 与 `GraphView` 之间切换。
 - `Settings` 内包含智能体参数和键盘覆盖说明。
-- `GraphView` 生产主路径以 `AgentIR` 为真源；下一阶段重构放弃旧版 Graph IR 兼容。
+- `GraphView` 生产主路径以 `AgentIR` 为唯一真源。
 - `GraphView` 当前只持久化节点位置和分组折叠状态；画布视角、缩放、选择和弹窗等交互状态仍是会话态。
 - 空格用于开始/继续或暂停仿真，输入控件聚焦时不会触发全局快捷键。
 
 ## 文档
 
 - [AGENTS.md](./AGENTS.md)：代理维护规则、命令、代码边界和验证要求。
-- [docs/GRAPH_IR_REFACTOR_PLAN.md](./docs/GRAPH_IR_REFACTOR_PLAN.md)：AgentIR 冻结设计、重构任务和验收边界。
+- [docs/GRAPH_IR_REFACTOR_PLAN.md](./docs/GRAPH_IR_REFACTOR_PLAN.md)：当前 AgentIR 规范与边界说明。

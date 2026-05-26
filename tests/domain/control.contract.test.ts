@@ -177,9 +177,10 @@ test('simulation session keeps main-agent runtime status aligned across mode swi
   runtimeStatus = session.getAgentRuntimeStatus();
   assert.equal(runtimeStatus.state, 'applied');
   assert.deepEqual(runtimeStatus.appliedSummary, {
-    inputSignalCount: 72,
+    inputSignalCount: 108,
     outputSignalCount: 3,
     neuronCount: 2,
+    connectionCount: 76,
     leafLinkCount: 76,
   });
 
@@ -188,7 +189,7 @@ test('simulation session keeps main-agent runtime status aligned across mode swi
   assert.equal(expectMainAgent(session).visionCells.length, 18);
   runtimeStatus = session.getAgentRuntimeStatus();
   assert.equal(runtimeStatus.state, 'applied');
-  assert.equal(runtimeStatus.appliedSummary.inputSignalCount, 54);
+  assert.equal(runtimeStatus.appliedSummary.inputSignalCount, 108);
 
   const agent = createAgent({
     id: mainAgent.id,
@@ -395,7 +396,7 @@ test('snn keyboard override keeps stepping runtime state while overriding applie
   assert.equal(controller.getActiveLeafNodeIds(mainAgent.id).includes('output-move-forward'), true);
 });
 
-test('vision-cell world input provider ignores legacy visualInput and only uses visionCells as source of truth', () => {
+test('vision-cell world input provider ignores non-canonical visualInput and only uses visionCells as source of truth', () => {
   const provider = createVisionActionInputSignalProvider();
   const agent = createAgent({
     visionCells: createVisionCells(2, { r: 0.1, g: 0.2, b: 0.3 }),
@@ -422,9 +423,13 @@ test('invalid install keeps the last successfully applied runtime summary', () =
     ...currentAgent,
     body: {
       ...currentAgent.body,
-      outputRules: currentAgent.body.outputRules.map((rule) => ({
-        ...rule,
-        targetTemplate: 'thruster.$1',
+      outputEndpoints: currentAgent.body.outputEndpoints.map((endpoint) => ({
+        ...endpoint,
+        target: endpoint.target.replace(/^action\./, 'thruster.'),
+      })),
+      mappings: currentAgent.body.mappings.map((mapping) => ({
+        ...mapping,
+        ...(mapping.kind === 'output' ? { nodeId: `invalid-${mapping.nodeId}` } : {}),
       })),
     },
   };
@@ -433,4 +438,26 @@ test('invalid install keeps the last successfully applied runtime summary', () =
 
   assert.equal(runtimeStatus.state, 'invalid');
   assert.deepEqual(runtimeStatus.appliedSummary, appliedSummary);
+});
+
+test('runtime summary counts remain stable when persisted body endpoint/mapping order changes', () => {
+  const session = createSimulationSession();
+
+  session.initialize();
+  const seedAgent = createSeedAgentForSession(session);
+  const baselineRuntimeStatus = session.setAgentIR(seedAgent);
+  assert.equal(baselineRuntimeStatus.state, 'applied');
+
+  const reorderedAgent: AgentIR = {
+    ...seedAgent,
+    body: {
+      inputEndpoints: [...seedAgent.body.inputEndpoints].reverse(),
+      outputEndpoints: [...seedAgent.body.outputEndpoints].reverse(),
+      mappings: [...seedAgent.body.mappings].reverse(),
+    },
+    connections: [...seedAgent.connections],
+  };
+  const reorderedRuntimeStatus = session.setAgentIR(reorderedAgent);
+  assert.equal(reorderedRuntimeStatus.state, 'applied');
+  assert.deepEqual(reorderedRuntimeStatus.appliedSummary, baselineRuntimeStatus.appliedSummary);
 });

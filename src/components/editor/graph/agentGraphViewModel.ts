@@ -6,6 +6,7 @@ import type {
   BrainContainerNode,
   BrainNeuronNode,
   BrainStructuralPreflight,
+  SynapseModelIR,
   WorldRegistry,
 } from '../../../domain/brain';
 import {
@@ -78,6 +79,103 @@ type AggregateLinkView = {
   leafLinkIds: string[];
   count: number;
   totalWeight: number;
+  resolvedWeightCount: number;
+  unresolvedWeightCount: number;
+  synapseModelIds: string[];
+};
+type GraphViewSynapseInfo = NonNullable<GraphViewLink['synapse']>;
+type GraphViewSynapseSummary = NonNullable<GraphViewLink['synapseSummary']>;
+
+const FALLBACK_WEIGHT_VALUE = 0;
+const FALLBACK_WEIGHT_DISPLAY = 'unresolved-weight';
+const FALLBACK_DELAY_DISPLAY = 'unresolved-delay';
+
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+const formatWeightDisplay = (weight: number | null): string =>
+  weight == null ? FALLBACK_WEIGHT_DISPLAY : Number.isInteger(weight) ? `${weight}` : weight.toFixed(2);
+
+const toNumericRecord = (value: unknown): Record<string, number> => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return {};
+  }
+
+  const record = value as Record<string, unknown>;
+  const numericRecord: Record<string, number> = {};
+  for (const [key, candidate] of Object.entries(record)) {
+    if (isFiniteNumber(candidate)) {
+      numericRecord[key] = candidate;
+    }
+  }
+  return numericRecord;
+};
+
+const createSynapseModelIndex = (agent: AgentIR): Map<string, SynapseModelIR> =>
+  new Map((agent.brain.synapseModels ?? []).map((model) => [model.id, model]));
+
+const resolveConnectionSynapseInfo = (
+  connection: AgentConnection,
+  synapseModelsById: Map<string, SynapseModelIR>
+): GraphViewSynapseInfo => {
+  const synapseModelId = connection.synapseModelId?.trim() ?? '';
+  const parameterOverrides = toNumericRecord(connection.parameterOverrides);
+
+  if (synapseModelId.length === 0) {
+    return {
+      resolutionStatus: 'missing-synapse-model-id',
+      synapseModelId: null,
+      synapseModelLabel: null,
+      synapseKind: null,
+      defaults: {},
+      parameterOverrides,
+      effectiveParameters: { ...parameterOverrides },
+      effectiveWeight: null,
+      effectiveDelayMs: null,
+      effectiveDelayMsDisplay: FALLBACK_DELAY_DISPLAY,
+    };
+  }
+
+  const synapseModel = synapseModelsById.get(synapseModelId);
+  if (!synapseModel) {
+    return {
+      resolutionStatus: 'missing-synapse-model',
+      synapseModelId,
+      synapseModelLabel: null,
+      synapseKind: null,
+      defaults: {},
+      parameterOverrides,
+      effectiveParameters: { ...parameterOverrides },
+      effectiveWeight: null,
+      effectiveDelayMs: null,
+      effectiveDelayMsDisplay: FALLBACK_DELAY_DISPLAY,
+    };
+  }
+
+  const defaults = toNumericRecord(synapseModel.defaults);
+  const effectiveParameters: Record<string, number> = {
+    ...defaults,
+    ...parameterOverrides,
+  };
+  const effectiveWeight = isFiniteNumber(effectiveParameters.weight) ? effectiveParameters.weight : null;
+  const effectiveDelayMs = isFiniteNumber(effectiveParameters.delayMs) ? effectiveParameters.delayMs : null;
+  const resolutionStatus: GraphViewSynapseInfo['resolutionStatus'] =
+    effectiveWeight == null
+      ? 'missing-effective-weight'
+      : effectiveDelayMs == null
+        ? 'missing-effective-delay'
+        : 'resolved';
+
+  return {
+    resolutionStatus,
+    synapseModelId: synapseModel.id,
+    synapseModelLabel: synapseModel.label ?? null,
+    synapseKind: synapseModel.kind,
+    defaults,
+    parameterOverrides,
+    effectiveParameters,
+    effectiveWeight,
+    effectiveDelayMs,
+    effectiveDelayMsDisplay: effectiveDelayMs == null ? FALLBACK_DELAY_DISPLAY : `${effectiveDelayMs}`,
+  };
 };
 
 const toViewPosition = (position: Position, scope: 'root' | 'child'): Position =>
@@ -231,8 +329,7 @@ const getDefaultExpandedChildPosition = (node: AgentGraphViewNodeRecord, index: 
 
 const getExpandedChildOffset = (
   groupChildren: AgentGraphViewNodeRecord[],
-  agent: AgentIR,
-  draftNodePositions: NodePositionDraftMap
+  agent: AgentIR
 ): Position => {
   if (groupChildren.length === 0) {
     return { x: 0, y: 0 };
@@ -241,8 +338,6 @@ const getExpandedChildOffset = (
   const minX = Math.min(
     ...groupChildren.map((child, index) => {
       const position =
-        draftNodePositions[child.refNodeId] ??
-        draftNodePositions[child.id] ??
         agent.layout?.nodes[getLayoutNodeKey(child)]?.position ??
         getDefaultExpandedChildPosition(child, index);
       return position.x;
@@ -251,8 +346,6 @@ const getExpandedChildOffset = (
   const minY = Math.min(
     ...groupChildren.map((child, index) => {
       const position =
-        draftNodePositions[child.refNodeId] ??
-        draftNodePositions[child.id] ??
         agent.layout?.nodes[getLayoutNodeKey(child)]?.position ??
         getDefaultExpandedChildPosition(child, index);
       return position.y;
@@ -267,19 +360,16 @@ const getExpandedChildOffset = (
 
 const getExpandedGroupSize = (
   groupChildren: AgentGraphViewNodeRecord[],
-  agent: AgentIR,
-  draftNodePositions: NodePositionDraftMap
+  agent: AgentIR
 ) => {
   if (groupChildren.length === 0) {
     return AGENT_GRAPH_EXPANDED_GROUP_MIN_SIZE;
   }
 
-  const offset = getExpandedChildOffset(groupChildren, agent, draftNodePositions);
+  const offset = getExpandedChildOffset(groupChildren, agent);
   const maxRight = Math.max(
     ...groupChildren.map((child, index) => {
       const position =
-        draftNodePositions[child.refNodeId] ??
-        draftNodePositions[child.id] ??
         agent.layout?.nodes[getLayoutNodeKey(child)]?.position ??
         getDefaultExpandedChildPosition(child, index);
       const size = getStoredNodeSize(child);
@@ -289,8 +379,6 @@ const getExpandedGroupSize = (
   const maxBottom = Math.max(
     ...groupChildren.map((child, index) => {
       const position =
-        draftNodePositions[child.refNodeId] ??
-        draftNodePositions[child.id] ??
         agent.layout?.nodes[getLayoutNodeKey(child)]?.position ??
         getDefaultExpandedChildPosition(child, index);
       const size = getStoredNodeSize(child);
@@ -354,7 +442,7 @@ const buildIndexes = (
       id: BODY_INPUTS_GROUP_ID,
       refNodeId: BODY_INPUTS_GROUP_ID,
       kind: 'adapter',
-      label: 'Inputs',
+      label: '输入组',
     });
   }
 
@@ -364,7 +452,7 @@ const buildIndexes = (
       id: rootContainer.id,
       refNodeId: rootContainer.id,
       kind: 'neuron-group',
-      label: rootContainer.label ?? rootContainer.id,
+      label: 'Brain组',
       container: rootContainer,
     });
   }
@@ -374,7 +462,7 @@ const buildIndexes = (
       id: BODY_OUTPUTS_GROUP_ID,
       refNodeId: BODY_OUTPUTS_GROUP_ID,
       kind: 'adapter',
-      label: 'Outputs',
+      label: '输出组',
     });
   }
 
@@ -403,7 +491,7 @@ const buildIndexes = (
           id: neuron.id,
           refNodeId: neuron.id,
           kind: 'neuron',
-          label: neuron.label,
+          label: neuron.label ?? neuron.id,
           neuron,
         };
         const nextTrail = [...trail, neuron.id];
@@ -568,6 +656,7 @@ const getScopeNodeIdForLeaf = (
 
 const collectAggregateLinks = (
   connections: AgentConnection[],
+  synapseInfoByConnectionId: Map<string, GraphViewSynapseInfo>,
   pathById: Map<string, string[]>,
   currentPath: string[],
   expandedContainerIds: Set<string>
@@ -582,11 +671,24 @@ const collectAggregateLinks = (
     }
 
     const key = `${fromNodeId}->${toNodeId}`;
+    const synapseInfo = synapseInfoByConnectionId.get(connection.id) ?? null;
+    const resolvedWeight = synapseInfo?.effectiveWeight;
+    const hasResolvedWeight = resolvedWeight != null;
+    const effectiveWeight = hasResolvedWeight ? resolvedWeight : FALLBACK_WEIGHT_VALUE;
+    const synapseModelId = synapseInfo?.synapseModelId ?? null;
     const current = aggregateMap.get(key);
     if (current) {
       current.leafLinkIds.push(connection.id);
       current.count += 1;
-      current.totalWeight += connection.weight;
+      current.totalWeight += effectiveWeight;
+      if (hasResolvedWeight) {
+        current.resolvedWeightCount += 1;
+      } else {
+        current.unresolvedWeightCount += 1;
+      }
+      if (synapseModelId && !current.synapseModelIds.includes(synapseModelId)) {
+        current.synapseModelIds.push(synapseModelId);
+      }
       continue;
     }
 
@@ -595,7 +697,10 @@ const collectAggregateLinks = (
       toNodeId,
       leafLinkIds: [connection.id],
       count: 1,
-      totalWeight: connection.weight,
+      totalWeight: effectiveWeight,
+      resolvedWeightCount: hasResolvedWeight ? 1 : 0,
+      unresolvedWeightCount: hasResolvedWeight ? 0 : 1,
+      synapseModelIds: synapseModelId ? [synapseModelId] : [],
     });
   }
 
@@ -604,11 +709,13 @@ const collectAggregateLinks = (
 
 const collectBoundaryAggregateLinks = ({
   connections,
+  synapseInfoByConnectionId,
   pathById,
   currentPath,
   expandedContainerIds,
 }: {
   connections: AgentConnection[];
+  synapseInfoByConnectionId: Map<string, GraphViewSynapseInfo>;
   pathById: Map<string, string[]>;
   currentPath: string[];
   expandedContainerIds: Set<string>;
@@ -628,11 +735,24 @@ const collectBoundaryAggregateLinks = ({
     }
 
     const key = `${fromNodeId}->${toNodeId}`;
+    const synapseInfo = synapseInfoByConnectionId.get(connection.id) ?? null;
+    const resolvedWeight = synapseInfo?.effectiveWeight;
+    const hasResolvedWeight = resolvedWeight != null;
+    const effectiveWeight = hasResolvedWeight ? resolvedWeight : FALLBACK_WEIGHT_VALUE;
+    const synapseModelId = synapseInfo?.synapseModelId ?? null;
     const current = aggregateMap.get(key);
     if (current) {
       current.leafLinkIds.push(connection.id);
       current.count += 1;
-      current.totalWeight += connection.weight;
+      current.totalWeight += effectiveWeight;
+      if (hasResolvedWeight) {
+        current.resolvedWeightCount += 1;
+      } else {
+        current.unresolvedWeightCount += 1;
+      }
+      if (synapseModelId && !current.synapseModelIds.includes(synapseModelId)) {
+        current.synapseModelIds.push(synapseModelId);
+      }
       return;
     }
 
@@ -641,7 +761,10 @@ const collectBoundaryAggregateLinks = ({
       toNodeId,
       leafLinkIds: [connection.id],
       count: 1,
-      totalWeight: connection.weight,
+      totalWeight: effectiveWeight,
+      resolvedWeightCount: hasResolvedWeight ? 1 : 0,
+      unresolvedWeightCount: hasResolvedWeight ? 0 : 1,
+      synapseModelIds: synapseModelId ? [synapseModelId] : [],
     });
   };
 
@@ -790,16 +913,30 @@ export const buildAgentGraphViewModel = ({
   const containerConnections = agent.connections.filter(
     (connection) => containerLeafIds.has(connection.from.nodeId) && containerLeafIds.has(connection.to.nodeId)
   );
+  const synapseModelsById = createSynapseModelIndex(agent);
+  const synapseInfoByConnectionId = new Map<string, GraphViewSynapseInfo>(
+    agent.connections.map((connection) => [
+      connection.id,
+      resolveConnectionSynapseInfo(connection, synapseModelsById),
+    ])
+  );
   const expandedContainerIds = new Set(
     currentChildren
       .filter((node) => isNodeExpanded(agent, node))
       .map((node) => node.id)
   );
-  const aggregateLinks = collectAggregateLinks(containerConnections, indexes.pathById, currentPath, expandedContainerIds);
+  const aggregateLinks = collectAggregateLinks(
+    containerConnections,
+    synapseInfoByConnectionId,
+    indexes.pathById,
+    currentPath,
+    expandedContainerIds
+  );
   const boundaryAggregateLinks =
     navigationPath.length === 1 && navigationPath[0] === agent.brain.rootContainerId
       ? collectBoundaryAggregateLinks({
           connections: agent.connections,
+          synapseInfoByConnectionId,
           pathById: indexes.pathById,
           currentPath,
           expandedContainerIds,
@@ -810,7 +947,7 @@ export const buildAgentGraphViewModel = ({
     const position = getLayoutPosition(agent, node, index, currentScope, draftNodePositions);
     const expanded = isNodeExpanded(agent, node);
     const groupChildren = getContainerChildRecords(node, indexes);
-    const size = expanded ? getExpandedGroupSize(groupChildren, agent, draftNodePositions) : getNodeSize(node);
+    const size = expanded ? getExpandedGroupSize(groupChildren, agent) : getNodeSize(node);
     const childCount =
       node.kind === 'adapter'
         ? getAdapterChildRecords(node.id, indexes).length
@@ -838,6 +975,7 @@ export const buildAgentGraphViewModel = ({
         leaf,
         proxy: false,
         local: true,
+        previewOnly: false,
         direction,
       },
       currentScope
@@ -860,8 +998,9 @@ export const buildAgentGraphViewModel = ({
       navigable: isContainerNode(node),
       leaf,
       proxy: false,
-      movable: true,
+      movable: currentScope === 'child',
       local: true,
+      previewOnly: false,
       direction,
       connectableSource: capabilities.canSource,
       connectableTarget: capabilities.canTarget,
@@ -878,13 +1017,10 @@ export const buildAgentGraphViewModel = ({
       continue;
     }
 
-    const childOffset = getExpandedChildOffset(groupChildren, agent, draftNodePositions);
+    const childOffset = getExpandedChildOffset(groupChildren, agent);
 
     for (const [childIndex, child] of groupChildren.entries()) {
-      const childLayoutPosition =
-        draftNodePositions[child.refNodeId] ??
-        draftNodePositions[child.id] ??
-        agent.layout?.nodes[getLayoutNodeKey(child)]?.position;
+      const childLayoutPosition = agent.layout?.nodes[getLayoutNodeKey(child)]?.position;
       const childPosition = childLayoutPosition ?? getDefaultExpandedChildPosition(child, childIndex);
       const size = getStoredNodeSize(child);
       const direction = getNodeDirection(child);
@@ -896,6 +1032,7 @@ export const buildAgentGraphViewModel = ({
           leaf,
           proxy: false,
           local: true,
+          previewOnly: currentScope === 'root',
           direction,
         },
         currentScope
@@ -918,8 +1055,9 @@ export const buildAgentGraphViewModel = ({
         navigable: isContainerNode(child),
         leaf,
         proxy: false,
-        movable: true,
+        movable: false,
         local: true,
+        previewOnly: currentScope === 'root',
         direction,
         connectableSource: capabilities.canSource,
         connectableTarget: capabilities.canTarget,
@@ -944,6 +1082,7 @@ export const buildAgentGraphViewModel = ({
   }
   const localLeafIds = new Set(nodes.filter((node) => node.local && node.leaf && !node.proxy).map((node) => node.refNodeId));
   const nodeIdsInView = new Set(nodes.map((node) => node.id));
+  const viewConnectionById = new Map(containerConnections.map((connection) => [connection.id, connection]));
   const links: GraphViewLink[] = [...aggregateLinks, ...boundaryAggregateLinks]
     .filter((link) => nodeIdsInView.has(link.fromNodeId) && nodeIdsInView.has(link.toNodeId))
     .map((link) => {
@@ -951,23 +1090,40 @@ export const buildAgentGraphViewModel = ({
       const toViewNode = visibleNodeByRefId.get(link.toNodeId);
       const isDirectLeafLink = link.count === 1 && Boolean(fromViewNode?.leaf && toViewNode?.leaf);
       const connectionId = link.leafLinkIds[0] ?? `aggregate:${link.fromNodeId}:${link.toNodeId}`;
+      const synapseSummary: GraphViewSynapseSummary = {
+        synapseModelIds: [...link.synapseModelIds],
+        resolvedWeightCount: link.resolvedWeightCount,
+        unresolvedWeightCount: link.unresolvedWeightCount,
+        resolvedWeightTotal: link.totalWeight,
+      };
       const connection = isDirectLeafLink
-        ? containerConnections.find((candidate) => candidate.id === connectionId)
+        ? viewConnectionById.get(connectionId)
         : null;
 
       if (isDirectLeafLink && connection) {
+        const synapseInfo = synapseInfoByConnectionId.get(connection.id) ?? null;
+        const effectiveWeight = synapseInfo?.effectiveWeight ?? null;
+        const resolvedWeight = effectiveWeight ?? FALLBACK_WEIGHT_VALUE;
         return {
           id: connection.id,
           fromNodeId: fromViewNode?.viewId ?? link.fromNodeId,
           toNodeId: toViewNode?.viewId ?? link.toNodeId,
           fromRefNodeId: connection.from.nodeId,
           toRefNodeId: connection.to.nodeId,
-          weight: connection.weight,
+          weight: resolvedWeight,
+          weightDisplay: formatWeightDisplay(effectiveWeight),
           count: 1,
           aggregate: false,
           leafLinkIds: [connection.id],
           inspectable: true,
           editable: true,
+          synapse: synapseInfo,
+          synapseSummary: {
+            synapseModelIds: synapseInfo?.synapseModelId ? [synapseInfo.synapseModelId] : [],
+            resolvedWeightCount: effectiveWeight == null ? 0 : 1,
+            unresolvedWeightCount: effectiveWeight == null ? 1 : 0,
+            resolvedWeightTotal: effectiveWeight ?? FALLBACK_WEIGHT_VALUE,
+          },
         };
       }
 
@@ -978,11 +1134,14 @@ export const buildAgentGraphViewModel = ({
         fromRefNodeId: visibleNodeByRefId.get(link.fromNodeId)?.refNodeId ?? link.fromNodeId,
         toRefNodeId: visibleNodeByRefId.get(link.toNodeId)?.refNodeId ?? link.toNodeId,
         weight: link.totalWeight,
+        weightDisplay: formatWeightDisplay(link.totalWeight),
         count: link.count,
         aggregate: true,
         leafLinkIds: [...link.leafLinkIds],
         inspectable: true,
         editable: false,
+        synapse: null,
+        synapseSummary,
       };
     });
 

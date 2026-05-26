@@ -38,18 +38,10 @@ export interface HostRuntimeProfile {
   createCommandApplier: () => WorldControlCommandApplier;
 }
 
-const DEFAULT_AGENT_LAYOUT_VERSION = 1 as const;
-const DEFAULT_AGENT_VERSION = 1 as const;
-const DEFAULT_BODY_VERSION = 1 as const;
-const DEFAULT_BRAIN_VERSION = 1 as const;
-const DEFAULT_VISION_INPUT_RULE_ID = 'vision-inputs';
-const DEFAULT_MOTOR_OUTPUT_RULE_ID = 'motor-outputs';
-
-const applyRuleTemplate = (template: string, match: RegExpExecArray): string =>
-  template.replace(/\$(\d+)/g, (_token, rawGroupIndex: string) => {
-    const groupIndex = Number.parseInt(rawGroupIndex, 10);
-    return match[groupIndex] ?? '';
-  });
+const DEFAULT_VISION_INPUT_ENDPOINT_ID = 'vision-inputs';
+const DEFAULT_MOTOR_OUTPUT_ENDPOINT_ID = 'motor-outputs';
+const DEFAULT_NEURON_MODEL_ID = 'seed.neuron.izhikevich.v1';
+const DEFAULT_SYNAPSE_MODEL_ID = 'seed.synapse.static-current.v1';
 
 const toSupportedActionTargets = (bindings: MovementWorldControlBindings): Set<string> =>
   new Set(Object.values(bindings).map((binding) => `action.${binding}`));
@@ -94,70 +86,6 @@ export const createVisionActionWorldRegistry = (
     outputs: [{ id: 'action', direction: 'output', kind: 'action-map', enumerable: true }],
     resolveInputBinding,
     resolveOutputBinding,
-    resolveInputRuleBinding: (rule, match) => {
-      const source = applyRuleTemplate(rule.sourceTemplate, match);
-      return {
-        source,
-        binding: resolveInputBinding(source),
-      };
-    },
-    resolveOutputRuleBinding: (rule, match) => {
-      const target = applyRuleTemplate(rule.targetTemplate, match);
-      return {
-        target,
-        binding: resolveOutputBinding(target),
-      };
-    },
-    enumerateInputNodeIds: (rule, projectedVisionCellCount) => {
-      const templateMatch = rule.sourceTemplate.match(/^vision\.\$(\d+)\.\$(\d+)$/);
-      if (!templateMatch) {
-        return [];
-      }
-
-      const channelGroupIndex = Number.parseInt(templateMatch[1], 10);
-      const cellGroupIndex = Number.parseInt(templateMatch[2], 10);
-      const anchoredPattern =
-        rule.nodeIdPattern.startsWith('^') && rule.nodeIdPattern.endsWith('$')
-          ? rule.nodeIdPattern.slice(1, -1)
-          : rule.nodeIdPattern;
-
-      const isSupportedPattern =
-        anchoredPattern.includes('([RGB])') &&
-        (anchoredPattern.includes('(\\d+)') || anchoredPattern.includes('(\\\\d+)'));
-      if (!isSupportedPattern || channelGroupIndex === cellGroupIndex) {
-        return [];
-      }
-
-      const nodeIds = new Set<string>();
-      for (let cellIndex = 0; cellIndex < projectedVisionCellCount; cellIndex += 1) {
-        for (const channel of INPUT_CHANNELS) {
-          const nodeId = anchoredPattern
-            .replace('([RGB])', channel)
-            .replace('(\\\\d+)', String(cellIndex))
-            .replace('(\\d+)', String(cellIndex));
-          nodeIds.add(nodeId);
-        }
-      }
-
-      return [...nodeIds];
-    },
-    enumerateOutputNodeIds: (rule) => {
-      const templateMatch = rule.targetTemplate.match(/^action\.\$(\d+)$/);
-      const alternationMatch = rule.nodeIdPattern.match(/\(([^)]+)\)/);
-      if (!templateMatch || !alternationMatch) {
-        return [];
-      }
-
-      return alternationMatch[1]
-        .split('|')
-        .filter((value) => value.length > 0)
-        .map((value) =>
-          rule.nodeIdPattern
-            .replace(/^\^/, '')
-            .replace(/\$$/, '')
-            .replace(alternationMatch[0], value)
-        );
-    },
   };
 };
 
@@ -173,39 +101,51 @@ const createAgentMetadata = (
 });
 
 const createDefaultBodyIR = (
+  visionCells: number,
   movementBindings: MovementWorldControlBindings = VISION_ACTION_MOVEMENT_BINDINGS
 ): BodyIR => ({
-  version: DEFAULT_BODY_VERSION,
-  inputRules: [
-    {
-      id: DEFAULT_VISION_INPUT_RULE_ID,
-      nodeIdPattern: '^vision-([RGB])-(\\d+)$',
-      sourceTemplate: 'vision.$1.$2',
+  inputEndpoints: Array.from({ length: Math.max(0, Math.floor(visionCells)) }).flatMap((_, cellIndex) =>
+    INPUT_CHANNELS.map((channel) => ({
+      id: `${DEFAULT_VISION_INPUT_ENDPOINT_ID}-${channel}-${cellIndex}`,
+      source: `vision.${channel}.${cellIndex}`,
+      worldPort: 'vision',
       scale: 1,
-    },
-  ],
-  outputRules: [
-    {
-      id: DEFAULT_MOTOR_OUTPUT_RULE_ID,
-      nodeIdPattern: `^output-(${[
-        movementBindings.turnLeft,
-        movementBindings.moveForward,
-        movementBindings.turnRight,
-      ].join('|')})$`,
-      targetTemplate: 'action.$1',
-      decayPerSecond: 4,
-    },
+    }))
+  ),
+  outputEndpoints: [
+    movementBindings.turnLeft,
+    movementBindings.moveForward,
+    movementBindings.turnRight,
+  ].map((action) => ({
+    id: `${DEFAULT_MOTOR_OUTPUT_ENDPOINT_ID}-${action}`,
+    target: `action.${action}`,
+    worldPort: 'action',
+    decayPerSecond: 4,
+  })),
+  mappings: [
+    ...Array.from({ length: Math.max(0, Math.floor(visionCells)) }).flatMap((_, cellIndex) =>
+      INPUT_CHANNELS.map((channel) => ({
+        id: `mapping-input-${channel}-${cellIndex}`,
+        kind: 'input' as const,
+        endpointId: `${DEFAULT_VISION_INPUT_ENDPOINT_ID}-${channel}-${cellIndex}`,
+        nodeId: `vision-${channel}-${cellIndex}`,
+      }))
+    ),
+    ...[movementBindings.turnLeft, movementBindings.moveForward, movementBindings.turnRight].map((action) => ({
+      id: `mapping-output-${action}`,
+      kind: 'output' as const,
+      endpointId: `${DEFAULT_MOTOR_OUTPUT_ENDPOINT_ID}-${action}`,
+      nodeId: `output-${action}`,
+    })),
   ],
 });
 
 const createDefaultBrainIR = (): BrainIR => ({
-  version: DEFAULT_BRAIN_VERSION,
-  rootContainerId: HOST_ROOT_CONTAINER_ID,
-  neurons: [
+  neuronModels: [
     {
-      id: 'neuron-1',
-      label: '神经元1',
-      model: 'izhikevich',
+      id: DEFAULT_NEURON_MODEL_ID,
+      family: 'izhikevich',
+      label: '默认 Izhikevich 神经元',
       params: {
         a: 0.02,
         b: 0.2,
@@ -213,6 +153,25 @@ const createDefaultBrainIR = (): BrainIR => ({
         d: 8,
         threshold: 30,
       },
+    },
+  ],
+  synapseModels: [
+    {
+      id: DEFAULT_SYNAPSE_MODEL_ID,
+      label: '默认静态电流突触',
+      kind: 'static-current',
+      defaults: {
+        weight: 1,
+        delayMs: 0,
+      },
+    },
+  ],
+  rootContainerId: HOST_ROOT_CONTAINER_ID,
+  neurons: [
+    {
+      id: 'neuron-1',
+      label: '神经元1',
+      neuronModelId: DEFAULT_NEURON_MODEL_ID,
       initialState: {
         v: -65,
       },
@@ -220,14 +179,7 @@ const createDefaultBrainIR = (): BrainIR => ({
     {
       id: 'neuron-2',
       label: '神经元2',
-      model: 'izhikevich',
-      params: {
-        a: 0.02,
-        b: 0.2,
-        c: -65,
-        d: 8,
-        threshold: 30,
-      },
+      neuronModelId: DEFAULT_NEURON_MODEL_ID,
       initialState: {
         v: -65,
       },
@@ -257,22 +209,25 @@ const createDefaultConnections = (
         id: `link-vision-R-${cellIndex}-neuron-1`,
         from: { scope: 'bodyInput', nodeId: `vision-R-${cellIndex}`, portId: 'out' },
         to: { scope: 'brain', nodeId: 'neuron-1', portId: 'dendrite' },
-        weight: 1,
-        delayMs: 0,
+        synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
       },
       {
         id: `link-vision-G-${cellIndex}-neuron-1`,
         from: { scope: 'bodyInput', nodeId: `vision-G-${cellIndex}`, portId: 'out' },
         to: { scope: 'brain', nodeId: 'neuron-1', portId: 'dendrite' },
-        weight: 0.75,
-        delayMs: 0,
+        synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
+        parameterOverrides: {
+          weight: 0.75,
+        },
       },
       {
         id: `link-vision-B-${cellIndex}-neuron-2`,
         from: { scope: 'bodyInput', nodeId: `vision-B-${cellIndex}`, portId: 'out' },
         to: { scope: 'brain', nodeId: 'neuron-2', portId: 'dendrite' },
-        weight: 0.75,
-        delayMs: 0,
+        synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
+        parameterOverrides: {
+          weight: 0.75,
+        },
       }
     );
   }
@@ -282,29 +237,28 @@ const createDefaultConnections = (
       id: 'link-neuron-1-neuron-2',
       from: { scope: 'brain', nodeId: 'neuron-1', portId: 'axon' },
       to: { scope: 'brain', nodeId: 'neuron-2', portId: 'dendrite' },
-      weight: 0.5,
-      delayMs: 0,
+      synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
+      parameterOverrides: {
+        weight: 0.5,
+      },
     },
     {
       id: `link-neuron-1-output-${movementBindings.moveForward}`,
       from: { scope: 'brain', nodeId: 'neuron-1', portId: 'axon' },
       to: { scope: 'bodyOutput', nodeId: `output-${movementBindings.moveForward}`, portId: 'in' },
-      weight: 1,
-      delayMs: 0,
+      synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
     },
     {
       id: `link-neuron-2-output-${movementBindings.turnLeft}`,
       from: { scope: 'brain', nodeId: 'neuron-2', portId: 'axon' },
       to: { scope: 'bodyOutput', nodeId: `output-${movementBindings.turnLeft}`, portId: 'in' },
-      weight: 1,
-      delayMs: 0,
+      synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
     },
     {
       id: `link-neuron-2-output-${movementBindings.turnRight}`,
       from: { scope: 'brain', nodeId: 'neuron-2', portId: 'axon' },
       to: { scope: 'bodyOutput', nodeId: `output-${movementBindings.turnRight}`, portId: 'in' },
-      weight: 1,
-      delayMs: 0,
+      synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
     }
   );
 
@@ -348,7 +302,6 @@ const createDefaultLayout = (
   }
 
   return {
-    version: DEFAULT_AGENT_LAYOUT_VERSION,
     nodes,
   };
 };
@@ -366,9 +319,8 @@ export const createVisionActionSeedAgentIR = (
       : `agent-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
   return {
-    version: DEFAULT_AGENT_VERSION,
     metadata: createAgentMetadata(name, timestamp, idSource),
-    body: createDefaultBodyIR(movementBindings),
+    body: createDefaultBodyIR(normalizedVisionCells, movementBindings),
     brain: createDefaultBrainIR(),
     connections: createDefaultConnections(normalizedVisionCells, movementBindings),
     layout: createDefaultLayout(normalizedVisionCells, movementBindings),

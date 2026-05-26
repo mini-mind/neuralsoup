@@ -16,6 +16,10 @@ import {
 } from '../../src/storage/brainLibraryRecord';
 
 const WORLD_REGISTRY = createVisionActionWorldRegistry();
+
+const createCanonicalV2Agent = (visionCells: number, name: string) => {
+  return createVisionActionSeedAgentIR(visionCells, name);
+};
 class MemoryStorage {
   private values = new Map<string, string>();
   public failWrites = false;
@@ -48,17 +52,18 @@ const installMemoryLocalStorage = () => {
   return storage;
 };
 
-test('Brain Library storage saves and loads v1 record payloads', () => {
+test('Brain Library storage saves and loads v2 AgentIR record payloads', () => {
   const storage = installMemoryLocalStorage();
-  const record = createBrainLibraryItemFromAgent('Stored Brain', createVisionActionSeedAgentIR(1, 'Stored Brain'), WORLD_REGISTRY);
+  const record = createBrainLibraryItemFromAgent('Stored Brain', createCanonicalV2Agent(1, 'Stored Brain'), WORLD_REGISTRY);
 
   saveBrainLibrary([record], WORLD_REGISTRY);
   const rawValue = storage.getItem(BRAIN_LIBRARY_STORAGE_KEY);
   assert.ok(rawValue);
-  assert.equal(JSON.parse(rawValue).storageVersion, 1);
+  const parsedRaw = JSON.parse(rawValue);
+  assert.equal(parsedRaw.storageVersion, 1);
+  assert.equal('version' in parsedRaw.brains[0].agent, false);
   assert.equal('packageVersion' in JSON.parse(rawValue).brains[0], false);
   assert.equal('metadata' in JSON.parse(rawValue).brains[0], false);
-  assert.equal('visionCellCount' in JSON.parse(rawValue).brains[0].agent.body, false);
 
   const loaded = loadBrainLibraryWithStatus(WORLD_REGISTRY);
   assert.equal(loaded.status.state, 'ok');
@@ -67,10 +72,10 @@ test('Brain Library storage saves and loads v1 record payloads', () => {
 });
 
 test('Brain Library record creation rejects invalid AgentIR instead of persisting a corrupt entry', () => {
-  const invalidAgent = createVisionActionSeedAgentIR(1, 'Invalid Brain');
-  invalidAgent.body.outputRules[0] = {
-    ...invalidAgent.body.outputRules[0],
-    targetTemplate: 'thruster.$1',
+  const invalidAgent = createCanonicalV2Agent(1, 'Invalid Brain');
+  invalidAgent.body.outputEndpoints[0] = {
+    ...invalidAgent.body.outputEndpoints[0],
+    target: 'thruster.$1',
   };
 
   assert.throws(
@@ -116,7 +121,7 @@ test('Brain Library storage rejects old array payloads instead of migrating impl
   const storage = installMemoryLocalStorage();
   const brain = createBrainLibraryItemFromAgent(
     'Old Array Brain',
-    createVisionActionSeedAgentIR(1, 'Old Array Brain'),
+    createCanonicalV2Agent(1, 'Old Array Brain'),
     WORLD_REGISTRY
   );
   storage.setItem(BRAIN_LIBRARY_STORAGE_KEY, JSON.stringify([brain]));
@@ -126,6 +131,32 @@ test('Brain Library storage rejects old array payloads instead of migrating impl
   assert.equal(loaded.status.state, 'recovered');
   assert.match(loaded.status.message ?? '', /存储格式无效/);
   assert.equal(loaded.brains.length, 0);
+  assert.ok(storage.getItem(BRAIN_LIBRARY_CORRUPT_STORAGE_KEY));
+});
+
+test('Brain Library storage rejects envelope payloads with unexpected top-level keys', () => {
+  const storage = installMemoryLocalStorage();
+  const brain = createBrainLibraryItemFromAgent(
+    'Unexpected Envelope Key',
+    createCanonicalV2Agent(1, 'Unexpected Envelope Key'),
+    WORLD_REGISTRY
+  );
+  storage.setItem(
+    BRAIN_LIBRARY_STORAGE_KEY,
+    JSON.stringify({
+      storageVersion: 1,
+      savedAt: new Date().toISOString(),
+      brains: [brain],
+      dirty: true,
+    })
+  );
+
+  const loaded = loadBrainLibraryWithStatus(WORLD_REGISTRY);
+
+  assert.equal(loaded.status.state, 'recovered');
+  assert.match(loaded.status.message ?? '', /存储格式无效/);
+  assert.equal(loaded.brains.length, 0);
+  assert.equal(storage.getItem(BRAIN_LIBRARY_STORAGE_KEY), null);
   assert.ok(storage.getItem(BRAIN_LIBRARY_CORRUPT_STORAGE_KEY));
 });
 
@@ -162,10 +193,35 @@ test('Brain Library storage quarantines structurally invalid non-canonical paylo
   assert.ok(storage.getItem(BRAIN_LIBRARY_CORRUPT_STORAGE_KEY));
 });
 
+test('Brain Library storage rejects canonical records with unexpected top-level keys', () => {
+  const storage = installMemoryLocalStorage();
+  storage.setItem(
+    BRAIN_LIBRARY_STORAGE_KEY,
+    JSON.stringify({
+      storageVersion: 1,
+      savedAt: new Date().toISOString(),
+      brains: [
+        {
+          agent: createCanonicalV2Agent(1, 'Record Dirty Key'),
+          dirty: true,
+        },
+      ],
+    })
+  );
+
+  const loaded = loadBrainLibraryWithStatus(WORLD_REGISTRY);
+
+  assert.equal(loaded.status.state, 'recovered');
+  assert.match(loaded.status.message ?? '', /存储格式无效/);
+  assert.equal(loaded.brains.length, 0);
+  assert.equal(storage.getItem(BRAIN_LIBRARY_STORAGE_KEY), null);
+  assert.ok(storage.getItem(BRAIN_LIBRARY_CORRUPT_STORAGE_KEY));
+});
+
 test('Brain Library storage reports LocalStorage capacity write failures', () => {
   const storage = installMemoryLocalStorage();
   storage.failWrites = true;
-  const record = createBrainLibraryItemFromAgent('Too Large', createVisionActionSeedAgentIR(1, 'Too Large'), WORLD_REGISTRY);
+  const record = createBrainLibraryItemFromAgent('Too Large', createCanonicalV2Agent(1, 'Too Large'), WORLD_REGISTRY);
 
   assert.throws(
     () => saveBrainLibrary([record], WORLD_REGISTRY),
@@ -173,12 +229,30 @@ test('Brain Library storage reports LocalStorage capacity write failures', () =>
   );
 });
 
-test('Brain Library storage rewrites canonical records into normalized AgentIR shape on load', () => {
+test('Brain Library save rejects records with unexpected top-level keys instead of persisting them', () => {
+  installMemoryLocalStorage();
+  const record = createBrainLibraryItemFromAgent(
+    'Save Dirty Key',
+    createCanonicalV2Agent(1, 'Save Dirty Key'),
+    WORLD_REGISTRY
+  );
+  const dirtyRecord = {
+    ...record,
+    dirty: true,
+  };
+
+  assert.throws(
+    () => saveBrainLibrary([dirtyRecord as unknown as typeof record], WORLD_REGISTRY),
+    /存储记录仅允许顶层 agent/
+  );
+});
+
+test('Brain Library storage rejects canonical-envelope payloads when AgentIR is non-canonical', () => {
   const storage = installMemoryLocalStorage();
-  const agent = createVisionActionSeedAgentIR(2, 'Canonical Rewrite');
+  const agent = createCanonicalV2Agent(2, 'Canonical Rewrite');
   const rawStoredRecord = structuredClone({ agent });
 
-  rawStoredRecord.agent.layout ??= { version: 1, nodes: {} };
+  rawStoredRecord.agent.layout ??= { nodes: {} };
   (rawStoredRecord.agent.layout.nodes as Record<string, Record<string, unknown>>)['neuron-1'] = {
     ...((rawStoredRecord.agent.layout.nodes as Record<string, Record<string, unknown>>)['neuron-1'] ?? {}),
     position: { x: 50, y: 150 },
@@ -203,24 +277,18 @@ test('Brain Library storage rewrites canonical records into normalized AgentIR s
 
   const loaded = loadBrainLibraryWithStatus(WORLD_REGISTRY);
 
-  assert.equal(loaded.status.state, 'ok');
-  assert.equal(loaded.brains.length, 1);
-
-  const persisted = JSON.parse(storage.getItem(BRAIN_LIBRARY_STORAGE_KEY) ?? 'null') as {
-    brains: Array<{ agent: { layout?: { nodes?: Record<string, Record<string, unknown>>; viewportByContainerId?: unknown } } }>;
-  };
-  assert.equal('visionCellCount' in ((persisted.brains[0] as { agent: { body: Record<string, unknown> } }).agent.body), false);
-  assert.equal('size' in (persisted.brains[0]?.agent.layout?.nodes?.['neuron-1'] ?? {}), false);
-  assert.equal('expanded' in (persisted.brains[0]?.agent.layout?.nodes?.['neuron-1'] ?? {}), false);
-  assert.equal('viewportByContainerId' in (persisted.brains[0]?.agent.layout ?? {}), false);
+  assert.equal(loaded.status.state, 'recovered');
+  assert.match(loaded.status.message ?? '', /仅支持当前 AgentIR 规范/);
+  assert.equal(loaded.brains.length, 0);
+  assert.equal(storage.getItem(BRAIN_LIBRARY_STORAGE_KEY), null);
+  assert.ok(storage.getItem(BRAIN_LIBRARY_CORRUPT_STORAGE_KEY));
 });
 
-test('canonical Brain Library normalization strips legacy layout viewport fields from the main path', () => {
-  const agent = createVisionActionSeedAgentIR(1, 'Layout Payload Validation');
+test('Brain Library record creation rejects non-canonical layout fields instead of stripping them', () => {
+  const agent = createCanonicalV2Agent(1, 'Layout Payload Validation');
   const candidate = {
     ...agent,
     layout: {
-      version: 1,
       nodes: {
         ...(agent.layout?.nodes ?? {}),
       },
@@ -234,14 +302,16 @@ test('canonical Brain Library normalization strips legacy layout viewport fields
     };
   };
 
-  assert.equal(isValidBrainLibraryAgentPayload(candidate, WORLD_REGISTRY), true);
-  const normalized = createBrainLibraryItemFromAgent('Normalized Layout', candidate, WORLD_REGISTRY);
-  assert.equal('viewportByContainerId' in (normalized.agent.layout ?? {}), false);
+  assert.equal(isValidBrainLibraryAgentPayload(candidate, WORLD_REGISTRY), false);
+  assert.throws(
+    () => createBrainLibraryItemFromAgent('Normalized Layout', candidate, WORLD_REGISTRY),
+    /仅支持当前 AgentIR 规范/
+  );
 });
 
-test('Brain Library canonical record storage strips leaked legacy body visionCellCount on canonical payload load', () => {
+test('Brain Library canonical record storage rejects leaked non-canonical body fields on load', () => {
   const storage = installMemoryLocalStorage();
-  const brain = createVisionActionSeedAgentIR(2, 'Canonical Legacy Leak');
+  const brain = createCanonicalV2Agent(2, 'Canonical Legacy Leak');
   const leakedBrain = {
     ...brain,
     body: {
@@ -265,18 +335,15 @@ test('Brain Library canonical record storage strips leaked legacy body visionCel
 
   const loaded = loadBrainLibraryWithStatus(WORLD_REGISTRY);
 
-  assert.equal(loaded.status.state, 'ok');
-  assert.equal(loaded.brains.length, 1);
-  const persisted = JSON.parse(storage.getItem(BRAIN_LIBRARY_STORAGE_KEY) ?? 'null') as {
-    brains: Array<{ packageVersion?: number; metadata?: Record<string, unknown>; agent: { body: Record<string, unknown> } }>;
-  };
-  assert.equal('packageVersion' in persisted.brains[0], false);
-  assert.equal('metadata' in persisted.brains[0], false);
-  assert.equal('visionCellCount' in persisted.brains[0].agent.body, false);
+  assert.equal(loaded.status.state, 'recovered');
+  assert.match(loaded.status.message ?? '', /仅支持当前 AgentIR 规范/);
+  assert.equal(loaded.brains.length, 0);
+  assert.equal(storage.getItem(BRAIN_LIBRARY_STORAGE_KEY), null);
+  assert.ok(storage.getItem(BRAIN_LIBRARY_CORRUPT_STORAGE_KEY));
 });
 
 test('renameBrainLibraryItem updates canonical agent metadata only once', () => {
-  const record = createBrainLibraryItemFromAgent('Rename Source', createVisionActionSeedAgentIR(1, 'Rename Source'), WORLD_REGISTRY);
+  const record = createBrainLibraryItemFromAgent('Rename Source', createCanonicalV2Agent(1, 'Rename Source'), WORLD_REGISTRY);
 
   const [renamed] = renameBrainLibraryItem([record], record.agent.metadata.id, 'Renamed Brain');
   assert.ok(renamed);
@@ -284,10 +351,10 @@ test('renameBrainLibraryItem updates canonical agent metadata only once', () => 
 });
 
 test('upsertBrainLibraryItemAgent updates canonical agent metadata timestamps', () => {
-  const record = createBrainLibraryItemFromAgent('Upsert Source', createVisionActionSeedAgentIR(1, 'Upsert Source'), WORLD_REGISTRY);
+  const record = createBrainLibraryItemFromAgent('Upsert Source', createCanonicalV2Agent(1, 'Upsert Source'), WORLD_REGISTRY);
   const replacement = createBrainLibraryItemFromAgent(
     'Replacement Draft',
-    createVisionActionSeedAgentIR(1, 'Replacement Draft'),
+    createCanonicalV2Agent(1, 'Replacement Draft'),
     WORLD_REGISTRY
   ).agent;
 

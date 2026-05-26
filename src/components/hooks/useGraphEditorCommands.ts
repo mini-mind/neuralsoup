@@ -22,7 +22,7 @@ import {
   GRAPH_LAYOUT_ONLY_CHANGE,
   GRAPH_SEMANTIC_CHANGE,
 } from './graphDocumentChangePolicy';
-import type { GraphNodeUpdatePayload } from '../editor/graph/graphNodeUpdate';
+import type { GraphLinkUpdatePayload, GraphNodeUpdatePayload } from '../editor/graph/graphNodeUpdate';
 import type { GraphViewLink, GraphViewNode } from '../editor/graph/graphViewTypes';
 import type { AgentGraphViewIndexes, AgentGraphViewNodeRecord } from '../editor/graph/agentGraphViewModel';
 import { canGraphNodesConnect } from '../editor/graph/graphLinkPolicy';
@@ -40,8 +40,62 @@ const INPUT_PORT_ID = 'in';
 const OUTPUT_PORT_ID = 'out';
 const NEURON_INPUT_PORT_ID = 'dendrite';
 const NEURON_OUTPUT_PORT_ID = 'axon';
+const DEFAULT_NEURON_PARAMETER_OVERRIDES = {
+  a: 0.02,
+  b: 0.2,
+  c: -65,
+  d: 8,
+  threshold: 30,
+} as const;
+const DEFAULT_CONNECTION_PARAMETER_OVERRIDES = {
+  weight: 0.8,
+  delayMs: 0,
+} as const;
+const KNOWN_NEURON_PARAM_KEYS: Array<keyof typeof DEFAULT_NEURON_PARAMETER_OVERRIDES> = [
+  'a',
+  'b',
+  'c',
+  'd',
+  'threshold',
+];
 
 const uniqueIds = (ids: string[]) => Array.from(new Set(ids));
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
+
+const toNumericRecord = (value: unknown): Record<string, number> => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return {};
+  }
+
+  const record = value as Record<string, unknown>;
+  const numericRecord: Record<string, number> = {};
+  for (const [key, candidate] of Object.entries(record)) {
+    if (isFiniteNumber(candidate)) {
+      numericRecord[key] = candidate;
+    }
+  }
+  return numericRecord;
+};
+
+const hasNeuronModelId = (agent: AgentIR, modelId: string): boolean =>
+  (agent.brain.neuronModels ?? []).some((model) => model.id === modelId);
+
+const hasSynapseModelId = (agent: AgentIR, modelId: string): boolean =>
+  (agent.brain.synapseModels ?? []).some((model) => model.id === modelId);
+
+const resolveNeuronModelById = (agent: AgentIR, modelId: string) =>
+  (agent.brain.neuronModels ?? []).find((model) => model.id === modelId) ?? null;
+
+const resolveDefaultNeuronModelId = (agent: AgentIR): string | null => {
+  const candidate = (agent.brain.neuronModels ?? []).find((model) => isNonEmptyString(model.id));
+  return candidate ? candidate.id : null;
+};
+
+const resolveDefaultSynapseModelId = (agent: AgentIR): string | null => {
+  const candidate = (agent.brain.synapseModels ?? []).find((model) => isNonEmptyString(model.id));
+  return candidate ? candidate.id : null;
+};
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -145,7 +199,6 @@ const updateAgentLayoutNodeState = (
 ): AgentIR => ({
   ...agent,
   layout: {
-    version: 1,
     ...(agent.layout ?? {}),
     nodes: {
       ...(agent.layout?.nodes ?? {}),
@@ -328,6 +381,7 @@ export const useGraphEditorCommands = ({
       }
 
       const uniqueSourceNodeIds = uniqueIds(sourceNodeIds);
+      let resolvedSynapseModelId: string | null = null;
       const nextConnections: AgentIR['connections'] = [];
       const resolvedLinkIds: string[] = [];
       const attemptedEndpoints = new Set<string>();
@@ -384,7 +438,10 @@ export const useGraphEditorCommands = ({
           id: nextLinkId,
           from: fromEndpoint,
           to: toEndpoint,
-          weight: 0.8,
+          synapseModelId: '',
+          parameterOverrides: {
+            ...DEFAULT_CONNECTION_PARAMETER_OVERRIDES,
+          },
         };
         nextConnections.push(nextConnection);
         resolvedLinkIds.push(nextLinkId);
@@ -403,10 +460,23 @@ export const useGraphEditorCommands = ({
           return current;
         }
 
+        if (!resolvedSynapseModelId) {
+          resolvedSynapseModelId = resolveDefaultSynapseModelId(current);
+        }
+        if (!resolvedSynapseModelId || !hasSynapseModelId(current, resolvedSynapseModelId)) {
+          return current;
+        }
+
         committed = true;
         return {
           ...current,
-          connections: [...current.connections, ...nextConnections],
+          connections: [
+            ...current.connections,
+            ...nextConnections.map((connection) => ({
+              ...connection,
+              synapseModelId: resolvedSynapseModelId as string,
+            })),
+          ],
         };
       }, GRAPH_SEMANTIC_CHANGE);
 
@@ -667,6 +737,7 @@ export const useGraphEditorCommands = ({
       const siblingIndex = currentChildren.filter((child) => child.kind === 'neuron').length + 1;
       const storedPosition = toStoredPosition({ x, y }, currentScope);
       let createdNeuronId: string | null = null;
+      let resolvedNeuronModelId: string | null = null;
       setAgent((current) => {
         if (!isCurrentBrainStructurallyEditable(current)) {
           return current;
@@ -674,6 +745,12 @@ export const useGraphEditorCommands = ({
 
         const currentContainerId = resolveCurrentBrainContainerId(current, navigationPath);
         if (!currentContainerId) {
+          return current;
+        }
+        if (!resolvedNeuronModelId) {
+          resolvedNeuronModelId = resolveDefaultNeuronModelId(current);
+        }
+        if (!resolvedNeuronModelId || !hasNeuronModelId(current, resolvedNeuronModelId)) {
           return current;
         }
 
@@ -689,13 +766,9 @@ export const useGraphEditorCommands = ({
                 {
                   id: nextNeuronId,
                   label: `神经元${siblingIndex}`,
-                  model: 'izhikevich',
-                  params: {
-                    a: 0.02,
-                    b: 0.2,
-                    c: -65,
-                    d: 8,
-                    threshold: 30,
+                  neuronModelId: resolvedNeuronModelId,
+                  parameterOverrides: {
+                    ...DEFAULT_NEURON_PARAMETER_OVERRIDES,
                   },
                   initialState: {
                     v: -65,
@@ -807,6 +880,7 @@ export const useGraphEditorCommands = ({
         proxy: false,
         movable: true,
         local: true,
+        previewOnly: false,
         direction: 'internal',
         connectableSource: true,
         connectableTarget: true,
@@ -864,7 +938,10 @@ export const useGraphEditorCommands = ({
             nodeId: nextNeuronId,
             portId: toPortId,
           },
-          weight: 0.8,
+          synapseModelId: '',
+          parameterOverrides: {
+            ...DEFAULT_CONNECTION_PARAMETER_OVERRIDES,
+          },
         });
         resolvedLinkIds.push(nextLinkId);
       }
@@ -900,6 +977,13 @@ export const useGraphEditorCommands = ({
           nextNeuronLabel: `神经元${siblingIndex}`,
           nextNeuronPosition: toStoredPosition({ x, y }, currentScope),
           connections: resolvedConnections,
+          neuronModelId: resolveDefaultNeuronModelId(current) ?? undefined,
+          neuronParameterOverrides: {
+            ...DEFAULT_NEURON_PARAMETER_OVERRIDES,
+          },
+          neuronInitialState: {
+            v: -65,
+          },
         });
         if (!isAcceptedGraphEdit(result)) {
           return current;
@@ -1104,35 +1188,69 @@ export const useGraphEditorCommands = ({
           return current;
         }
 
+        const hasTargetNode = current.brain.neurons.some((neuron) => neuron.id === nodeId);
+        if (!hasTargetNode) {
+          return current;
+        }
+
+        const neuronModelIdProvided = payload.neuronModelId !== undefined;
+        const nextNeuronModelId = payload.neuronModelId?.trim();
+        if (neuronModelIdProvided && !nextNeuronModelId) {
+          return current;
+        }
+        if (nextNeuronModelId && !hasNeuronModelId(current, nextNeuronModelId)) {
+          return current;
+        }
+
+        const nextParameterOverrides = toNumericRecord(payload.parameterOverrides);
+        const parameterOverridesProvided = payload.parameterOverrides !== undefined;
+        const normalizedInitialState =
+          payload.initialState && isFiniteNumber(payload.initialState.v)
+            ? {
+                v: payload.initialState.v,
+                ...(isFiniteNumber(payload.initialState.u) ? { u: payload.initialState.u } : {}),
+              }
+            : undefined;
+
         return {
           ...current,
           brain: {
             ...current.brain,
             neurons: current.brain.neurons.map((neuron) =>
-              neuron.id === nodeId
-                ? {
-                    ...neuron,
-                    label: payload.label,
-                    params: {
-                      ...neuron.params,
-                      ...(typeof payload.parameterOverrides?.a === 'number' ? { a: payload.parameterOverrides.a } : {}),
-                      ...(typeof payload.parameterOverrides?.b === 'number' ? { b: payload.parameterOverrides.b } : {}),
-                      ...(typeof payload.parameterOverrides?.c === 'number' ? { c: payload.parameterOverrides.c } : {}),
-                      ...(typeof payload.parameterOverrides?.d === 'number' ? { d: payload.parameterOverrides.d } : {}),
-                      ...(typeof payload.parameterOverrides?.threshold === 'number'
-                        ? { threshold: payload.parameterOverrides.threshold }
-                        : {}),
-                    },
-                    ...(payload.initialState
+            neuron.id === nodeId
+              ? {
+                  ...neuron,
+                  ...(() => {
+                    const targetNeuronModelId = nextNeuronModelId ?? neuron.neuronModelId;
+                    const modelParams = resolveNeuronModelById(current, targetNeuronModelId)?.params ?? null;
+                    const effectiveParameterOverrides = parameterOverridesProvided
+                      ? nextParameterOverrides
+                      : toNumericRecord(neuron.parameterOverrides);
+                    const resolvedParameters = modelParams
                       ? {
-                          initialState: {
-                            v: payload.initialState.v,
-                            ...(typeof payload.initialState.u === 'number' ? { u: payload.initialState.u } : {}),
-                          },
+                          ...modelParams,
+                          ...effectiveParameterOverrides,
                         }
-                      : {}),
-                  }
-                : neuron
+                      : effectiveParameterOverrides;
+
+                    return {
+                      parameterOverrides: effectiveParameterOverrides,
+                      ...(resolvedParameters
+                        ? {
+                            params: Object.fromEntries(
+                              KNOWN_NEURON_PARAM_KEYS.flatMap((key) =>
+                                isFiniteNumber(resolvedParameters[key]) ? [[key, resolvedParameters[key]]] : []
+                              )
+                            ),
+                          }
+                        : {}),
+                    };
+                  })(),
+                  label: payload.label,
+                  ...(nextNeuronModelId ? { neuronModelId: nextNeuronModelId } : {}),
+                  ...(normalizedInitialState ? { initialState: normalizedInitialState } : {}),
+                }
+              : neuron
             ),
           },
         };
@@ -1142,7 +1260,7 @@ export const useGraphEditorCommands = ({
   );
 
   const updateLinkWeight = useCallback(
-    (linkId: string, weight: number) => {
+    (linkId: string, payloadOrWeight: number | GraphLinkUpdatePayload) => {
       if (!graphStructureEditable) {
         return;
       }
@@ -1152,15 +1270,59 @@ export const useGraphEditorCommands = ({
           return current;
         }
 
+        const hasTargetLink = current.connections.some((link) => link.id === linkId);
+        if (!hasTargetLink) {
+          return current;
+        }
+
+        const payload: GraphLinkUpdatePayload =
+          typeof payloadOrWeight === 'number'
+            ? {
+                parameterOverrides: { weight: payloadOrWeight },
+              }
+            : payloadOrWeight;
+        const synapseModelIdProvided = payload.synapseModelId !== undefined;
+        const requestedSynapseModelId = payload.synapseModelId?.trim();
+        const targetSynapseModelId = requestedSynapseModelId ?? null;
+        if (synapseModelIdProvided && !requestedSynapseModelId) {
+          return current;
+        }
+        if (targetSynapseModelId && !hasSynapseModelId(current, targetSynapseModelId)) {
+          return current;
+        }
+
         return {
           ...current,
           connections: current.connections.map((link) =>
-            link.id === linkId
-              ? {
-                  ...link,
-                  weight,
-                }
-              : link
+            link.id !== linkId
+              ? link
+              : (() => {
+                  const activeSynapseModelId = targetSynapseModelId ?? link.synapseModelId?.trim() ?? '';
+                  if (!activeSynapseModelId || !hasSynapseModelId(current, activeSynapseModelId)) {
+                    return link;
+                  }
+
+                  const incomingOverrides = toNumericRecord(payload.parameterOverrides);
+                  const normalizedIncomingOverrides: Record<string, number> = {};
+                  for (const [key, value] of Object.entries(incomingOverrides)) {
+                    if (key === 'weight' || key === 'delayMs') {
+                      normalizedIncomingOverrides[key] = value;
+                    } else {
+                      normalizedIncomingOverrides[key] = value;
+                    }
+                  }
+
+                  const mergedParameterOverrides: Record<string, number> = {
+                    ...toNumericRecord(link.parameterOverrides),
+                    ...normalizedIncomingOverrides,
+                  };
+
+                  return {
+                    ...link,
+                    synapseModelId: activeSynapseModelId,
+                    parameterOverrides: mergedParameterOverrides,
+                  };
+                })()
           ),
         };
       }, GRAPH_SEMANTIC_CHANGE);

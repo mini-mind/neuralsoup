@@ -2,12 +2,11 @@ import type { AgentIR, AgentMetadata, WorldRegistry } from '../domain/brain';
 import {
   createBrainLibraryItemFromAgent,
   isValidBrainLibraryAgentPayload,
-  normalizeCanonicalBrainLibraryRecord,
   type BrainLibraryRecord,
 } from './brainLibraryRecord';
 
 export interface BrainLibraryExchangeDocument {
-  version: 1;
+  version: 2;
   kind: 'neuralsoup-agent';
   agent: AgentIR;
 }
@@ -15,28 +14,30 @@ export interface BrainLibraryExchangeDocument {
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-export const isBrainLibraryExchangeDocument = (_value: unknown): _value is BrainLibraryExchangeDocument => false;
+const hasOnlyKeys = (value: Record<string, unknown>, allowedKeys: readonly string[]): boolean =>
+  Object.keys(value).every((key) => allowedKeys.includes(key));
+
+export const isBrainLibraryExchangeDocument = (value: unknown): value is BrainLibraryExchangeDocument =>
+  isObject(value) &&
+  hasOnlyKeys(value, ['version', 'kind', 'agent']) &&
+  value.version === 2 &&
+  value.kind === 'neuralsoup-agent' &&
+  isObject((value as { agent?: unknown }).agent);
 
 export const isBrainLibraryExchangeDocumentWithRegistry = (
   value: unknown,
   worldRegistry: WorldRegistry
 ): value is BrainLibraryExchangeDocument =>
-  isObject(value) &&
-  value.version === 1 &&
-  value.kind === 'neuralsoup-agent' &&
+  isBrainLibraryExchangeDocument(value) &&
   isValidBrainLibraryAgentPayload((value as { agent?: unknown }).agent, worldRegistry);
 
 export const encodeBrainLibraryRecordForExchange = (
   record: BrainLibraryRecord
 ): BrainLibraryExchangeDocument => {
-  const normalized = normalizeCanonicalBrainLibraryRecord(record.agent, {
-    ...record.agent.metadata,
-  });
-
   return {
-    version: 1,
+    version: 2,
     kind: 'neuralsoup-agent',
-    agent: normalized.agent,
+    agent: record.agent,
   };
 };
 
@@ -59,7 +60,13 @@ const createImportedRecord = (
     name: trimmedName || agent.metadata.name,
   };
 
-  return normalizeCanonicalBrainLibraryRecord(agent, nextMetadata);
+  const created = createBrainLibraryItemFromAgent(nextMetadata.name, agent, worldRegistry);
+  return {
+    agent: {
+      ...created.agent,
+      metadata: nextMetadata,
+    },
+  };
 };
 
 export const normalizeImportedBrainExchange = (

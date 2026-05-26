@@ -76,22 +76,24 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
       data-testid="topology-viewport"
       aria-hidden={!isActive}
     >
-      <SNNTopologyEditor
-        width={Math.max(viewport.width, 1)}
-        height={Math.max(viewport.height, 1)}
-        agent={agent}
-        graphSessionToken={graphSessionToken}
-        visionCells={visionCells}
-        installedSummary={installedSummary}
-        worldRegistry={worldRegistry}
-        onAgentChange={onAgentChange}
-        onGraphPathChange={onGraphPathChange}
-        onGraphPathNavigateRegister={onGraphPathNavigateRegister}
-        runtimeStatus={runtimeStatus}
-        draftStatus={draftStatus}
-        runtimeActivity={runtimeActivity}
-        isActive={isActive}
-      />
+      <div className="graph-primary-panel">
+        <SNNTopologyEditor
+          width={Math.max(viewport.width, 1)}
+          height={Math.max(viewport.height, 1)}
+          agent={agent}
+          graphSessionToken={graphSessionToken}
+          visionCells={visionCells}
+          installedSummary={installedSummary}
+          worldRegistry={worldRegistry}
+          onAgentChange={onAgentChange}
+          onGraphPathChange={onGraphPathChange}
+          onGraphPathNavigateRegister={onGraphPathNavigateRegister}
+          runtimeStatus={runtimeStatus}
+          draftStatus={draftStatus}
+          runtimeActivity={runtimeActivity}
+          isActive={isActive}
+        />
+      </div>
     </div>
   );
 };

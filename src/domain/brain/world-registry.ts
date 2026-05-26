@@ -1,5 +1,3 @@
-import type { BodyInputRule, BodyOutputRule } from './agent-ir';
-
 export interface WorldInputBinding {
   source: string;
   worldPort: string;
@@ -10,16 +8,6 @@ export interface WorldOutputBinding {
   target: string;
   worldPort: string;
   commandKind: string;
-}
-
-export interface WorldInputRuleBindingResolution {
-  source: string;
-  binding: WorldInputBinding | null;
-}
-
-export interface WorldOutputRuleBindingResolution {
-  target: string;
-  binding: WorldOutputBinding | null;
 }
 
 export interface WorldPortDescriptor {
@@ -35,8 +23,4 @@ export interface WorldRegistry {
   outputs: WorldPortDescriptor[];
   resolveInputBinding(source: string): WorldInputBinding | null;
   resolveOutputBinding(target: string): WorldOutputBinding | null;
-  resolveInputRuleBinding(rule: BodyInputRule, match: RegExpExecArray): WorldInputRuleBindingResolution;
-  resolveOutputRuleBinding(rule: BodyOutputRule, match: RegExpExecArray): WorldOutputRuleBindingResolution;
-  enumerateInputNodeIds(rule: BodyInputRule, projectedVisionCellCount: number): string[];
-  enumerateOutputNodeIds(rule: BodyOutputRule): string[];
 }

@@ -20,13 +20,77 @@ export interface GraphLinkDetailData {
   toNodeId: string;
   fromRefNodeId: string;
   toRefNodeId: string;
+  synapseModelId: string | null;
+  parameterOverrides: {
+    weight?: number;
+    delayMs?: number;
+  };
+  resolvedParameters: {
+    weight: number;
+    delayMs: number;
+  };
+  defaultParameters: {
+    weight: number | null;
+    delayMs: number | null;
+  };
   weight: number;
+  delayMs: number;
   count: number;
   aggregate: boolean;
   inspectable: boolean;
   editable: boolean;
   leafLinkIds: string[];
 }
+
+interface GraphLinkInspectorSynapseSnapshot {
+  defaults?: Record<string, number>;
+  parameterOverrides?: Record<string, number>;
+  effectiveWeight?: number | null;
+  effectiveDelayMs?: number | null;
+}
+
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+const toNumericRecord = (value: unknown): Record<string, number> => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return {};
+  }
+
+  const record = value as Record<string, unknown>;
+  const numericRecord: Record<string, number> = {};
+  for (const [key, candidate] of Object.entries(record)) {
+    if (isFiniteNumber(candidate)) {
+      numericRecord[key] = candidate;
+    }
+  }
+  return numericRecord;
+};
+
+export const resolveGraphLinkInspectorParameters = (snapshot: GraphLinkInspectorSynapseSnapshot | null | undefined) => {
+  const defaultWeight = isFiniteNumber(snapshot?.defaults?.weight) ? snapshot.defaults.weight : null;
+  const defaultDelayMs = isFiniteNumber(snapshot?.defaults?.delayMs) ? snapshot.defaults.delayMs : null;
+  const overrideWeight = isFiniteNumber(snapshot?.parameterOverrides?.weight) ? snapshot.parameterOverrides.weight : undefined;
+  const overrideDelayMs = isFiniteNumber(snapshot?.parameterOverrides?.delayMs)
+    ? snapshot.parameterOverrides.delayMs
+    : undefined;
+  const resolvedWeight = overrideWeight ?? (isFiniteNumber(snapshot?.effectiveWeight) ? snapshot.effectiveWeight : defaultWeight ?? 0);
+  const resolvedDelayMs =
+    overrideDelayMs ?? (isFiniteNumber(snapshot?.effectiveDelayMs) ? snapshot.effectiveDelayMs : defaultDelayMs ?? 0);
+
+  return {
+    parameterOverrides: {
+      ...(overrideWeight == null ? {} : { weight: overrideWeight }),
+      ...(overrideDelayMs == null ? {} : { delayMs: overrideDelayMs }),
+    },
+    resolvedParameters: {
+      weight: resolvedWeight,
+      delayMs: resolvedDelayMs,
+    },
+    defaultParameters: {
+      weight: defaultWeight,
+      delayMs: defaultDelayMs,
+    },
+  };
+};
 
 export interface GraphPoint {
   x: number;
@@ -83,6 +147,8 @@ export interface GraphDocumentChangeOptions {
 
 const uniqueIds = (ids: string[]) => Array.from(new Set(ids));
 const arePointsEqual = (left: GraphPoint, right: GraphPoint) => left.x === right.x && left.y === right.y;
+const getDefaultNavigationPath = (agent: AgentIR): string[] =>
+  agent.brain.rootContainerId ? [agent.brain.rootContainerId] : [];
 
 const areStringArraysEqual = (left: string[], right: string[]) =>
   left.length === right.length && left.every((value, index) => value === right[index]);
@@ -95,7 +161,7 @@ export const useSNNTopologyState = ({
   runtimeActiveNodeIds = [],
   onAgentChange,
 }: UseSNNTopologyStateOptions) => {
-  const [navigationPath, setNavigationPath] = useState<string[]>([]);
+  const [navigationPath, setNavigationPath] = useState<string[]>(() => getDefaultNavigationPath(agent));
   const {
     selectionState,
     setSelectionState,
@@ -238,13 +304,21 @@ export const useSNNTopologyState = ({
     }
 
     const leafLink = agent.connections.find((link) => link.id === showDetailModal.id) ?? null;
+    const viewSynapse = viewLink.synapse ?? null;
+    const synapseParameters = resolveGraphLinkInspectorParameters(viewSynapse);
+
     return {
       id: viewLink.id,
       fromNodeId: viewLink.fromNodeId,
       toNodeId: viewLink.toNodeId,
       fromRefNodeId: viewLink.fromRefNodeId,
       toRefNodeId: viewLink.toRefNodeId,
-      weight: leafLink?.weight ?? viewLink.weight,
+      synapseModelId: leafLink?.synapseModelId ?? viewSynapse?.synapseModelId ?? null,
+      parameterOverrides: synapseParameters.parameterOverrides,
+      resolvedParameters: synapseParameters.resolvedParameters,
+      defaultParameters: synapseParameters.defaultParameters,
+      weight: synapseParameters.resolvedParameters.weight,
+      delayMs: synapseParameters.resolvedParameters.delayMs,
       count: viewLink.count,
       aggregate: viewLink.aggregate,
       inspectable: viewLink.inspectable,
@@ -286,19 +360,19 @@ export const useSNNTopologyState = ({
     editorSessionTokenRef.current = graphSessionToken;
     activeCanvasScopeKeyRef.current = null;
     viewportStateByScopeKeyRef.current = new Map();
-    setNavigationPath([]);
+    setNavigationPath(getDefaultNavigationPath(agent));
     clearTransientState();
     setCanvasSession(createDefaultCanvasSessionState());
-  }, [clearTransientState, graphSessionToken, setCanvasSession]);
+  }, [agent, clearTransientState, graphSessionToken, setCanvasSession]);
 
   useEffect(() => {
     if (hasValidNavigationPath) {
       return;
     }
 
-    setNavigationPath([]);
+    setNavigationPath(getDefaultNavigationPath(agent));
     clearTransientState();
-  }, [clearTransientState, hasValidNavigationPath]);
+  }, [agent, clearTransientState, hasValidNavigationPath]);
 
   useEffect(() => {
     if (scopeSessionRef.current === scopeKey) {
@@ -313,8 +387,14 @@ export const useSNNTopologyState = ({
       return;
     }
 
+    const defaultPath = getDefaultNavigationPath(agent);
+    if (defaultPath.length > 0) {
+      setNavigationPath(defaultPath);
+      return;
+    }
+
     scopeSessionRef.current = 'root';
-  }, [navigationPath.length]);
+  }, [agent, navigationPath.length]);
 
   const navigateTo = useCallback(
     (nodeId: string) => {
@@ -337,7 +417,7 @@ export const useSNNTopologyState = ({
   const navigateToBreadcrumb = useCallback(
     (breadcrumbId: string) => {
       if (breadcrumbId === 'root') {
-        setNavigationPath([]);
+        setNavigationPath(getDefaultNavigationPath(agent));
       } else {
         const path = agentViewModel.indexes.pathById.get(breadcrumbId);
         if (!path) {
@@ -349,7 +429,7 @@ export const useSNNTopologyState = ({
 
       clearTransientState();
     },
-    [agentViewModel.indexes.pathById, clearTransientState]
+    [agent, agentViewModel.indexes.pathById, clearTransientState]
   );
 
   const selectNode = useCallback(
@@ -537,7 +617,7 @@ export const useSNNTopologyState = ({
         return 'navigate';
       }
 
-      if (node.editable && !node.proxy) {
+      if (node.editable && !node.proxy && !node.previewOnly) {
         return 'edit';
       }
 
@@ -748,14 +828,20 @@ export const useSNNTopologyState = ({
       return null;
     }
 
+    const neuronModelId = activeNode.neuron?.neuronModelId?.trim() ?? '';
+    const neuronModel =
+      neuronModelId.length > 0 ? agent.brain.neuronModels.find((model) => model.id === neuronModelId) : undefined;
+    const defaultParameters = neuronModel ? toNumericRecord(neuronModel.params) : {};
+    const parameterOverrides = toNumericRecord(activeNode.neuron?.parameterOverrides);
+
     return {
-      a: activeNode.neuron?.params.a ?? 0.02,
-      b: activeNode.neuron?.params.b ?? 0.2,
-      c: activeNode.neuron?.params.c ?? -65,
-      d: activeNode.neuron?.params.d ?? 8,
-      threshold: activeNode.neuron?.params.threshold ?? 30,
+      a: parameterOverrides.a ?? defaultParameters.a ?? 0.02,
+      b: parameterOverrides.b ?? defaultParameters.b ?? 0.2,
+      c: parameterOverrides.c ?? defaultParameters.c ?? -65,
+      d: parameterOverrides.d ?? defaultParameters.d ?? 8,
+      threshold: parameterOverrides.threshold ?? defaultParameters.threshold ?? 30,
     };
-  }, [activeNode]);
+  }, [activeNode, agent.brain.neuronModels]);
 
   return {
     breadcrumbs,

@@ -184,28 +184,70 @@ export const useGraphCanvasAssembly = ({
 
   const updateNodePositionsFromSceneDraft = useCallback(
     (updates: Array<{ nodeId: string; x: number; y: number }>) => {
+      const sceneNodeByViewId = new Map(scene.list.map((node) => [node.viewId, node] as const));
       updateNodePositionsInDraft(
         updates.map(({ nodeId, x, y }) => ({
           nodeId,
-          x: x + sceneOriginRef.current.x,
-          y: y + sceneOriginRef.current.y,
+          x:
+            (() => {
+              const sceneNode = sceneNodeByViewId.get(nodeId);
+              if (sceneNode?.expansionParentId) {
+                const parentNode = sceneNodeByViewId.get(sceneNode.expansionParentId);
+                if (parentNode) {
+                  return x - parentNode.sceneX - sceneNode.expansionOffsetX;
+                }
+              }
+              return x + sceneOriginRef.current.x;
+            })(),
+          y:
+            (() => {
+              const sceneNode = sceneNodeByViewId.get(nodeId);
+              if (sceneNode?.expansionParentId) {
+                const parentNode = sceneNodeByViewId.get(sceneNode.expansionParentId);
+                if (parentNode) {
+                  return y - parentNode.sceneY - sceneNode.expansionOffsetY;
+                }
+              }
+              return y + sceneOriginRef.current.y;
+            })(),
         }))
       );
     },
-    [updateNodePositionsInDraft]
+    [scene.list, updateNodePositionsInDraft]
   );
 
   const persistNodePositionsFromScene = useCallback(
     (updates: Array<{ nodeId: string; x: number; y: number }>) => {
+      const sceneNodeByViewId = new Map(scene.list.map((node) => [node.viewId, node] as const));
       persistNodePositions(
         updates.map(({ nodeId, x, y }) => ({
           nodeId,
-          x: x + sceneOriginRef.current.x,
-          y: y + sceneOriginRef.current.y,
+          x:
+            (() => {
+              const sceneNode = sceneNodeByViewId.get(nodeId);
+              if (sceneNode?.expansionParentId) {
+                const parentNode = sceneNodeByViewId.get(sceneNode.expansionParentId);
+                if (parentNode) {
+                  return x - parentNode.sceneX - sceneNode.expansionOffsetX;
+                }
+              }
+              return x + sceneOriginRef.current.x;
+            })(),
+          y:
+            (() => {
+              const sceneNode = sceneNodeByViewId.get(nodeId);
+              if (sceneNode?.expansionParentId) {
+                const parentNode = sceneNodeByViewId.get(sceneNode.expansionParentId);
+                if (parentNode) {
+                  return y - parentNode.sceneY - sceneNode.expansionOffsetY;
+                }
+              }
+              return y + sceneOriginRef.current.y;
+            })(),
         }))
       );
     },
-    [persistNodePositions]
+    [persistNodePositions, scene.list]
   );
 
   const orchestratorNodes = useMemo(
@@ -219,11 +261,13 @@ export const useGraphCanvasAssembly = ({
         proxy: node.proxy,
         movable: node.movable,
         local: node.local,
+        previewOnly: node.previewOnly,
         connectableSource: node.connectableSource,
         ungroupable: node.kind === 'neuron-group' && node.local && !node.proxy && !node.expansionParentId,
         contextMenuGroup: !node.leaf && node.local && !node.proxy && !node.expansionParentId,
         expanded: node.expanded,
         expansionParentId: node.expansionParentId,
+        titleDragHandleOnly: node.kind === 'neuron-group' && node.expanded && !node.expansionParentId,
       })),
     [scene.list]
   );

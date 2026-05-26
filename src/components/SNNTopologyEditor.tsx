@@ -100,6 +100,28 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
     updateLinkWeight,
   } = state;
 
+  const handleLinkDetailUpdate = (
+    linkId: string,
+    payload:
+      | number
+      | {
+          weight: number;
+          delayMs?: number;
+          synapseModelId?: string;
+          parameterOverrides?: {
+            weight?: number;
+            delayMs?: number;
+          };
+        }
+  ) => {
+    if (typeof payload === 'number') {
+      updateLinkWeight(linkId, payload);
+      return;
+    }
+
+    updateLinkWeight(linkId, payload);
+  };
+
   const selectedCount = selectedNodeIds.length + (selectedLinkId ? 1 : 0);
 
   const canCreateNeuronHere = currentContainerKind === 'neuron-group';
@@ -236,7 +258,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
         activeNeuronParameters={activeNeuronParameters}
         onClose={closeDetailModal}
         onUpdateNode={updateNodeLabelAndParams}
-        onUpdateLink={updateLinkWeight}
+        onUpdateLink={handleLinkDetailUpdate}
       />
     </div>
   );

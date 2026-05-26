@@ -7,11 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "test:domain": "node --import tsx --test $(find tests/domain -name '*.test.ts' | sort)",
-    "test:compat": "node --import tsx --test $(find tests/compat -name '*.test.ts' | sort)",
     "type-check": "tsc --noEmit",
     "check:pixi-imports": "node scripts/check-pixi-imports.mjs",
     "preview": "vite preview",
     "test:e2e": "playwright test",
+    "test:e2e:critical": "playwright test e2e/simulation-library-critical.spec.ts e2e/graph-critical.spec.ts",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui"
   },

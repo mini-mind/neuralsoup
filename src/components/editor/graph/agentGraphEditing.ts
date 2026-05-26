@@ -10,7 +10,6 @@ const updateBrainContainerById = (
 const withLayoutNodePosition = (agent: AgentIR, nodeId: string, position: Position): AgentIR => ({
   ...agent,
   layout: {
-    version: 1,
     ...(agent.layout ?? {}),
     nodes: {
       ...(agent.layout?.nodes ?? {}),
@@ -34,7 +33,9 @@ export type AgentGraphEditingIssueCode =
   | 'root-has-parent'
   | 'orphan-container'
   | 'cycle-detected'
-  | 'unreachable-container';
+  | 'unreachable-container'
+  | 'missing-neuron-model-id'
+  | 'missing-synapse-model-id';
 
 export interface AgentGraphEditingIssue {
   code: AgentGraphEditingIssueCode;
@@ -74,6 +75,32 @@ const createAgentGraphEditingIssue = (
 const hasBrainNodeIdCollision = (agent: AgentIR, nodeId: string): boolean =>
   agent.brain.neurons.some((neuron) => neuron.id === nodeId) ||
   agent.brain.containers.some((container) => container.id === nodeId);
+
+const DEFAULT_NEURON_PARAMETER_OVERRIDES = {
+  a: 0.02,
+  b: 0.2,
+  c: -65,
+  d: 8,
+  threshold: 30,
+} as const;
+
+const DEFAULT_CONNECTION_PARAMETER_OVERRIDES = {
+  weight: 0.8,
+  delayMs: 0,
+} as const;
+
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0;
+
+const resolveFirstNeuronModelId = (agent: AgentIR): string | null => {
+  const firstModel = agent.brain.neuronModels?.find((model) => isNonEmptyString(model.id));
+  return firstModel ? firstModel.id : null;
+};
+
+const resolveFirstSynapseModelId = (agent: AgentIR): string | null => {
+  const firstModel = agent.brain.synapseModels?.find((model) => isNonEmptyString(model.id));
+  return firstModel ? firstModel.id : null;
+};
 
 const collectBrainStructureIssues = (agent: AgentIR): AgentGraphEditingIssue[] => {
   const issues: AgentGraphEditingIssue[] = [];
@@ -488,7 +515,17 @@ export interface CreateNeuronAndConnectInput {
   nextNeuronId: string;
   nextNeuronLabel: string;
   nextNeuronPosition: Position;
-  connections: AgentIR['connections'];
+  connections: Array<
+    Omit<AgentIR['connections'][number], 'synapseModelId'> & {
+      synapseModelId?: string;
+    }
+  >;
+  neuronModelId?: string;
+  neuronParameterOverrides?: Record<string, number>;
+  neuronInitialState?: {
+    v: number;
+    u?: number;
+  };
 }
 
 export const tryCreateNeuronAndConnectInContainer = (
@@ -499,6 +536,9 @@ export const tryCreateNeuronAndConnectInContainer = (
     nextNeuronLabel,
     nextNeuronPosition,
     connections,
+    neuronModelId,
+    neuronParameterOverrides,
+    neuronInitialState,
   }: CreateNeuronAndConnectInput
 ): AgentGraphEditingResult => {
   const parentContainer = agent.brain.containers.find((container) => container.id === parentContainerId);
@@ -511,16 +551,50 @@ export const tryCreateNeuronAndConnectInContainer = (
     ]);
   }
 
-  const preconditions = hasBrainNodeIdCollision(agent, nextNeuronId)
-    ? [
-        createAgentGraphEditingIssue(
-          'duplicate-node-id',
-          `Cannot create neuron "${nextNeuronId}" because that brain node id already exists.`
-        ),
-      ]
-    : [];
+  const resolvedNeuronModelId = neuronModelId?.trim() || resolveFirstNeuronModelId(agent);
+  const resolvedSynapseModelId = resolveFirstSynapseModelId(agent);
+  const neuronModelIdExplicitlyProvided = neuronModelId !== undefined;
+  const neuronModelIdInvalidWhenProvided = neuronModelIdExplicitlyProvided && !isNonEmptyString(neuronModelId);
+  const preconditions: AgentGraphEditingIssue[] = [];
+  if (neuronModelIdInvalidWhenProvided) {
+    preconditions.push(
+      createAgentGraphEditingIssue(
+        'missing-neuron-model-id',
+        `Cannot create neuron "${nextNeuronId}" because the provided neuron model id is empty or invalid.`
+      )
+    );
+  }
+  if (hasBrainNodeIdCollision(agent, nextNeuronId)) {
+    preconditions.push(
+      createAgentGraphEditingIssue(
+        'duplicate-node-id',
+        `Cannot create neuron "${nextNeuronId}" because that brain node id already exists.`
+      )
+    );
+  }
+  if (!resolvedNeuronModelId) {
+    preconditions.push(
+      createAgentGraphEditingIssue(
+        'missing-neuron-model-id',
+        `Cannot create neuron "${nextNeuronId}" because no valid neuron model id is available.`
+      )
+    );
+  }
+  if (connections.length > 0 && !resolvedSynapseModelId) {
+    preconditions.push(
+      createAgentGraphEditingIssue(
+        'missing-synapse-model-id',
+        `Cannot create connections for neuron "${nextNeuronId}" because no valid synapse model id is available.`
+      )
+    );
+  }
 
   return validateAgentGraphEdit(agent, () => {
+    const safeNeuronModelId = resolvedNeuronModelId as string;
+    const safeSynapseModelId = resolvedSynapseModelId as string;
+    const nextInitialState = neuronInitialState ?? {
+      v: -65,
+    };
     let nextAgent: AgentIR = {
       ...agent,
       brain: {
@@ -530,17 +604,11 @@ export const tryCreateNeuronAndConnectInContainer = (
           {
             id: nextNeuronId,
             label: nextNeuronLabel,
-            model: 'izhikevich',
-            params: {
-              a: 0.02,
-              b: 0.2,
-              c: -65,
-              d: 8,
-              threshold: 30,
+            neuronModelId: safeNeuronModelId,
+            parameterOverrides: {
+              ...(neuronParameterOverrides ?? DEFAULT_NEURON_PARAMETER_OVERRIDES),
             },
-            initialState: {
-              v: -65,
-            },
+            initialState: nextInitialState,
           },
         ],
         containers: updateBrainContainerById(agent.brain.containers, parentContainerId, (container) => ({
@@ -548,7 +616,20 @@ export const tryCreateNeuronAndConnectInContainer = (
           children: [...container.children, { scope: 'brain', nodeId: nextNeuronId }],
         })),
       },
-      connections: [...agent.connections, ...connections],
+      connections: [
+        ...agent.connections,
+        ...connections.map((connection) => {
+          const mergedOverrides: Record<string, number> = {
+            ...DEFAULT_CONNECTION_PARAMETER_OVERRIDES,
+            ...((connection.parameterOverrides as Record<string, number> | undefined) ?? {}),
+          };
+          return {
+            ...connection,
+            synapseModelId: safeSynapseModelId,
+            parameterOverrides: mergedOverrides,
+          };
+        }),
+      ],
     };
 
     nextAgent = withLayoutNodePosition(nextAgent, nextNeuronId, nextNeuronPosition);

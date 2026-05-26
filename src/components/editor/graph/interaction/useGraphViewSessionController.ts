@@ -8,11 +8,13 @@ interface GraphViewSessionControllerNode extends SceneNodeGeometry {
   proxy: boolean;
   movable: boolean;
   local: boolean;
+  previewOnly: boolean;
   connectableSource: boolean;
   ungroupable: boolean;
   contextMenuGroup: boolean;
   expanded: boolean;
   expansionParentId: string | null;
+  titleDragHandleOnly: boolean;
 }
 
 interface GraphViewSessionControllerOptions {

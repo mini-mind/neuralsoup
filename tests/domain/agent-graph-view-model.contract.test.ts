@@ -1,60 +1,107 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildAgentBodyRulePreviewModel, preflightBrainStructure, type AgentIR, type WorldRegistry } from '../../src/domain/brain';
+import { buildAgentBodyEndpointPreviewModel, preflightBrainStructure, type AgentIR, type WorldRegistry } from '../../src/domain/brain';
+import { resolveConnectionOverridePayload } from '../../src/components/ConnectionDetailEditor';
 import { buildAgentGraphViewModel } from '../../src/components/editor/graph/agentGraphViewModel';
+import { resolveGraphLinkInspectorParameters } from '../../src/components/hooks/useSNNTopologyState';
 import { createVisionActionWorldRegistry } from '../../src/host';
 
 const WORLD_REGISTRY = createVisionActionWorldRegistry();
+const DEFAULT_NEURON_MODEL_ID = 'izhikevich-default';
+const DEFAULT_SYNAPSE_MODEL_ID = 'static-default';
+const CHANNELS = ['R', 'G', 'B'] as const;
+const ACTIONS = ['turn-left', 'move-forward', 'turn-right'] as const;
 
-const createRuleAuthorityTestRegistry = (): WorldRegistry => ({
+interface CanonicalBodyFixtureOptions {
+  inputEndpointId: string;
+  outputEndpointId: string;
+  inputNodePrefix: string;
+  outputNodePrefix: string;
+  visionCells: number;
+  inputSourcePrefix?: string;
+  outputTargetPrefix?: string;
+  inputScale: number;
+  outputDecayPerSecond: number;
+}
+
+const createEndpointAuthorityTestRegistry = (): WorldRegistry => ({
   version: 1,
   inputs: [{ id: 'vision', direction: 'input', kind: 'vision-array', enumerable: true }],
   outputs: [{ id: 'action', direction: 'output', kind: 'action-map', enumerable: true }],
-  resolveInputBinding: () => null,
-  resolveOutputBinding: () => null,
-  resolveInputRuleBinding: (_rule, match) => {
-    const channel = match[1] ?? '';
-    const cellIndex = Number.parseInt(match[2] ?? '-1', 10);
-    const source = `vision.${channel}.${cellIndex}`;
-    return {
-      source,
-      binding:
-        channel.length === 0 || !Number.isFinite(cellIndex) || cellIndex < 0
-          ? null
-          : {
-              source,
-              worldPort: 'vision',
-              cellIndex,
-            },
-    };
-  },
-  resolveOutputRuleBinding: (_rule, match) => {
-    const action = match[1] ?? '';
-    const target = `action.${action}`;
-    return {
-      target,
-      binding:
-        action.length === 0
-          ? null
-          : {
-              target,
-              worldPort: 'action',
-              commandKind: action,
-            },
-    };
-  },
-  enumerateInputNodeIds: (_rule, projectedVisionCellCount) => {
-    const nodeIds: string[] = [];
-    for (let cellIndex = 0; cellIndex < projectedVisionCellCount; cellIndex += 1) {
-      nodeIds.push(`sensor-R-${cellIndex}`, `sensor-G-${cellIndex}`, `sensor-B-${cellIndex}`);
+  resolveInputBinding: (source) => {
+    const match = source.match(/^(?:vision|unsupported)\.([RGB])\.(\d+)$/);
+    if (!match) {
+      return null;
     }
-    return nodeIds;
+
+    const cellIndex = Number.parseInt(match[2] ?? '-1', 10);
+    return {
+      source: `vision.${match[1]}.${cellIndex}`,
+      worldPort: 'vision',
+      cellIndex,
+    };
   },
-  enumerateOutputNodeIds: () => ['effector-turn-left', 'effector-move-forward', 'effector-turn-right'],
+  resolveOutputBinding: (target) => {
+    const match = target.match(/^(?:action|unsupported)\.(turn-left|move-forward|turn-right)$/);
+    if (!match) {
+      return null;
+    }
+
+    return {
+      target: `action.${match[1]}`,
+      worldPort: 'action',
+      commandKind: match[1],
+    };
+  },
 });
 
+const configureCanonicalBody = (
+  agent: AgentIR,
+  {
+    inputEndpointId,
+    outputEndpointId,
+    inputNodePrefix,
+    outputNodePrefix,
+    visionCells,
+    inputSourcePrefix = 'vision',
+    outputTargetPrefix = 'action',
+    inputScale,
+    outputDecayPerSecond,
+  }: CanonicalBodyFixtureOptions
+): void => {
+  agent.body = {
+    inputEndpoints: Array.from({ length: visionCells }).flatMap((_, cellIndex) =>
+      CHANNELS.map((channel) => ({
+        id: `${inputEndpointId}-${channel}-${cellIndex}`,
+        source: `${inputSourcePrefix}.${channel}.${cellIndex}`,
+        scale: inputScale,
+      }))
+    ),
+    outputEndpoints: ACTIONS.map((action) => ({
+      id: `${outputEndpointId}-${action}`,
+      target: `${outputTargetPrefix}.${action}`,
+      decayPerSecond: outputDecayPerSecond,
+    })),
+    mappings: [
+      ...Array.from({ length: visionCells }).flatMap((_, cellIndex) =>
+        CHANNELS.map((channel) => ({
+          id: `${inputEndpointId}-mapping-${channel}-${cellIndex}`,
+          kind: 'input' as const,
+          endpointId: `${inputEndpointId}-${channel}-${cellIndex}`,
+          nodeId: `${inputNodePrefix}-${channel}-${cellIndex}`,
+        }))
+      ),
+      ...ACTIONS.map((action) => ({
+        id: `${outputEndpointId}-mapping-${action}`,
+        kind: 'output' as const,
+        endpointId: `${outputEndpointId}-${action}`,
+        nodeId: `${outputNodePrefix}-${action}`,
+      })),
+    ],
+  };
+};
+
 const createTestAgent = (): AgentIR => ({
-  version: 1,
   metadata: {
     id: 'agent-test',
     name: 'Agent Test',
@@ -62,25 +109,42 @@ const createTestAgent = (): AgentIR => ({
     updatedAt: '2026-01-01T00:00:00.000Z',
   },
   body: {
-    version: 1,
-    inputRules: [],
-    outputRules: [],
+    inputEndpoints: [],
+    outputEndpoints: [],
+    mappings: [],
   },
   brain: {
-    version: 1,
-    rootContainerId: 'root-group',
-    neurons: [
+    neuronModels: [
       {
-        id: 'neuron-1',
-        label: 'Neuron 1',
-        model: 'izhikevich',
+        id: DEFAULT_NEURON_MODEL_ID,
+        family: 'izhikevich',
+        label: 'Default Izhikevich',
         params: {
           a: 0.02,
           b: 0.2,
           c: -65,
           d: 8,
-          threshold: 30,
+          threshold: -70,
         },
+      },
+    ],
+    synapseModels: [
+      {
+        id: DEFAULT_SYNAPSE_MODEL_ID,
+        kind: 'static-current',
+        label: 'Static Default',
+        defaults: {
+          weight: 0.5,
+          delayMs: 0,
+        },
+      },
+    ],
+    rootContainerId: 'root-group',
+    neurons: [
+      {
+        id: 'neuron-1',
+        label: 'Neuron 1',
+        neuronModelId: DEFAULT_NEURON_MODEL_ID,
         initialState: {
           v: -65,
         },
@@ -88,14 +152,7 @@ const createTestAgent = (): AgentIR => ({
       {
         id: 'neuron-2',
         label: 'Neuron 2',
-        model: 'izhikevich',
-        params: {
-          a: 0.02,
-          b: 0.2,
-          c: -65,
-          d: 8,
-          threshold: 30,
-        },
+        neuronModelId: DEFAULT_NEURON_MODEL_ID,
         initialState: {
           v: -65,
         },
@@ -122,11 +179,10 @@ const createTestAgent = (): AgentIR => ({
       id: 'connection-1',
       from: { scope: 'brain', nodeId: 'neuron-1' },
       to: { scope: 'brain', nodeId: 'neuron-2' },
-      weight: 0.5,
+      synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
     },
   ],
   layout: {
-    version: 1,
     nodes: {
       'expanded-group': {
         position: { x: 100, y: 120 },
@@ -172,6 +228,68 @@ test('agent graph view expanded children use viewId for active highlights', () =
   assert.equal(viewModel.activeViewNodeIds.has('neuron-1'), false);
 });
 
+test('agent graph expanded group size derives from persisted child bounds with padding and minimum size', () => {
+  const agent = createTestAgent();
+  agent.layout = {
+    nodes: {
+      ...agent.layout?.nodes,
+      'neuron-1': { position: { x: 0, y: 0 } },
+      'neuron-2': { position: { x: 420, y: 260 } },
+    },
+  };
+
+  const viewModel = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [agent.brain.rootContainerId],
+    draftNodePositions: {
+      'neuron-1': { x: 1400, y: 1300 },
+      'neuron-2': { x: 1800, y: 1600 },
+    },
+    runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
+  });
+
+  const expandedGroup = viewModel.nodes.find((node) => node.id === 'expanded-group');
+  assert.ok(expandedGroup);
+  assert.equal(expandedGroup.width, 494);
+  assert.equal(expandedGroup.height, 334);
+});
+
+test('agent graph expanded child local projection uses persisted canvas position and ignores transient draft positions', () => {
+  const agent = createTestAgent();
+  agent.layout = {
+    nodes: {
+      ...agent.layout?.nodes,
+      'expanded-group': {
+        position: { x: 100, y: 120 },
+        collapsed: false,
+      },
+      'neuron-1': { position: { x: 0, y: 0 } },
+      'neuron-2': { position: { x: 420, y: 260 } },
+    },
+  };
+
+  const viewModel = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [agent.brain.rootContainerId],
+    draftNodePositions: {
+      'neuron-1': { x: 1000, y: 1000 },
+      'neuron-2': { x: 2000, y: 2000 },
+    },
+    runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
+  });
+
+  const child1 = viewModel.nodes.find((node) => node.viewId === 'expanded-group::neuron-1');
+  const child2 = viewModel.nodes.find((node) => node.viewId === 'expanded-group::neuron-2');
+  assert.ok(child1);
+  assert.ok(child2);
+  assert.equal(child1.x, 390);
+  assert.equal(child1.y, 190);
+  assert.equal(child2.x, 810);
+  assert.equal(child2.y, 450);
+});
+
 test('agent graph root brain child scope does not inject orphan adapter proxy nodes', () => {
   const agent = createTestAgent();
   const viewModel = buildAgentGraphViewModel({
@@ -187,39 +305,31 @@ test('agent graph root brain child scope does not inject orphan adapter proxy no
 
 test('agent graph root brain child scope projects boundary adapters without proxy nodes', () => {
   const agent = createTestAgent();
-  agent.body.inputRules = [
-    {
-      id: 'vision-inputs',
-      nodeIdPattern: '^vision-([RGB])-(\\d+)$',
-      sourceTemplate: 'vision.$1.$2',
-      scale: 1,
-    },
-  ];
-  agent.body.outputRules = [
-    {
-      id: 'motor-outputs',
-      nodeIdPattern: '^output-(turn-left|move-forward|turn-right)$',
-      targetTemplate: 'action.$1',
-      decayPerSecond: 4,
-    },
-  ];
+  configureCanonicalBody(agent, {
+    inputEndpointId: 'vision-inputs',
+    outputEndpointId: 'motor-outputs',
+    inputNodePrefix: 'vision',
+    outputNodePrefix: 'output',
+    visionCells: 1,
+    inputScale: 1,
+    outputDecayPerSecond: 4,
+  });
   agent.connections = [
     ...agent.connections,
     {
       id: 'body-input-to-neuron',
       from: { scope: 'bodyInput', nodeId: 'vision-G-0' },
       to: { scope: 'brain', nodeId: 'neuron-1' },
-      weight: 1,
+      synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
     },
     {
       id: 'neuron-to-body-output',
       from: { scope: 'brain', nodeId: 'neuron-2' },
       to: { scope: 'bodyOutput', nodeId: 'output-move-forward' },
-      weight: 1,
+      synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
     },
   ];
   agent.layout = {
-    version: 1,
     nodes: {
       ...agent.layout?.nodes,
       'vision-R-0': { position: { x: 0, y: 0 } },
@@ -251,24 +361,16 @@ test('agent graph root brain child scope projects boundary adapters without prox
 
 test('agent graph root scope exposes canonical body endpoints even before any connection references them', () => {
   const agent = createTestAgent();
-  agent.body.inputRules = [
-    {
-      id: 'vision-inputs',
-      nodeIdPattern: '^vision-([RGB])-(\\d+)$',
-      sourceTemplate: 'vision.$1.$2',
-      scale: 1,
-    },
-  ];
-  agent.body.outputRules = [
-    {
-      id: 'motor-outputs',
-      nodeIdPattern: '^output-(turn-left|move-forward|turn-right)$',
-      targetTemplate: 'action.$1',
-      decayPerSecond: 4,
-    },
-  ];
+  configureCanonicalBody(agent, {
+    inputEndpointId: 'vision-inputs',
+    outputEndpointId: 'motor-outputs',
+    inputNodePrefix: 'vision',
+    outputNodePrefix: 'output',
+    visionCells: 1,
+    inputScale: 1,
+    outputDecayPerSecond: 4,
+  });
   agent.layout = {
-    version: 1,
     nodes: {
       ...agent.layout?.nodes,
       'vision-R-0': { position: { x: 0, y: 0 } },
@@ -284,7 +386,7 @@ test('agent graph root scope exposes canonical body endpoints even before any co
       id: 'connection-1',
       from: { scope: 'brain', nodeId: 'neuron-1' },
       to: { scope: 'brain', nodeId: 'neuron-2' },
-      weight: 0.5,
+      synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
     },
   ];
 
@@ -335,24 +437,16 @@ test('agent graph root scope exposes canonical body endpoints even before any co
 
 test('agent graph root adapters can expand in place and expose their signal children', () => {
   const agent = createTestAgent();
-  agent.body.inputRules = [
-    {
-      id: 'vision-inputs',
-      nodeIdPattern: '^vision-([RGB])-(\\d+)$',
-      sourceTemplate: 'vision.$1.$2',
-      scale: 1,
-    },
-  ];
-  agent.body.outputRules = [
-    {
-      id: 'motor-outputs',
-      nodeIdPattern: '^output-(turn-left|move-forward|turn-right)$',
-      targetTemplate: 'action.$1',
-      decayPerSecond: 4,
-    },
-  ];
+  configureCanonicalBody(agent, {
+    inputEndpointId: 'vision-inputs',
+    outputEndpointId: 'motor-outputs',
+    inputNodePrefix: 'vision',
+    outputNodePrefix: 'output',
+    visionCells: 1,
+    inputScale: 1,
+    outputDecayPerSecond: 4,
+  });
   agent.layout = {
-    version: 1,
     nodes: {
       ...agent.layout?.nodes,
       'input-adapter': {
@@ -389,35 +483,28 @@ test('agent graph root adapters can expand in place and expose their signal chil
 
 test('agent graph root adapters report installed counts from compiled runtime truth', () => {
   const agent = createTestAgent();
-  agent.body.inputRules = [
-    {
-      id: 'vision-inputs',
-      nodeIdPattern: '^vision-([RGB])-(\\d+)$',
-      sourceTemplate: 'vision.$1.$2',
-      scale: 1,
-    },
-  ];
-  agent.body.outputRules = [
-    {
-      id: 'motor-outputs',
-      nodeIdPattern: '^output-(turn-left|move-forward|turn-right)$',
-      targetTemplate: 'action.$1',
-      decayPerSecond: 4,
-    },
-  ];
+  configureCanonicalBody(agent, {
+    inputEndpointId: 'vision-inputs',
+    outputEndpointId: 'motor-outputs',
+    inputNodePrefix: 'vision',
+    outputNodePrefix: 'output',
+    visionCells: 1,
+    inputScale: 1,
+    outputDecayPerSecond: 4,
+  });
   agent.connections = [
     ...agent.connections,
     {
       id: 'body-input-to-neuron',
       from: { scope: 'bodyInput', nodeId: 'vision-G-0' },
       to: { scope: 'brain', nodeId: 'neuron-1' },
-      weight: 1,
+      synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
     },
     {
       id: 'neuron-to-body-output',
       from: { scope: 'brain', nodeId: 'neuron-2' },
       to: { scope: 'bodyOutput', nodeId: 'output-move-forward' },
-      weight: 1,
+      synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
     },
   ];
 
@@ -442,39 +529,31 @@ test('agent graph root adapters report installed counts from compiled runtime tr
 
 test('expanded core boundary adapters project links to concrete signal children instead of the adapter group', () => {
   const agent = createTestAgent();
-  agent.body.inputRules = [
-    {
-      id: 'vision-inputs',
-      nodeIdPattern: '^vision-([RGB])-(\\d+)$',
-      sourceTemplate: 'vision.$1.$2',
-      scale: 1,
-    },
-  ];
-  agent.body.outputRules = [
-    {
-      id: 'motor-outputs',
-      nodeIdPattern: '^output-(turn-left|move-forward|turn-right)$',
-      targetTemplate: 'action.$1',
-      decayPerSecond: 4,
-    },
-  ];
+  configureCanonicalBody(agent, {
+    inputEndpointId: 'vision-inputs',
+    outputEndpointId: 'motor-outputs',
+    inputNodePrefix: 'vision',
+    outputNodePrefix: 'output',
+    visionCells: 1,
+    inputScale: 1,
+    outputDecayPerSecond: 4,
+  });
   agent.connections = [
     ...agent.connections,
     {
       id: 'body-input-to-neuron',
       from: { scope: 'bodyInput', nodeId: 'vision-G-0' },
       to: { scope: 'brain', nodeId: 'neuron-1' },
-      weight: 1,
+      synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
     },
     {
       id: 'neuron-to-body-output',
       from: { scope: 'brain', nodeId: 'neuron-2' },
       to: { scope: 'bodyOutput', nodeId: 'output-move-forward' },
-      weight: 1,
+      synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
     },
   ];
   agent.layout = {
-    version: 1,
     nodes: {
       ...agent.layout?.nodes,
       'core-input-adapter': {
@@ -521,6 +600,125 @@ test('expanded core boundary adapters project links to concrete signal children 
     ),
     true
   );
+  const directInputLeafLink = viewModel.links.find((link) => link.id === 'body-input-to-neuron');
+  const directOutputLeafLink = viewModel.links.find((link) => link.id === 'neuron-to-body-output');
+  assert.ok(directInputLeafLink);
+  assert.ok(directOutputLeafLink);
+  assert.equal(directInputLeafLink.aggregate, false);
+  assert.equal(directOutputLeafLink.aggregate, false);
+  assert.deepEqual(directInputLeafLink.leafLinkIds, ['body-input-to-neuron']);
+  assert.deepEqual(directOutputLeafLink.leafLinkIds, ['neuron-to-body-output']);
+  assert.equal(directInputLeafLink.inspectable, true);
+  assert.equal(directOutputLeafLink.inspectable, true);
+  assert.equal(directInputLeafLink.editable, true);
+  assert.equal(directOutputLeafLink.editable, true);
+});
+
+test('agent graph aggregate links sum resolved synapse weights instead of non-canonical top-level connection.weight', () => {
+  const agent = createTestAgent();
+  configureCanonicalBody(agent, {
+    inputEndpointId: 'vision-inputs',
+    outputEndpointId: 'motor-outputs',
+    inputNodePrefix: 'vision',
+    outputNodePrefix: 'output',
+    visionCells: 1,
+    inputScale: 1,
+    outputDecayPerSecond: 4,
+  });
+  agent.brain.synapseModels = [
+    ...(agent.brain.synapseModels ?? []),
+    {
+      id: 'static-drive',
+      kind: 'static-current',
+      label: 'Static Drive',
+      defaults: {
+        weight: 3,
+        delayMs: 0,
+      },
+    },
+  ];
+  agent.layout = {
+    nodes: {
+      ...agent.layout?.nodes,
+      'expanded-group': {
+        position: { x: 100, y: 120 },
+        collapsed: true,
+      },
+    },
+  };
+  agent.connections = [
+    ...agent.connections,
+    {
+      id: 'body-input-a',
+      from: { scope: 'bodyInput', nodeId: 'vision-R-0' },
+      to: { scope: 'brain', nodeId: 'neuron-1' },
+      synapseModelId: 'static-drive',
+      parameterOverrides: { weight: 4 },
+    },
+    {
+      id: 'body-input-b',
+      from: { scope: 'bodyInput', nodeId: 'vision-G-0' },
+      to: { scope: 'brain', nodeId: 'neuron-1' },
+      synapseModelId: 'static-drive',
+    },
+  ];
+
+  const viewModel = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [agent.brain.rootContainerId],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+    projectedVisionCellCount: 1,
+    worldRegistry: WORLD_REGISTRY,
+  });
+
+  const aggregateInputLink = viewModel.links.find(
+    (link) => link.aggregate && link.fromNodeId === 'core-input-adapter' && link.toNodeId === 'expanded-group'
+  );
+  assert.ok(aggregateInputLink);
+  assert.equal(aggregateInputLink.count, 2);
+  assert.equal(aggregateInputLink.weight, 7);
+  assert.notEqual(aggregateInputLink.weight, 300);
+  assert.deepEqual(new Set(aggregateInputLink.leafLinkIds), new Set(['body-input-a', 'body-input-b']));
+  assert.equal(aggregateInputLink.inspectable, true);
+  assert.equal(aggregateInputLink.editable, false);
+});
+
+test('agent graph neuron record keeps stable model reference when per-neuron overrides drift from model defaults', () => {
+  const agent = createTestAgent();
+  agent.brain.neuronModels = [
+    ...(agent.brain.neuronModels ?? []),
+    {
+      id: 'izhikevich-burst',
+      family: 'izhikevich',
+      label: 'Burst Profile',
+      params: {
+        a: 0.03,
+        b: 0.25,
+        c: -60,
+        d: 4,
+        threshold: -52,
+      },
+    },
+  ];
+  agent.brain.neurons[0] = {
+    ...agent.brain.neurons[0]!,
+    neuronModelId: 'izhikevich-burst',
+    parameterOverrides: { threshold: 30 },
+  };
+
+  const viewModel = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [agent.brain.rootContainerId],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
+  });
+
+  const neuronRecord = viewModel.indexes.nodeById.get('neuron-1');
+  assert.ok(neuronRecord?.neuron);
+  assert.equal(neuronRecord.neuron.neuronModelId, 'izhikevich-burst');
+  assert.equal(neuronRecord.neuron.parameterOverrides?.threshold, 30);
 });
 
 test('agent graph root scope uses the canonical rootContainerId as the top-level brain node id', () => {
@@ -631,25 +829,18 @@ test('agent graph detects container cycles without recursive blow-up', () => {
 
 test('agent graph view and body preview share the same canonical endpoint expansion', () => {
   const agent = createTestAgent();
-  agent.body.inputRules = [
-    {
-      id: 'sensor-inputs',
-      nodeIdPattern: '^sensor-([RGB])-(\\d+)$',
-      sourceTemplate: 'vision.$1.$2',
-      scale: 1,
-    },
-  ];
-  agent.body.outputRules = [
-    {
-      id: 'effector-outputs',
-      nodeIdPattern: '^effector-(turn-left|move-forward|turn-right)$',
-      targetTemplate: 'action.$1',
-      decayPerSecond: 2,
-    },
-  ];
+  configureCanonicalBody(agent, {
+    inputEndpointId: 'sensor-inputs',
+    outputEndpointId: 'effector-outputs',
+    inputNodePrefix: 'sensor',
+    outputNodePrefix: 'effector',
+    visionCells: 2,
+    inputScale: 1,
+    outputDecayPerSecond: 2,
+  });
   const projectedVisionCellCount = 2;
 
-  const preview = buildAgentBodyRulePreviewModel(agent, WORLD_REGISTRY, projectedVisionCellCount);
+  const preview = buildAgentBodyEndpointPreviewModel(agent, WORLD_REGISTRY, projectedVisionCellCount);
   const inputScopeView = buildAgentGraphViewModel({
     agent,
     navigationPath: ['input-adapter'],
@@ -679,29 +870,22 @@ test('agent graph view and body preview share the same canonical endpoint expans
 
 test('agent graph view marks canonical-only body endpoints that are not installed in compiled runtime', () => {
   const agent = createTestAgent();
-  agent.body.inputRules = [
-    {
-      id: 'sensor-inputs',
-      nodeIdPattern: '^sensor-([RGB])-(\\d+)$',
-      sourceTemplate: 'vision.$1.$2',
-      scale: 1,
-    },
-  ];
-  agent.body.outputRules = [
-    {
-      id: 'effector-outputs',
-      nodeIdPattern: '^effector-(turn-left|move-forward|turn-right)$',
-      targetTemplate: 'action.$1',
-      decayPerSecond: 2,
-    },
-  ];
+  configureCanonicalBody(agent, {
+    inputEndpointId: 'sensor-inputs',
+    outputEndpointId: 'effector-outputs',
+    inputNodePrefix: 'sensor',
+    outputNodePrefix: 'effector',
+    visionCells: 1,
+    inputScale: 1,
+    outputDecayPerSecond: 2,
+  });
   const projectedVisionCellCount = 1;
   agent.connections = [
     {
       id: 'sensor-link',
       from: { scope: 'bodyInput', nodeId: 'sensor-G-0' },
       to: { scope: 'brain', nodeId: 'neuron-1' },
-      weight: 1,
+      synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
     },
   ];
 
@@ -723,42 +907,37 @@ test('agent graph view marks canonical-only body endpoints that are not installe
   assert.equal(canonicalOnlyInput.detail.includes('canonical-only'), true);
 });
 
-test('agent graph view, preview, and runtime counts share registry rule-binding authority', () => {
+test('agent graph view, preview, and runtime counts share registry endpoint-binding authority', () => {
   const agent = createTestAgent();
-  const authorityRegistry = createRuleAuthorityTestRegistry();
-  agent.body.inputRules = [
-    {
-      id: 'sensor-inputs',
-      nodeIdPattern: '^sensor-([RGB])-(\\d+)$',
-      sourceTemplate: 'unsupported.$1.$2',
-      scale: 1,
-    },
-  ];
-  agent.body.outputRules = [
-    {
-      id: 'effector-outputs',
-      nodeIdPattern: '^effector-(turn-left|move-forward|turn-right)$',
-      targetTemplate: 'unsupported.$1',
-      decayPerSecond: 2,
-    },
-  ];
+  const authorityRegistry = createEndpointAuthorityTestRegistry();
+  configureCanonicalBody(agent, {
+    inputEndpointId: 'sensor-inputs',
+    outputEndpointId: 'effector-outputs',
+    inputNodePrefix: 'sensor',
+    outputNodePrefix: 'effector',
+    visionCells: 2,
+    inputSourcePrefix: 'unsupported',
+    outputTargetPrefix: 'unsupported',
+    inputScale: 1,
+    outputDecayPerSecond: 2,
+  });
   agent.connections = [
     ...agent.connections,
     {
       id: 'sensor-link',
       from: { scope: 'bodyInput', nodeId: 'sensor-G-1' },
       to: { scope: 'brain', nodeId: 'neuron-1' },
-      weight: 1,
+      synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
     },
     {
       id: 'effector-link',
       from: { scope: 'brain', nodeId: 'neuron-2' },
       to: { scope: 'bodyOutput', nodeId: 'effector-move-forward' },
-      weight: 1,
+      synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
     },
   ];
 
-  const preview = buildAgentBodyRulePreviewModel(agent, authorityRegistry, 2);
+  const preview = buildAgentBodyEndpointPreviewModel(agent, authorityRegistry, 2);
   const rootView = buildAgentGraphViewModel({
     agent,
     navigationPath: [],
@@ -785,9 +964,9 @@ test('agent graph view, preview, and runtime counts share registry rule-binding 
   });
 
   assert.deepEqual(preview.issues, []);
-  const inputPreviewItems = preview.input.previewsByRuleId['sensor-inputs'] ?? [];
-  assert.equal(inputPreviewItems[inputPreviewItems.length - 1]?.resolved, 'vision.R.1');
-  assert.equal(preview.output.previewsByRuleId['effector-outputs']?.[1]?.resolved, 'action.turn-left');
+  const inputPreviewItems = preview.input.previewsByEndpointId['sensor-inputs-R-1'] ?? [];
+  assert.equal(inputPreviewItems[inputPreviewItems.length - 1]?.resolved, 'unsupported.R.1');
+  assert.equal(preview.output.previewsByEndpointId['effector-outputs-turn-left']?.[0]?.resolved, 'unsupported.turn-left');
   assert.deepEqual(
     inputScopeView.nodes.map((node) => node.refNodeId).sort(),
     [...preview.input.endpointNodeIds].sort()
@@ -805,4 +984,42 @@ test('agent graph view, preview, and runtime counts share registry rule-binding 
   assert.equal(outputAdapter.runtimeInstalledLeafCount, 1);
   assert.equal(inputAdapter.detail, '6 canonical / 1 installed');
   assert.equal(outputAdapter.detail, '3 canonical / 1 installed');
+});
+
+test('graph link inspector parameters keep resolved display values separate from real overrides', () => {
+  const resolved = resolveGraphLinkInspectorParameters({
+    defaults: {
+      weight: 1,
+      delayMs: 0,
+    },
+    parameterOverrides: {},
+    effectiveWeight: 1,
+    effectiveDelayMs: 0,
+  });
+
+  assert.deepEqual(resolved.parameterOverrides, {});
+  assert.deepEqual(resolved.resolvedParameters, { weight: 1, delayMs: 0 });
+  assert.deepEqual(resolved.defaultParameters, { weight: 1, delayMs: 0 });
+});
+
+test('connection detail update payload omits overrides when values equal model defaults', () => {
+  const strippedOverrides = resolveConnectionOverridePayload({
+    defaultParameters: {
+      weight: 1,
+      delayMs: 0,
+    },
+    nextWeightValue: 1,
+    nextDelayMsValue: 0,
+  });
+  assert.deepEqual(strippedOverrides.parameterOverrides, {});
+
+  const keptOverrides = resolveConnectionOverridePayload({
+    defaultParameters: {
+      weight: 1,
+      delayMs: 0,
+    },
+    nextWeightValue: 1.25,
+    nextDelayMsValue: 7,
+  });
+  assert.deepEqual(keptOverrides.parameterOverrides, { weight: 1.25, delayMs: 7 });
 });

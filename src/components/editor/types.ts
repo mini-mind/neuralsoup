@@ -4,42 +4,28 @@ export interface AgentParameters {
   visionAngle: number;
 }
 
-export interface BodyIRInputRule {
-  nodeIdPattern: string;
-  sourceTemplate: string;
-  scale: number;
-}
-
-export interface BodyIROutputRule {
-  nodeIdPattern: string;
-  targetTemplate: string;
-  decayPerSecond: number;
-}
-
-export interface BodyIRSettingsValue {
-  inputRules: BodyIRInputRule[];
-  outputRules: BodyIROutputRule[];
-}
-
 export interface BodyIRValidationMessage {
   level: 'error' | 'warning' | 'info';
   message: string;
-  scope?: 'body' | 'input-rule' | 'output-rule';
-  ruleIndex?: number;
+  scope?: 'body' | 'input-endpoint' | 'output-endpoint';
+  endpointId?: string;
+  endpointIndex?: number;
 }
 
 export interface BodyIRInputPreviewItem {
+  endpointId?: string;
   nodeId: string;
   resolvedSource: string;
   scale?: number;
-  ruleIndex?: number;
+  endpointIndex?: number;
 }
 
 export interface BodyIROutputPreviewItem {
+  endpointId?: string;
   nodeId: string;
   resolvedTarget: string;
   decayPerSecond?: number;
-  ruleIndex?: number;
+  endpointIndex?: number;
 }
 
 export interface BodyIRPreviewData {
@@ -58,6 +44,6 @@ export interface GraphPathItem {
   label: string;
 }
 
-export type EditorTab = 'settings' | 'graph';
+export type EditorTab = 'settings' | 'graph' | 'body';
 
-export type SettingsSection = 'agent-parameters' | 'body-ir' | 'keyboard-inputs';
+export type SettingsSection = 'agent-parameters' | 'keyboard-inputs';

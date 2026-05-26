@@ -15,6 +15,7 @@ export const summarizeAgentIR = (
     inputSignalCount: endpointIds.bodyInputNodeIds.length,
     outputSignalCount: endpointIds.bodyOutputNodeIds.length,
     neuronCount: agent.brain.neurons.length,
+    connectionCount: agent.connections.length,
     leafLinkCount: agent.connections.length,
   };
 };

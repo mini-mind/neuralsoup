@@ -46,13 +46,12 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
       <div className="tab-strip-left">
         <button
           type="button"
-          className="tab-icon-button tab-strip-brain-button"
-          data-testid="brain-library-button"
-          title="切换 Brain"
-          aria-label="切换 Brain"
-          onClick={onBrainLibraryOpen}
+          className={`tab-strip-tab ${editorTab === 'body' ? 'active' : ''}`}
+          data-testid="editor-tab-body"
+          aria-pressed={editorTab === 'body'}
+          onClick={() => onEditorTabChange('body')}
         >
-          🧠
+          BodyIR
         </button>
         <div
           className={`tab-strip-path-tab ${editorTab === 'graph' ? 'active' : ''}`}
@@ -93,6 +92,16 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
       </div>
       <div className="tab-button-group">
         <div className="control-buttons">
+          <button
+            type="button"
+            className="tab-icon-button tab-strip-brain-button"
+            data-testid="brain-library-button"
+            title="切换 Brain"
+            aria-label="切换 Brain"
+            onClick={onBrainLibraryOpen}
+          >
+            🧠
+          </button>
           <button
             type="button"
             className={`tab-icon-button ${editorTab === 'settings' ? 'active' : ''}`}

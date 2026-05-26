@@ -27,11 +27,13 @@ interface OrchestratorNode extends SceneNodeGeometry {
   proxy: boolean;
   movable: boolean;
   local: boolean;
+  previewOnly: boolean;
   connectableSource: boolean;
   ungroupable: boolean;
   contextMenuGroup: boolean;
   expanded: boolean;
   expansionParentId: string | null;
+  titleDragHandleOnly: boolean;
 }
 
 interface GraphInteractionDependencies {
@@ -147,6 +149,35 @@ export const useGraphInteractionOrchestrator = ({
     []
   );
 
+  const shouldTreatPointAsExpandedGroupBody = useCallback((clientPoint: GraphPoint) => {
+    if (typeof document === 'undefined' || typeof document.elementsFromPoint !== 'function') {
+      return false;
+    }
+
+    const stack = document.elementsFromPoint(clientPoint.x, clientPoint.y);
+    for (const element of stack) {
+      if (!(element instanceof Element)) {
+        continue;
+      }
+
+      if (element.closest('[data-topology-group-title-handle="true"]')) {
+        return false;
+      }
+
+      const nodeElement = element.closest<HTMLElement>('[data-topology-view-node-id]');
+      const groupBodyElement = element.closest<HTMLElement>('[data-topology-group-body="true"]');
+      if (nodeElement && !groupBodyElement) {
+        return false;
+      }
+
+      if (groupBodyElement) {
+        return true;
+      }
+    }
+
+    return false;
+  }, []);
+
   const getSourceScenePoint = useCallback(
     (sourceNodeIds: string[]) => {
       const sourceNodes = sourceNodeIds
@@ -177,7 +208,15 @@ export const useGraphInteractionOrchestrator = ({
 
   const resolveNodeHit = useCallback(
     (target: EventTarget | null, clientPoint: GraphPoint) => {
+      if (shouldTreatPointAsExpandedGroupBody(clientPoint)) {
+        return null;
+      }
+
       const targetElement = target instanceof Element ? target : null;
+      const groupBodyElement = targetElement?.closest<HTMLElement>('[data-topology-group-body="true"]');
+      if (groupBodyElement) {
+        return null;
+      }
       const domNodeId = targetElement?.closest<HTMLElement>('[data-topology-view-node-id]')?.dataset.topologyViewNodeId;
       if (domNodeId) {
         return getNodeById(domNodeId);
@@ -192,12 +231,20 @@ export const useGraphInteractionOrchestrator = ({
 
       return hitNode ? getNodeById(hitNode.id) : null;
     },
-    [getNodeById, sceneRef]
+    [getNodeById, sceneRef, shouldTreatPointAsExpandedGroupBody]
   );
 
   const resolveNodeHitIncludingSources = useCallback(
     (target: EventTarget | null, clientPoint: GraphPoint) => {
+      if (shouldTreatPointAsExpandedGroupBody(clientPoint)) {
+        return null;
+      }
+
       const targetElement = target instanceof Element ? target : null;
+      const groupBodyElement = targetElement?.closest<HTMLElement>('[data-topology-group-body="true"]');
+      if (groupBodyElement) {
+        return null;
+      }
       const domNodeId = targetElement?.closest<HTMLElement>('[data-topology-view-node-id]')?.dataset.topologyViewNodeId;
       if (domNodeId) {
         return getNodeById(domNodeId);
@@ -212,7 +259,7 @@ export const useGraphInteractionOrchestrator = ({
 
       return hitNode ? getNodeById(hitNode.id) : null;
     },
-    [getNodeById, sceneRef]
+    [getNodeById, sceneRef, shouldTreatPointAsExpandedGroupBody]
   );
 
   const beginCanvasContextGesture = useCallback(
@@ -467,12 +514,31 @@ export const useGraphInteractionOrchestrator = ({
         }
 
         const pressedNode = getNodeById(currentInteraction.nodeId);
-        if (!pressedNode || !pressedNode.movable || pressedNode.proxy || !pressedNode.local) {
+        if (!pressedNode || !pressedNode.movable || pressedNode.proxy || !pressedNode.local || pressedNode.previewOnly) {
           endInteraction(currentInteraction);
           return;
         }
 
+        const pressedHandleOnly = pressedNode.titleDragHandleOnly;
+        const targetElement = event.target instanceof Element ? event.target : null;
+        const pressedOnHandle = Boolean(
+          targetElement?.closest('[data-topology-group-title-handle="true"]')
+        );
+        if (pressedHandleOnly && !pressedOnHandle) {
+          clearSelection();
+          beginSelectionRect(currentInteraction.startScene);
+          setInteractionState({
+            type: 'selecting',
+            startScene: currentInteraction.startScene,
+            currentScene: currentInteraction.startScene,
+            moved: false,
+          });
+          return;
+        }
+
+        const pressedExpandedChild = Boolean(pressedNode.expansionParentId);
         const shouldMoveSelection =
+          !pressedExpandedChild &&
           !currentInteraction.additive &&
           selectedNodeIds.includes(pressedNode.id) &&
           selectedNodeIds.length > 1;
@@ -482,6 +548,7 @@ export const useGraphInteractionOrchestrator = ({
                 selectedNodeIds.includes(candidate.id) &&
                 candidate.movable &&
                 candidate.local &&
+                !candidate.previewOnly &&
                 !candidate.proxy
             )
           : [pressedNode];

@@ -20,7 +20,9 @@ const parseImportedBrainPackage = (rawValue: string): unknown => {
   try {
     return JSON.parse(rawValue) as unknown;
   } catch (error) {
-    throw new Error(`JSON 解析失败：${error instanceof Error ? error.message : '未知错误'}`);
+    throw new Error(
+      `导入失败：文件不是当前支持的 Brain JSON 格式。JSON 解析失败：${error instanceof Error ? error.message : '未知错误'}`
+    );
   }
 };
 
@@ -93,7 +95,14 @@ const BrainLibraryModal: React.FC<BrainLibraryModalProps> = ({
       await onImportBrain(resolvedImportName, parseImportedBrainPackage(text));
       setErrorMessage(null);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : '导入失败');
+      const fallbackMessage = '导入失败：文件不是当前支持的 Brain JSON 格式。';
+      if (!(error instanceof Error)) {
+        setErrorMessage(fallbackMessage);
+      } else if (error.message.includes('当前支持的 Brain JSON 格式')) {
+        setErrorMessage(error.message);
+      } else {
+        setErrorMessage(`${fallbackMessage} ${error.message}`);
+      }
     } finally {
       input.value = '';
       input.disabled = false;
