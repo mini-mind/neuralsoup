@@ -120,7 +120,7 @@ export interface GraphSelectionState {
   linkId: string | null;
 }
 
-export type GraphNodeDoubleClickAction = 'navigate' | 'edit' | null;
+export type GraphNodeDoubleClickAction = 'enter-scope' | 'edit' | null;
 
 export interface GraphSelectionOptions {
   additive?: boolean;
@@ -610,11 +610,11 @@ export const useSNNTopologyState = ({
       }
 
       if (node.kind === 'adapter') {
-        return node.adapterNavigable ? 'navigate' : null;
+        return node.adapterNavigable ? 'enter-scope' : null;
       }
 
       if (node.navigable) {
-        return 'navigate';
+        return 'enter-scope';
       }
 
       if (node.editable && !node.proxy && !node.previewOnly) {
@@ -662,6 +662,35 @@ export const useSNNTopologyState = ({
     closeDetailModal,
     dismissDetailModalIf,
   });
+
+  const enterScopeFromNode = useCallback((nodeId: string) => {
+    const node = viewNodeByViewId.get(nodeId);
+    if (!node) {
+      return;
+    }
+
+    if (node.kind === 'adapter') {
+      if (node.adapterNavigable) {
+        navigateTo(nodeId);
+      }
+      return;
+    }
+
+    if (node.navigable) {
+      navigateTo(nodeId);
+    }
+  }, [navigateTo, viewNodeByViewId]);
+
+  const toggleInlineExpansionForNode = useCallback((nodeId: string) => {
+    const node = viewNodeByViewId.get(nodeId);
+    if (!node) {
+      return;
+    }
+
+    if (node.kind === 'neuron-group' && node.local && !node.proxy && !node.previewOnly) {
+      toggleGroupExpanded(nodeId);
+    }
+  }, [toggleGroupExpanded, viewNodeByViewId]);
 
   const setCanvasOffset = useCallback((offset: GraphCanvasViewport) => {
     const activeScopeKey = activeCanvasScopeKeyRef.current;
@@ -878,6 +907,8 @@ export const useSNNTopologyState = ({
     closeDetailModal,
     dismissDetailModalIf,
     getNodeDoubleClickAction,
+    enterScopeFromNode,
+    toggleInlineExpansionForNode,
     connectSourceNodesToTarget,
     updateNodePositionsInDraft,
     discardNodeDraftPositions,
@@ -888,7 +919,6 @@ export const useSNNTopologyState = ({
     createNeuronAndConnectAt,
     aggregateSelectedNodes,
     ungroupNode,
-    toggleGroupExpanded,
     clearDraftNodePositions,
     setCanvasOffset,
     setCanvasSession: setCanvasSessionState,

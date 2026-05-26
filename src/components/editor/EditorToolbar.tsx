@@ -5,11 +5,11 @@ import './EditorPanels.css';
 
 interface EditorToolbarProps {
   editorTab: EditorTab;
-  graphPath: GraphPathItem[];
+  mirroredGraphPath: GraphPathItem[];
   runState: SimulationLifecycleState;
   onBrainLibraryOpen: () => void;
   onEditorTabChange: (nextTab: EditorTab) => void;
-  onGraphPathNavigate: (pathId: string) => void;
+  onBridgeNavigateToPathId: (pathId: string) => void;
   onStartPause: () => void;
   onReset: () => void;
 }
@@ -29,29 +29,31 @@ const getVisibleGraphPath = (graphPath: GraphPathItem[]): Array<GraphPathItem | 
 
 const EditorToolbar: React.FC<EditorToolbarProps> = ({
   editorTab,
-  graphPath,
+  mirroredGraphPath,
   runState,
   onBrainLibraryOpen,
   onEditorTabChange,
-  onGraphPathNavigate,
+  onBridgeNavigateToPathId,
   onStartPause,
   onReset
 }) => {
   const startPauseLabel =
     runState === 'idle' ? '开始（Space）' : runState === 'paused' ? '继续（Space）' : '暂停（Space）';
-  const visibleGraphPath = getVisibleGraphPath(graphPath);
+  const visibleGraphPath = getVisibleGraphPath(mirroredGraphPath);
 
   return (
     <div className="tab-strip">
       <div className="tab-strip-left">
         <button
           type="button"
-          className={`tab-strip-tab ${editorTab === 'body' ? 'active' : ''}`}
+          className={`tab-strip-tab tab-strip-icon-tab ${editorTab === 'body' ? 'active' : ''}`}
           data-testid="editor-tab-body"
+          title="BodyIR"
+          aria-label="BodyIR"
           aria-pressed={editorTab === 'body'}
           onClick={() => onEditorTabChange('body')}
         >
-          BodyIR
+          ⇄
         </button>
         <div
           className={`tab-strip-path-tab ${editorTab === 'graph' ? 'active' : ''}`}
@@ -79,7 +81,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
                     event.stopPropagation();
                     onEditorTabChange('graph');
                     if (index !== visibleGraphPath.length - 1) {
-                      onGraphPathNavigate(item.id);
+                      onBridgeNavigateToPathId(item.id);
                     }
                   }}
                 >

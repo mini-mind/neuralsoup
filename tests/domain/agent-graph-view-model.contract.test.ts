@@ -211,7 +211,7 @@ test('agent graph view expanded children expose separate viewId and refId indexe
   const expandedChild = viewModel.nodes.find((node) => node.viewId === 'expanded-group::neuron-1');
   assert.ok(expandedChild);
   assert.equal(viewModel.viewNodeByViewId.get('expanded-group::neuron-1'), expandedChild);
-  assert.equal(viewModel.visibleNodeByRefId.get('neuron-1'), expandedChild);
+  assert.equal(viewModel.visibleNodeByRefId.get('neuron-1'), undefined);
 });
 
 test('agent graph view expanded children use viewId for active highlights', () => {
@@ -226,6 +226,33 @@ test('agent graph view expanded children use viewId for active highlights', () =
 
   assert.equal(viewModel.activeViewNodeIds.has('expanded-group::neuron-1'), true);
   assert.equal(viewModel.activeViewNodeIds.has('neuron-1'), false);
+});
+
+test('agent graph identity semantics keep expanded child as view projection while enter scope switches to ref identity', () => {
+  const agent = createTestAgent();
+
+  const expandedScopeView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [agent.brain.rootContainerId],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: ['neuron-1'],
+    worldRegistry: WORLD_REGISTRY,
+  });
+  const enteredScopeView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [agent.brain.rootContainerId, 'expanded-group'],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: ['neuron-1'],
+    worldRegistry: WORLD_REGISTRY,
+  });
+
+  assert.equal(expandedScopeView.scopeKey, 'root-group');
+  assert.equal(enteredScopeView.scopeKey, 'root-group/expanded-group');
+  assert.deepEqual(expandedScopeView.breadcrumbs.map((item) => item.id), ['root', 'root-group']);
+  assert.deepEqual(enteredScopeView.breadcrumbs.map((item) => item.id), ['root', 'root-group', 'expanded-group']);
+  assert.equal(expandedScopeView.activeViewNodeIds.has('expanded-group::neuron-1'), true);
+  assert.equal(enteredScopeView.activeViewNodeIds.has('neuron-1'), true);
+  assert.equal(enteredScopeView.activeViewNodeIds.has('expanded-group::neuron-1'), false);
 });
 
 test('agent graph expanded group size derives from persisted child bounds with padding and minimum size', () => {

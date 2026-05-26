@@ -14,6 +14,7 @@ type BodyCanvasSelection =
 
 interface BodyTopologyCanvasProps {
   model: BodyCanvasModel;
+  canvasSession: GraphCanvasSessionState;
   selectedDirection: 'input' | 'output' | null;
   selectedEndpointId: string | null;
   highlightedNodeIds?: string[];
@@ -40,6 +41,7 @@ const sharedCapabilities = {
 
 const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
   model,
+  canvasSession,
   selectedDirection,
   selectedEndpointId,
   highlightedNodeIds = [],
@@ -68,7 +70,7 @@ const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
   const [linkContextSelection, setLinkContextSelection] = useState<Exclude<BodyCanvasSelection, null> | null>(null);
   const [linkContextPosition, setLinkContextPosition] = useState<{ x: number; y: number } | null>(null);
 
-  const viewport: GraphCanvasViewport = { x: 0, y: 0 };
+  const viewport: GraphCanvasViewport = canvasSession.viewport;
   const session = useGraphViewSessionController({
     isActive: true,
     scopeKey: 'body',
@@ -77,7 +79,7 @@ const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
     hasOpenDetailModal: false,
     sceneOrigin: { x: 0, y: 0 },
     viewport,
-    scale: 1,
+    scale: canvasSession.scale,
     selectedNodeIds,
     capabilities,
     isEditableOrInteractiveTarget: () => false,
@@ -99,7 +101,12 @@ const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
       titleDragHandleOnly: false,
     })),
     callbacks: {
-      onViewportChange: () => undefined,
+      onViewportChange: (nextViewport) => {
+        onCanvasSessionChange?.({
+          viewport: nextViewport,
+          scale: canvasSession.scale,
+        });
+      },
       onSessionChange: (nextSession) => {
         onCanvasSessionChange?.(nextSession);
       },
@@ -169,7 +176,7 @@ const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
       sceneWidth={model.surfaceWidth}
       sceneHeight={model.surfaceHeight}
       canvasViewport={viewport}
-      canvasScale={1}
+      canvasScale={canvasSession.scale}
       isPanning={session.interaction?.type === 'panning'}
       isSelecting={session.interaction?.type === 'selecting'}
       isLinking={session.interaction?.type === 'linking'}

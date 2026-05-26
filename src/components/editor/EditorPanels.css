@@ -457,6 +457,12 @@
   background: #1d1d1d;
 }
 
+.body-mapping-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .body-mapping-canvas-grid {
   display: grid;
   grid-template-columns: 1fr;

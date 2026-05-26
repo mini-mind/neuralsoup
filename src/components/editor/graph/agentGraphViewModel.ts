@@ -196,6 +196,7 @@ const getStoredNodeSize = getNodeSize;
 const isLeafNode = (node: AgentGraphViewNodeRecord) => node.kind === 'neuron' || node.kind === 'signal';
 
 const isContainerNode = (node: AgentGraphViewNodeRecord) => node.kind === 'adapter' || node.kind === 'neuron-group';
+const isExpandedChildViewNode = (node: GraphViewNode) => node.expansionParentId != null;
 
 const isInputAdapterId = (nodeId: string) => nodeId === BODY_INPUTS_GROUP_ID || nodeId === CORE_BODY_INPUTS_GROUP_ID;
 
@@ -1074,9 +1075,24 @@ export const buildAgentGraphViewModel = ({
 
   const viewNodeByViewId = new Map<string, GraphViewNode>();
   const visibleNodeByRefId = new Map<string, GraphViewNode>();
+  const renderNodeByRefId = new Map<string, GraphViewNode>();
   for (const node of nodes) {
     viewNodeByViewId.set(node.viewId, node);
-    if (!visibleNodeByRefId.has(node.refNodeId)) {
+    const existingRenderNode = renderNodeByRefId.get(node.refNodeId);
+    if (!existingRenderNode || (isExpandedChildViewNode(node) && !isExpandedChildViewNode(existingRenderNode))) {
+      renderNodeByRefId.set(node.refNodeId, node);
+    }
+    if (isExpandedChildViewNode(node)) {
+      continue;
+    }
+
+    const existing = visibleNodeByRefId.get(node.refNodeId);
+    if (!existing) {
+      visibleNodeByRefId.set(node.refNodeId, node);
+      continue;
+    }
+
+    if (isExpandedChildViewNode(existing) && !isExpandedChildViewNode(node)) {
       visibleNodeByRefId.set(node.refNodeId, node);
     }
   }
@@ -1086,8 +1102,8 @@ export const buildAgentGraphViewModel = ({
   const links: GraphViewLink[] = [...aggregateLinks, ...boundaryAggregateLinks]
     .filter((link) => nodeIdsInView.has(link.fromNodeId) && nodeIdsInView.has(link.toNodeId))
     .map((link) => {
-      const fromViewNode = visibleNodeByRefId.get(link.fromNodeId);
-      const toViewNode = visibleNodeByRefId.get(link.toNodeId);
+      const fromViewNode = renderNodeByRefId.get(link.fromNodeId);
+      const toViewNode = renderNodeByRefId.get(link.toNodeId);
       const isDirectLeafLink = link.count === 1 && Boolean(fromViewNode?.leaf && toViewNode?.leaf);
       const connectionId = link.leafLinkIds[0] ?? `aggregate:${link.fromNodeId}:${link.toNodeId}`;
       const synapseSummary: GraphViewSynapseSummary = {
@@ -1131,8 +1147,8 @@ export const buildAgentGraphViewModel = ({
         id: `aggregate:${link.fromNodeId}:${link.toNodeId}`,
         fromNodeId: link.fromNodeId,
         toNodeId: link.toNodeId,
-        fromRefNodeId: visibleNodeByRefId.get(link.fromNodeId)?.refNodeId ?? link.fromNodeId,
-        toRefNodeId: visibleNodeByRefId.get(link.toNodeId)?.refNodeId ?? link.toNodeId,
+        fromRefNodeId: renderNodeByRefId.get(link.fromNodeId)?.refNodeId ?? link.fromNodeId,
+        toRefNodeId: renderNodeByRefId.get(link.toNodeId)?.refNodeId ?? link.toNodeId,
         weight: link.totalWeight,
         weightDisplay: formatWeightDisplay(link.totalWeight),
         count: link.count,

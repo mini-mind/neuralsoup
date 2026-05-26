@@ -22,6 +22,7 @@
 - `src/App.tsx`：顶层 UI 编排。
 - `src/components/`：React 界面、拓扑编辑器、画布渲染。
 - `src/components/editor/`：右侧编辑区标签页、设置面板、工具栏。
+- `src/components/editor/graph/`：BrainIR/BodyIR 画布、共享交互内核与场景投影。
 - `src/domain/`：纯 brain/world 领域逻辑。
 - `src/runtime/`：仿真 session 边界。
 - `src/engine/`：仿真引擎、世界管理、Pixi 适配与渲染。
@@ -34,7 +35,8 @@
 - `src/domain/` 不依赖 React、Pixi、DOM、`window` 或浏览器事件。
 - runtime 状态放在 `src/runtime/` 或 engine/session API 后面；React 负责界面状态和命令分发，不承载领域决策。
 - Pixi 只能经由 `src/engine/pixi.ts` 引入；其他位置不要从 `pixi.js`、`pixi.js-legacy` 或 `@pixi/*` 直接导入。
-- 右侧 `GraphView` 目前仍是拓扑沙盒；用户可见工作流覆盖放在 `e2e/`。
+- `AgentIR` 是持久化真源；画布视角、缩放、选择、弹窗和拖拽草稿属于会话态，不要在 App 层复制第二真源。
+- BrainIR 与 BodyIR 画布共享 `src/components/editor/graph/sharedCanvasCore.ts` 能力边界；业务语义留在各自 adapter，不要把 Brain/Body 语义反向塞回共享内核。
 
 ## 验证
 

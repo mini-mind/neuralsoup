@@ -17,8 +17,8 @@ interface GraphEditorPanelProps {
   draftStatus: AgentDraftStatus;
   runtimeActivity: AgentRuntimeActivitySnapshot;
   onAgentChange: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
-  onGraphPathChange: (graphPath: GraphPathItem[], sourceSessionToken: string) => void;
-  onGraphPathNavigateRegister: (navigate: (pathId: string) => void, sourceSessionToken: string) => void;
+  onMirroredGraphPathSync: (graphPath: GraphPathItem[], sourceSessionToken: string) => void;
+  onBridgePathNavigatorRegister: (navigate: (pathId: string) => void, sourceSessionToken: string) => void;
 }
 
 const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
@@ -32,8 +32,8 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
   draftStatus,
   runtimeActivity,
   onAgentChange,
-  onGraphPathChange,
-  onGraphPathNavigateRegister
+  onMirroredGraphPathSync,
+  onBridgePathNavigatorRegister
 }) => {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -86,8 +86,8 @@ const GraphEditorPanel: React.FC<GraphEditorPanelProps> = ({
           installedSummary={installedSummary}
           worldRegistry={worldRegistry}
           onAgentChange={onAgentChange}
-          onGraphPathChange={onGraphPathChange}
-          onGraphPathNavigateRegister={onGraphPathNavigateRegister}
+          onMirroredGraphPathSync={onMirroredGraphPathSync}
+          onBridgePathNavigatorRegister={onBridgePathNavigatorRegister}
           runtimeStatus={runtimeStatus}
           draftStatus={draftStatus}
           runtimeActivity={runtimeActivity}

@@ -94,8 +94,6 @@ const App: React.FC = () => {
     syncAgentParametersFromBrain,
     draftProjectedVisionCellCount,
     agentDraftStatus,
-    bodyDraftStatus,
-    bodyEndpointPreview,
     bodyEndpointValidation,
     hasUnsavedDraftChanges: hasUnsavedWorkspaceChanges,
     handleAgentParametersChange,
@@ -146,10 +144,10 @@ const App: React.FC = () => {
   const installedGraphSummary = agentRuntimeStatus.appliedSummary;
   const graphEditorSessionToken = currentAgentDocument.metadata.id;
   const {
-    graphPath,
-    handleGraphPathNavigate,
-    handleGraphPathChange,
-    handleGraphPathNavigateRegister,
+    mirroredGraphPath,
+    bridgeNavigateToPathId,
+    syncMirroredGraphPath,
+    registerBridgePathNavigator,
   } = useGraphNavigationCoordinator(graphEditorSessionToken);
   const {
     brainLibrary,
@@ -339,7 +337,7 @@ const App: React.FC = () => {
         );
       },
       getRuntimeActiveNodeIds: () => [...agentRuntimeActivity.activeNodeIds],
-      getGraphPathIds: () => graphPath.map((item) => item.id),
+      getGraphPathIds: () => mirroredGraphPath.map((item) => item.id),
       getActiveAgentId: () => currentAgentDocumentRef.current.metadata.id,
       getActiveBrainId: () => activeBrainId,
       getDraftAgentId: () => draftAgentDocumentRef.current.metadata.id,
@@ -348,7 +346,7 @@ const App: React.FC = () => {
     return () => {
       delete window.__NEURALSOUP_TEST_API__;
     };
-  }, [activeBrainId, agentRuntimeActivity.activeNodeIds, graphPath, handleAgentChange, handleGraphAgentChange, isE2ETestMode]);
+  }, [activeBrainId, agentRuntimeActivity.activeNodeIds, handleAgentChange, handleGraphAgentChange, isE2ETestMode, mirroredGraphPath]);
 
   return (
     <div
@@ -404,11 +402,11 @@ const App: React.FC = () => {
       <div className="control-area" data-testid="control-panel" style={controlAreaStyle}>
         <EditorToolbar
           editorTab={editorTab}
-          graphPath={graphPath}
+          mirroredGraphPath={mirroredGraphPath}
           runState={runState}
           onBrainLibraryOpen={openBrainLibrary}
           onEditorTabChange={setEditorTab}
-          onGraphPathNavigate={handleGraphPathNavigate}
+          onBridgeNavigateToPathId={bridgeNavigateToPathId}
           onStartPause={handleStartPause}
           onReset={handleReset}
         />
@@ -441,8 +439,6 @@ const App: React.FC = () => {
             <BodyMappingPanel
               agent={draftAgentDocument}
               worldRegistry={worldRegistry}
-              bodyDraftStatus={bodyDraftStatus}
-              preview={bodyEndpointPreview}
               validation={bodyEndpointValidation}
               onBodyChange={(updater) => {
                 commitEditedAgentDocument(
@@ -468,8 +464,8 @@ const App: React.FC = () => {
             draftStatus={agentDraftStatus}
             runtimeActivity={agentRuntimeActivity}
             onAgentChange={handleGraphAgentChange}
-            onGraphPathChange={handleGraphPathChange}
-            onGraphPathNavigateRegister={handleGraphPathNavigateRegister}
+            onMirroredGraphPathSync={syncMirroredGraphPath}
+            onBridgePathNavigatorRegister={registerBridgePathNavigator}
           />
           <div
             className={`content-panel settings-control ${editorTab === 'settings' ? 'is-active' : 'is-hidden'}`}

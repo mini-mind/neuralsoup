@@ -340,6 +340,9 @@ interface GraphEditorCommandDependencies {
   dismissDetailModalIf: (predicate: (detail: DetailModalData) => boolean) => void;
 }
 
+const resolveViewNode = (viewNodeByViewId: Map<string, GraphViewNode>, nodeId: string): GraphViewNode | null =>
+  viewNodeByViewId.get(nodeId) ?? null;
+
 export const useGraphEditorCommands = ({
   setAgent,
   currentScope,
@@ -349,7 +352,7 @@ export const useGraphEditorCommands = ({
   indexes,
   localLeafIds,
   viewNodeByViewId,
-  visibleNodeByRefId,
+  visibleNodeByRefId: _visibleNodeByRefId,
   selectionState,
   draftNodePositions,
   links,
@@ -1024,14 +1027,18 @@ export const useGraphEditorCommands = ({
       return;
     }
 
-    const selectedNodeIdSet = new Set(selectionState.nodeIds.map((nodeId) => viewNodeByViewId.get(nodeId)?.refNodeId ?? nodeId));
+    const selectedNodeIdSet = new Set(
+      selectionState.nodeIds
+        .map((nodeId) => resolveViewNode(viewNodeByViewId, nodeId)?.refNodeId)
+        .filter((nodeId): nodeId is string => Boolean(nodeId))
+    );
     const selectedChildren = currentChildren.filter((child) => selectedNodeIdSet.has(child.refNodeId));
     if (selectedChildren.length < 2) {
       return;
     }
 
     const selectedViewNodes = selectedChildren
-      .map((child) => visibleNodeByRefId.get(child.refNodeId))
+      .map((child) => viewNodeByViewId.get(child.id))
       .filter((node): node is GraphViewNode => node != null && !node.proxy);
     if (selectedViewNodes.length !== selectedChildren.length) {
       return;
@@ -1056,7 +1063,7 @@ export const useGraphEditorCommands = ({
         nextGroupPosition: toStoredPosition({ x: minX, y: minY }, currentScope),
         childPositionsById: Object.fromEntries(
           selectedChildren.map((child) => {
-            const viewNode = visibleNodeByRefId.get(child.refNodeId);
+            const viewNode = viewNodeByViewId.get(child.id);
             return [
               child.refNodeId,
               viewNode
@@ -1095,7 +1102,7 @@ export const useGraphEditorCommands = ({
     scheduleFocusNode,
     selectionState.nodeIds,
     setAgent,
-    visibleNodeByRefId,
+    viewNodeByViewId,
   ]);
 
   const ungroupNode = useCallback(
@@ -1104,7 +1111,9 @@ export const useGraphEditorCommands = ({
         return;
       }
 
-      const targetGroup = currentChildren.find((child) => child.id === nodeId || child.refNodeId === nodeId);
+      const targetGroupViewNode = resolveViewNode(viewNodeByViewId, nodeId);
+      const targetGroupRefNodeId = targetGroupViewNode?.refNodeId ?? nodeId;
+      const targetGroup = currentChildren.find((child) => child.id === targetGroupRefNodeId);
       if (!targetGroup || targetGroup.kind !== 'neuron-group') {
         return;
       }
@@ -1146,6 +1155,7 @@ export const useGraphEditorCommands = ({
       graphStructureEditable,
       navigationPath,
       setAgent,
+      viewNodeByViewId,
     ]
   );
 

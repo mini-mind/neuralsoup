@@ -19,8 +19,8 @@ interface SNNTopologyEditorProps {
   installedSummary: AgentIRSummary;
   worldRegistry: WorldRegistry;
   onAgentChange?: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
-  onGraphPathChange?: (graphPath: GraphPathItem[], sourceSessionToken: string) => void;
-  onGraphPathNavigateRegister?: (navigate: (pathId: string) => void, sourceSessionToken: string) => void;
+  onMirroredGraphPathSync?: (graphPath: GraphPathItem[], sourceSessionToken: string) => void;
+  onBridgePathNavigatorRegister?: (navigate: (pathId: string) => void, sourceSessionToken: string) => void;
   runtimeStatus: AgentRuntimeStatus;
   draftStatus: AgentDraftStatus;
   runtimeActivity: AgentRuntimeActivitySnapshot;
@@ -36,8 +36,8 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   installedSummary,
   worldRegistry,
   onAgentChange,
-  onGraphPathChange,
-  onGraphPathNavigateRegister,
+  onMirroredGraphPathSync,
+  onBridgePathNavigatorRegister,
   runtimeStatus,
   draftStatus,
   runtimeActivity,
@@ -67,7 +67,6 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
     activeNode,
     activeLink,
     activeNeuronParameters,
-    navigateTo,
     navigateToBreadcrumb,
     selectNodes,
     selectNode,
@@ -80,6 +79,8 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
     openLinkDetail,
     closeDetailModal,
     getNodeDoubleClickAction,
+    enterScopeFromNode,
+    toggleInlineExpansionForNode,
     connectSourceNodesToTarget,
     updateNodePositionsInDraft,
     discardNodeDraftPositions,
@@ -90,7 +91,6 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
     createNeuronAndConnectAt,
     aggregateSelectedNodes,
     ungroupNode,
-    toggleGroupExpanded,
     setCanvasOffset: setCanvasOffsetState,
     setCanvasSession: setCanvasSessionState,
     syncCanvasViewportForScope,
@@ -123,6 +123,14 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   };
 
   const selectedCount = selectedNodeIds.length + (selectedLinkId ? 1 : 0);
+  const getCanvasNodeDoubleClickAction = (nodeId: string): 'navigate' | 'edit' | null => {
+    const action = getNodeDoubleClickAction(nodeId);
+    if (action === 'enter-scope') {
+      return 'navigate';
+    }
+
+    return action;
+  };
 
   const canCreateNeuronHere = currentContainerKind === 'neuron-group';
   const canAggregateSelection = currentContainerKind === 'neuron-group' && selectedNodeIds.length > 1;
@@ -200,19 +208,19 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   });
 
   useEffect(() => {
-    onGraphPathChange?.(
+    onMirroredGraphPathSync?.(
       breadcrumbs.map((item) => ({ id: item.id, label: item.label })),
       graphSessionToken
     );
-  }, [breadcrumbs, graphSessionToken, onGraphPathChange]);
+  }, [breadcrumbs, graphSessionToken, onMirroredGraphPathSync]);
 
   useEffect(() => {
-    if (!onGraphPathNavigateRegister) {
+    if (!onBridgePathNavigatorRegister) {
       return;
     }
 
-    onGraphPathNavigateRegister(navigateToBreadcrumb, graphSessionToken);
-  }, [graphSessionToken, navigateToBreadcrumb, onGraphPathNavigateRegister]);
+    onBridgePathNavigatorRegister(navigateToBreadcrumb, graphSessionToken);
+  }, [graphSessionToken, navigateToBreadcrumb, onBridgePathNavigatorRegister]);
 
   return (
     <div className="snn-topology-editor" data-testid="topology-editor">
@@ -244,15 +252,15 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
         onNodeContextMenu={handleNodeContextMenu}
         onSelectLink={selectLink}
         onOpenLinkDetail={openLinkDetail}
-        onNavigateToNode={navigateTo}
+        onNavigateToNode={enterScopeFromNode}
         onOpenNodeDetail={openNodeDetail}
-        getNodeDoubleClickAction={getNodeDoubleClickAction}
+        getNodeDoubleClickAction={getCanvasNodeDoubleClickAction}
         onCloseContextMenu={closeContextMenu}
         onAddNeuronAt={addNeuronAt}
         onAddNeuronGroupAt={addNeuronGroupAt}
         onAggregateSelectedNodes={aggregateSelectedNodes}
         onUngroupNode={ungroupNode}
-        onToggleGroupExpanded={toggleGroupExpanded}
+        onToggleGroupExpanded={toggleInlineExpansionForNode}
       />
 
       <GraphDetailModal

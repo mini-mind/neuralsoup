@@ -8,8 +8,8 @@ const areGraphPathsEqual = (left: GraphPathItem[], right: GraphPathItem[]): bool
   left.every((item, index) => item.id === right[index]?.id && item.label === right[index]?.label);
 
 export const useGraphNavigationCoordinator = (graphSessionToken: string) => {
-  const [graphPath, setGraphPath] = useState<GraphPathItem[]>(ROOT_GRAPH_PATH);
-  const graphPathNavigateRef = useRef<(pathId: string) => void>(() => {});
+  const [mirroredGraphPath, setMirroredGraphPath] = useState<GraphPathItem[]>(ROOT_GRAPH_PATH);
+  const bridgeNavigateToPathIdRef = useRef<(pathId: string) => void>(() => {});
   const graphSessionTokenRef = useRef(graphSessionToken);
 
   useEffect(() => {
@@ -17,25 +17,25 @@ export const useGraphNavigationCoordinator = (graphSessionToken: string) => {
   }, [graphSessionToken]);
 
   useEffect(() => {
-    graphPathNavigateRef.current = () => {};
-    setGraphPath(ROOT_GRAPH_PATH);
+    bridgeNavigateToPathIdRef.current = () => {};
+    setMirroredGraphPath(ROOT_GRAPH_PATH);
   }, [graphSessionToken]);
 
-  const handleGraphPathNavigate = useCallback((pathId: string) => {
-    graphPathNavigateRef.current(pathId);
+  const bridgeNavigateToPathId = useCallback((pathId: string) => {
+    bridgeNavigateToPathIdRef.current(pathId);
   }, []);
 
-  const handleGraphPathChange = useCallback((nextGraphPath: GraphPathItem[], sourceSessionToken: string) => {
+  const syncMirroredGraphPath = useCallback((nextGraphPath: GraphPathItem[], sourceSessionToken: string) => {
     if (sourceSessionToken !== graphSessionTokenRef.current) {
       return;
     }
 
-    setGraphPath((currentGraphPath) => (
+    setMirroredGraphPath((currentGraphPath) => (
       areGraphPathsEqual(currentGraphPath, nextGraphPath) ? currentGraphPath : nextGraphPath
     ));
   }, []);
 
-  const handleGraphPathNavigateRegister = useCallback((
+  const registerBridgePathNavigator = useCallback((
     navigate: (pathId: string) => void,
     sourceSessionToken: string
   ) => {
@@ -43,13 +43,13 @@ export const useGraphNavigationCoordinator = (graphSessionToken: string) => {
       return;
     }
 
-    graphPathNavigateRef.current = navigate;
+    bridgeNavigateToPathIdRef.current = navigate;
   }, []);
 
   return {
-    graphPath,
-    handleGraphPathNavigate,
-    handleGraphPathChange,
-    handleGraphPathNavigateRegister,
+    mirroredGraphPath,
+    bridgeNavigateToPathId,
+    syncMirroredGraphPath,
+    registerBridgePathNavigator,
   };
 };

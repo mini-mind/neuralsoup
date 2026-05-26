@@ -217,7 +217,7 @@
     {
       "id": "task-004",
       "priority": "P1",
-      "status": "pending",
+      "status": "completed",
       "title": "BrainIR 容器语义收口：统一 root/group/expand/enter 的行为模型",
       "depends_on": [
         "task-002"
@@ -244,9 +244,70 @@
       }
     },
     {
+      "id": "task-004a",
+      "priority": "P1",
+      "status": "completed",
+      "title": "导航语义收口：区分导航真源与展示镜像，集中 enter/expand 动作边界",
+      "depends_on": [
+        "task-003"
+      ],
+      "scope": [
+        "src/App.tsx",
+        "src/components/editor/EditorToolbar.tsx",
+        "src/components/editor/GraphEditorPanel.tsx",
+        "src/components/hooks/useGraphNavigationCoordinator.ts",
+        "src/components/hooks/useSNNTopologyState.ts",
+        "src/components/SNNTopologyEditor.tsx"
+      ],
+      "description": "把 GraphView 的路径导航语义收口为一套清晰模型：`navigationPath` 仍为编辑器内部真源，App/Toolbar 只保留展示镜像与跳转桥接；同时把 enter scope 和 toggle inline expand 的触发边界集中，避免组件侧分散混用。",
+      "acceptance": [
+        "展示层不再把 graph path 镜像误导成第二套真源，命名和接口语义清晰。",
+        "进入层级与原地展开的动作边界集中在单一接口或统一命名上，而不是分散在组件里隐式判断。",
+        "既有路径导航、双击进入、右键展开/收起行为不退化。"
+      ],
+      "self_review": [
+        "检查是否只是改名但没有真正收口接口语义。",
+        "检查 toolbar/app 和编辑器之间是否仍保留容易被误解为双真源的状态契约。"
+      ],
+      "delegation": "可委派一个 worker 负责导航镜像与动作边界收口；主代理负责验收和后续身份层收口。",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && git diff --check",
+        "timeout_seconds": 1500
+      }
+    },
+    {
+      "id": "task-004b",
+      "priority": "P1",
+      "status": "completed",
+      "title": "身份语义收口：统一 viewId/refNodeId 入口并补容器语义回归测试",
+      "depends_on": [
+        "task-004a"
+      ],
+      "scope": [
+        "src/components/editor/graph/**",
+        "src/components/hooks/useGraphEditorCommands.ts",
+        "tests/domain/agent-graph-view-model.contract.test.ts"
+      ],
+      "description": "把 expanded child 的 `viewId/refNodeId` 双轨使用收口成显式适配边界，统一导航、选择、详情和编辑入口消费哪一种身份，并补 enter/expand 语义差异的最小回归测试。",
+      "acceptance": [
+        "导航、选择、详情和编辑入口不再零散地各自猜测该用 viewId 还是 refNodeId。",
+        "同一 group 在 enter 与 expand 两种展示路径下的 breadcrumbs、scopeKey、selection 和 active highlight 行为有测试锁定。",
+        "不引入兼容层或第三套节点身份。"
+      ],
+      "self_review": [
+        "检查 visibleNodeByRefId 的使用点是否仍偷渡模糊身份语义。",
+        "检查 expanded child 的选择和详情打开是否仍依赖偶然映射顺序。"
+      ],
+      "delegation": "建议在 004a 完成后再委派一个 worker 实现，避免与导航接口收口互相打架。",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && git diff --check",
+        "timeout_seconds": 1500
+      }
+    },
+    {
       "id": "task-005",
       "priority": "P1",
-      "status": "pending",
+      "status": "completed",
       "title": "长期架构文档补齐：冻结前端编辑器与 runtime 的职责边界",
       "depends_on": [
         "task-001",
@@ -281,5 +342,5 @@
     "每完成一个阶段都应先自审，再决定是否追加新任务或拆分现有任务。",
     "完成标准遵循 AGENTS.md：不以能跑为准，不在当前范围内制造已知返工。"
   ],
-  "last_updated": "2026-05-26T14:20:00Z"
+  "last_updated": "2026-05-26T16:35:00Z"
 }

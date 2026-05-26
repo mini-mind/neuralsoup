@@ -11,13 +11,12 @@ import type {
 import { mutateBodyIR } from '../../domain/brain';
 import BodyTopologyCanvas from './graph/body/BodyTopologyCanvas';
 import { buildBodyCanvasModel } from './graph/body/bodySceneAdapter';
-import type { BodyIRDraftStatus, BodyIRPreviewData, BodyIRValidationMessage } from './types';
+import type { BodyIRValidationMessage } from './types';
+import type { GraphCanvasSessionState } from '../hooks/useSNNTopologyState';
 
 interface BodyMappingPanelProps {
   agent: AgentIR;
   worldRegistry: WorldRegistry;
-  bodyDraftStatus: BodyIRDraftStatus;
-  preview?: BodyIRPreviewData;
   validation?: BodyIRValidationMessage[];
   onBodyChange: (updater: (current: BodyIR) => BodyIR) => void;
   onApply: () => void;
@@ -111,8 +110,6 @@ const parseNumber = (value: string, fallback: number): number => {
 const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
   agent,
   worldRegistry,
-  bodyDraftStatus,
-  preview,
   validation = [],
   onBodyChange,
   onApply,
@@ -122,6 +119,10 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
   const [selectedEndpoint, setSelectedEndpoint] = useState<SelectedEndpoint>(() => getDefaultSelectedEndpoint(body));
   const [selection, setSelection] = useState<BodySelection>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [canvasSession, setCanvasSession] = useState<GraphCanvasSessionState>({
+    viewport: { x: 0, y: 0 },
+    scale: 1,
+  });
 
   useEffect(() => {
     if (!selectedEndpoint) {
@@ -232,19 +233,15 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
 
   return (
     <div className="body-mapping-panel" data-testid="body-mapping-panel">
-      <div className="body-mapping-summary">
-        <span>{preview?.canonicalSummary ?? '暂无 BodyIR 端点预览。'}</span>
-        <span>{preview?.compiledSummary ?? ''}</span>
-        <span>{bodyDraftStatus.hasChanges ? '存在未应用变更' : '已与当前 Agent 同步'}</span>
-      </div>
-
       <section className="body-mapping-graph-card">
         <BodyTopologyCanvas
           model={canvasModel}
+          canvasSession={canvasSession}
           selectedDirection={selectedDirection}
           selectedEndpointId={selectedEndpointId}
           highlightedNodeIds={highlightedNodeIds}
           highlightedMappingIds={highlightedMappingIds}
+          onCanvasSessionChange={setCanvasSession}
           onSelectionChange={(nextSelection) => syncSelection(nextSelection)}
           onContextEditSelection={(nextSelection) => syncSelection(nextSelection, { openEditor: true })}
           onDeleteLinkSelection={(linkSelection) => {
