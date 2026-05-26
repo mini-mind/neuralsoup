@@ -3,6 +3,7 @@ import type { GraphViewLink } from './graphViewTypes';
 import type { GraphInteractionState, GraphContextMenuState } from './interaction/interactionSession';
 import type { GraphSceneProjection } from './graphSceneProjection';
 import { getNodeCenter } from './tools/canvasGeometry';
+import type { SharedCanvasCapabilities } from './sharedCanvasCore';
 import TopologyCanvasSurface from './TopologyCanvasSurface';
 import TopologyLinkLayer from './TopologyLinkLayer';
 import TopologyNodeLayer from './TopologyNodeLayer';
@@ -42,9 +43,7 @@ interface GraphTopologyCanvasProps {
   selectedNodeIds: string[];
   selectedLinkId: string | null;
   activeViewNodeIds: Set<string>;
-  canCreateNeuronHere: boolean;
-  canAggregateSelection: boolean;
-  canUngroupNodesHere: boolean;
+  capabilities: SharedCanvasCapabilities;
   onCanvasContextMenu: (event: React.MouseEvent<HTMLDivElement>) => void;
   onCanvasMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
   onNodeMouseDown: (event: React.MouseEvent<HTMLDivElement>, nodeId: string) => void;
@@ -81,9 +80,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
   selectedNodeIds,
   selectedLinkId,
   activeViewNodeIds,
-  canCreateNeuronHere,
-  canAggregateSelection,
-  canUngroupNodesHere,
+  capabilities,
   onCanvasContextMenu,
   onCanvasMouseDown,
   onNodeMouseDown,
@@ -229,7 +226,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
               onMouseDown={(event) => event.stopPropagation()}
               onClick={(event) => event.stopPropagation()}
             >
-              {contextMenu.kind === 'canvas' && canCreateNeuronHere ? (
+              {contextMenu.kind === 'canvas' && capabilities.canCreateNodeAtCanvasContext ? (
                 <>
                   <button
                     type="button"
@@ -255,7 +252,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
                   </button>
                 </>
               ) : null}
-              {contextMenu.kind === 'selection' && canAggregateSelection ? (
+              {contextMenu.kind === 'selection' && capabilities.canAggregateSelection ? (
                 <button
                   type="button"
                   className="topology-context-menu-item"
@@ -281,7 +278,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
                   >
                     {scene.map.get(contextMenu.nodeIds[0])?.expanded ? '收起' : '展开'}
                   </button>
-                  {canUngroupNodesHere && scene.map.get(contextMenu.nodeIds[0])?.kind === 'neuron-group' ? (
+                  {capabilities.canUngroupGroupNode && scene.map.get(contextMenu.nodeIds[0])?.kind === 'neuron-group' ? (
                     <button
                       type="button"
                       className="topology-context-menu-item"

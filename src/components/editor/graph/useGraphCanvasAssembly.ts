@@ -9,6 +9,7 @@ import type {
 } from '../../hooks/useSNNTopologyState';
 import { getNodeCenter, NODE_PLACEMENT_MARGIN } from './tools/canvasGeometry';
 import { isEditableOrInteractiveTarget } from './isEditableOrInteractiveTarget';
+import type { SharedCanvasCallbacks, SharedCanvasCapabilities } from './sharedCanvasCore';
 
 interface GraphCanvasAssemblyOptions {
   width: number;
@@ -18,8 +19,7 @@ interface GraphCanvasAssemblyOptions {
   scopeKey: string;
   nodes: GraphViewNode[];
   selectedNodeIds: string[];
-  canCreateNeuronHere: boolean;
-  canAggregateSelection: boolean;
+  capabilities: SharedCanvasCapabilities;
   canvasViewport: GraphCanvasViewport;
   setCanvasOffset: (offset: GraphCanvasViewport) => void;
   setCanvasSession: (nextSession: GraphCanvasSessionState) => void;
@@ -30,20 +30,8 @@ interface GraphCanvasAssemblyOptions {
     isActive: boolean;
   }) => void;
   canvasScale: number;
-  beginSelectionRect: (point: { x: number; y: number }) => void;
-  updateSelectionRect: (point: { x: number; y: number }, intersectedNodeIds: string[]) => void;
-  cancelSelectionRect: () => void;
-  clearSelection: () => void;
-  connectSourceNodesToTarget: (sourceNodeIds: string[], targetNodeId: string) => void;
-  createNeuronAndConnectAt: (sourceNodeIds: string[], x: number, y: number) => void;
-  updateNodePositionsInDraft: (updates: Array<{ nodeId: string; x: number; y: number }>) => void;
-  discardNodeDraftPositions: () => void;
-  persistNodePositions: (updates: Array<{ nodeId: string; x: number; y: number }>) => void;
-  selectNode: (nodeId: string, options?: { additive?: boolean }) => void;
-  selectNodes: (nodeIds: string[]) => void;
-  closeDetailModal: () => void;
+  callbacks: Omit<SharedCanvasCallbacks, 'onViewportChange' | 'onSessionChange'>;
   hasOpenDetailModal: boolean;
-  removeSelected: () => void;
 }
 
 export const useGraphCanvasAssembly = ({
@@ -54,27 +42,14 @@ export const useGraphCanvasAssembly = ({
   scopeKey,
   nodes,
   selectedNodeIds,
-  canCreateNeuronHere,
-  canAggregateSelection,
+  capabilities,
   canvasViewport,
   setCanvasOffset,
   setCanvasSession,
   syncCanvasViewportForScope,
   canvasScale,
-  beginSelectionRect,
-  updateSelectionRect,
-  cancelSelectionRect,
-  clearSelection,
-  connectSourceNodesToTarget,
-  createNeuronAndConnectAt,
-  updateNodePositionsInDraft,
-  discardNodeDraftPositions,
-  persistNodePositions,
-  selectNode,
-  selectNodes,
-  closeDetailModal,
+  callbacks,
   hasOpenDetailModal,
-  removeSelected,
 }: GraphCanvasAssemblyOptions) => {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<HTMLDivElement>(null);
@@ -185,7 +160,7 @@ export const useGraphCanvasAssembly = ({
   const updateNodePositionsFromSceneDraft = useCallback(
     (updates: Array<{ nodeId: string; x: number; y: number }>) => {
       const sceneNodeByViewId = new Map(scene.list.map((node) => [node.viewId, node] as const));
-      updateNodePositionsInDraft(
+      callbacks.onDraftNodePositionsUpdate(
         updates.map(({ nodeId, x, y }) => ({
           nodeId,
           x:
@@ -213,13 +188,13 @@ export const useGraphCanvasAssembly = ({
         }))
       );
     },
-    [scene.list, updateNodePositionsInDraft]
+    [callbacks, scene.list]
   );
 
   const persistNodePositionsFromScene = useCallback(
     (updates: Array<{ nodeId: string; x: number; y: number }>) => {
       const sceneNodeByViewId = new Map(scene.list.map((node) => [node.viewId, node] as const));
-      persistNodePositions(
+      callbacks.onNodePositionsPersist(
         updates.map(({ nodeId, x, y }) => ({
           nodeId,
           x:
@@ -247,7 +222,7 @@ export const useGraphCanvasAssembly = ({
         }))
       );
     },
-    [persistNodePositions, scene.list]
+    [callbacks, scene.list]
   );
 
   const orchestratorNodes = useMemo(
@@ -304,27 +279,18 @@ export const useGraphCanvasAssembly = ({
     nodes: orchestratorNodes,
     sceneOrigin: scene.origin,
     viewport: canvasViewport,
-    setViewport: setCanvasOffset,
-    setCanvasSession,
+    callbacks: {
+      ...callbacks,
+      onViewportChange: setCanvasOffset,
+      onSessionChange: setCanvasSession,
+      onDraftNodePositionsUpdate: updateNodePositionsFromSceneDraft,
+      onNodePositionsPersist: persistNodePositionsFromScene,
+    },
     scale: canvasScale,
     selectedNodeIds,
-    canCreateNeuronHere,
-    canAggregateSelection,
-    beginSelectionRect,
-    updateSelectionRect,
-    cancelSelectionRect,
-    clearSelection,
-    connectSourceNodesToTarget,
-    createNeuronAndConnectAt,
-    updateNodePositionsInDraft: updateNodePositionsFromSceneDraft,
-    discardNodeDraftPositions,
-    persistNodePositions: persistNodePositionsFromScene,
-    selectNode,
-    selectNodes,
-    closeDetailModal,
+    capabilities,
     hasOpenDetailModal,
     isEditableOrInteractiveTarget,
-    removeSelected,
   });
 
   return {

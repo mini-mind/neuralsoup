@@ -8,7 +8,6 @@ import {
   type RefObject,
   type SetStateAction,
 } from 'react';
-import type { GraphCanvasSessionState } from '../../../hooks/useSNNTopologyState';
 import {
   clampNodePlacement,
   clampZoom,
@@ -22,6 +21,7 @@ import {
 } from '../tools/canvasGeometry';
 import { findIntersectedNodeIds, findSceneNodeAtClientPoint } from '../tools/nodeHitTest';
 import type { GraphContextMenuState, GraphInteractionState } from './interactionSession';
+import type { SharedCanvasCallbacks, SharedCanvasCapabilities } from '../sharedCanvasCore';
 
 interface OrchestratorNode extends SceneNodeGeometry {
   proxy: boolean;
@@ -43,23 +43,25 @@ interface GraphInteractionDependencies {
   nodes: OrchestratorNode[];
   sceneOrigin: GraphPoint;
   viewport: GraphViewport;
-  setViewport: (nextViewport: GraphViewport) => void;
-  setCanvasSession: (nextSession: GraphCanvasSessionState) => void;
+  callbacks: Pick<
+    SharedCanvasCallbacks,
+    | 'onViewportChange'
+    | 'onSessionChange'
+    | 'onSelectionBoxStart'
+    | 'onSelectionBoxUpdate'
+    | 'onSelectionBoxCancel'
+    | 'onSelectionClear'
+    | 'onConnectNodes'
+    | 'onCreateNodeAndConnectAt'
+    | 'onDraftNodePositionsUpdate'
+    | 'onDraftNodePositionsDiscard'
+    | 'onNodePositionsPersist'
+    | 'onNodeSelect'
+    | 'onNodesSelect'
+  >;
   scale: number;
   selectedNodeIds: string[];
-  canCreateNeuronHere: boolean;
-  canAggregateSelection: boolean;
-  beginSelectionRect: (point: GraphPoint) => void;
-  updateSelectionRect: (point: GraphPoint, intersectedNodeIds: string[]) => void;
-  cancelSelectionRect: () => void;
-  clearSelection: () => void;
-  connectSourceNodesToTarget: (sourceNodeIds: string[], targetNodeId: string) => void;
-  createNeuronAndConnectAt: (sourceNodeIds: string[], x: number, y: number) => void;
-  updateNodePositionsInDraft: (updates: Array<{ nodeId: string; x: number; y: number }>) => void;
-  discardNodeDraftPositions: () => void;
-  persistNodePositions: (updates: Array<{ nodeId: string; x: number; y: number }>) => void;
-  selectNode: (nodeId: string, options?: { additive?: boolean }) => void;
-  selectNodes: (nodeIds: string[]) => void;
+  capabilities: Pick<SharedCanvasCapabilities, 'canCreateNodeAtCanvasContext' | 'canAggregateSelection'>;
 }
 
 export interface GraphInteractionOrchestratorResult {
@@ -89,23 +91,10 @@ export const useGraphInteractionOrchestrator = ({
   nodes,
   sceneOrigin,
   viewport,
-  setViewport,
-  setCanvasSession,
+  callbacks,
   scale,
   selectedNodeIds,
-  canCreateNeuronHere,
-  canAggregateSelection,
-  beginSelectionRect,
-  updateSelectionRect,
-  cancelSelectionRect,
-  clearSelection,
-  connectSourceNodesToTarget,
-  createNeuronAndConnectAt,
-  updateNodePositionsInDraft,
-  discardNodeDraftPositions,
-  persistNodePositions,
-  selectNode,
-  selectNodes,
+  capabilities,
 }: GraphInteractionDependencies): GraphInteractionOrchestratorResult => {
   const interactionRef = useRef<GraphInteractionState | null>(null);
   const viewportRef = useRef(viewport);
@@ -404,25 +393,25 @@ export const useGraphInteractionOrchestrator = ({
 
       if (currentInteraction.type === 'pressing') {
         if (currentInteraction.additive) {
-          selectNode(currentInteraction.nodeId, { additive: true });
+          callbacks.onNodeSelect(currentInteraction.nodeId, { additive: true });
         } else {
-          selectNodes([currentInteraction.nodeId]);
+          callbacks.onNodesSelect([currentInteraction.nodeId]);
         }
       }
 
       if (currentInteraction.type === 'surface-pressing' && currentInteraction.surfaceTarget === 'canvas') {
-        clearSelection();
+        callbacks.onSelectionClear();
       }
 
       if (currentInteraction.type === 'selecting') {
         if (!currentInteraction.moved) {
-          clearSelection();
+          callbacks.onSelectionClear();
         }
-        cancelSelectionRect();
+        callbacks.onSelectionBoxCancel();
       }
 
       if (currentInteraction.type === 'context-gesture' && !currentInteraction.moved) {
-        if (currentInteraction.contextTarget === 'canvas' && canCreateNeuronHere) {
+        if (currentInteraction.contextTarget === 'canvas' && capabilities.canCreateNodeAtCanvasContext) {
           setContextMenu({
             kind: 'canvas',
             client: currentInteraction.startClient,
@@ -442,7 +431,7 @@ export const useGraphInteractionOrchestrator = ({
             scene: currentInteraction.startScene,
             nodeIds: currentInteraction.contextNodeIds,
           });
-        } else if (currentInteraction.contextTarget === 'selection' && canAggregateSelection) {
+        } else if (currentInteraction.contextTarget === 'selection' && capabilities.canAggregateSelection) {
           setContextMenu({
             kind: 'selection',
             client: currentInteraction.startClient,
@@ -455,7 +444,7 @@ export const useGraphInteractionOrchestrator = ({
       if (currentInteraction.type === 'moving') {
         if (currentInteraction.moved) {
           const positions = finalMovingPositions ?? currentInteraction.currentPositions;
-          persistNodePositions(
+          callbacks.onNodePositionsPersist(
             Object.entries(positions).map(([nodeId, point]) => ({
               nodeId,
               x: point.x,
@@ -463,22 +452,17 @@ export const useGraphInteractionOrchestrator = ({
             }))
           );
         } else {
-          discardNodeDraftPositions();
+          callbacks.onDraftNodePositionsDiscard();
         }
       }
 
       setInteractionState(null);
     },
     [
-      canAggregateSelection,
-      canCreateNeuronHere,
-      cancelSelectionRect,
-      clearSelection,
-      discardNodeDraftPositions,
+      callbacks,
+      capabilities.canAggregateSelection,
+      capabilities.canCreateNodeAtCanvasContext,
       getNodeById,
-      persistNodePositions,
-      selectNode,
-      selectNodes,
       setInteractionState,
     ]
   );
@@ -525,8 +509,8 @@ export const useGraphInteractionOrchestrator = ({
           targetElement?.closest('[data-topology-group-title-handle="true"]')
         );
         if (pressedHandleOnly && !pressedOnHandle) {
-          clearSelection();
-          beginSelectionRect(currentInteraction.startScene);
+          callbacks.onSelectionClear();
+          callbacks.onSelectionBoxStart(currentInteraction.startScene);
           setInteractionState({
             type: 'selecting',
             startScene: currentInteraction.startScene,
@@ -563,7 +547,7 @@ export const useGraphInteractionOrchestrator = ({
         );
 
         if (!shouldMoveSelection) {
-          selectNodes([pressedNode.id]);
+          callbacks.onNodesSelect([pressedNode.id]);
         }
 
         setInteractionState({
@@ -585,8 +569,8 @@ export const useGraphInteractionOrchestrator = ({
           return;
         }
 
-        clearSelection();
-        beginSelectionRect(currentInteraction.startScene);
+        callbacks.onSelectionClear();
+        callbacks.onSelectionBoxStart(currentInteraction.startScene);
         setInteractionState({
           type: 'selecting',
           startScene: currentInteraction.startScene,
@@ -603,7 +587,7 @@ export const useGraphInteractionOrchestrator = ({
             currentInteraction.moved ||
             hasMovedPastThreshold(currentInteraction.startClient, { x: event.clientX, y: event.clientY }),
         };
-        setViewport({
+        callbacks.onViewportChange({
           x: currentInteraction.startOffset.x + (event.clientX - currentInteraction.startClient.x),
           y: currentInteraction.startOffset.y + (event.clientY - currentInteraction.startClient.y),
         });
@@ -655,7 +639,7 @@ export const useGraphInteractionOrchestrator = ({
           height: nextScene.y - currentInteraction.startScene.y,
         });
         const intersectedNodeIds = findIntersectedNodeIds(nodesRef.current, nextRect, (node) => !node.proxy);
-        updateSelectionRect(nextScene, intersectedNodeIds);
+        callbacks.onSelectionBoxUpdate(nextScene, intersectedNodeIds);
         const nextInteraction = {
           ...currentInteraction,
           currentScene: nextScene,
@@ -674,7 +658,7 @@ export const useGraphInteractionOrchestrator = ({
 
       if (currentInteraction.type === 'moving') {
         const nextPositions = getMovingPositions(currentInteraction, { x: event.clientX, y: event.clientY });
-        updateNodePositionsInDraft(
+        callbacks.onDraftNodePositionsUpdate(
           Object.entries(nextPositions).map(([nodeId, point]) => ({
             nodeId,
             x: point.x,
@@ -736,14 +720,18 @@ export const useGraphInteractionOrchestrator = ({
         const targetNodeId = targetNode?.id ?? null;
 
         if (targetNodeId && !currentInteraction.sourceNodeIds.includes(targetNodeId)) {
-          connectSourceNodesToTarget(currentInteraction.sourceNodeIds, targetNodeId);
+          callbacks.onConnectNodes(currentInteraction.sourceNodeIds, targetNodeId);
           setInteractionState(null);
           return;
         }
 
-        if (!releasedOnSourceNode && currentInteraction.mode === 'multi' && canCreateNeuronHere) {
+        if (!releasedOnSourceNode && currentInteraction.mode === 'multi' && capabilities.canCreateNodeAtCanvasContext) {
           const scenePoint = getScenePoint(releaseClientPoint);
-          createNeuronAndConnectAt(currentInteraction.sourceNodeIds, scenePoint.x + sceneOriginRef.current.x, scenePoint.y + sceneOriginRef.current.y);
+          callbacks.onCreateNodeAndConnectAt(
+            currentInteraction.sourceNodeIds,
+            scenePoint.x + sceneOriginRef.current.x,
+            scenePoint.y + sceneOriginRef.current.y
+          );
           setInteractionState(null);
           return;
         }
@@ -765,13 +753,8 @@ export const useGraphInteractionOrchestrator = ({
       window.removeEventListener('blur', handleWindowBlur);
     };
   }, [
-    canAggregateSelection,
-    canCreateNeuronHere,
-    cancelSelectionRect,
-    clearSelection,
-    connectSourceNodesToTarget,
-    createNeuronAndConnectAt,
-    discardNodeDraftPositions,
+    callbacks,
+    capabilities.canCreateNodeAtCanvasContext,
     endInteraction,
     getNodeById,
     getMovingPositions,
@@ -782,9 +765,6 @@ export const useGraphInteractionOrchestrator = ({
     sceneRef,
     selectedNodeIds,
     setInteractionState,
-    setViewport,
-    updateNodePositionsInDraft,
-    updateSelectionRect,
   ]);
 
   const handleCanvasWheel = useCallback(
@@ -811,7 +791,7 @@ export const useGraphInteractionOrchestrator = ({
       const sceneX = (pointerX - viewportRef.current.x) / currentScale;
       const sceneY = (pointerY - viewportRef.current.y) / currentScale;
 
-      setCanvasSession({
+      callbacks.onSessionChange({
         viewport: {
           x: pointerX - sceneX * nextScale,
           y: pointerY - sceneY * nextScale,
@@ -819,7 +799,7 @@ export const useGraphInteractionOrchestrator = ({
         scale: nextScale,
       });
     },
-    [isActive, setCanvasSession, surfaceRef]
+    [callbacks, isActive, surfaceRef]
   );
 
   const handleCanvasMouseDown = useCallback(

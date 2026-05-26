@@ -127,6 +127,11 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   const canCreateNeuronHere = currentContainerKind === 'neuron-group';
   const canAggregateSelection = currentContainerKind === 'neuron-group' && selectedNodeIds.length > 1;
   const canUngroupNodesHere = currentContainerKind === 'neuron-group';
+  const canvasCapabilities = {
+    canCreateNodeAtCanvasContext: canCreateNeuronHere,
+    canAggregateSelection,
+    canUngroupGroupNode: canUngroupNodesHere,
+  } as const;
 
   const {
     surfaceRef,
@@ -151,27 +156,28 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
     scopeKey: canvasScopeKey,
     nodes,
     selectedNodeIds,
-    canCreateNeuronHere,
-    canAggregateSelection,
+    capabilities: canvasCapabilities,
     canvasViewport,
     setCanvasOffset: setCanvasOffsetState,
     setCanvasSession: setCanvasSessionState,
     syncCanvasViewportForScope,
     canvasScale,
-    beginSelectionRect,
-    updateSelectionRect,
-    cancelSelectionRect,
-    clearSelection,
-    connectSourceNodesToTarget,
-    createNeuronAndConnectAt,
-    updateNodePositionsInDraft,
-    discardNodeDraftPositions,
-    persistNodePositions,
-    selectNode,
-    selectNodes,
-    closeDetailModal,
+    callbacks: {
+      onSelectionBoxStart: beginSelectionRect,
+      onSelectionBoxUpdate: updateSelectionRect,
+      onSelectionBoxCancel: cancelSelectionRect,
+      onSelectionClear: clearSelection,
+      onConnectNodes: connectSourceNodesToTarget,
+      onCreateNodeAndConnectAt: createNeuronAndConnectAt,
+      onDraftNodePositionsUpdate: updateNodePositionsInDraft,
+      onDraftNodePositionsDiscard: discardNodeDraftPositions,
+      onNodePositionsPersist: persistNodePositions,
+      onNodeSelect: selectNode,
+      onNodesSelect: selectNodes,
+      onDetailClose: closeDetailModal,
+      onSelectionRemove: removeSelected,
+    },
     hasOpenDetailModal: showDetailModal !== null,
-    removeSelected,
   });
 
   const diagnostics = useGraphTopologyDiagnosticsModel({
@@ -231,9 +237,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
         selectedNodeIds={selectedNodeIds}
         selectedLinkId={selectedLinkId}
         activeViewNodeIds={activeViewNodeIds}
-        canCreateNeuronHere={canCreateNeuronHere}
-        canAggregateSelection={canAggregateSelection}
-        canUngroupNodesHere={canUngroupNodesHere}
+        capabilities={canvasCapabilities}
         onCanvasContextMenu={handleCanvasContextMenu}
         onCanvasMouseDown={handleCanvasMouseDown}
         onNodeMouseDown={handleNodeMouseDown}

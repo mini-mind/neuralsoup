@@ -8,9 +8,8 @@ import type {
   BodyOutputMappingIR,
   WorldRegistry,
 } from '../../domain/brain';
-import TopologyCanvasSurface from './graph/TopologyCanvasSurface';
-import TopologyLinkLayer, { type TopologyLinkSceneNode } from './graph/TopologyLinkLayer';
-import TopologyNodeLayer from './graph/TopologyNodeLayer';
+import BodyTopologyCanvas from './graph/body/BodyTopologyCanvas';
+import { buildBodyCanvasModel } from './graph/body/bodySceneAdapter';
 import type {
   BodyIRDraftStatus,
   BodyIRPreviewData,
@@ -33,92 +32,10 @@ type SelectedEndpoint =
   | { kind: 'output'; endpointId: string }
   | null;
 
-type BodyCanvasNodeKind = 'world-input' | 'body-input' | 'body-output' | 'world-output';
-type BodyCanvasDirection = 'input' | 'output';
-
-type BodyCanvasNode = {
-  id: string;
-  label: string;
-  detail: string;
-  kind: BodyCanvasNodeKind;
-  direction: BodyCanvasDirection;
-  x: number;
-  y: number;
-  labelSide: 'left' | 'right';
-  relatedEndpointIds: string[];
-};
-
-type BodyCanvasLink = {
-  id: string;
-  fromNodeId: string;
-  toNodeId: string;
-  direction: BodyCanvasDirection;
-  endpointId: string;
-  endpointOrder: number;
-  mappingId: string;
-  nodeId: string;
-  label: string;
-  detail: string;
-};
-
-type BodyCanvasSceneNode = TopologyLinkSceneNode & {
-  id: string;
-  kind: BodyCanvasNodeKind;
-  label: string;
-  detail: string;
-  direction: BodyCanvasDirection;
-  labelSide: 'left' | 'right';
-  relatedEndpointIds: string[];
-  x: number;
-  y: number;
-};
-
 type BodySelection =
-  | { kind: 'node'; direction: BodyCanvasDirection; endpointId: string; nodeId: string }
-  | { kind: 'link'; direction: BodyCanvasDirection; endpointId: string; mappingId: string; nodeId: string; linkId: string }
+  | { kind: 'node'; direction: 'input' | 'output'; endpointId: string; nodeId: string }
+  | { kind: 'link'; direction: 'input' | 'output'; endpointId: string; mappingId: string; nodeId: string; linkId: string }
   | null;
-
-type BodyContextMenuState =
-  | {
-      selection: Exclude<BodySelection, null>;
-      position: {
-        x: number;
-        y: number;
-      };
-    }
-  | null;
-
-type InputMatchRow = {
-  key: string;
-  mappingId: string;
-  endpointId: string;
-  endpointOrder: number;
-  nodeId: string;
-  resolvedSource: string;
-  scale?: number;
-};
-
-type OutputMatchRow = {
-  key: string;
-  mappingId: string;
-  endpointId: string;
-  endpointOrder: number;
-  nodeId: string;
-  resolvedTarget: string;
-  decayPerSecond?: number;
-};
-
-const SURFACE_WIDTH = 1280;
-const NODE_SIZE = 16;
-const SECTION_TOP = 64;
-const ROW_SPACING = 28;
-const SECTION_GAP = 132;
-const SURFACE_BOTTOM = 56;
-
-const WORLD_INPUT_X = 120;
-const BODY_INPUT_X = 420;
-const BODY_OUTPUT_X = 860;
-const WORLD_OUTPUT_X = 1160;
 
 const createEndpointId = (prefix: 'input' | 'output') =>
   `${prefix}-endpoint-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -158,19 +75,6 @@ const createOutputMapping = (endpointId: string): BodyOutputMappingIR => ({
   endpointId,
   nodeId: '',
 });
-
-const dedupeSorted = (values: Iterable<string>): string[] => [...new Set(values)].sort((left, right) => left.localeCompare(right));
-
-const appendEndpointId = (map: Map<string, string[]>, key: string, endpointId: string) => {
-  const current = map.get(key);
-  if (!current) {
-    map.set(key, [endpointId]);
-    return;
-  }
-  if (!current.includes(endpointId)) {
-    current.push(endpointId);
-  }
-};
 
 const getDefaultSelectedEndpoint = (body: BodyIR): SelectedEndpoint => {
   const inputEndpoint = body.inputEndpoints[0];
@@ -224,7 +128,6 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
   const body = agent.body;
   const [selectedEndpoint, setSelectedEndpoint] = useState<SelectedEndpoint>(() => getDefaultSelectedEndpoint(body));
   const [selection, setSelection] = useState<BodySelection>(null);
-  const [contextMenu, setContextMenu] = useState<BodyContextMenuState>(null);
   const [editorOpen, setEditorOpen] = useState(false);
 
   useEffect(() => {
@@ -274,59 +177,6 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
     () => new Map(body.outputEndpoints.map((endpoint, index) => [endpoint.id, index])),
     [body.outputEndpoints]
   );
-  const inputEndpointById = useMemo(
-    () => new Map(body.inputEndpoints.map((endpoint) => [endpoint.id, endpoint])),
-    [body.inputEndpoints]
-  );
-  const outputEndpointById = useMemo(
-    () => new Map(body.outputEndpoints.map((endpoint) => [endpoint.id, endpoint])),
-    [body.outputEndpoints]
-  );
-
-  const inputRows = useMemo<InputMatchRow[]>(
-    () => body.mappings.flatMap((mapping, index) => {
-      if (mapping.kind !== 'input') {
-        return [];
-      }
-      const endpoint = inputEndpointById.get(mapping.endpointId);
-      if (!endpoint) {
-        return [];
-      }
-      return [{
-        key: `input-${mapping.id}-${index}`,
-        mappingId: mapping.id,
-        endpointId: endpoint.id,
-        endpointOrder: inputEndpointIdToIndex.get(endpoint.id) ?? -1,
-        nodeId: mapping.nodeId,
-        resolvedSource: endpoint.source,
-        scale: endpoint.scale,
-      }];
-    }),
-    [body.mappings, inputEndpointById, inputEndpointIdToIndex]
-  );
-
-  const outputRows = useMemo<OutputMatchRow[]>(
-    () => body.mappings.flatMap((mapping, index) => {
-      if (mapping.kind !== 'output') {
-        return [];
-      }
-      const endpoint = outputEndpointById.get(mapping.endpointId);
-      if (!endpoint) {
-        return [];
-      }
-      return [{
-        key: `output-${mapping.id}-${index}`,
-        mappingId: mapping.id,
-        endpointId: endpoint.id,
-        endpointOrder: outputEndpointIdToIndex.get(endpoint.id) ?? -1,
-        nodeId: mapping.nodeId,
-        resolvedTarget: endpoint.target,
-        decayPerSecond: endpoint.decayPerSecond,
-      }];
-    }),
-    [body.mappings, outputEndpointById, outputEndpointIdToIndex]
-  );
-
   const selectedInputEndpoint = selectedEndpoint?.kind === 'input'
     ? body.inputEndpoints.find((endpoint) => endpoint.id === selectedEndpoint.endpointId) ?? null
     : null;
@@ -353,243 +203,11 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
     );
   }, [selectedEndpoint, validation]);
 
-  const canvasModel = useMemo(() => {
-    const bodyInputNodeIds = dedupeSorted(inputRows.map((row) => row.nodeId));
-    const bodyOutputNodeIds = dedupeSorted(outputRows.map((row) => row.nodeId));
-    const worldInputSignals = dedupeSorted(inputRows.map((row) => row.resolvedSource));
-    const worldOutputSignals = dedupeSorted(outputRows.map((row) => row.resolvedTarget));
-
-    const inputSpan = Math.max(worldInputSignals.length, bodyInputNodeIds.length, 1);
-    const outputSpan = Math.max(bodyOutputNodeIds.length, worldOutputSignals.length, 1);
-    const inputSectionHeight = inputSpan * ROW_SPACING;
-    const outputSectionTop = SECTION_TOP + inputSectionHeight + SECTION_GAP;
-    const surfaceHeight = outputSectionTop + outputSpan * ROW_SPACING + SURFACE_BOTTOM;
-
-    const inputSourceEndpoints = new Map<string, string[]>();
-    const inputBodyEndpoints = new Map<string, string[]>();
-    const outputBodyEndpoints = new Map<string, string[]>();
-    const outputTargetEndpoints = new Map<string, string[]>();
-
-    inputRows.forEach((row) => {
-      appendEndpointId(inputSourceEndpoints, row.resolvedSource, row.endpointId);
-      appendEndpointId(inputBodyEndpoints, row.nodeId, row.endpointId);
-    });
-    outputRows.forEach((row) => {
-      appendEndpointId(outputBodyEndpoints, row.nodeId, row.endpointId);
-      appendEndpointId(outputTargetEndpoints, row.resolvedTarget, row.endpointId);
-    });
-
-    const nodes: BodyCanvasNode[] = [];
-
-    worldInputSignals.forEach((signal, index) => {
-      const binding = worldRegistry.resolveInputBinding(signal);
-      nodes.push({
-        id: `world-input:${signal}`,
-        label: signal,
-        detail: binding ? `World 输入端口 ${binding.worldPort}` : '未解析的 World 输入信号',
-        kind: 'world-input',
-        direction: 'input',
-        x: WORLD_INPUT_X,
-        y: SECTION_TOP + index * ROW_SPACING,
-        labelSide: 'right',
-        relatedEndpointIds: inputSourceEndpoints.get(signal) ?? [],
-      });
-    });
-
-    bodyInputNodeIds.forEach((nodeId, index) => {
-      const brainConnectionCount = agent.connections.filter(
-        (connection) =>
-          (connection.from.scope === 'bodyInput' && connection.from.nodeId === nodeId) ||
-          (connection.to.scope === 'bodyInput' && connection.to.nodeId === nodeId)
-      ).length;
-
-      nodes.push({
-        id: `body-input:${nodeId}`,
-        label: nodeId,
-        detail: `Body 输入信号节点，关联 Brain 连接 ${brainConnectionCount} 条`,
-        kind: 'body-input',
-        direction: 'input',
-        x: BODY_INPUT_X,
-        y: SECTION_TOP + index * ROW_SPACING,
-        labelSide: 'right',
-        relatedEndpointIds: inputBodyEndpoints.get(nodeId) ?? [],
-      });
-    });
-
-    bodyOutputNodeIds.forEach((nodeId, index) => {
-      const brainConnectionCount = agent.connections.filter(
-        (connection) =>
-          (connection.from.scope === 'bodyOutput' && connection.from.nodeId === nodeId) ||
-          (connection.to.scope === 'bodyOutput' && connection.to.nodeId === nodeId)
-      ).length;
-
-      nodes.push({
-        id: `body-output:${nodeId}`,
-        label: nodeId,
-        detail: `Body 输出信号节点，关联 Brain 连接 ${brainConnectionCount} 条`,
-        kind: 'body-output',
-        direction: 'output',
-        x: BODY_OUTPUT_X,
-        y: outputSectionTop + index * ROW_SPACING,
-        labelSide: 'left',
-        relatedEndpointIds: outputBodyEndpoints.get(nodeId) ?? [],
-      });
-    });
-
-    worldOutputSignals.forEach((signal, index) => {
-      const binding = worldRegistry.resolveOutputBinding(signal);
-      nodes.push({
-        id: `world-output:${signal}`,
-        label: signal,
-        detail: binding ? `World 输出端口 ${binding.worldPort}` : '未解析的 World 输出信号',
-        kind: 'world-output',
-        direction: 'output',
-        x: WORLD_OUTPUT_X,
-        y: outputSectionTop + index * ROW_SPACING,
-        labelSide: 'left',
-        relatedEndpointIds: outputTargetEndpoints.get(signal) ?? [],
-      });
-    });
-
-    const sceneNodes: BodyCanvasSceneNode[] = nodes.map((node) => ({
-      ...node,
-      sceneX: node.x - NODE_SIZE / 2,
-      sceneY: node.y - NODE_SIZE / 2,
-      width: NODE_SIZE,
-      height: NODE_SIZE,
-    }));
-    const nodeById = new Map(sceneNodes.map((node) => [node.id, node]));
-
-    const links: BodyCanvasLink[] = [
-      ...inputRows.map((row) => ({
-        id: `body-input-link-${row.mappingId}`,
-        fromNodeId: `world-input:${row.resolvedSource}`,
-        toNodeId: `body-input:${row.nodeId}`,
-        direction: 'input' as const,
-        endpointId: row.endpointId,
-        endpointOrder: row.endpointOrder,
-        mappingId: row.mappingId,
-        nodeId: row.nodeId,
-        label: row.endpointOrder >= 0 ? `E${row.endpointOrder + 1}` : 'E?',
-        detail: `${row.resolvedSource} -> ${row.nodeId}`,
-      })),
-      ...outputRows.map((row) => ({
-        id: `body-output-link-${row.mappingId}`,
-        fromNodeId: `body-output:${row.nodeId}`,
-        toNodeId: `world-output:${row.resolvedTarget}`,
-        direction: 'output' as const,
-        endpointId: row.endpointId,
-        endpointOrder: row.endpointOrder,
-        mappingId: row.mappingId,
-        nodeId: row.nodeId,
-        label: row.endpointOrder >= 0 ? `E${row.endpointOrder + 1}` : 'E?',
-        detail: `${row.nodeId} -> ${row.resolvedTarget}`,
-      })),
-    ].filter((link) => nodeById.has(link.fromNodeId) && nodeById.has(link.toNodeId));
-
-    return {
-      nodes: sceneNodes,
-      nodeById,
-      links,
-      surfaceHeight,
-      outputSectionTop,
-    };
-  }, [agent.connections, inputRows, outputRows, worldRegistry]);
-
-  const handleNodeSelect = (node: BodyCanvasNode) => {
-    const nextEndpointId = node.relatedEndpointIds[0];
-    if (!nextEndpointId) {
-      return;
-    }
-    setSelectedEndpoint({ kind: node.direction, endpointId: nextEndpointId });
-    setSelection({ kind: 'node', direction: node.direction, endpointId: nextEndpointId, nodeId: node.id });
-    setContextMenu(null);
-  };
-
-  const handleNodeContextMenu = (
-    event: React.MouseEvent<HTMLButtonElement>,
-    node: BodyCanvasSceneNode
-  ) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const nextEndpointId = node.relatedEndpointIds[0];
-    if (!nextEndpointId) {
-      return;
-    }
-
-    const nextSelection: Exclude<BodySelection, null> = {
-      kind: 'node',
-      direction: node.direction,
-      endpointId: nextEndpointId,
-      nodeId: node.id,
-    };
-
-    setSelectedEndpoint({ kind: node.direction, endpointId: nextEndpointId });
-    setSelection(nextSelection);
-    setContextMenu({
-      selection: nextSelection,
-      position: {
-        x: event.clientX,
-        y: event.clientY,
-      },
-    });
-  };
-
-  const handleLinkSelect = (link: BodyCanvasLink) => {
-    setSelectedEndpoint({ kind: link.direction, endpointId: link.endpointId });
-    setSelection({
-      kind: 'link',
-      direction: link.direction,
-      endpointId: link.endpointId,
-      mappingId: link.mappingId,
-      nodeId: link.nodeId,
-      linkId: link.id,
-    });
-    setContextMenu(null);
-  };
-
-  const handleLinkContextMenu = (
-    event: React.MouseEvent<SVGGElement>,
-    link: BodyCanvasLink
-  ) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const nextSelection: Exclude<BodySelection, null> = {
-      kind: 'link',
-      direction: link.direction,
-      endpointId: link.endpointId,
-      mappingId: link.mappingId,
-      nodeId: link.nodeId,
-      linkId: link.id,
-    };
-
-    setSelectedEndpoint({ kind: link.direction, endpointId: link.endpointId });
-    setSelection(nextSelection);
-    setContextMenu({
-      selection: nextSelection,
-      position: {
-        x: event.clientX,
-        y: event.clientY,
-      },
-    });
-  };
-
-  const handleOpenSelectionEditor = () => {
-    if (!contextMenu?.selection) {
-      return;
-    }
-
-    setSelection(contextMenu.selection);
-    setEditorOpen(true);
-    setContextMenu(null);
-  };
+  const canvasModel = useMemo(() => buildBodyCanvasModel(agent, body, worldRegistry), [agent, body, worldRegistry]);
 
   const handleApplyAndClose = () => {
     onApply();
     setEditorOpen(false);
-    setContextMenu(null);
   };
 
   const selectedDirection = selectedEndpoint?.kind ?? null;
@@ -625,129 +243,47 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
       </div>
 
       <section className="body-mapping-graph-card">
-        <TopologyCanvasSurface
-          width={SURFACE_WIDTH}
-          height={Math.max(480, canvasModel.surfaceHeight)}
-          sceneWidth={SURFACE_WIDTH}
-          sceneHeight={canvasModel.surfaceHeight}
-          canvasViewport={{ x: 0, y: 0 }}
-          canvasScale={1}
-          dataTestId="body-mapping-canvas"
-          onCanvasMouseDown={() => setContextMenu(null)}
-          onCanvasContextMenu={(event) => {
-            event.preventDefault();
-            setContextMenu(null);
+        <BodyTopologyCanvas
+          model={canvasModel}
+          selectedDirection={selectedDirection}
+          selectedEndpointId={selectedEndpointId}
+          onSelectionChange={(nextSelection) => {
+            setSelection(nextSelection);
+            if (nextSelection) {
+              setSelectedEndpoint({ kind: nextSelection.direction, endpointId: nextSelection.endpointId });
+            }
+          }}
+          onContextEditSelection={(nextSelection) => {
+            setSelection(nextSelection);
+            setSelectedEndpoint({ kind: nextSelection.direction, endpointId: nextSelection.endpointId });
+            setEditorOpen(true);
           }}
           beforeScene={
-            <>
-              <div className="body-mapping-floating-actions">
-                <button
-                  type="button"
-                  className="settings-action-button secondary"
-                  onClick={() => setEditorOpen(true)}
-                >
-                  端点
-                </button>
-                <button
-                  type="button"
-                  className="settings-action-button"
-                  onClick={onApply}
-                >
-                  应用
-                </button>
-                <button
-                  type="button"
-                  className="settings-action-button secondary"
-                  onClick={onReset}
-                >
-                  重置
-                </button>
-              </div>
-              {contextMenu ? (
-                <div
-                  className="topology-context-menu"
-                  data-testid="body-mapping-context-menu"
-                  style={{
-                    left: contextMenu.position.x,
-                    top: contextMenu.position.y,
-                  }}
-                  onMouseDown={(event) => event.stopPropagation()}
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <button
-                    type="button"
-                    className="topology-context-menu-item"
-                    data-testid="body-mapping-context-edit-endpoint"
-                    onClick={handleOpenSelectionEditor}
-                  >
-                    编辑所选节点的端点
-                  </button>
-                </div>
-              ) : null}
-            </>
+            <div className="body-mapping-floating-actions">
+              <button
+                type="button"
+                className="settings-action-button secondary"
+                onClick={() => setEditorOpen(true)}
+              >
+                端点
+              </button>
+              <button
+                type="button"
+                className="settings-action-button"
+                onClick={onApply}
+              >
+                应用
+              </button>
+              <button
+                type="button"
+                className="settings-action-button secondary"
+                onClick={onReset}
+              >
+                重置
+              </button>
+            </div>
           }
-        >
-          <svg
-            className="body-topology-links"
-            viewBox={`0 0 ${SURFACE_WIDTH} ${canvasModel.surfaceHeight}`}
-            preserveAspectRatio="xMinYMin meet"
-          >
-            <text className="body-topology-section-label" x={WORLD_INPUT_X - 28} y={SECTION_TOP - 20}>
-              World Inputs
-            </text>
-            <text className="body-topology-section-label" x={BODY_INPUT_X - 28} y={SECTION_TOP - 20}>
-              Body Inputs
-            </text>
-            <text className="body-topology-section-label" x={BODY_OUTPUT_X - 28} y={canvasModel.outputSectionTop - 20}>
-              Body Outputs
-            </text>
-            <text className="body-topology-section-label" x={WORLD_OUTPUT_X - 28} y={canvasModel.outputSectionTop - 20}>
-              World Outputs
-            </text>
-          </svg>
-
-          <TopologyLinkLayer
-            sceneNodeMap={canvasModel.nodeById}
-            links={canvasModel.links.map((link) => ({
-              id: link.id,
-              fromNodeId: link.fromNodeId,
-              toNodeId: link.toNodeId,
-              label: link.label,
-              selected: selectedDirection === link.direction && selectedEndpointId === link.endpointId,
-              onClick: () => handleLinkSelect(link),
-              onDoubleClick: undefined,
-              onContextMenu: (event: React.MouseEvent<SVGGElement>) => handleLinkContextMenu(event, link),
-            }))}
-          />
-
-          <TopologyNodeLayer
-            nodes={canvasModel.nodes.map((node) => {
-              const selected =
-                selectedDirection === node.direction &&
-                selectedEndpointId != null &&
-                node.relatedEndpointIds.includes(selectedEndpointId);
-
-              return {
-                id: node.id,
-                x: node.sceneX,
-                y: node.sceneY,
-                width: node.width,
-                height: node.height,
-                className: `body-topology-node topology-node is-leaf ${selected ? 'is-selected' : ''}`,
-                title: node.detail,
-                dataTestId: `body-topology-node-${node.id}`,
-                asButton: true,
-                onClick: () => handleNodeSelect(node),
-                onContextMenu: (event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>) =>
-                  handleNodeContextMenu(event as React.MouseEvent<HTMLButtonElement>, node),
-                content: <>
-                  <span className="topology-node-shape topology-node-dot" />
-                  <span className={`body-topology-node-label is-${node.labelSide}`}>{node.label}</span>
-                </>,
-              };
-            })}
-          />
-        </TopologyCanvasSurface>
+        />
       </section>
 
       {validation.length > 0 ? (

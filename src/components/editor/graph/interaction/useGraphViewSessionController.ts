@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, type RefObject } from 'react';
 import type { GraphInteractionOrchestratorResult } from './useGraphInteractionOrchestrator';
 import { useGraphInteractionOrchestrator } from './useGraphInteractionOrchestrator';
 import type { GraphPoint, GraphViewport, SceneNodeGeometry } from '../tools/canvasGeometry';
-import type { GraphCanvasSessionState } from '../../../hooks/useSNNTopologyState';
+import type { SharedCanvasCallbacks, SharedCanvasCapabilities } from '../sharedCanvasCore';
 
 interface GraphViewSessionControllerNode extends SceneNodeGeometry {
   proxy: boolean;
@@ -26,26 +26,28 @@ interface GraphViewSessionControllerOptions {
   nodes: GraphViewSessionControllerNode[];
   sceneOrigin: GraphPoint;
   viewport: GraphViewport;
-  setViewport: (nextViewport: GraphViewport) => void;
-  setCanvasSession: (nextSession: GraphCanvasSessionState) => void;
+  callbacks: Pick<
+    SharedCanvasCallbacks,
+    | 'onViewportChange'
+    | 'onSessionChange'
+    | 'onSelectionBoxStart'
+    | 'onSelectionBoxUpdate'
+    | 'onSelectionBoxCancel'
+    | 'onSelectionClear'
+    | 'onConnectNodes'
+    | 'onCreateNodeAndConnectAt'
+    | 'onDraftNodePositionsUpdate'
+    | 'onDraftNodePositionsDiscard'
+    | 'onNodePositionsPersist'
+    | 'onNodeSelect'
+    | 'onNodesSelect'
+    | 'onDetailClose'
+    | 'onSelectionRemove'
+  >;
   scale: number;
   selectedNodeIds: string[];
-  canCreateNeuronHere: boolean;
-  canAggregateSelection: boolean;
-  beginSelectionRect: (point: GraphPoint) => void;
-  updateSelectionRect: (point: GraphPoint, intersectedNodeIds: string[]) => void;
-  cancelSelectionRect: () => void;
-  clearSelection: () => void;
-  connectSourceNodesToTarget: (sourceNodeIds: string[], targetNodeId: string) => void;
-  createNeuronAndConnectAt: (sourceNodeIds: string[], x: number, y: number) => void;
-  updateNodePositionsInDraft: (updates: Array<{ nodeId: string; x: number; y: number }>) => void;
-  discardNodeDraftPositions: () => void;
-  persistNodePositions: (updates: Array<{ nodeId: string; x: number; y: number }>) => void;
-  selectNode: (nodeId: string, options?: { additive?: boolean }) => void;
-  selectNodes: (nodeIds: string[]) => void;
-  closeDetailModal: () => void;
+  capabilities: Pick<SharedCanvasCapabilities, 'canCreateNodeAtCanvasContext' | 'canAggregateSelection'>;
   isEditableOrInteractiveTarget: (target: EventTarget | null) => boolean;
-  removeSelected: () => void;
 }
 
 interface CancelGraphViewSessionOptions {
@@ -66,26 +68,11 @@ export const useGraphViewSessionController = ({
   nodes,
   sceneOrigin,
   viewport,
-  setViewport,
-  setCanvasSession,
+  callbacks,
   scale,
   selectedNodeIds,
-  canCreateNeuronHere,
-  canAggregateSelection,
-  beginSelectionRect,
-  updateSelectionRect,
-  cancelSelectionRect,
-  clearSelection,
-  connectSourceNodesToTarget,
-  createNeuronAndConnectAt,
-  updateNodePositionsInDraft,
-  discardNodeDraftPositions,
-  persistNodePositions,
-  selectNode,
-  selectNodes,
-  closeDetailModal,
+  capabilities,
   isEditableOrInteractiveTarget,
-  removeSelected,
 }: GraphViewSessionControllerOptions) => {
   const scopeRef = useRef<string | null>(null);
   const orchestrator = useGraphInteractionOrchestrator({
@@ -95,23 +82,10 @@ export const useGraphViewSessionController = ({
     nodes,
     sceneOrigin,
     viewport,
-    setViewport,
-    setCanvasSession,
+    callbacks,
     scale,
     selectedNodeIds,
-    canCreateNeuronHere,
-    canAggregateSelection,
-    beginSelectionRect,
-    updateSelectionRect,
-    cancelSelectionRect,
-    clearSelection,
-    connectSourceNodesToTarget,
-    createNeuronAndConnectAt,
-    updateNodePositionsInDraft,
-    discardNodeDraftPositions,
-    persistNodePositions,
-    selectNode,
-    selectNodes,
+    capabilities,
   });
   const {
     interaction,
@@ -128,21 +102,15 @@ export const useGraphViewSessionController = ({
   const cancelSession = useCallback(
     (options?: CancelGraphViewSessionOptions) => {
       if (options?.closeDetailModal) {
-        closeDetailModal();
+        callbacks.onDetailClose();
       }
 
       setInteractionState(null);
-      discardNodeDraftPositions();
-      cancelSelectionRect();
+      callbacks.onDraftNodePositionsDiscard();
+      callbacks.onSelectionBoxCancel();
       closeContextMenu();
     },
-    [
-      cancelSelectionRect,
-      closeContextMenu,
-      closeDetailModal,
-      discardNodeDraftPositions,
-      setInteractionState,
-    ]
+    [callbacks, closeContextMenu, setInteractionState]
   );
 
   useEffect(() => {
@@ -203,14 +171,14 @@ export const useGraphViewSessionController = ({
         return;
       }
 
-      removeSelected();
+      callbacks.onSelectionRemove();
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [cancelSession, contextMenu, hasOpenDetailModal, interaction, isActive, isEditableOrInteractiveTarget, removeSelected, surfaceRef]);
+  }, [callbacks, cancelSession, contextMenu, hasOpenDetailModal, interaction, isActive, isEditableOrInteractiveTarget, surfaceRef]);
 
   const contextMenuPosition = useMemo(() => {
     if (!contextMenu) {

@@ -36,7 +36,7 @@
     {
       "id": "task-002",
       "priority": "P0",
-      "status": "pending",
+      "status": "completed",
       "title": "统一拓扑画布内核：抽出 BodyIR/BrainIR 共用的交互与 scene adapter 边界",
       "depends_on": [
         "task-001"
@@ -58,6 +58,68 @@
         "检查 BodyIR/BrainIR 是否仍残留彼此独有但本可复用的交互实现。"
       ],
       "delegation": "先由 subagent 做现状切分和接口草案，再由另一个 subagent 落共享内核和 adapter 接入。",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && git diff --check",
+        "timeout_seconds": 1500
+      }
+    },
+    {
+      "id": "task-002a",
+      "priority": "P0",
+      "status": "completed",
+      "title": "共享画布 core 首批抽取：几何、命中、交互会话、基础图层脱离 Brain 命名",
+      "depends_on": [
+        "task-001"
+      ],
+      "scope": [
+        "src/components/editor/graph/tools/**",
+        "src/components/editor/graph/interaction/**",
+        "src/components/editor/graph/TopologyCanvasSurface.tsx",
+        "src/components/editor/graph/TopologyNodeLayer.tsx",
+        "src/components/editor/graph/TopologyLinkLayer.tsx",
+        "src/components/editor/graph/useGraphCanvasAssembly.ts",
+        "src/components/editor/graph/GraphTopologyCanvas.tsx"
+      ],
+      "description": "把当前 BrainIR 画布里可复用的几何、命中、场景投影、交互状态机、会话控制和基础图层收口为共享 core，接口改成 capability + callback 风格，不继续携带 Brain 专有命名。",
+      "acceptance": [
+        "共享 core 不依赖 AgentIR、container、neuron、synapse、adapter 等 Brain 语义。",
+        "BrainIR 画布仍按现有行为工作，交互能力不退化。",
+        "core 的输入输出接口可以被 BodyIR 复用，而不是只能服务 BrainIR。"
+      ],
+      "self_review": [
+        "检查是否只是移动文件或换名转发，没有真实减少 Brain 语义侵入。",
+        "检查 core 接口是否仍要求调用方提供 Brain 特有概念。"
+      ],
+      "delegation": "可委派一个 worker 在共享 core 范围内完成抽取；主代理负责验收与接口收口。",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && git diff --check",
+        "timeout_seconds": 1500
+      }
+    },
+    {
+      "id": "task-002b",
+      "priority": "P0",
+      "status": "completed",
+      "title": "BodyIR 画布接入 shared core：收口场景投影与画布交互壳",
+      "depends_on": [
+        "task-002a"
+      ],
+      "scope": [
+        "src/components/editor/BodyMappingPanel.tsx",
+        "src/components/editor/graph/body/**",
+        "src/components/editor/graph/**"
+      ],
+      "description": "把 BodyIR 画布从 BodyMappingPanel 中拆出 scene adapter 和 canvas 容器，复用 shared core 的画布交互壳；BodyMappingPanel 只保留 BodyIR 领域状态与编辑命令。",
+      "acceptance": [
+        "BodyIR 画布不再在 BodyMappingPanel 中内联 scene/右键菜单/画布渲染大段逻辑。",
+        "共享层只负责画布交互与渲染壳，Body adapter 负责 endpoint/mapping 投影和编辑命令。",
+        "BodyIR 当前选择、右键编辑、应用/重置行为保持一致。"
+      ],
+      "self_review": [
+        "检查 BodyIR 是否仍保留第二套独立画布交互状态机。",
+        "检查 Body adapter 是否错误吸收了共享层本该承担的几何/交互逻辑。"
+      ],
+      "delegation": "可委派一个 worker 在 BodyIR 相关文件内完成 adapter 化接入；主代理负责在共享接口上集成验收。",
       "validation": {
         "command": "npm run type-check && npm run test:domain && git diff --check",
         "timeout_seconds": 1500
@@ -160,5 +222,5 @@
     "每完成一个阶段都应先自审，再决定是否追加新任务或拆分现有任务。",
     "完成标准遵循 AGENTS.md：不以能跑为准，不在当前范围内制造已知返工。"
   ],
-  "last_updated": "2026-05-26T10:45:00Z"
+  "last_updated": "2026-05-26T12:40:00Z"
 }
