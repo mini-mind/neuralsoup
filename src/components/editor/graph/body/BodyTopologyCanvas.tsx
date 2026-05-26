@@ -16,10 +16,14 @@ interface BodyTopologyCanvasProps {
   model: BodyCanvasModel;
   selectedDirection: 'input' | 'output' | null;
   selectedEndpointId: string | null;
+  highlightedNodeIds?: string[];
+  highlightedMappingIds?: string[];
   capabilities?: Pick<SharedCanvasCapabilities, 'canCreateNodeAtCanvasContext' | 'canAggregateSelection'>;
   onCanvasSessionChange?: (nextSession: GraphCanvasSessionState) => void;
   onSelectionChange: (selection: BodyCanvasSelection) => void;
   onContextEditSelection: (selection: Exclude<BodyCanvasSelection, null>) => void;
+  onDeleteLinkSelection?: (selection: Extract<BodyCanvasSelection, { kind: 'link' }>) => void;
+  onBindNodeSelectionToEndpoint?: (selection: Extract<BodyCanvasSelection, { kind: 'node' }>) => void;
   beforeScene?: React.ReactNode;
 }
 
@@ -38,10 +42,14 @@ const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
   model,
   selectedDirection,
   selectedEndpointId,
+  highlightedNodeIds = [],
+  highlightedMappingIds = [],
   capabilities = sharedCapabilities,
   onCanvasSessionChange,
   onSelectionChange,
   onContextEditSelection,
+  onDeleteLinkSelection,
+  onBindNodeSelectionToEndpoint,
   beforeScene,
 }) => {
   const surfaceRef = useRef<HTMLDivElement>(null);
@@ -54,6 +62,8 @@ const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
       .filter((node) => node.direction === selectedDirection && node.relatedEndpointIds.includes(selectedEndpointId))
       .map((node) => node.id);
   }, [model.nodes, selectedDirection, selectedEndpointId]);
+  const highlightedNodeIdSet = useMemo(() => new Set(highlightedNodeIds), [highlightedNodeIds]);
+  const highlightedMappingIdSet = useMemo(() => new Set(highlightedMappingIds), [highlightedMappingIds]);
   const selectedNodeIdSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
   const [linkContextSelection, setLinkContextSelection] = useState<Exclude<BodyCanvasSelection, null> | null>(null);
   const [linkContextPosition, setLinkContextPosition] = useState<{ x: number; y: number } | null>(null);
@@ -95,7 +105,7 @@ const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
       },
       onSelectionBoxStart: () => undefined,
       onSelectionBoxUpdate: (_point, intersectedNodeIds) => {
-        const candidateNode = model.nodes.find((node) => intersectedNodeIds.includes(node.id) && node.relatedEndpointIds.length > 0);
+        const candidateNode = model.nodes.find((node) => intersectedNodeIds.includes(node.id));
         if (!candidateNode) {
           onSelectionChange(null);
           return;
@@ -103,7 +113,7 @@ const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
         onSelectionChange({
           kind: 'node',
           direction: candidateNode.direction,
-          endpointId: candidateNode.relatedEndpointIds[0],
+          endpointId: candidateNode.relatedEndpointIds[0] ?? '',
           nodeId: candidateNode.id,
         });
       },
@@ -120,20 +130,20 @@ const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
       onNodePositionsPersist: () => undefined,
       onNodeSelect: (nodeId, options) => {
         const node = model.nodeById.get(nodeId);
-        if (!node || node.relatedEndpointIds.length === 0) {
+        if (!node) {
           return;
         }
         if (!options?.additive) {
           onSelectionChange({
             kind: 'node',
             direction: node.direction,
-            endpointId: node.relatedEndpointIds[0],
+            endpointId: node.relatedEndpointIds[0] ?? '',
             nodeId: node.id,
           });
         }
       },
       onNodesSelect: (nodeIds) => {
-        const node = model.nodes.find((candidate) => nodeIds.includes(candidate.id) && candidate.relatedEndpointIds.length > 0);
+        const node = model.nodes.find((candidate) => nodeIds.includes(candidate.id));
         if (!node) {
           onSelectionChange(null);
           return;
@@ -141,7 +151,7 @@ const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
         onSelectionChange({
           kind: 'node',
           direction: node.direction,
-          endpointId: node.relatedEndpointIds[0],
+          endpointId: node.relatedEndpointIds[0] ?? '',
           nodeId: node.id,
         });
       },
@@ -213,14 +223,14 @@ const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
                     return;
                   }
                   const node = model.nodeById.get(sourceNodeId);
-                  if (!node || node.relatedEndpointIds.length === 0) {
+                  if (!node) {
                     session.closeContextMenu();
                     return;
                   }
                   onContextEditSelection({
                     kind: 'node',
                     direction: node.direction,
-                    endpointId: node.relatedEndpointIds[0],
+                    endpointId: node.relatedEndpointIds[0] ?? '',
                     nodeId: node.id,
                   });
                   session.closeContextMenu();
@@ -230,6 +240,36 @@ const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
               >
                 编辑所选节点的端点
               </button>
+              {linkContextSelection?.kind === 'link' && onDeleteLinkSelection ? (
+                <button
+                  type="button"
+                  className="topology-context-menu-item"
+                  data-testid="body-mapping-context-delete-link"
+                  onClick={() => {
+                    onDeleteLinkSelection(linkContextSelection);
+                    setLinkContextSelection(null);
+                    setLinkContextPosition(null);
+                    session.closeContextMenu();
+                  }}
+                >
+                  删除映射连线
+                </button>
+              ) : null}
+              {linkContextSelection?.kind === 'node' && onBindNodeSelectionToEndpoint ? (
+                <button
+                  type="button"
+                  className="topology-context-menu-item"
+                  data-testid="body-mapping-context-bind-node"
+                  onClick={() => {
+                    onBindNodeSelectionToEndpoint(linkContextSelection);
+                    setLinkContextSelection(null);
+                    setLinkContextPosition(null);
+                    session.closeContextMenu();
+                  }}
+                >
+                  绑定到当前端点
+                </button>
+              ) : null}
             </div>
           ) : null}
         </>
@@ -257,7 +297,9 @@ const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
           fromNodeId: link.fromNodeId,
           toNodeId: link.toNodeId,
           label: link.label,
-          selected: selectedDirection === link.direction && selectedEndpointId === link.endpointId,
+          selected:
+            (selectedDirection === link.direction && selectedEndpointId === link.endpointId) ||
+            highlightedMappingIdSet.has(link.mappingId),
           onClick: () =>
             {
               setLinkContextSelection(null);
@@ -301,14 +343,27 @@ const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
           y: node.sceneY,
           width: node.width,
           height: node.height,
-          className: `body-topology-node topology-node is-leaf ${selectedNodeIdSet.has(node.id) ? 'is-selected' : ''}`,
+          className: `body-topology-node topology-node is-leaf ${
+            selectedNodeIdSet.has(node.id) || highlightedNodeIdSet.has(node.id) ? 'is-selected' : ''
+          }`,
           title: node.detail,
           dataTestId: `body-topology-node-${node.id}`,
           asButton: true,
           onMouseDown: (event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>) =>
             session.handleNodeMouseDown(event as React.MouseEvent<HTMLDivElement>, node.id),
-          onContextMenu: (event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>) =>
-            session.handleNodeContextMenu(event as React.MouseEvent<HTMLDivElement>),
+          onContextMenu: (event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>) => {
+            session.handleNodeContextMenu(event as React.MouseEvent<HTMLDivElement>);
+            setLinkContextSelection({
+              kind: 'node',
+              direction: node.direction,
+              endpointId: node.relatedEndpointIds[0] ?? '',
+              nodeId: node.id,
+            });
+            setLinkContextPosition({
+              x: event.clientX,
+              y: event.clientY,
+            });
+          },
           content: (
             <>
               <span className="topology-node-shape topology-node-dot" />

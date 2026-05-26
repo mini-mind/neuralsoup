@@ -225,10 +225,15 @@ export const useAgentWorkspaceCoordinator = ({
 
   const bodyEndpointValidation = useMemo<BodyIRValidationMessage[]>(() => {
     return bodyEndpointPreviewModel.issues.map((issue) => ({
+      code: issue.code,
       level: issue.kind === 'compile-error' || issue.kind === 'conflict' ? 'error' : 'warning',
       message: issue.message,
       scope: issue.scope === 'input' ? 'input-endpoint' : 'output-endpoint',
       endpointId: issue.endpointId,
+      nodeId: issue.nodeId,
+      relatedMappingIds: issue.relatedMappingIds,
+      resolved: issue.resolved,
+      target: issue.target,
       endpointIndex:
         issue.scope === 'input'
           ? draftAgentDocument.body.inputEndpoints.findIndex(

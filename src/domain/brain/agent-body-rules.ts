@@ -10,6 +10,16 @@ import type { WorldInputBinding, WorldOutputBinding, WorldRegistry } from './wor
 
 export type AgentBodyEndpointScope = 'input' | 'output';
 export type AgentBodyEndpointIssueKind = 'compile-error' | 'conflict' | 'unmatched';
+export type AgentBodyEndpointIssueCode =
+  | 'body-input-node-unmapped'
+  | 'body-input-node-multi-mapped'
+  | 'body-input-mapping-endpoint-missing'
+  | 'body-input-endpoint-source-unsupported'
+  | 'body-output-node-unmapped'
+  | 'body-output-node-multi-mapped'
+  | 'body-output-mapping-endpoint-missing'
+  | 'body-output-endpoint-target-unsupported'
+  | 'body-output-target-conflict';
 
 export interface AgentBodyEndpointPreviewItem {
   nodeId: string;
@@ -24,6 +34,7 @@ export interface AgentBodyEndpointPreviewGroup {
 }
 
 export interface AgentBodyEndpointIssueSummaryItem {
+  code: AgentBodyEndpointIssueCode;
   scope: AgentBodyEndpointScope;
   kind: AgentBodyEndpointIssueKind;
   message: string;
@@ -150,6 +161,7 @@ const resolveBodyInputMappings = (
 
     if (matches.length === 0) {
       issues.push({
+        code: 'body-input-node-unmapped',
         scope: 'input',
         kind: 'unmatched',
         nodeId,
@@ -161,6 +173,7 @@ const resolveBodyInputMappings = (
     if (matches.length > 1) {
       const relatedMappingIds = matches.map((mapping) => mapping.id);
       issues.push({
+        code: 'body-input-node-multi-mapped',
         scope: 'input',
         kind: 'conflict',
         nodeId,
@@ -176,6 +189,7 @@ const resolveBodyInputMappings = (
     const endpoint = endpointById.get(mapping.endpointId);
     if (!endpoint) {
       issues.push({
+        code: 'body-input-mapping-endpoint-missing',
         scope: 'input',
         kind: 'compile-error',
         endpointId: mapping.endpointId,
@@ -196,6 +210,7 @@ const resolveBodyInputMappings = (
     const parsed = parseBodyInputSource(nodeId, binding, endpoint.scale);
     if (!parsed) {
       issues.push({
+        code: 'body-input-endpoint-source-unsupported',
         scope: 'input',
         kind: 'compile-error',
         endpointId: endpoint.id,
@@ -248,6 +263,7 @@ const resolveBodyOutputMappings = (
 
     if (matches.length === 0) {
       issues.push({
+        code: 'body-output-node-unmapped',
         scope: 'output',
         kind: 'unmatched',
         nodeId,
@@ -259,6 +275,7 @@ const resolveBodyOutputMappings = (
     if (matches.length > 1) {
       const relatedMappingIds = matches.map((mapping) => mapping.id);
       issues.push({
+        code: 'body-output-node-multi-mapped',
         scope: 'output',
         kind: 'conflict',
         nodeId,
@@ -274,6 +291,7 @@ const resolveBodyOutputMappings = (
     const endpoint = endpointById.get(mapping.endpointId);
     if (!endpoint) {
       issues.push({
+        code: 'body-output-mapping-endpoint-missing',
         scope: 'output',
         kind: 'compile-error',
         endpointId: mapping.endpointId,
@@ -294,6 +312,7 @@ const resolveBodyOutputMappings = (
     const parsed = parseBodyOutputTarget(nodeId, binding, endpoint.decayPerSecond);
     if (!parsed) {
       issues.push({
+        code: 'body-output-endpoint-target-unsupported',
         scope: 'output',
         kind: 'compile-error',
         endpointId: endpoint.id,
@@ -307,6 +326,7 @@ const resolveBodyOutputMappings = (
     const existingNodeId = targetToNodeId.get(parsed.target);
     if (existingNodeId && existingNodeId !== nodeId) {
       issues.push({
+        code: 'body-output-target-conflict',
         scope: 'output',
         kind: 'conflict',
         nodeId,

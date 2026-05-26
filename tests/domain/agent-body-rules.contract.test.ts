@@ -243,6 +243,7 @@ test('buildAgentBodyEndpointPreviewModel summarizes missing endpoint references 
   assert.equal(
     preview.issues.some(
       (issue) =>
+        issue.code === 'body-input-mapping-endpoint-missing' &&
         issue.scope === 'input' &&
         issue.kind === 'compile-error' &&
         issue.endpointId === 'missing-input-endpoint' &&
@@ -254,6 +255,7 @@ test('buildAgentBodyEndpointPreviewModel summarizes missing endpoint references 
   assert.equal(
     preview.issues.some(
       (issue) =>
+        issue.code === 'body-input-endpoint-source-unsupported' &&
         issue.scope === 'input' &&
         issue.kind === 'compile-error' &&
         issue.endpointId === 'unsupported-input-endpoint' &&
@@ -265,6 +267,7 @@ test('buildAgentBodyEndpointPreviewModel summarizes missing endpoint references 
   assert.equal(
     preview.issues.some(
       (issue) =>
+        issue.code === 'body-output-mapping-endpoint-missing' &&
         issue.scope === 'output' &&
         issue.kind === 'compile-error' &&
         issue.endpointId === 'missing-output-endpoint' &&
@@ -276,6 +279,7 @@ test('buildAgentBodyEndpointPreviewModel summarizes missing endpoint references 
   assert.equal(
     preview.issues.some(
       (issue) =>
+        issue.code === 'body-output-endpoint-target-unsupported' &&
         issue.scope === 'output' &&
         issue.kind === 'compile-error' &&
         issue.endpointId === 'unsupported-output-endpoint' &&
@@ -403,6 +407,7 @@ test('buildAgentBodyEndpointPreviewModel summarizes duplicate mappings, duplicat
   assert.equal(
     preview.issues.some(
       (issue) =>
+        issue.code === 'body-input-node-multi-mapped' &&
         issue.scope === 'input' &&
         issue.kind === 'conflict' &&
         issue.nodeId === 'sensor-G-2' &&
@@ -414,6 +419,7 @@ test('buildAgentBodyEndpointPreviewModel summarizes duplicate mappings, duplicat
   assert.equal(
     preview.issues.some(
       (issue) =>
+        issue.code === 'body-input-node-unmapped' &&
         issue.scope === 'input' &&
         issue.kind === 'unmatched' &&
         issue.nodeId === 'vision-G-2'
@@ -423,6 +429,7 @@ test('buildAgentBodyEndpointPreviewModel summarizes duplicate mappings, duplicat
   assert.equal(
     preview.issues.some(
       (issue) =>
+        issue.code === 'body-output-node-multi-mapped' &&
         issue.scope === 'output' &&
         issue.kind === 'conflict' &&
         issue.nodeId === 'effector-move-forward' &&
@@ -434,6 +441,7 @@ test('buildAgentBodyEndpointPreviewModel summarizes duplicate mappings, duplicat
   assert.equal(
     preview.issues.some(
       (issue) =>
+        issue.code === 'body-output-target-conflict' &&
         issue.scope === 'output' &&
         issue.kind === 'conflict' &&
         issue.nodeId === 'effector-turn-left' &&
@@ -444,6 +452,7 @@ test('buildAgentBodyEndpointPreviewModel summarizes duplicate mappings, duplicat
   assert.equal(
     preview.issues.some(
       (issue) =>
+        issue.code === 'body-output-node-unmapped' &&
         issue.scope === 'output' &&
         issue.kind === 'unmatched' &&
         issue.nodeId === 'effector-turn-right'

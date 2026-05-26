@@ -128,7 +128,7 @@
     {
       "id": "task-003",
       "priority": "P1",
-      "status": "pending",
+      "status": "completed",
       "title": "BodyIR 编辑器升格：把世界端口到 body 映射建成一等拓扑画布",
       "depends_on": [
         "task-002"
@@ -153,6 +153,65 @@
       "validation": {
         "command": "npm run type-check && npm run test:domain && git diff --check",
         "timeout_seconds": 1200
+      }
+    },
+    {
+      "id": "task-003a",
+      "priority": "P1",
+      "status": "completed",
+      "title": "BodyIR 领域/类型基线：结构化诊断与编辑命令契约收口",
+      "depends_on": [
+        "task-002"
+      ],
+      "scope": [
+        "src/domain/brain/**",
+        "src/components/editor/types.ts",
+        "src/components/hooks/useAgentWorkspaceCoordinator.ts",
+        "tests/domain/**"
+      ],
+      "description": "把 BodyIR 编辑期约束从运行期解析报错中收口出来，形成结构化诊断、可复用的编辑命令契约和更强的 UI 诊断类型，为后续 Body 画布直编提供稳定基线。",
+      "acceptance": [
+        "BodyIR 诊断包含稳定 code 和可定位字段，而不只是 message 文本。",
+        "常见 BodyIR 编辑动作存在领域级原子操作或等价契约，不再要求 UI 直接拼数组。",
+        "相关领域测试覆盖 conflict/unmatched/compile-error 和编辑命令边界。"
+      ],
+      "self_review": [
+        "检查是否把 UI 偶发需求硬编码进领域层，导致契约反向依赖界面。",
+        "检查新增类型是否真正被 workspace/Body editor 消费，而不是悬空。"
+      ],
+      "delegation": "可委派一个 worker 负责 domain/types/tests；主代理负责验收和后续 UI 接线判断。",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && git diff --check",
+        "timeout_seconds": 1500
+      }
+    },
+    {
+      "id": "task-003b",
+      "priority": "P1",
+      "status": "completed",
+      "title": "BodyIR 画布直编最小集：映射删改与画布诊断联动",
+      "depends_on": [
+        "task-003a"
+      ],
+      "scope": [
+        "src/components/editor/BodyMappingPanel.tsx",
+        "src/components/editor/graph/body/**",
+        "src/components/editor/types.ts"
+      ],
+      "description": "在结构化诊断和编辑命令契约稳定后，把 BodyIR 画布升级为最小可直编拓扑图，优先支持 link 删除、节点到 endpoint 的绑定/改绑与诊断高亮。",
+      "acceptance": [
+        "Body 画布可直接完成最小映射编辑，而不完全依赖表单输入。",
+        "画布中的冲突和无效映射能定位到具体节点/连线。",
+        "Apply/Reset 与画布直编状态保持一致，不引入旁路真源。"
+      ],
+      "self_review": [
+        "检查是否为了直编又引入第三套 BodyIR 状态来源。",
+        "检查最小直编是否只覆盖 happy path，忽略冲突和撤销边界。"
+      ],
+      "delegation": "可委派一个 worker 负责 Body 画布直编最小集，主代理负责集成验收。",
+      "validation": {
+        "command": "npm run type-check && npm run test:domain && git diff --check",
+        "timeout_seconds": 1500
       }
     },
     {
@@ -222,5 +281,5 @@
     "每完成一个阶段都应先自审，再决定是否追加新任务或拆分现有任务。",
     "完成标准遵循 AGENTS.md：不以能跑为准，不在当前范围内制造已知返工。"
   ],
-  "last_updated": "2026-05-26T12:40:00Z"
+  "last_updated": "2026-05-26T14:20:00Z"
 }

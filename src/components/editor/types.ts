@@ -5,11 +5,25 @@ export interface AgentParameters {
 }
 
 export interface BodyIRValidationMessage {
+  code:
+    | 'body-input-node-unmapped'
+    | 'body-input-node-multi-mapped'
+    | 'body-input-mapping-endpoint-missing'
+    | 'body-input-endpoint-source-unsupported'
+    | 'body-output-node-unmapped'
+    | 'body-output-node-multi-mapped'
+    | 'body-output-mapping-endpoint-missing'
+    | 'body-output-endpoint-target-unsupported'
+    | 'body-output-target-conflict';
   level: 'error' | 'warning' | 'info';
   message: string;
   scope?: 'body' | 'input-endpoint' | 'output-endpoint';
   endpointId?: string;
   endpointIndex?: number;
+  nodeId?: string;
+  relatedMappingIds?: string[];
+  resolved?: string;
+  target?: string;
 }
 
 export interface BodyIRInputPreviewItem {

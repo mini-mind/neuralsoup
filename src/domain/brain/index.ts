@@ -6,5 +6,6 @@ export * from './agent-reconcile';
 export * from './agent-summary';
 export * from './agent-step';
 export * from './agent-body-rules';
+export * from './agent-body-edit';
 export * from './world-registry';
 export * from './brain-structural-preflight';

@@ -1,3 +1,4 @@
+import { resolveAgentBodyEndpointIds } from '../../../../domain/brain';
 import type { AgentIR, BodyIR, WorldRegistry } from '../../../../domain/brain';
 import type { TopologyLinkSceneNode } from '../TopologyLinkLayer';
 
@@ -124,8 +125,15 @@ export const buildBodyCanvasModel = (agent: AgentIR, body: BodyIR, worldRegistry
     ];
   });
 
-  const bodyInputNodeIds = dedupeSorted(inputRows.map((row) => row.nodeId));
-  const bodyOutputNodeIds = dedupeSorted(outputRows.map((row) => row.nodeId));
+  const resolvedEndpointIds = resolveAgentBodyEndpointIds(agent, worldRegistry);
+  const bodyInputNodeIds = dedupeSorted([
+    ...resolvedEndpointIds.bodyInputNodeIds,
+    ...inputRows.map((row) => row.nodeId),
+  ]);
+  const bodyOutputNodeIds = dedupeSorted([
+    ...resolvedEndpointIds.bodyOutputNodeIds,
+    ...outputRows.map((row) => row.nodeId),
+  ]);
   const worldInputSignals = dedupeSorted(inputRows.map((row) => row.resolvedSource));
   const worldOutputSignals = dedupeSorted(outputRows.map((row) => row.resolvedTarget));
 

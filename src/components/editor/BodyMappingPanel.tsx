@@ -8,13 +8,10 @@ import type {
   BodyOutputMappingIR,
   WorldRegistry,
 } from '../../domain/brain';
+import { mutateBodyIR } from '../../domain/brain';
 import BodyTopologyCanvas from './graph/body/BodyTopologyCanvas';
 import { buildBodyCanvasModel } from './graph/body/bodySceneAdapter';
-import type {
-  BodyIRDraftStatus,
-  BodyIRPreviewData,
-  BodyIRValidationMessage,
-} from './types';
+import type { BodyIRDraftStatus, BodyIRPreviewData, BodyIRValidationMessage } from './types';
 
 interface BodyMappingPanelProps {
   agent: AgentIR;
@@ -94,9 +91,7 @@ const updateInputEndpointById = (
   updater: (endpoint: BodyInputEndpointIR) => BodyInputEndpointIR
 ): BodyIR => ({
   ...body,
-  inputEndpoints: body.inputEndpoints.map((endpoint) =>
-    endpoint.id === endpointId ? updater(endpoint) : endpoint
-  ),
+  inputEndpoints: body.inputEndpoints.map((endpoint) => (endpoint.id === endpointId ? updater(endpoint) : endpoint)),
 });
 
 const updateOutputEndpointById = (
@@ -105,9 +100,7 @@ const updateOutputEndpointById = (
   updater: (endpoint: BodyOutputEndpointIR) => BodyOutputEndpointIR
 ): BodyIR => ({
   ...body,
-  outputEndpoints: body.outputEndpoints.map((endpoint) =>
-    endpoint.id === endpointId ? updater(endpoint) : endpoint
-  ),
+  outputEndpoints: body.outputEndpoints.map((endpoint) => (endpoint.id === endpointId ? updater(endpoint) : endpoint)),
 });
 
 const parseNumber = (value: string, fallback: number): number => {
@@ -135,19 +128,11 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
       setSelectedEndpoint(getDefaultSelectedEndpoint(body));
       return;
     }
-
-    if (
-      selectedEndpoint.kind === 'input' &&
-      !body.inputEndpoints.some((endpoint) => endpoint.id === selectedEndpoint.endpointId)
-    ) {
+    if (selectedEndpoint.kind === 'input' && !body.inputEndpoints.some((endpoint) => endpoint.id === selectedEndpoint.endpointId)) {
       setSelectedEndpoint(getDefaultSelectedEndpoint(body));
       return;
     }
-
-    if (
-      selectedEndpoint.kind === 'output' &&
-      !body.outputEndpoints.some((endpoint) => endpoint.id === selectedEndpoint.endpointId)
-    ) {
+    if (selectedEndpoint.kind === 'output' && !body.outputEndpoints.some((endpoint) => endpoint.id === selectedEndpoint.endpointId)) {
       setSelectedEndpoint(getDefaultSelectedEndpoint(body));
     }
   }, [body, selectedEndpoint]);
@@ -156,19 +141,16 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
     if (!editorOpen) {
       return;
     }
-
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setEditorOpen(false);
       }
     };
-
     window.addEventListener('keydown', handleEscape);
-    return () => {
-      window.removeEventListener('keydown', handleEscape);
-    };
+    return () => window.removeEventListener('keydown', handleEscape);
   }, [editorOpen]);
 
+  const canvasModel = useMemo(() => buildBodyCanvasModel(agent, body, worldRegistry), [agent, body, worldRegistry]);
   const inputEndpointIdToIndex = useMemo(
     () => new Map(body.inputEndpoints.map((endpoint, index) => [endpoint.id, index])),
     [body.inputEndpoints]
@@ -177,12 +159,10 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
     () => new Map(body.outputEndpoints.map((endpoint, index) => [endpoint.id, index])),
     [body.outputEndpoints]
   );
-  const selectedInputEndpoint = selectedEndpoint?.kind === 'input'
-    ? body.inputEndpoints.find((endpoint) => endpoint.id === selectedEndpoint.endpointId) ?? null
-    : null;
-  const selectedOutputEndpoint = selectedEndpoint?.kind === 'output'
-    ? body.outputEndpoints.find((endpoint) => endpoint.id === selectedEndpoint.endpointId) ?? null
-    : null;
+  const selectedInputEndpoint =
+    selectedEndpoint?.kind === 'input' ? body.inputEndpoints.find((endpoint) => endpoint.id === selectedEndpoint.endpointId) ?? null : null;
+  const selectedOutputEndpoint =
+    selectedEndpoint?.kind === 'output' ? body.outputEndpoints.find((endpoint) => endpoint.id === selectedEndpoint.endpointId) ?? null : null;
   const selectedInputEndpointIndex = selectedInputEndpoint ? inputEndpointIdToIndex.get(selectedInputEndpoint.id) ?? -1 : -1;
   const selectedOutputEndpointIndex = selectedOutputEndpoint ? outputEndpointIdToIndex.get(selectedOutputEndpoint.id) ?? -1 : -1;
 
@@ -190,49 +170,65 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
     if (!selectedEndpoint) {
       return validation;
     }
-
     return validation.filter(
       (item) =>
         item.scope === 'body' ||
-        (selectedEndpoint.kind === 'input' &&
-          item.scope === 'input-endpoint' &&
-          item.endpointId === selectedEndpoint.endpointId) ||
-        (selectedEndpoint.kind === 'output' &&
-          item.scope === 'output-endpoint' &&
-          item.endpointId === selectedEndpoint.endpointId)
+        (selectedEndpoint.kind === 'input' && item.scope === 'input-endpoint' && item.endpointId === selectedEndpoint.endpointId) ||
+        (selectedEndpoint.kind === 'output' && item.scope === 'output-endpoint' && item.endpointId === selectedEndpoint.endpointId)
     );
   }, [selectedEndpoint, validation]);
 
-  const canvasModel = useMemo(() => buildBodyCanvasModel(agent, body, worldRegistry), [agent, body, worldRegistry]);
-
-  const handleApplyAndClose = () => {
-    onApply();
-    setEditorOpen(false);
-  };
+  const highlightedMappingIds = useMemo(
+    () => [...new Set(selectedValidation.flatMap((item) => item.relatedMappingIds ?? []))],
+    [selectedValidation]
+  );
+  const highlightedNodeIds = useMemo(() => {
+    const nodeIds = new Set<string>();
+    selectedValidation.forEach((item) => {
+      if (item.nodeId && item.nodeId.trim()) {
+        const rawNodeId = item.nodeId.trim();
+        if (item.code.startsWith('body-input-')) {
+          nodeIds.add(`body-input:${rawNodeId}`);
+        } else if (item.code.startsWith('body-output-')) {
+          nodeIds.add(`body-output:${rawNodeId}`);
+        }
+      }
+    });
+    canvasModel.links.forEach((link) => {
+      if (highlightedMappingIds.includes(link.mappingId)) {
+        nodeIds.add(link.fromNodeId);
+        nodeIds.add(link.toNodeId);
+      }
+    });
+    return [...nodeIds];
+  }, [canvasModel.links, highlightedMappingIds, selectedValidation]);
 
   const selectedDirection = selectedEndpoint?.kind ?? null;
   const selectedEndpointId = selectedEndpoint?.endpointId ?? null;
-  const selectedLinkDetail = selection?.kind === 'link'
-    ? canvasModel.links.find((link) => link.id === selection.linkId) ?? null
-    : null;
-  const selectedNodeDetail = selection?.kind === 'node'
-    ? canvasModel.nodes.find((node) => node.id === selection.nodeId) ?? null
-    : null;
+  const selectedLinkDetail = selection?.kind === 'link' ? canvasModel.links.find((link) => link.id === selection.linkId) ?? null : null;
+  const selectedNodeDetail = selection?.kind === 'node' ? canvasModel.nodes.find((node) => node.id === selection.nodeId) ?? null : null;
 
   const selectedInputMappings =
     selectedInputEndpoint == null
       ? []
       : body.mappings.filter(
-          (mapping): mapping is BodyInputMappingIR =>
-            mapping.kind === 'input' && mapping.endpointId === selectedInputEndpoint.id
+          (mapping): mapping is BodyInputMappingIR => mapping.kind === 'input' && mapping.endpointId === selectedInputEndpoint.id
         );
   const selectedOutputMappings =
     selectedOutputEndpoint == null
       ? []
       : body.mappings.filter(
-          (mapping): mapping is BodyOutputMappingIR =>
-            mapping.kind === 'output' && mapping.endpointId === selectedOutputEndpoint.id
+          (mapping): mapping is BodyOutputMappingIR => mapping.kind === 'output' && mapping.endpointId === selectedOutputEndpoint.id
         );
+  const syncSelection = (nextSelection: BodySelection, options?: { openEditor?: boolean }) => {
+    setSelection(nextSelection);
+    if (nextSelection?.endpointId) {
+      setSelectedEndpoint({ kind: nextSelection.direction, endpointId: nextSelection.endpointId });
+    }
+    if (options?.openEditor) {
+      setEditorOpen(true);
+    }
+  };
 
   return (
     <div className="body-mapping-panel" data-testid="body-mapping-panel">
@@ -247,38 +243,52 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
           model={canvasModel}
           selectedDirection={selectedDirection}
           selectedEndpointId={selectedEndpointId}
-          onSelectionChange={(nextSelection) => {
-            setSelection(nextSelection);
-            if (nextSelection) {
-              setSelectedEndpoint({ kind: nextSelection.direction, endpointId: nextSelection.endpointId });
-            }
+          highlightedNodeIds={highlightedNodeIds}
+          highlightedMappingIds={highlightedMappingIds}
+          onSelectionChange={(nextSelection) => syncSelection(nextSelection)}
+          onContextEditSelection={(nextSelection) => syncSelection(nextSelection, { openEditor: true })}
+          onDeleteLinkSelection={(linkSelection) => {
+            onBodyChange((current) => mutateBodyIR(current, [{ type: 'mapping.remove', mappingId: linkSelection.mappingId }]).body);
           }}
-          onContextEditSelection={(nextSelection) => {
-            setSelection(nextSelection);
-            setSelectedEndpoint({ kind: nextSelection.direction, endpointId: nextSelection.endpointId });
-            setEditorOpen(true);
+          onBindNodeSelectionToEndpoint={(nodeSelection) => {
+            if (!selectedEndpoint?.endpointId) {
+              return;
+            }
+            if (selectedEndpoint.kind === 'input' && !nodeSelection.nodeId.startsWith('body-input:')) {
+              return;
+            }
+            if (selectedEndpoint.kind === 'output' && !nodeSelection.nodeId.startsWith('body-output:')) {
+              return;
+            }
+            const mapping =
+              selectedEndpoint.kind === 'input'
+                ? ({
+                    id: createMappingId('input'),
+                    kind: 'input',
+                    endpointId: selectedEndpoint.endpointId,
+                    nodeId: nodeSelection.nodeId.replace('body-input:', ''),
+                  } satisfies BodyInputMappingIR)
+                : ({
+                    id: createMappingId('output'),
+                    kind: 'output',
+                    endpointId: selectedEndpoint.endpointId,
+                    nodeId: nodeSelection.nodeId.replace('body-output:', ''),
+                  } satisfies BodyOutputMappingIR);
+            onBodyChange((current) =>
+              mutateBodyIR(current, [
+                { type: 'mapping.replace-for-node', scope: selectedEndpoint.kind, nodeId: mapping.nodeId, mapping },
+              ]).body
+            );
           }}
           beforeScene={
             <div className="body-mapping-floating-actions">
-              <button
-                type="button"
-                className="settings-action-button secondary"
-                onClick={() => setEditorOpen(true)}
-              >
+              <button type="button" className="settings-action-button secondary" onClick={() => setEditorOpen(true)}>
                 端点
               </button>
-              <button
-                type="button"
-                className="settings-action-button"
-                onClick={onApply}
-              >
+              <button type="button" className="settings-action-button" onClick={onApply}>
                 应用
               </button>
-              <button
-                type="button"
-                className="settings-action-button secondary"
-                onClick={onReset}
-              >
+              <button type="button" className="settings-action-button secondary" onClick={onReset}>
                 重置
               </button>
             </div>
@@ -298,22 +308,10 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
       ) : null}
 
       {editorOpen ? (
-        <div
-          className="modal-overlay"
-          data-testid="body-mapping-editor-modal-overlay"
-          onClick={() => setEditorOpen(false)}
-        >
-          <div
-            className="modal-content"
-            data-testid="body-mapping-editor-modal"
-            onClick={(event) => event.stopPropagation()}
-          >
+        <div className="modal-overlay" data-testid="body-mapping-editor-modal-overlay" onClick={() => setEditorOpen(false)}>
+          <div className="modal-content" data-testid="body-mapping-editor-modal" onClick={(event) => event.stopPropagation()}>
             <div className="topology-detail-header">
-              <button
-                type="button"
-                className="topology-detail-close"
-                onClick={() => setEditorOpen(false)}
-              >
+              <button type="button" className="topology-detail-close" onClick={() => setEditorOpen(false)}>
                 关闭
               </button>
             </div>
@@ -343,11 +341,10 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
                   onClick={() =>
                     onBodyChange((current) => {
                       const endpoint = createDefaultInputEndpoint(current);
-                      return {
-                        ...current,
-                        inputEndpoints: [...current.inputEndpoints, endpoint],
-                        mappings: [...current.mappings, createInputMapping(endpoint.id)],
-                      };
+                      return mutateBodyIR(current, [
+                        { type: 'input-endpoint.upsert', endpoint },
+                        { type: 'mapping.upsert', mapping: createInputMapping(endpoint.id) },
+                      ]).body;
                     })
                   }
                 >
@@ -359,28 +356,19 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
                   onClick={() =>
                     onBodyChange((current) => {
                       const endpoint = createDefaultOutputEndpoint(current);
-                      return {
-                        ...current,
-                        outputEndpoints: [...current.outputEndpoints, endpoint],
-                        mappings: [...current.mappings, createOutputMapping(endpoint.id)],
-                      };
+                      return mutateBodyIR(current, [
+                        { type: 'output-endpoint.upsert', endpoint },
+                        { type: 'mapping.upsert', mapping: createOutputMapping(endpoint.id) },
+                      ]).body;
                     })
                   }
                 >
                   新增输出端点
                 </button>
-                <button
-                  type="button"
-                  className="settings-action-button secondary"
-                  onClick={onReset}
-                >
+                <button type="button" className="settings-action-button secondary" onClick={onReset}>
                   重置
                 </button>
-                <button
-                  type="button"
-                  className="settings-action-button"
-                  onClick={handleApplyAndClose}
-                >
+                <button type="button" className="settings-action-button" onClick={() => { onApply(); setEditorOpen(false); }}>
                   应用
                 </button>
               </div>
@@ -392,53 +380,46 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
                     <span>{body.inputEndpoints.length} 项</span>
                   </div>
                   <div className="body-mapping-endpoint-list">
-                    {body.inputEndpoints.map((endpoint, index) => {
-                      const active = selectedEndpoint?.kind === 'input' && selectedEndpoint.endpointId === endpoint.id;
-                      return (
-                        <button
-                          key={endpoint.id}
-                          type="button"
-                          className={`body-mapping-endpoint-item ${active ? 'is-active' : ''}`}
-                          onClick={() => setSelectedEndpoint({ kind: 'input', endpointId: endpoint.id })}
-                        >
-                          <span className="body-mapping-endpoint-item-title">E{index + 1}</span>
-                          <span className="body-mapping-endpoint-item-copy">{endpoint.source}</span>
-                          <span className="body-mapping-endpoint-item-copy">
-                            {body.mappings.filter(
-                              (mapping) => mapping.kind === 'input' && mapping.endpointId === endpoint.id
-                            ).length} 个节点
-                          </span>
-                        </button>
-                      );
-                    })}
+                    {body.inputEndpoints.map((endpoint, index) => (
+                      <button
+                        key={endpoint.id}
+                        type="button"
+                        className={`body-mapping-endpoint-item ${
+                          selectedEndpoint?.kind === 'input' && selectedEndpoint.endpointId === endpoint.id ? 'is-active' : ''
+                        }`}
+                        onClick={() => setSelectedEndpoint({ kind: 'input', endpointId: endpoint.id })}
+                      >
+                        <span className="body-mapping-endpoint-item-title">E{index + 1}</span>
+                        <span className="body-mapping-endpoint-item-copy">{endpoint.source}</span>
+                        <span className="body-mapping-endpoint-item-copy">
+                          {body.mappings.filter((mapping) => mapping.kind === 'input' && mapping.endpointId === endpoint.id).length} 个节点
+                        </span>
+                      </button>
+                    ))}
                   </div>
                 </section>
-
                 <section className="body-mapping-endpoint-list-card">
                   <div className="body-mapping-card-header">
                     <h4>输出端点</h4>
                     <span>{body.outputEndpoints.length} 项</span>
                   </div>
                   <div className="body-mapping-endpoint-list">
-                    {body.outputEndpoints.map((endpoint, index) => {
-                      const active = selectedEndpoint?.kind === 'output' && selectedEndpoint.endpointId === endpoint.id;
-                      return (
-                        <button
-                          key={endpoint.id}
-                          type="button"
-                          className={`body-mapping-endpoint-item ${active ? 'is-active' : ''}`}
-                          onClick={() => setSelectedEndpoint({ kind: 'output', endpointId: endpoint.id })}
-                        >
-                          <span className="body-mapping-endpoint-item-title">E{index + 1}</span>
-                          <span className="body-mapping-endpoint-item-copy">{endpoint.target}</span>
-                          <span className="body-mapping-endpoint-item-copy">
-                            {body.mappings.filter(
-                              (mapping) => mapping.kind === 'output' && mapping.endpointId === endpoint.id
-                            ).length} 个节点
-                          </span>
-                        </button>
-                      );
-                    })}
+                    {body.outputEndpoints.map((endpoint, index) => (
+                      <button
+                        key={endpoint.id}
+                        type="button"
+                        className={`body-mapping-endpoint-item ${
+                          selectedEndpoint?.kind === 'output' && selectedEndpoint.endpointId === endpoint.id ? 'is-active' : ''
+                        }`}
+                        onClick={() => setSelectedEndpoint({ kind: 'output', endpointId: endpoint.id })}
+                      >
+                        <span className="body-mapping-endpoint-item-title">E{index + 1}</span>
+                        <span className="body-mapping-endpoint-item-copy">{endpoint.target}</span>
+                        <span className="body-mapping-endpoint-item-copy">
+                          {body.mappings.filter((mapping) => mapping.kind === 'output' && mapping.endpointId === endpoint.id).length} 个节点
+                        </span>
+                      </button>
+                    ))}
                   </div>
                 </section>
               </div>
@@ -458,7 +439,6 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
                       : '未选择端点'}
                   </span>
                 </div>
-
                 {selectedInputEndpoint ? (
                   <div className="body-mapping-form-grid">
                     <label className="body-mapping-field">
@@ -467,10 +447,12 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
                         value={selectedInputEndpoint.source}
                         onChange={(event) =>
                           onBodyChange((current) =>
-                            updateInputEndpointById(current, selectedInputEndpoint.id, (endpoint) => ({
-                              ...endpoint,
-                              source: event.target.value,
-                            }))
+                            mutateBodyIR(current, [
+                              {
+                                type: 'input-endpoint.upsert',
+                                endpoint: { ...selectedInputEndpoint, source: event.target.value },
+                              },
+                            ]).body
                           )
                         }
                       />
@@ -511,22 +493,16 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
                         <input
                           value={mapping.nodeId}
                           onChange={(event) =>
-                            onBodyChange((current) => ({
-                              ...current,
-                              mappings: current.mappings.map((entry) =>
-                                entry.id === mapping.id ? { ...entry, nodeId: event.target.value } : entry
-                              ),
-                            }))
+                            onBodyChange((current) =>
+                              mutateBodyIR(current, [{ type: 'mapping.upsert', mapping: { ...mapping, nodeId: event.target.value } }]).body
+                            )
                           }
                         />
                         <button
                           type="button"
                           className="settings-action-button secondary"
                           onClick={() =>
-                            onBodyChange((current) => ({
-                              ...current,
-                              mappings: current.mappings.filter((entry) => entry.id !== mapping.id),
-                            }))
+                            onBodyChange((current) => mutateBodyIR(current, [{ type: 'mapping.remove', mappingId: mapping.id }]).body)
                           }
                         >
                           删除映射
@@ -537,10 +513,9 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
                       type="button"
                       className="settings-action-button secondary"
                       onClick={() =>
-                        onBodyChange((current) => ({
-                          ...current,
-                          mappings: [...current.mappings, createInputMapping(selectedInputEndpoint.id)],
-                        }))
+                        onBodyChange((current) =>
+                          mutateBodyIR(current, [{ type: 'mapping.upsert', mapping: createInputMapping(selectedInputEndpoint.id) }]).body
+                        )
                       }
                     >
                       新增映射节点
@@ -549,15 +524,9 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
                       type="button"
                       className="settings-action-button secondary"
                       onClick={() =>
-                        onBodyChange((current) => {
-                          return {
-                            ...current,
-                            inputEndpoints: current.inputEndpoints.filter((endpoint) => endpoint.id !== selectedInputEndpoint.id),
-                            mappings: current.mappings.filter(
-                              (mapping) => !(mapping.kind === 'input' && mapping.endpointId === selectedInputEndpoint.id)
-                            ),
-                          };
-                        })
+                        onBodyChange((current) =>
+                          mutateBodyIR(current, [{ type: 'input-endpoint.remove', endpointId: selectedInputEndpoint.id, pruneMappings: true }]).body
+                        )
                       }
                     >
                       删除输入端点
@@ -571,10 +540,12 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
                         value={selectedOutputEndpoint.target}
                         onChange={(event) =>
                           onBodyChange((current) =>
-                            updateOutputEndpointById(current, selectedOutputEndpoint.id, (endpoint) => ({
-                              ...endpoint,
-                              target: event.target.value,
-                            }))
+                            mutateBodyIR(current, [
+                              {
+                                type: 'output-endpoint.upsert',
+                                endpoint: { ...selectedOutputEndpoint, target: event.target.value },
+                              },
+                            ]).body
                           )
                         }
                       />
@@ -615,22 +586,16 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
                         <input
                           value={mapping.nodeId}
                           onChange={(event) =>
-                            onBodyChange((current) => ({
-                              ...current,
-                              mappings: current.mappings.map((entry) =>
-                                entry.id === mapping.id ? { ...entry, nodeId: event.target.value } : entry
-                              ),
-                            }))
+                            onBodyChange((current) =>
+                              mutateBodyIR(current, [{ type: 'mapping.upsert', mapping: { ...mapping, nodeId: event.target.value } }]).body
+                            )
                           }
                         />
                         <button
                           type="button"
                           className="settings-action-button secondary"
                           onClick={() =>
-                            onBodyChange((current) => ({
-                              ...current,
-                              mappings: current.mappings.filter((entry) => entry.id !== mapping.id),
-                            }))
+                            onBodyChange((current) => mutateBodyIR(current, [{ type: 'mapping.remove', mappingId: mapping.id }]).body)
                           }
                         >
                           删除映射
@@ -641,10 +606,9 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
                       type="button"
                       className="settings-action-button secondary"
                       onClick={() =>
-                        onBodyChange((current) => ({
-                          ...current,
-                          mappings: [...current.mappings, createOutputMapping(selectedOutputEndpoint.id)],
-                        }))
+                        onBodyChange((current) =>
+                          mutateBodyIR(current, [{ type: 'mapping.upsert', mapping: createOutputMapping(selectedOutputEndpoint.id) }]).body
+                        )
                       }
                     >
                       新增映射节点
@@ -653,15 +617,11 @@ const BodyMappingPanel: React.FC<BodyMappingPanelProps> = ({
                       type="button"
                       className="settings-action-button secondary"
                       onClick={() =>
-                        onBodyChange((current) => {
-                          return {
-                            ...current,
-                            outputEndpoints: current.outputEndpoints.filter((endpoint) => endpoint.id !== selectedOutputEndpoint.id),
-                            mappings: current.mappings.filter(
-                              (mapping) => !(mapping.kind === 'output' && mapping.endpointId === selectedOutputEndpoint.id)
-                            ),
-                          };
-                        })
+                        onBodyChange((current) =>
+                          mutateBodyIR(current, [
+                            { type: 'output-endpoint.remove', endpointId: selectedOutputEndpoint.id, pruneMappings: true },
+                          ]).body
+                        )
                       }
                     >
                       删除输出端点
