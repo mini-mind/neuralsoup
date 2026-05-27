@@ -117,6 +117,11 @@ export const rightClickLocator = async (page: Page, selector: string) => {
   await expect(page.locator(selectors.topologyContextMenu)).toBeVisible();
 };
 
+export const rightClickSceneNode = async (page: Page, viewNodeId: string) => {
+  await rightClickAt(page, await getSceneClientPoint(page, await getNodeCenterFromSummary(page, viewNodeId)));
+  await expect(page.locator(selectors.topologyContextMenu)).toBeVisible();
+};
+
 export const rightDragBetweenNodes = async (page: Page, fromSelector: string, toSelector: string) => {
   await dragOnCanvas(page, await getLocatorCenter(page, fromSelector), await getLocatorCenter(page, toSelector), {
     button: 'right',

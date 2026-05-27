@@ -19,7 +19,16 @@ interface BodyTopologyCanvasProps {
   selectedEndpointId: string | null;
   highlightedNodeIds?: string[];
   highlightedMappingIds?: string[];
-  capabilities?: Pick<SharedCanvasCapabilities, 'canCreateNodeAtCanvasContext' | 'canAggregateSelection'>;
+  capabilities?: Pick<
+    SharedCanvasCapabilities,
+    | 'canCreateNodeAtCanvasContext'
+    | 'canCreateSignalAtCanvasContext'
+    | 'canAggregateSelection'
+    | 'canMoveSelectionOutToParent'
+    | 'canUngroupGroupNode'
+    | 'canMoveNodeOutToParent'
+    | 'canMoveSelectionIntoGroup'
+  >;
   onCanvasSessionChange?: (nextSession: GraphCanvasSessionState) => void;
   onSelectionChange: (selection: BodyCanvasSelection) => void;
   onContextEditSelection: (selection: Exclude<BodyCanvasSelection, null>) => void;
@@ -36,8 +45,22 @@ const WORLD_OUTPUT_X = 1160;
 
 const sharedCapabilities = {
   canCreateNodeAtCanvasContext: false,
+  canCreateSignalAtCanvasContext: false,
   canAggregateSelection: true,
-} satisfies Pick<SharedCanvasCapabilities, 'canCreateNodeAtCanvasContext' | 'canAggregateSelection'>;
+  canMoveSelectionOutToParent: false,
+  canUngroupGroupNode: false,
+  canMoveNodeOutToParent: false,
+  canMoveSelectionIntoGroup: false,
+} satisfies Pick<
+  SharedCanvasCapabilities,
+  | 'canCreateNodeAtCanvasContext'
+  | 'canCreateSignalAtCanvasContext'
+  | 'canAggregateSelection'
+  | 'canMoveSelectionOutToParent'
+  | 'canUngroupGroupNode'
+  | 'canMoveNodeOutToParent'
+  | 'canMoveSelectionIntoGroup'
+>;
 
 const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
   model,
@@ -93,6 +116,7 @@ const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
       movable: false,
       local: true,
       previewOnly: true,
+      rootExpandedProjection: false,
       connectableSource: false,
       ungroupable: false,
       contextMenuGroup: false,

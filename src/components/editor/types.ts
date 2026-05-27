@@ -58,6 +58,6 @@ export interface GraphPathItem {
   label: string;
 }
 
-export type EditorTab = 'settings' | 'graph' | 'body';
+export type EditorTab = 'settings' | 'graph';
 
 export type SettingsSection = 'agent-parameters' | 'keyboard-inputs';

@@ -16,7 +16,7 @@ const isExpandedRootGroup = (node: GraphViewNode) =>
 
 const getDefaultDoubleClickIntent = (node: GraphViewNode): GraphNodeDoubleClickIntent => {
   if (node.kind === 'adapter') {
-    return node.adapterNavigable ? 'navigate' : null;
+    return node.adapterNavigable || node.expanded ? 'navigate' : null;
   }
 
   if (node.navigable) {
@@ -68,7 +68,7 @@ export const getGraphNodeInteractionDescriptor = (
     hitArea: 'node',
     dispatchesNodePointer: true,
     titleDragHandleOnly: false,
-    contextMenuGroup: !node.leaf && node.local && !node.proxy && !node.expansionParentId,
+    contextMenuGroup: !node.leaf && node.local && !node.proxy,
     doubleClickIntent: getDefaultDoubleClickIntent(node),
   };
 };

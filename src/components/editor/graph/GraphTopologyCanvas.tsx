@@ -56,12 +56,23 @@ interface GraphTopologyCanvasProps {
   onCloseContextMenu: () => void;
   onAddNeuronAt: (x: number, y: number) => void;
   onAddNeuronGroupAt: (x: number, y: number) => void;
+  onAddInputSignalAt: (x: number, y: number) => void;
+  onAddOutputSignalAt: (x: number, y: number) => void;
   onAggregateSelectedNodes: () => void;
   onUngroupNode: (nodeId: string) => void;
   onToggleGroupExpanded: (nodeId: string) => void;
+  onMoveNodeOutToParent: (nodeId: string) => void;
+  onMoveSelectionIntoGroup: (nodeId: string) => void;
+  onRemoveSelection: () => void;
 }
 
 const formatWeight = (weight: number) => (Number.isInteger(weight) ? `${weight}` : weight.toFixed(2));
+
+interface TopologyContextMenuAction {
+  key: string;
+  label: string;
+  onClick: () => void;
+}
 
 const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
   surfaceRef,
@@ -92,9 +103,14 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
   onCloseContextMenu,
   onAddNeuronAt,
   onAddNeuronGroupAt,
+  onAddInputSignalAt,
+  onAddOutputSignalAt,
   onAggregateSelectedNodes,
   onUngroupNode,
   onToggleGroupExpanded,
+  onMoveNodeOutToParent,
+  onMoveSelectionIntoGroup,
+  onRemoveSelection,
 }) => {
   const findEditableLinkNearClientPoint = useCallback(
     (clientX: number, clientY: number) => {
@@ -180,6 +196,179 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
 
   const pendingNodeIds = interaction?.type === 'linking' ? interaction.sourceNodeIds : [];
   const renderLabel = (link: GraphViewLink): string => (link.aggregate ? `${link.count}` : formatWeight(link.weight));
+  const contextMenuActions = React.useMemo<TopologyContextMenuAction[]>(() => {
+    if (!contextMenu) {
+      return [];
+    }
+
+    if (contextMenu.kind === 'canvas') {
+      const actions: TopologyContextMenuAction[] = [];
+      if (capabilities.canCreateNodeAtCanvasContext) {
+        actions.push({
+          key: 'topology-context-new-neuron',
+          label: '新建神经元',
+          onClick: () => {
+            onAddNeuronAt(contextMenu.scene.x + scene.origin.x, contextMenu.scene.y + scene.origin.y);
+            onCloseContextMenu();
+          },
+        });
+        actions.push({
+          key: 'topology-context-new-group',
+          label: '新建分组',
+          onClick: () => {
+            onAddNeuronGroupAt(contextMenu.scene.x + scene.origin.x, contextMenu.scene.y + scene.origin.y);
+            onCloseContextMenu();
+          },
+        });
+      }
+      if (capabilities.canCreateSignalAtCanvasContext) {
+        actions.push({
+          key: 'topology-context-new-input-signal',
+          label: '新建输入信号',
+          onClick: () => {
+            onAddInputSignalAt(contextMenu.scene.x + scene.origin.x, contextMenu.scene.y + scene.origin.y);
+            onCloseContextMenu();
+          },
+        });
+        actions.push({
+          key: 'topology-context-new-output-signal',
+          label: '新建输出信号',
+          onClick: () => {
+            onAddOutputSignalAt(contextMenu.scene.x + scene.origin.x, contextMenu.scene.y + scene.origin.y);
+            onCloseContextMenu();
+          },
+        });
+      }
+      return actions;
+    }
+
+    if (contextMenu.kind === 'selection') {
+      const actions: TopologyContextMenuAction[] = [];
+      if (contextMenu.selectionMode === 'leaf') {
+        actions.push({
+          key: 'topology-context-edit-node',
+          label: '编辑节点',
+          onClick: () => {
+            const nodeId = contextMenu.nodeIds[0];
+            if (nodeId) {
+              const contextNode = scene.map.get(nodeId);
+              if (contextNode) {
+                onOpenNodeDetail(contextNode.refNodeId);
+              }
+            }
+            onCloseContextMenu();
+          },
+        });
+        actions.push({
+          key: 'topology-context-delete-node',
+          label: '删除节点',
+          onClick: () => {
+            onRemoveSelection();
+            onCloseContextMenu();
+          },
+        });
+      }
+      if (contextMenu.selectionMode === 'selection' && capabilities.canAggregateSelection) {
+        actions.push({
+          key: 'topology-context-aggregate',
+          label: '聚合',
+          onClick: () => {
+            onAggregateSelectedNodes();
+            onCloseContextMenu();
+          },
+        });
+      }
+      if (capabilities.canMoveSelectionOutToParent) {
+        actions.push({
+          key: 'topology-context-move-out',
+          label: '移到上一级',
+          onClick: () => {
+            onMoveNodeOutToParent(contextMenu.nodeIds[0] ?? '');
+            onCloseContextMenu();
+          },
+        });
+      }
+      return actions;
+    }
+
+    const groupNodeId = contextMenu.nodeIds[0];
+    const groupNode = scene.map.get(groupNodeId);
+    const actions: TopologyContextMenuAction[] = [
+      {
+        key: 'topology-context-enter-group',
+        label: '进入组',
+        onClick: () => {
+          onNavigateToNode(groupNodeId);
+          onCloseContextMenu();
+        },
+      },
+      {
+        key: 'topology-context-toggle-group',
+        label: groupNode?.expanded ? '收起' : '展开',
+        onClick: () => {
+          onToggleGroupExpanded(groupNodeId);
+          onCloseContextMenu();
+        },
+      },
+    ];
+
+    if (capabilities.canUngroupGroupNode && groupNode?.kind === 'neuron-group') {
+      actions.push({
+        key: 'topology-context-ungroup',
+        label: '拆开组',
+        onClick: () => {
+          onUngroupNode(groupNodeId);
+          onCloseContextMenu();
+        },
+      });
+    }
+    if (capabilities.canMoveNodeOutToParent) {
+      actions.push({
+        key: 'topology-context-move-out',
+        label: '移到上一级',
+        onClick: () => {
+          onMoveNodeOutToParent(groupNodeId);
+          onCloseContextMenu();
+        },
+      });
+    }
+    if (capabilities.canMoveSelectionIntoGroup) {
+      actions.push({
+        key: 'topology-context-move-into-group',
+        label: '选中项移入此组',
+        onClick: () => {
+          onMoveSelectionIntoGroup(groupNodeId);
+          onCloseContextMenu();
+        },
+      });
+    }
+    return actions;
+  }, [
+    capabilities.canAggregateSelection,
+    capabilities.canCreateNodeAtCanvasContext,
+    capabilities.canCreateSignalAtCanvasContext,
+    capabilities.canMoveNodeOutToParent,
+    capabilities.canMoveSelectionIntoGroup,
+    capabilities.canMoveSelectionOutToParent,
+    capabilities.canUngroupGroupNode,
+    contextMenu,
+    onAddInputSignalAt,
+    onAddNeuronAt,
+    onAddNeuronGroupAt,
+    onAddOutputSignalAt,
+    onAggregateSelectedNodes,
+    onCloseContextMenu,
+    onMoveNodeOutToParent,
+    onMoveSelectionIntoGroup,
+    onNavigateToNode,
+    onOpenNodeDetail,
+    onRemoveSelection,
+    onToggleGroupExpanded,
+    onUngroupNode,
+    scene.map,
+    scene.origin.x,
+    scene.origin.y,
+  ]);
 
   return (
     <TopologyCanvasSurface
@@ -225,73 +414,17 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
               onMouseDown={(event) => event.stopPropagation()}
               onClick={(event) => event.stopPropagation()}
             >
-              {contextMenu.kind === 'canvas' && capabilities.canCreateNodeAtCanvasContext ? (
-                <>
-                  <button
-                    type="button"
-                    className="topology-context-menu-item"
-                    data-testid="topology-context-new-neuron"
-                    onClick={() => {
-                      onAddNeuronAt(contextMenu.scene.x + scene.origin.x, contextMenu.scene.y + scene.origin.y);
-                      onCloseContextMenu();
-                    }}
-                  >
-                    新建神经元
-                  </button>
-                  <button
-                    type="button"
-                    className="topology-context-menu-item"
-                    data-testid="topology-context-new-group"
-                    onClick={() => {
-                      onAddNeuronGroupAt(contextMenu.scene.x + scene.origin.x, contextMenu.scene.y + scene.origin.y);
-                      onCloseContextMenu();
-                    }}
-                  >
-                    新建分组
-                  </button>
-                </>
-              ) : null}
-              {contextMenu.kind === 'selection' && capabilities.canAggregateSelection ? (
+              {contextMenuActions.map((action) => (
                 <button
+                  key={action.key}
                   type="button"
                   className="topology-context-menu-item"
-                  data-testid="topology-context-aggregate"
-                  onClick={() => {
-                    onAggregateSelectedNodes();
-                    onCloseContextMenu();
-                  }}
+                  data-testid={action.key}
+                  onClick={action.onClick}
                 >
-                  聚合
+                  {action.label}
                 </button>
-              ) : null}
-              {contextMenu.kind === 'group' && contextMenu.nodeIds.length === 1 ? (
-                <>
-                  <button
-                    type="button"
-                    className="topology-context-menu-item"
-                    data-testid="topology-context-toggle-group"
-                    onClick={() => {
-                      onToggleGroupExpanded(contextMenu.nodeIds[0]);
-                      onCloseContextMenu();
-                    }}
-                  >
-                    {scene.map.get(contextMenu.nodeIds[0])?.expanded ? '收起' : '展开'}
-                  </button>
-                  {capabilities.canUngroupGroupNode && scene.map.get(contextMenu.nodeIds[0])?.kind === 'neuron-group' ? (
-                    <button
-                      type="button"
-                      className="topology-context-menu-item"
-                      data-testid="topology-context-ungroup"
-                      onClick={() => {
-                        onUngroupNode(contextMenu.nodeIds[0]);
-                        onCloseContextMenu();
-                      }}
-                    >
-                      拆开组
-                    </button>
-                  ) : null}
-                </>
-              ) : null}
+              ))}
             </div>
           ) : null}
         </>
@@ -399,6 +532,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
               : undefined,
             content: node.leaf ? <>
               <div className="topology-node-shape topology-node-dot" />
+              {node.expansionParentId ? <div className="topology-node-label topology-node-inline-label">{node.label}</div> : null}
               {canonicalOnly ? <div className="topology-node-canonical-badge" data-testid={`topology-node-canonical-only-${node.id}`}>C</div> : null}
             </> : (
               <div

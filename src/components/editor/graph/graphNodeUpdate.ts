@@ -11,6 +11,11 @@ export interface GraphNodeUpdatePayload {
   neuronModelId?: string;
   parameterOverrides?: GraphNodeParameterOverrides;
   initialState?: GraphNodeInitialStateUpdate;
+  nodeKind?: 'neuron' | 'neuron-group' | 'signal';
+  source?: string;
+  target?: string;
+  scale?: number;
+  decayPerSecond?: number;
 }
 
 export interface GraphLinkUpdatePayload {

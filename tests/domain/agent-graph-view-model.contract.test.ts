@@ -317,6 +317,55 @@ test('agent graph expanded child local projection uses persisted canvas position
   assert.equal(child2.y, 450);
 });
 
+test('agent graph root flattened scope exposes editable signal leaves and expanded brain groups', () => {
+  const agent = createTestAgent();
+  configureCanonicalBody(agent, {
+    inputEndpointId: 'vision-inputs',
+    outputEndpointId: 'motor-outputs',
+    inputNodePrefix: 'vision',
+    outputNodePrefix: 'output',
+    visionCells: 1,
+    inputScale: 1,
+    outputDecayPerSecond: 4,
+  });
+  agent.layout = {
+    nodes: {
+      ...agent.layout?.nodes,
+      'expanded-group': {
+        position: { x: 100, y: 120 },
+        collapsed: false,
+      },
+      'vision-R-0': { position: { x: 0, y: 0 } },
+      'vision-G-0': { position: { x: 0, y: 24 } },
+      'vision-B-0': { position: { x: 0, y: 48 } },
+    },
+  };
+
+  const rootView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+    projectedVisionCellCount: 1,
+    worldRegistry: WORLD_REGISTRY,
+  });
+
+  const brainExpandedChild = rootView.nodes.find((node) => node.id === 'expanded-group');
+  assert.ok(brainExpandedChild);
+  assert.equal(brainExpandedChild.previewOnly, false);
+  assert.equal(brainExpandedChild.rootExpandedProjection, false);
+  assert.equal(brainExpandedChild.movable, true);
+  assert.equal(brainExpandedChild.navigable, true);
+  assert.equal(brainExpandedChild.editable, false);
+
+  const adapterExpandedChild = rootView.nodes.find((node) => node.id === 'vision-G-0');
+  assert.ok(adapterExpandedChild);
+  assert.equal(adapterExpandedChild.previewOnly, false);
+  assert.equal(adapterExpandedChild.rootExpandedProjection, false);
+  assert.equal(adapterExpandedChild.connectableSource, true);
+  assert.equal(adapterExpandedChild.connectableTarget, false);
+});
+
 test('agent graph root brain child scope does not inject orphan adapter proxy nodes', () => {
   const agent = createTestAgent();
   const viewModel = buildAgentGraphViewModel({
@@ -381,12 +430,20 @@ test('agent graph root brain child scope projects boundary adapters without prox
   assert.equal(viewModel.nodes.some((node) => node.id === 'core-output-adapter'), true);
   assert.equal(viewModel.nodes.some((node) => node.proxy), false);
   const boundaryLinks = viewModel.links.filter((link) => link.aggregate);
-  assert.equal(boundaryLinks.length > 0, true);
+  assert.equal(boundaryLinks.length, 2);
+  assert.equal(
+    boundaryLinks.some((link) => link.fromNodeId === 'core-input-adapter' && link.toNodeId === 'neuron-1'),
+    true
+  );
+  assert.equal(
+    boundaryLinks.some((link) => link.fromNodeId === 'neuron-2' && link.toNodeId === 'core-output-adapter'),
+    true
+  );
   assert.equal(boundaryLinks.every((link) => link.inspectable), true);
-  assert.equal(boundaryLinks.every((link) => link.editable === false), true);
+  assert.equal(boundaryLinks.every((link) => link.editable), true);
 });
 
-test('agent graph root scope exposes canonical body endpoints even before any connection references them', () => {
+test('agent graph root scope flattens canonical body endpoints even before any connection references them', () => {
   const agent = createTestAgent();
   configureCanonicalBody(agent, {
     inputEndpointId: 'vision-inputs',
@@ -425,44 +482,22 @@ test('agent graph root scope exposes canonical body endpoints even before any co
     projectedVisionCellCount: 1,
     worldRegistry: WORLD_REGISTRY,
   });
-  const inputAdapter = rootView.nodes.find((node) => node.id === 'input-adapter');
-  const outputAdapter = rootView.nodes.find((node) => node.id === 'output-adapter');
-  assert.ok(inputAdapter);
-  assert.ok(outputAdapter);
-  assert.equal(inputAdapter.runtimeInstalledLeafCount, 0);
-  assert.equal(outputAdapter.runtimeInstalledLeafCount, 0);
-  assert.equal(inputAdapter.detail, '3 canonical / 0 installed');
-  assert.equal(outputAdapter.detail, '3 canonical / 0 installed');
+  const inputSignals = rootView.nodes.filter((node) => node.kind === 'signal' && node.direction === 'input');
+  const outputSignals = rootView.nodes.filter((node) => node.kind === 'signal' && node.direction === 'output');
+  assert.deepEqual(
+    inputSignals.map((node) => node.id).sort(),
+    ['vision-B-0', 'vision-G-0', 'vision-R-0']
+  );
+  assert.deepEqual(
+    outputSignals.map((node) => node.id).sort(),
+    ['output-move-forward', 'output-turn-left', 'output-turn-right']
+  );
+  assert.equal(inputSignals.every((node) => node.runtimeInstalledLeafCount === 0), true);
+  assert.equal(outputSignals.every((node) => node.runtimeInstalledLeafCount === 0), true);
   assert.equal(rootView.links.some((link) => link.aggregate), false);
-
-  const inputScopeView = buildAgentGraphViewModel({
-    agent,
-    navigationPath: ['input-adapter'],
-    draftNodePositions: {},
-    runtimeActiveNodeIds: [],
-    projectedVisionCellCount: 1,
-    worldRegistry: WORLD_REGISTRY,
-  });
-  const outputScopeView = buildAgentGraphViewModel({
-    agent,
-    navigationPath: ['output-adapter'],
-    draftNodePositions: {},
-    runtimeActiveNodeIds: [],
-    projectedVisionCellCount: 1,
-    worldRegistry: WORLD_REGISTRY,
-  });
-
-  assert.deepEqual(
-    new Set(inputScopeView.nodes.map((node) => node.id)),
-    new Set(['vision-R-0', 'vision-G-0', 'vision-B-0'])
-  );
-  assert.deepEqual(
-    new Set(outputScopeView.nodes.map((node) => node.id)),
-    new Set(['output-turn-left', 'output-move-forward', 'output-turn-right'])
-  );
 });
 
-test('agent graph root adapters can expand in place and expose their signal children', () => {
+test('agent graph root flattens signal children directly into the top level', () => {
   const agent = createTestAgent();
   configureCanonicalBody(agent, {
     inputEndpointId: 'vision-inputs',
@@ -476,14 +511,6 @@ test('agent graph root adapters can expand in place and expose their signal chil
   agent.layout = {
     nodes: {
       ...agent.layout?.nodes,
-      'input-adapter': {
-        position: { x: 24, y: 180 },
-        collapsed: false,
-      },
-      'output-adapter': {
-        position: { x: 644, y: 200 },
-        collapsed: false,
-      },
       'vision-R-0': { position: { x: 0, y: 0 } },
       'vision-G-0': { position: { x: 0, y: 24 } },
       'vision-B-0': { position: { x: 0, y: 48 } },
@@ -502,13 +529,12 @@ test('agent graph root adapters can expand in place and expose their signal chil
     worldRegistry: WORLD_REGISTRY,
   });
 
-  assert.equal(rootView.nodes.find((node) => node.id === 'input-adapter')?.expanded, true);
-  assert.equal(rootView.nodes.find((node) => node.id === 'output-adapter')?.expanded, true);
-  assert.equal(rootView.nodes.some((node) => node.viewId === 'input-adapter::vision-R-0'), true);
-  assert.equal(rootView.nodes.some((node) => node.viewId === 'output-adapter::output-move-forward'), true);
+  assert.equal(rootView.nodes.some((node) => node.id === 'vision-R-0'), true);
+  assert.equal(rootView.nodes.some((node) => node.id === 'output-move-forward'), true);
+  assert.equal(rootView.nodes.find((node) => node.id === 'vision-G-0')?.label, 'vision-G-0');
 });
 
-test('agent graph root adapters report installed counts from compiled runtime truth', () => {
+test('agent graph root signals report installed counts from compiled runtime truth', () => {
   const agent = createTestAgent();
   configureCanonicalBody(agent, {
     inputEndpointId: 'vision-inputs',
@@ -544,14 +570,17 @@ test('agent graph root adapters report installed counts from compiled runtime tr
     worldRegistry: WORLD_REGISTRY,
   });
 
-  const inputAdapter = rootView.nodes.find((node) => node.id === 'input-adapter');
-  const outputAdapter = rootView.nodes.find((node) => node.id === 'output-adapter');
-  assert.ok(inputAdapter);
-  assert.ok(outputAdapter);
-  assert.equal(inputAdapter.runtimeInstalledLeafCount, 1);
-  assert.equal(outputAdapter.runtimeInstalledLeafCount, 1);
-  assert.equal(inputAdapter.detail, '3 canonical / 1 installed');
-  assert.equal(outputAdapter.detail, '3 canonical / 1 installed');
+  const installedInput = rootView.nodes.find((node) => node.id === 'vision-G-0');
+  const installedOutput = rootView.nodes.find((node) => node.id === 'output-move-forward');
+  const canonicalOnlyInput = rootView.nodes.find((node) => node.id === 'vision-R-0');
+  assert.ok(installedInput);
+  assert.ok(installedOutput);
+  assert.ok(canonicalOnlyInput);
+  assert.equal(installedInput.runtimeInstalledLeafCount, 1);
+  assert.equal(installedOutput.runtimeInstalledLeafCount, 1);
+  assert.equal(installedInput.detail, 'input / installed');
+  assert.equal(installedOutput.detail, 'output / installed');
+  assert.equal(canonicalOnlyInput.detail, 'input / canonical-only');
 });
 
 test('expanded core boundary adapters project links to concrete signal children instead of the adapter group', () => {
@@ -708,7 +737,7 @@ test('agent graph aggregate links sum resolved synapse weights instead of non-ca
   assert.notEqual(aggregateInputLink.weight, 300);
   assert.deepEqual(new Set(aggregateInputLink.leafLinkIds), new Set(['body-input-a', 'body-input-b']));
   assert.equal(aggregateInputLink.inspectable, true);
-  assert.equal(aggregateInputLink.editable, false);
+  assert.equal(aggregateInputLink.editable, true);
 });
 
 test('agent graph neuron record keeps stable model reference when per-neuron overrides drift from model defaults', () => {
@@ -762,10 +791,10 @@ test('agent graph root scope uses the canonical rootContainerId as the top-level
     worldRegistry: WORLD_REGISTRY,
   });
 
-  const rootBrainNode = rootView.nodes.find((node) => node.refNodeId === agent.brain.rootContainerId);
+  const rootBrainNode = rootView.nodes.find((node) => node.refNodeId === 'expanded-group');
   assert.ok(rootBrainNode);
-  assert.equal(rootBrainNode.id, agent.brain.rootContainerId);
-  assert.equal(rootBrainNode.rootContainer, true);
+  assert.equal(rootBrainNode.id, 'expanded-group');
+  assert.equal(rootBrainNode.rootContainer, false);
 });
 
 test('agent graph projects the canonical root even when root is not the first container entry', () => {
@@ -787,7 +816,7 @@ test('agent graph projects the canonical root even when root is not the first co
     rootView.nodes
       .filter((node) => node.kind === 'neuron-group')
       .map((node) => node.refNodeId),
-    [agent.brain.rootContainerId]
+    ['expanded-group']
   );
 
   const rootScopeView = buildAgentGraphViewModel({
@@ -838,7 +867,7 @@ test('agent graph detects container cycles without recursive blow-up', () => {
     rootView.nodes
       .filter((node) => node.kind === 'neuron-group')
       .map((node) => node.refNodeId),
-    [agent.brain.rootContainerId]
+    ['expanded-group', 'root-group']
   );
 
   const rootScopeView = buildAgentGraphViewModel({
@@ -868,17 +897,17 @@ test('agent graph view and body preview share the same canonical endpoint expans
   const projectedVisionCellCount = 2;
 
   const preview = buildAgentBodyEndpointPreviewModel(agent, WORLD_REGISTRY, projectedVisionCellCount);
-  const inputScopeView = buildAgentGraphViewModel({
+  const rootView = buildAgentGraphViewModel({
     agent,
-    navigationPath: ['input-adapter'],
+    navigationPath: [],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
     projectedVisionCellCount,
     worldRegistry: WORLD_REGISTRY,
   });
-  const outputScopeView = buildAgentGraphViewModel({
+  const inputScopeView = buildAgentGraphViewModel({
     agent,
-    navigationPath: ['output-adapter'],
+    navigationPath: [agent.brain.rootContainerId],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
     projectedVisionCellCount,
@@ -886,13 +915,20 @@ test('agent graph view and body preview share the same canonical endpoint expans
   });
 
   assert.deepEqual(
-    inputScopeView.nodes.map((node) => node.refNodeId).sort(),
+    rootView.nodes
+      .filter((node) => node.kind === 'signal' && node.direction === 'input')
+      .map((node) => node.refNodeId)
+      .sort(),
     [...preview.input.endpointNodeIds].sort()
   );
   assert.deepEqual(
-    outputScopeView.nodes.map((node) => node.refNodeId).sort(),
+    rootView.nodes
+      .filter((node) => node.kind === 'signal' && node.direction === 'output')
+      .map((node) => node.refNodeId)
+      .sort(),
     [...preview.output.endpointNodeIds].sort()
   );
+  assert.equal(inputScopeView.nodes.some((node) => node.id === 'core-input-adapter'), true);
 });
 
 test('agent graph view marks canonical-only body endpoints that are not installed in compiled runtime', () => {
@@ -916,17 +952,17 @@ test('agent graph view marks canonical-only body endpoints that are not installe
     },
   ];
 
-  const inputScopeView = buildAgentGraphViewModel({
+  const rootView = buildAgentGraphViewModel({
     agent,
-    navigationPath: ['input-adapter'],
+    navigationPath: [],
     draftNodePositions: {},
     runtimeActiveNodeIds: [],
     projectedVisionCellCount,
     worldRegistry: WORLD_REGISTRY,
   });
 
-  const installedInput = inputScopeView.nodes.find((node) => node.refNodeId === 'sensor-G-0');
-  const canonicalOnlyInput = inputScopeView.nodes.find((node) => node.refNodeId === 'sensor-R-0');
+  const installedInput = rootView.nodes.find((node) => node.refNodeId === 'sensor-G-0');
+  const canonicalOnlyInput = rootView.nodes.find((node) => node.refNodeId === 'sensor-R-0');
   assert.ok(installedInput);
   assert.ok(canonicalOnlyInput);
   assert.equal(installedInput.runtimeInstalled, true);
@@ -973,44 +1009,32 @@ test('agent graph view, preview, and runtime counts share registry endpoint-bind
     projectedVisionCellCount: 2,
     worldRegistry: authorityRegistry,
   });
-  const inputScopeView = buildAgentGraphViewModel({
-    agent,
-    navigationPath: ['input-adapter'],
-    draftNodePositions: {},
-    runtimeActiveNodeIds: [],
-    projectedVisionCellCount: 2,
-    worldRegistry: authorityRegistry,
-  });
-  const outputScopeView = buildAgentGraphViewModel({
-    agent,
-    navigationPath: ['output-adapter'],
-    draftNodePositions: {},
-    runtimeActiveNodeIds: [],
-    projectedVisionCellCount: 2,
-    worldRegistry: authorityRegistry,
-  });
-
   assert.deepEqual(preview.issues, []);
   const inputPreviewItems = preview.input.previewsByEndpointId['sensor-inputs-R-1'] ?? [];
   assert.equal(inputPreviewItems[inputPreviewItems.length - 1]?.resolved, 'unsupported.R.1');
   assert.equal(preview.output.previewsByEndpointId['effector-outputs-turn-left']?.[0]?.resolved, 'unsupported.turn-left');
   assert.deepEqual(
-    inputScopeView.nodes.map((node) => node.refNodeId).sort(),
+    rootView.nodes
+      .filter((node) => node.kind === 'signal' && node.direction === 'input')
+      .map((node) => node.refNodeId)
+      .sort(),
     [...preview.input.endpointNodeIds].sort()
   );
   assert.deepEqual(
-    outputScopeView.nodes.map((node) => node.refNodeId).sort(),
+    rootView.nodes
+      .filter((node) => node.kind === 'signal' && node.direction === 'output')
+      .map((node) => node.refNodeId)
+      .sort(),
     [...preview.output.endpointNodeIds].sort()
   );
-
-  const inputAdapter = rootView.nodes.find((node) => node.id === 'input-adapter');
-  const outputAdapter = rootView.nodes.find((node) => node.id === 'output-adapter');
-  assert.ok(inputAdapter);
-  assert.ok(outputAdapter);
-  assert.equal(inputAdapter.runtimeInstalledLeafCount, 1);
-  assert.equal(outputAdapter.runtimeInstalledLeafCount, 1);
-  assert.equal(inputAdapter.detail, '6 canonical / 1 installed');
-  assert.equal(outputAdapter.detail, '3 canonical / 1 installed');
+  assert.equal(
+    rootView.nodes.filter((node) => node.kind === 'signal' && node.direction === 'input' && node.runtimeInstalled).length,
+    1
+  );
+  assert.equal(
+    rootView.nodes.filter((node) => node.kind === 'signal' && node.direction === 'output' && node.runtimeInstalled).length,
+    1
+  );
 });
 
 test('graph link inspector parameters keep resolved display values separate from real overrides', () => {

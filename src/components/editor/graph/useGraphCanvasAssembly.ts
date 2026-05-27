@@ -58,11 +58,10 @@ export const useGraphCanvasAssembly = ({
     () => projectGraphScene(nodes, { width, height }),
     [height, nodes, width]
   );
-  const sceneOriginRef = useRef(scene.origin);
-
-  useEffect(() => {
-    sceneOriginRef.current = scene.origin;
-  }, [scene.origin]);
+  const sceneNodeByViewId = useMemo(
+    () => new Map(scene.list.map((node) => [node.viewId, node] as const)),
+    [scene.list]
+  );
 
   const getInitialViewportX = useCallback(
     (focusNodes: GraphSceneNode[], preferredX: number) => {
@@ -158,72 +157,52 @@ export const useGraphCanvasAssembly = ({
     };
   }, [surfaceRef]);
 
+  const projectScenePositionToStoredPosition = useCallback(
+    (nodeId: string, x: number, y: number) => {
+      const sceneNode = sceneNodeByViewId.get(nodeId);
+      if (sceneNode?.expansionParentId) {
+        const parentNode = sceneNodeByViewId.get(sceneNode.expansionParentId);
+        if (parentNode) {
+          return {
+            x: x - parentNode.sceneX - sceneNode.expansionOffsetX,
+            y: y - parentNode.sceneY - sceneNode.expansionOffsetY,
+          };
+        }
+      }
+
+      return {
+        x: x + scene.origin.x,
+        y: y + scene.origin.y,
+      };
+    },
+    [scene.origin.x, scene.origin.y, sceneNodeByViewId]
+  );
+
+  const projectNodePositionUpdates = useCallback(
+    (updates: Array<{ nodeId: string; x: number; y: number }>) =>
+      updates.map(({ nodeId, x, y }) => {
+        const storedPosition = projectScenePositionToStoredPosition(nodeId, x, y);
+        return {
+          nodeId,
+          x: storedPosition.x,
+          y: storedPosition.y,
+        };
+      }),
+    [projectScenePositionToStoredPosition]
+  );
+
   const updateNodePositionsFromSceneDraft = useCallback(
     (updates: Array<{ nodeId: string; x: number; y: number }>) => {
-      const sceneNodeByViewId = new Map(scene.list.map((node) => [node.viewId, node] as const));
-      callbacks.onDraftNodePositionsUpdate(
-        updates.map(({ nodeId, x, y }) => ({
-          nodeId,
-          x:
-            (() => {
-              const sceneNode = sceneNodeByViewId.get(nodeId);
-              if (sceneNode?.expansionParentId) {
-                const parentNode = sceneNodeByViewId.get(sceneNode.expansionParentId);
-                if (parentNode) {
-                  return x - parentNode.sceneX - sceneNode.expansionOffsetX;
-                }
-              }
-              return x + sceneOriginRef.current.x;
-            })(),
-          y:
-            (() => {
-              const sceneNode = sceneNodeByViewId.get(nodeId);
-              if (sceneNode?.expansionParentId) {
-                const parentNode = sceneNodeByViewId.get(sceneNode.expansionParentId);
-                if (parentNode) {
-                  return y - parentNode.sceneY - sceneNode.expansionOffsetY;
-                }
-              }
-              return y + sceneOriginRef.current.y;
-            })(),
-        }))
-      );
+      callbacks.onDraftNodePositionsUpdate(projectNodePositionUpdates(updates));
     },
-    [callbacks, scene.list]
+    [callbacks, projectNodePositionUpdates]
   );
 
   const persistNodePositionsFromScene = useCallback(
     (updates: Array<{ nodeId: string; x: number; y: number }>) => {
-      const sceneNodeByViewId = new Map(scene.list.map((node) => [node.viewId, node] as const));
-      callbacks.onNodePositionsPersist(
-        updates.map(({ nodeId, x, y }) => ({
-          nodeId,
-          x:
-            (() => {
-              const sceneNode = sceneNodeByViewId.get(nodeId);
-              if (sceneNode?.expansionParentId) {
-                const parentNode = sceneNodeByViewId.get(sceneNode.expansionParentId);
-                if (parentNode) {
-                  return x - parentNode.sceneX - sceneNode.expansionOffsetX;
-                }
-              }
-              return x + sceneOriginRef.current.x;
-            })(),
-          y:
-            (() => {
-              const sceneNode = sceneNodeByViewId.get(nodeId);
-              if (sceneNode?.expansionParentId) {
-                const parentNode = sceneNodeByViewId.get(sceneNode.expansionParentId);
-                if (parentNode) {
-                  return y - parentNode.sceneY - sceneNode.expansionOffsetY;
-                }
-              }
-              return y + sceneOriginRef.current.y;
-            })(),
-        }))
-      );
+      callbacks.onNodePositionsPersist(projectNodePositionUpdates(updates));
     },
-    [callbacks, scene.list]
+    [callbacks, projectNodePositionUpdates]
   );
 
   const orchestratorNodes = useMemo(
@@ -240,6 +219,7 @@ export const useGraphCanvasAssembly = ({
           movable: node.movable,
           local: node.local,
           previewOnly: node.previewOnly,
+          rootExpandedProjection: node.rootExpandedProjection,
           connectableSource: node.connectableSource,
           ungroupable: node.kind === 'neuron-group' && node.local && !node.proxy && !node.expansionParentId,
           contextMenuGroup: descriptor.contextMenuGroup,

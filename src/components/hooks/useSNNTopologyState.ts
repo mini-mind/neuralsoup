@@ -53,6 +53,7 @@ interface GraphLinkInspectorSynapseSnapshot {
 }
 
 const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+const allValuesEqual = <T,>(values: T[]) => values.length > 0 && values.every((value) => value === values[0]);
 const toNumericRecord = (value: unknown): Record<string, number> => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return {};
@@ -184,7 +185,6 @@ export const useSNNTopologyState = ({
     pendingFocusLinkId,
     setPendingFocusLinkId,
   } = useGraphFocusQueueState();
-  const scopeSessionRef = useRef<string | null>(null);
   const editorSessionTokenRef = useRef(graphSessionToken);
   const {
     resetScopedCanvasSessions,
@@ -227,6 +227,14 @@ export const useSNNTopologyState = ({
     links,
     activeViewNodeIds,
   } = agentViewModel;
+  const linkById = useMemo(
+    () => new Map(links.map((link) => [link.id, link] as const)),
+    [links]
+  );
+  const connectionById = useMemo(
+    () => new Map(agent.connections.map((connection) => [connection.id, connection] as const)),
+    [agent.connections]
+  );
   const canvasScopeKey = `${agent.metadata.id}:${scopeKey}`;
   const hasValidNavigationPath = useMemo(() => {
     if (navigationPath.length === 0) {
@@ -307,14 +315,43 @@ export const useSNNTopologyState = ({
       return null;
     }
 
-    const viewLink = links.find((link) => link.id === showDetailModal.id);
+    const viewLink = linkById.get(showDetailModal.id);
     if (!viewLink) {
       return null;
     }
 
-    const leafLink = agent.connections.find((link) => link.id === showDetailModal.id) ?? null;
+    const leafLink = connectionById.get(showDetailModal.id) ?? null;
+    const aggregateLeafLinks = viewLink.aggregate
+      ? viewLink.leafLinkIds
+          .map((leafLinkId) => connectionById.get(leafLinkId) ?? null)
+          .filter((link): link is AgentIR['connections'][number] => link != null)
+      : [];
     const viewSynapse = viewLink.synapse ?? null;
+    const getLinkInspectorSnapshot = (linkId: string) => linkById.get(linkId)?.synapse ?? null;
+    const aggregateInspectorSnapshots = aggregateLeafLinks.map((link) =>
+      resolveGraphLinkInspectorParameters({
+        defaults: toNumericRecord(getLinkInspectorSnapshot(link.id)?.defaults ?? {}),
+        parameterOverrides: toNumericRecord(link.parameterOverrides),
+        effectiveWeight: getLinkInspectorSnapshot(link.id)?.effectiveWeight ?? null,
+        effectiveDelayMs: getLinkInspectorSnapshot(link.id)?.effectiveDelayMs ?? null,
+      })
+    );
     const synapseParameters = resolveGraphLinkInspectorParameters(viewSynapse);
+    const aggregateResolvedWeights = aggregateInspectorSnapshots.map((snapshot) => snapshot.resolvedParameters.weight);
+    const aggregateResolvedDelays = aggregateInspectorSnapshots.map((snapshot) => snapshot.resolvedParameters.delayMs);
+    const aggregateSynapseModelIds = aggregateLeafLinks.map((link) => link.synapseModelId?.trim() ?? '');
+    const aggregateDefaultWeights = aggregateInspectorSnapshots.map((snapshot) => snapshot.defaultParameters.weight);
+    const aggregateDefaultDelays = aggregateInspectorSnapshots.map((snapshot) => snapshot.defaultParameters.delayMs);
+    const aggregateParameterOverrideWeights = aggregateInspectorSnapshots.map((snapshot) => snapshot.parameterOverrides.weight);
+    const aggregateParameterOverrideDelays = aggregateInspectorSnapshots.map((snapshot) => snapshot.parameterOverrides.delayMs);
+    const batchWeight =
+      aggregateResolvedWeights[0] == null
+        ? synapseParameters.resolvedParameters.weight
+        : aggregateResolvedWeights[0];
+    const batchDelayMs =
+      aggregateResolvedDelays[0] == null
+        ? synapseParameters.resolvedParameters.delayMs
+        : aggregateResolvedDelays[0];
 
     return {
       id: viewLink.id,
@@ -322,19 +359,36 @@ export const useSNNTopologyState = ({
       toNodeId: viewLink.toNodeId,
       fromRefNodeId: viewLink.fromRefNodeId,
       toRefNodeId: viewLink.toRefNodeId,
-      synapseModelId: leafLink?.synapseModelId ?? viewSynapse?.synapseModelId ?? null,
-      parameterOverrides: synapseParameters.parameterOverrides,
-      resolvedParameters: synapseParameters.resolvedParameters,
-      defaultParameters: synapseParameters.defaultParameters,
-      weight: synapseParameters.resolvedParameters.weight,
-      delayMs: synapseParameters.resolvedParameters.delayMs,
+      synapseModelId: viewLink.aggregate
+        ? (allValuesEqual(aggregateSynapseModelIds) ? aggregateSynapseModelIds[0] || null : aggregateSynapseModelIds[0] || null)
+        : leafLink?.synapseModelId ?? viewSynapse?.synapseModelId ?? null,
+      parameterOverrides: viewLink.aggregate
+        ? {
+            ...(aggregateParameterOverrideWeights[0] == null ? {} : { weight: aggregateParameterOverrideWeights[0] }),
+            ...(aggregateParameterOverrideDelays[0] == null ? {} : { delayMs: aggregateParameterOverrideDelays[0] }),
+          }
+        : synapseParameters.parameterOverrides,
+      resolvedParameters: viewLink.aggregate
+        ? {
+            weight: batchWeight,
+            delayMs: batchDelayMs,
+          }
+        : synapseParameters.resolvedParameters,
+      defaultParameters: viewLink.aggregate
+        ? {
+            weight: allValuesEqual(aggregateDefaultWeights) ? (aggregateDefaultWeights[0] ?? null) : aggregateDefaultWeights[0] ?? null,
+            delayMs: allValuesEqual(aggregateDefaultDelays) ? (aggregateDefaultDelays[0] ?? null) : aggregateDefaultDelays[0] ?? null,
+          }
+        : synapseParameters.defaultParameters,
+      weight: viewLink.aggregate ? batchWeight : synapseParameters.resolvedParameters.weight,
+      delayMs: viewLink.aggregate ? batchDelayMs : synapseParameters.resolvedParameters.delayMs,
       count: viewLink.count,
       aggregate: viewLink.aggregate,
       inspectable: viewLink.inspectable,
       editable: viewLink.editable,
       leafLinkIds: [...viewLink.leafLinkIds],
     };
-  }, [agent.connections, links, showDetailModal]);
+  }, [connectionById, linkById, showDetailModal]);
 
   useEffect(() => {
     if (!showDetailModal) {
@@ -351,23 +405,14 @@ export const useSNNTopologyState = ({
     }
   }, [activeLink, activeNode, setShowDetailModal, showDetailModal]);
 
-  const resetSelectionInspectorState = useCallback(() => {
-    scopeSessionRef.current = null;
+  const resetEditorTransientState = useCallback(() => {
     setSelectionState(createEmptySelectionState());
     setSelectionRect(null);
     setShowDetailModal(null);
-  }, [setSelectionState, setShowDetailModal]);
-
-  const resetDraftAndFocusState = useCallback(() => {
     setDraftNodePositions({});
     setPendingFocusNodeId(null);
     setPendingFocusLinkId(null);
-  }, [setPendingFocusLinkId]);
-
-  const resetEditorTransientState = useCallback(() => {
-    resetSelectionInspectorState();
-    resetDraftAndFocusState();
-  }, [resetDraftAndFocusState, resetSelectionInspectorState]);
+  }, [setDraftNodePositions, setPendingFocusLinkId, setPendingFocusNodeId, setSelectionState, setShowDetailModal]);
 
   useEffect(() => {
     if (editorSessionTokenRef.current === graphSessionToken) {
@@ -389,20 +434,6 @@ export const useSNNTopologyState = ({
     setNavigationPath(getDefaultNavigationPath(agent));
     resetEditorTransientState();
   }, [agent, hasValidNavigationPath, resetEditorTransientState]);
-
-  useEffect(() => {
-    if (scopeSessionRef.current === scopeKey) {
-      return;
-    }
-
-    scopeSessionRef.current = scopeKey;
-  }, [scopeKey]);
-
-  useEffect(() => {
-    if (navigationPath.length === 0) {
-      scopeSessionRef.current = 'root';
-    }
-  }, [navigationPath.length]);
 
   const navigateTo = useCallback(
     (nodeId: string) => {
@@ -639,12 +670,17 @@ export const useSNNTopologyState = ({
     removeSelected,
     addNeuronAt,
     addNeuronGroupAt,
+    addInputSignalAt,
+    addOutputSignalAt,
     createNeuronAndConnectAt,
     aggregateSelectedNodes,
     ungroupNode,
     toggleGroupExpanded,
+    moveNodeOutToParent,
+    moveSelectionIntoGroup,
     updateNodeLabelAndParams,
     updateLinkWeight,
+    updateAggregateLinks,
   } = useGraphEditorCommands({
     setAgent,
     currentScope,
@@ -685,7 +721,7 @@ export const useSNNTopologyState = ({
       return;
     }
 
-    if (node.kind === 'neuron-group' && node.local && !node.proxy && !node.previewOnly) {
+    if ((node.kind === 'neuron-group' || node.kind === 'adapter') && node.local && !node.proxy && !node.previewOnly) {
       toggleGroupExpanded(nodeId);
     }
   }, [toggleGroupExpanded, viewNodeByViewId]);
@@ -752,9 +788,13 @@ export const useSNNTopologyState = ({
     removeSelected,
     addNeuronAt,
     addNeuronGroupAt,
+    addInputSignalAt,
+    addOutputSignalAt,
     createNeuronAndConnectAt,
     aggregateSelectedNodes,
     ungroupNode,
+    moveNodeOutToParent,
+    moveSelectionIntoGroup,
     clearDraftNodePositions,
     setCanvasOffset: setScopedCanvasOffset,
     setCanvasSession: setScopedCanvasSession,
@@ -762,5 +802,6 @@ export const useSNNTopologyState = ({
     syncCanvasViewportForScope,
     updateNodeLabelAndParams,
     updateLinkWeight,
+    updateAggregateLinks,
   };
 };

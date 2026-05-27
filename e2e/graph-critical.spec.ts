@@ -8,6 +8,7 @@ import {
   getLocatorCenter,
   getNodeViewPosition,
   parsePointPair,
+  rightClickSceneNode,
   rightClickLocator,
   rightDragBetweenNodes,
 } from './support/canvas';
@@ -109,6 +110,81 @@ test('critical: aggregate group expand and ungroup minimal path', async ({ page 
   await expect(page.locator(groupSelector)).toHaveCount(0);
   await expect(page.locator(selectors.nodeNeuronOne)).toBeVisible();
   await expect(page.locator(selectors.nodeNeuronTwo)).toBeVisible();
+});
+
+test('critical: group detail rename and aggregate link batch edit persist through modal reopen', async ({ page }) => {
+  await openGraphEditor(page);
+  await enterCoreGroup(page);
+
+  await page.locator(selectors.nodeNeuronOne).click();
+  await page.locator(selectors.nodeNeuronTwo).click({ modifiers: ['Shift'] });
+  await rightClickLocator(page, selectors.nodeNeuronTwo);
+  await page.locator(selectors.topologyContextAggregate).click();
+
+  const groupSelector = '[data-testid^="topology-node-group-"]';
+  await expect(page.locator(groupSelector)).toHaveCount(1);
+  const groupLocator = page.locator(groupSelector).first();
+  const originalTestId = await groupLocator.getAttribute('data-testid');
+  if (!originalTestId) {
+    throw new Error('Grouped node test id missing');
+  }
+  const groupId = originalTestId.replace('topology-node-', '');
+
+  await doubleClickNode(page, `[data-testid="${originalTestId}"]`);
+  await expect(getDetailModal(page)).toBeVisible();
+  await getDetailField(page, selectors.groupLabelInput).fill('critical-group');
+  await closeTopologyDetailModal(page);
+  await expect(page.locator(`[data-testid="topology-node-${groupId}"]`)).toContainText('critical-group');
+
+  await rightClickLocator(page, `[data-testid="topology-node-${groupId}"]`);
+  await page.locator(selectors.topologyContextToggleGroup).click();
+  await expect(page.locator(`[data-testid="topology-node-body-${groupId}"]`)).toBeVisible();
+
+  const aggregateLink = page.locator('[data-testid^="topology-link-aggregate:"]').first();
+  await expect(aggregateLink).toBeVisible();
+  await aggregateLink.dblclick({ force: true });
+  await expect(getDetailModal(page)).toBeVisible();
+  await expect(page.locator(selectors.aggregateLinkDetail)).toBeVisible();
+  await getDetailField(page, selectors.connectionSynapseModelIdInput).fill(DEFAULT_SYNAPSE_MODEL_ID);
+  await getDetailField(page, selectors.connectionWeightInput).fill('2.5');
+  await getDetailField(page, selectors.connectionDelayMsInput).fill('9');
+  await closeTopologyDetailModal(page);
+
+  await aggregateLink.dblclick({ force: true });
+  await expect(getDetailModal(page)).toBeVisible();
+  await expect(getDetailField(page, selectors.connectionWeightInput)).toHaveValue('2.5');
+  await expect(getDetailField(page, selectors.connectionSynapseModelIdInput)).toHaveValue(DEFAULT_SYNAPSE_MODEL_ID);
+  await expect(getDetailField(page, selectors.connectionDelayMsInput)).toHaveValue('9');
+  await closeTopologyDetailModal(page);
+});
+
+test('critical: move selection into group and move node back to parent via group context menu', async ({ page }) => {
+  await openGraphEditor(page);
+  await enterCoreGroup(page);
+  await createNeuronThreeViaContextMenu(page);
+
+  await page.locator(selectors.nodeNeuronOne).click();
+  await page.locator(selectors.nodeNeuronTwo).click({ modifiers: ['Shift'] });
+  await rightClickLocator(page, selectors.nodeNeuronTwo);
+  await page.locator(selectors.topologyContextAggregate).click();
+
+  const groupSelector = '[data-testid^="topology-node-group-"]';
+  await expect(page.locator(groupSelector)).toHaveCount(1);
+
+  await page.locator(selectors.nodeNeuronThree).click();
+  await rightClickLocator(page, groupSelector);
+  await expect(page.locator(selectors.topologyContextMoveIntoGroup)).toBeVisible();
+  await page.locator(selectors.topologyContextMoveIntoGroup).click();
+
+  const groupId = ((await page.locator(groupSelector).getAttribute('data-testid')) ?? '').replace('topology-node-', '');
+  await rightClickLocator(page, groupSelector);
+  await page.locator(selectors.topologyContextEnterGroup).click();
+  await page.locator(selectors.nodeNeuronThree).click();
+  await expect(page.locator(selectors.topologySelectedCount)).toHaveText('1');
+  await expect(page.locator(selectors.topologyActionMoveOut)).toBeVisible();
+  await page.locator(selectors.topologyActionMoveOut).click();
+  await page.locator(selectors.topologyBreadcrumbRoot).click();
+  await expect(page.locator(selectors.nodeNeuronThree)).toBeVisible();
 });
 
 test('critical: multi-select batch link happy path', async ({ page }) => {

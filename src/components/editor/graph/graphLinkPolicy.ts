@@ -5,6 +5,7 @@ export interface GraphLinkPolicyNode {
   proxy: boolean;
   local: boolean;
   previewOnly?: boolean;
+  rootExpandedProjection?: boolean;
   direction: 'input' | 'output' | 'internal';
 }
 
@@ -17,7 +18,11 @@ export const getGraphLinkCapabilities = (
   node: GraphLinkPolicyNode,
   currentScope: 'root' | 'child'
 ): GraphLinkCapabilities => {
-  const interactiveLeaf = node.leaf && (currentScope === 'child' || node.previewOnly === true);
+  const interactiveLeaf =
+    node.leaf &&
+    node.local &&
+    (currentScope === 'child' || currentScope === 'root' || node.rootExpandedProjection === true) &&
+    node.previewOnly !== true;
   if (!interactiveLeaf) {
     return {
       canSource: false,

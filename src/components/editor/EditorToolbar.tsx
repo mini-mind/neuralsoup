@@ -44,17 +44,6 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
   return (
     <div className="tab-strip">
       <div className="tab-strip-left">
-        <button
-          type="button"
-          className={`tab-strip-tab tab-strip-icon-tab ${editorTab === 'body' ? 'active' : ''}`}
-          data-testid="editor-tab-body"
-          title="BodyIR"
-          aria-label="BodyIR"
-          aria-pressed={editorTab === 'body'}
-          onClick={() => onEditorTabChange('body')}
-        >
-          ⇄
-        </button>
         <div
           className={`tab-strip-path-tab ${editorTab === 'graph' ? 'active' : ''}`}
           data-testid="editor-tab-graph"

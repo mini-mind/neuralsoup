@@ -70,3 +70,21 @@ test('mutateBodyIR supports no-op updates without fabricating changes', () => {
   assert.equal(result.changed, false);
   assert.deepEqual(result.body, body);
 });
+
+test('mutateBodyIR can remove output endpoint and prune related mappings for signal deletion', () => {
+  const body = createBody();
+  const result = mutateBodyIR(body, [
+    {
+      type: 'output-endpoint.remove',
+      endpointId: 'out-1',
+      pruneMappings: true,
+    },
+  ]);
+
+  assert.equal(result.changed, true);
+  assert.deepEqual(result.body.outputEndpoints, []);
+  assert.equal(
+    result.body.mappings.some((mapping) => mapping.kind === 'output' && mapping.endpointId === 'out-1'),
+    false
+  );
+});

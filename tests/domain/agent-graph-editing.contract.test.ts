@@ -4,8 +4,10 @@ import type { AgentIR } from '../../src/domain/brain';
 import {
   aggregateAgentNodesIntoGroup,
   createNeuronAndConnectInContainer,
+  reparentAgentNode,
   tryAggregateAgentNodesIntoGroup,
   tryCreateNeuronAndConnectInContainer,
+  tryReparentAgentNode,
   tryUngroupAgentContainer,
   ungroupAgentContainer,
 } from '../../src/components/editor/graph/agentGraphEditing';
@@ -277,6 +279,196 @@ test('tryUngroupAgentContainer rejects missing parent ownership and keeps safe w
 
   assert.equal(result.reason, 'missing-target-container');
   assert.equal(ungroupAgentContainer(aggregated, 'root-group', 'group-missing'), aggregated);
+});
+
+test('tryReparentAgentNode moves a neuron into an existing group and updates its layout position', () => {
+  const aggregated = aggregateAgentNodesIntoGroup(createEditingAgent(), createAggregateInput());
+  const result = tryReparentAgentNode(aggregated, {
+    nodeId: 'neuron-3',
+    fromContainerId: 'root-group',
+    toContainerId: 'group-1',
+    nextPosition: { x: 40, y: 50 },
+  });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) {
+    return;
+  }
+
+  const root = result.agent.brain.containers.find((container) => container.id === 'root-group');
+  const group = result.agent.brain.containers.find((container) => container.id === 'group-1');
+  assert.ok(root);
+  assert.ok(group);
+  assert.deepEqual(root.children, [{ scope: 'container', nodeId: 'group-1' }]);
+  assert.deepEqual(group.children.at(-1), { scope: 'brain', nodeId: 'neuron-3' });
+  assert.deepEqual(result.agent.layout?.nodes['neuron-3']?.position, { x: 40, y: 50 });
+});
+
+test('tryReparentAgentNode moves a nested group back to parent scope', () => {
+  const baseAgent = createEditingAgent();
+  const nested: AgentIR = {
+    ...baseAgent,
+    brain: {
+      ...baseAgent.brain,
+      containers: [
+        {
+          id: 'root-group',
+          label: 'Root',
+          children: [
+            { scope: 'container', nodeId: 'group-1' },
+            { scope: 'brain', nodeId: 'neuron-3' },
+          ],
+        },
+        {
+          id: 'group-1',
+          label: '神经元组1',
+          children: [{ scope: 'container', nodeId: 'group-2' }],
+        },
+        {
+          id: 'group-2',
+          label: '子组',
+          children: [
+            { scope: 'brain', nodeId: 'neuron-1' },
+            { scope: 'brain', nodeId: 'neuron-2' },
+          ],
+        },
+      ],
+    },
+    layout: {
+      nodes: {
+        ...baseAgent.layout?.nodes,
+        'group-1': { position: { x: 120, y: 80 } },
+        'group-2': { position: { x: 40, y: 50 } },
+      },
+    },
+  };
+
+  const result = tryReparentAgentNode(nested, {
+    nodeId: 'group-2',
+    fromContainerId: 'group-1',
+    toContainerId: 'root-group',
+    nextPosition: { x: 360, y: 240 },
+  });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) {
+    return;
+  }
+
+  const root = result.agent.brain.containers.find((container) => container.id === 'root-group');
+  const parentGroup = result.agent.brain.containers.find((container) => container.id === 'group-1');
+  assert.ok(root);
+  assert.ok(parentGroup);
+  assert.deepEqual(root.children, [
+    { scope: 'container', nodeId: 'group-1' },
+    { scope: 'brain', nodeId: 'neuron-3' },
+    { scope: 'container', nodeId: 'group-2' },
+  ]);
+  assert.deepEqual(parentGroup.children, []);
+  assert.deepEqual(result.agent.layout?.nodes['group-2']?.position, { x: 360, y: 240 });
+});
+
+test('tryReparentAgentNode can preserve an expanded-child absolute position when moving back to parent scope', () => {
+  const baseAgent = createEditingAgent();
+  const nested: AgentIR = {
+    ...baseAgent,
+    brain: {
+      ...baseAgent.brain,
+      containers: [
+        {
+          id: 'root-group',
+          label: 'Root',
+          children: [
+            { scope: 'container', nodeId: 'group-1' },
+            { scope: 'brain', nodeId: 'neuron-3' },
+          ],
+        },
+        {
+          id: 'group-1',
+          label: '神经元组1',
+          children: [
+            { scope: 'brain', nodeId: 'neuron-1' },
+            { scope: 'brain', nodeId: 'neuron-2' },
+          ],
+        },
+      ],
+    },
+    layout: {
+      nodes: {
+        ...baseAgent.layout?.nodes,
+        'group-1': { position: { x: 120, y: 80 } },
+        'neuron-1': { position: { x: 30, y: 30 } },
+      },
+    },
+  };
+
+  const result = tryReparentAgentNode(nested, {
+    nodeId: 'neuron-1',
+    fromContainerId: 'group-1',
+    toContainerId: 'root-group',
+    nextPosition: { x: 150, y: 110 },
+  });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) {
+    return;
+  }
+
+  assert.deepEqual(result.agent.layout?.nodes['neuron-1']?.position, { x: 150, y: 110 });
+});
+
+test('tryReparentAgentNode rejects moving a container into its own descendant and safe wrapper stays no-op', () => {
+  const baseAgent = createEditingAgent();
+  const nested: AgentIR = {
+    ...baseAgent,
+    brain: {
+      ...baseAgent.brain,
+      containers: [
+        {
+          id: 'root-group',
+          label: 'Root',
+          children: [
+            { scope: 'container', nodeId: 'group-1' },
+            { scope: 'brain', nodeId: 'neuron-3' },
+          ],
+        },
+        {
+          id: 'group-1',
+          label: '神经元组1',
+          children: [{ scope: 'container', nodeId: 'group-2' }],
+        },
+        {
+          id: 'group-2',
+          label: '子组',
+          children: [
+            { scope: 'brain', nodeId: 'neuron-1' },
+            { scope: 'brain', nodeId: 'neuron-2' },
+          ],
+        },
+      ],
+    },
+  };
+
+  const result = tryReparentAgentNode(nested, {
+    nodeId: 'group-1',
+    fromContainerId: 'root-group',
+    toContainerId: 'group-2',
+  });
+
+  assert.equal(result.ok, false);
+  if (result.ok) {
+    return;
+  }
+
+  assert.equal(result.reason, 'cycle-detected');
+  assert.equal(
+    reparentAgentNode(nested, {
+      nodeId: 'group-1',
+      fromContainerId: 'root-group',
+      toContainerId: 'group-2',
+    }),
+    nested
+  );
 });
 
 test('tryAggregateAgentNodesIntoGroup rejects malformed source graphs with missing root containers', () => {

@@ -1,10 +1,13 @@
 import React from 'react';
 import NeuronDetailEditor from '../../NeuronDetailEditor';
 import ConnectionDetailEditor from '../../ConnectionDetailEditor';
+import GroupDetailEditor from '../../GroupDetailEditor';
+import SignalDetailEditor from '../../SignalDetailEditor';
 import type { GraphNodeUpdatePayload } from './graphNodeUpdate';
 import type { DetailModalData, GraphLinkDetailData } from '../../hooks/useSNNTopologyState';
 import type { AgentGraphViewNodeRecord } from './agentGraphViewModel';
 import type { IzhikevichNeuronParameters } from '../../../domain/brain/shared';
+import { resolveConnectionOverridePayload } from '../../ConnectionDetailEditor';
 
 interface GraphDetailModalProps {
   detailModal: DetailModalData | null;
@@ -34,14 +37,6 @@ interface GraphDetailModalProps {
         }
   ) => void;
 }
-
-const DEFAULT_SIGNAL_PARAMS = {
-  a: 0,
-  b: 0,
-  c: 0,
-  d: 0,
-  threshold: 0,
-};
 
 const DEFAULT_NEURON_OVERRIDES: IzhikevichNeuronParameters = {
   a: 0.02,
@@ -87,6 +82,28 @@ const resolveNeuronEffectiveForEditor = (
     c: activeNode.neuron?.parameterOverrides?.c ?? defaults.c,
     d: activeNode.neuron?.parameterOverrides?.d ?? defaults.d,
     threshold: activeNode.neuron?.parameterOverrides?.threshold ?? defaults.threshold,
+  };
+};
+
+const resolveAggregateEditableConnection = (activeLink: GraphLinkDetailData) => {
+  const defaultParameters = activeLink.defaultParameters;
+  const resolvedParameters = {
+    weight: activeLink.weight,
+    delayMs: activeLink.delayMs,
+  };
+
+  return {
+    id: activeLink.id,
+    from: activeLink.fromNodeId,
+    to: activeLink.toNodeId,
+    synapseModelId: activeLink.synapseModelId ?? '',
+    parameterOverrides: resolveConnectionOverridePayload({
+      defaultParameters,
+      nextWeightValue: resolvedParameters.weight,
+      nextDelayMsValue: resolvedParameters.delayMs,
+    }).parameterOverrides,
+    resolvedParameters,
+    defaultParameters,
   };
 };
 
@@ -165,15 +182,41 @@ const GraphDetailModal: React.FC<GraphDetailModalProps> = ({
           />
         )}
         {detailModal.type === 'node' && activeNode?.kind === 'signal' && (
-          <NeuronDetailEditor
-            neuron={{
+          <SignalDetailEditor
+            signal={{
               id: activeNode.id,
               label: activeNode.label,
-              parameterOverrides: DEFAULT_SIGNAL_PARAMS,
-              readonly: true,
-              description: 'Signal adapter leaf 当前为只读；标签与端点映射请在 Settings > Body IR 中编辑。',
+              direction: activeNode.endpoint?.scope === 'bodyInput' ? 'input' : 'output',
+              source: activeNode.endpoint?.scope === 'bodyInput' ? activeNode.endpoint.source : undefined,
+              target: activeNode.endpoint?.scope === 'bodyOutput' ? activeNode.endpoint.target : undefined,
+              scale: activeNode.endpoint?.scope === 'bodyInput' ? activeNode.endpoint.scale : undefined,
+              decayPerSecond:
+                activeNode.endpoint?.scope === 'bodyOutput' ? activeNode.endpoint.decayPerSecond : undefined,
             }}
-            onUpdate={() => {}}
+            onUpdate={(updatedSignal) => {
+              onUpdateNode(activeNode.id, {
+                label: updatedSignal.label,
+                nodeKind: 'signal',
+                source: updatedSignal.source,
+                target: updatedSignal.target,
+                scale: updatedSignal.scale,
+                decayPerSecond: updatedSignal.decayPerSecond,
+              });
+            }}
+          />
+        )}
+        {detailModal.type === 'node' && activeNode?.kind === 'neuron-group' && (
+          <GroupDetailEditor
+            group={{
+              id: activeNode.id,
+              label: activeNode.label,
+            }}
+            onUpdate={(updatedGroup) => {
+              onUpdateNode(activeNode.id, {
+                label: updatedGroup.label,
+                nodeKind: 'neuron-group',
+              });
+            }}
           />
         )}
         {detailModal.type === 'link' && activeLink && !activeLink.aggregate && activeLink.editable && (
@@ -228,8 +271,25 @@ const GraphDetailModal: React.FC<GraphDetailModalProps> = ({
             <div data-testid="topology-aggregate-link-to-ref">{activeLink.toRefNodeId}</div>
             <div data-testid="topology-aggregate-link-count">{String(activeLink.count)}</div>
             <div data-testid="topology-aggregate-link-weight">{formatAggregateWeight(activeLink.weight)}</div>
-            <div data-testid="topology-aggregate-link-readonly">只读摘要链路</div>
             <div data-testid="topology-aggregate-link-leaf-ids">{activeLink.leafLinkIds.join('|')}</div>
+            <ConnectionDetailEditor
+              connection={resolveAggregateEditableConnection(activeLink)}
+              onUpdate={(updatedConnection) => {
+                onUpdateLink(activeLink.id, {
+                  weight: updatedConnection.resolvedParameters.weight,
+                  delayMs: updatedConnection.resolvedParameters.delayMs,
+                  synapseModelId: updatedConnection.synapseModelId,
+                  parameterOverrides: {
+                    ...(updatedConnection.parameterOverrides.weight == null
+                      ? {}
+                      : { weight: updatedConnection.parameterOverrides.weight }),
+                    ...(updatedConnection.parameterOverrides.delayMs == null
+                      ? {}
+                      : { delayMs: updatedConnection.parameterOverrides.delayMs }),
+                  },
+                });
+              }}
+            />
           </div>
         )}
       </div>

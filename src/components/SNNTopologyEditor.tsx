@@ -87,9 +87,13 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
     removeSelected,
     addNeuronAt,
     addNeuronGroupAt,
+    addInputSignalAt,
+    addOutputSignalAt,
     createNeuronAndConnectAt,
     aggregateSelectedNodes,
     ungroupNode,
+    moveNodeOutToParent,
+    moveSelectionIntoGroup,
     setCanvasOffset: setCanvasOffsetState,
     setCanvasSession: setCanvasSessionState,
     syncCanvasViewportForScope,
@@ -97,6 +101,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
     canvasScale,
     updateNodeLabelAndParams,
     updateLinkWeight,
+    updateAggregateLinks,
   } = state;
 
   const handleLinkDetailUpdate = (
@@ -118,18 +123,35 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
       return;
     }
 
+    const activeLink = links.find((link) => link.id === linkId) ?? null;
+    if (activeLink?.aggregate) {
+      updateAggregateLinks(activeLink.leafLinkIds, payload);
+      return;
+    }
+
     updateLinkWeight(linkId, payload);
   };
 
   const selectedCount = selectedNodeIds.length + (selectedLinkId ? 1 : 0);
 
-  const canCreateNeuronHere = currentContainerKind === 'neuron-group';
-  const canAggregateSelection = currentContainerKind === 'neuron-group' && selectedNodeIds.length > 1;
-  const canUngroupNodesHere = currentContainerKind === 'neuron-group';
+  const canCreateNeuronHere = currentContainerKind === 'root' || currentContainerKind === 'neuron-group';
+  const canCreateSignalHere = currentScope === 'root';
+  const canAggregateSelection =
+    (currentContainerKind === 'root' || currentContainerKind === 'neuron-group') && selectedNodeIds.length > 1;
+  const canUngroupNodesHere = currentContainerKind === 'root' || currentContainerKind === 'neuron-group';
+  const hasContainerParent = currentScope === 'child';
+  const canMoveNodeOutToParent = currentContainerKind === 'neuron-group' && hasContainerParent;
+  const canMoveSelectionIntoGroup =
+    (currentContainerKind === 'root' || currentContainerKind === 'neuron-group') && selectedNodeIds.length > 0;
+  const canMoveSelectionOutToParent = currentContainerKind === 'neuron-group' && hasContainerParent && selectedNodeIds.length > 0;
   const canvasCapabilities = {
     canCreateNodeAtCanvasContext: canCreateNeuronHere,
+    canCreateSignalAtCanvasContext: canCreateSignalHere,
     canAggregateSelection,
     canUngroupGroupNode: canUngroupNodesHere,
+    canMoveNodeOutToParent,
+    canMoveSelectionIntoGroup,
+    canMoveSelectionOutToParent,
   } as const;
 
   const {
@@ -218,6 +240,18 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
       <GraphTopologyDiagnostics
         {...diagnostics}
       />
+      {canMoveSelectionOutToParent && selectedNodeId ? (
+        <div className="topology-inline-actions">
+          <button
+            type="button"
+            className="topology-inline-action"
+            data-testid="topology-action-move-out"
+            onClick={() => moveNodeOutToParent(selectedNodeId)}
+          >
+            移到上一级
+          </button>
+        </div>
+      ) : null}
 
       <GraphTopologyCanvas
         surfaceRef={surfaceRef}
@@ -248,9 +282,14 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
         onCloseContextMenu={closeContextMenu}
         onAddNeuronAt={addNeuronAt}
         onAddNeuronGroupAt={addNeuronGroupAt}
+        onAddInputSignalAt={addInputSignalAt}
+        onAddOutputSignalAt={addOutputSignalAt}
         onAggregateSelectedNodes={aggregateSelectedNodes}
         onUngroupNode={ungroupNode}
         onToggleGroupExpanded={toggleInlineExpansionForNode}
+        onMoveNodeOutToParent={moveNodeOutToParent}
+        onMoveSelectionIntoGroup={moveSelectionIntoGroup}
+        onRemoveSelection={removeSelected}
       />
 
       <GraphDetailModal

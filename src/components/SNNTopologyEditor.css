@@ -8,6 +8,30 @@
   background: #202020;
 }
 
+.topology-inline-actions {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 9;
+  display: flex;
+  gap: 8px;
+}
+
+.topology-inline-action {
+  appearance: none;
+  min-height: 24px;
+  padding: 4px 10px;
+  border: 1px solid #5f7b5f;
+  background: rgba(36, 48, 36, 0.94);
+  color: #d6e3d6;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.topology-inline-action:hover {
+  background: rgba(54, 72, 54, 0.98);
+}
+
 .topology-surface {
   position: relative;
   width: 100%;
@@ -302,12 +326,26 @@
 }
 
 .topology-node.is-expanded-child.is-neuron .topology-node-titlebar,
-.topology-node.is-expanded-child.is-neuron .topology-node-label,
 .topology-node.is-expanded-child.is-neuron .topology-node-detail,
 .topology-node.is-expanded-child.is-signal .topology-node-titlebar,
-.topology-node.is-expanded-child.is-signal .topology-node-label,
 .topology-node.is-expanded-child.is-signal .topology-node-detail {
   display: none;
+}
+
+.topology-node-inline-label {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 6px);
+  transform: translateX(-50%);
+  max-width: 120px;
+  color: #ddd;
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
 }
 
 .topology-node.is-selected .topology-node-shape,

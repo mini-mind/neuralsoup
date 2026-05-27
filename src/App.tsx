@@ -6,7 +6,6 @@ import {
 import { VISION_ACTION_HOST_PROFILE } from './host';
 import type { SimulationControlMode } from './domain/world';
 import BrainLibraryModal from './components/editor/BrainLibraryModal';
-import BodyMappingPanel from './components/editor/BodyMappingPanel';
 import EditorToolbar from './components/editor/EditorToolbar';
 import GraphEditorPanel from './components/editor/GraphEditorPanel';
 import SettingsPanel from './components/editor/SettingsPanel';
@@ -100,11 +99,8 @@ const App: React.FC = () => {
     handleAgentChange,
     handleGraphAgentChange,
     handleDraftAgentParametersChange,
-    handleBodyApply,
-    handleBodyReset,
     applyDraftAgentParameters,
     resetDraftAgentParameters,
-    commitEditedAgentDocument,
   } = useAgentWorkspaceCoordinator({
     initialAgentDocument,
     defaultAgentParameters: DEFAULT_AGENT_PARAMETERS,
@@ -432,27 +428,6 @@ const App: React.FC = () => {
         </div>
 
         <div className={`content-area ${editorTab === 'settings' ? 'settings-mode' : 'snn-mode'}`}>
-          <div
-            className={`content-panel settings-control ${editorTab === 'body' ? 'is-active' : 'is-hidden'}`}
-            aria-hidden={editorTab !== 'body'}
-          >
-            <BodyMappingPanel
-              agent={draftAgentDocument}
-              worldRegistry={worldRegistry}
-              validation={bodyEndpointValidation}
-              onBodyChange={(updater) => {
-                commitEditedAgentDocument(
-                  {
-                    ...draftAgentDocumentRef.current,
-                    body: updater(draftAgentDocumentRef.current.body),
-                  },
-                  GRAPH_DRAFT_ONLY_CHANGE
-                );
-              }}
-              onApply={handleBodyApply}
-              onReset={handleBodyReset}
-            />
-          </div>
           <GraphEditorPanel
             isActive={editorTab === 'graph'}
             agent={draftAgentDocument}

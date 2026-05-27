@@ -1,4 +1,5 @@
 import type { GraphPoint } from '../tools/canvasGeometry';
+import type { GraphSelectionContextMenuMode } from './contextMenuPolicy';
 
 export type GraphInteractionState =
   | {
@@ -23,6 +24,7 @@ export type GraphInteractionState =
       contextNodeIds: string[];
       sourceNodeIds: string[];
       sourceScenePoint: GraphPoint | null;
+      singleNodeLeaf: boolean;
       moved: boolean;
     }
   | {
@@ -56,9 +58,23 @@ export type GraphInteractionState =
       moved: boolean;
     };
 
-export interface GraphContextMenuState {
-  kind: 'canvas' | 'selection' | 'group';
-  client: GraphPoint;
-  scene: GraphPoint;
-  nodeIds: string[];
-}
+export type GraphContextMenuState =
+  | {
+      kind: 'canvas';
+      client: GraphPoint;
+      scene: GraphPoint;
+      nodeIds: [];
+    }
+  | {
+      kind: 'selection';
+      client: GraphPoint;
+      scene: GraphPoint;
+      nodeIds: string[];
+      selectionMode: Exclude<GraphSelectionContextMenuMode, 'none'>;
+    }
+  | {
+      kind: 'group';
+      client: GraphPoint;
+      scene: GraphPoint;
+      nodeIds: [string];
+    };

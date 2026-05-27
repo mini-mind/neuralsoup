@@ -25,6 +25,7 @@ export interface GraphViewNode {
   movable: boolean;
   local: boolean;
   previewOnly: boolean;
+  rootExpandedProjection: boolean;
   direction: 'input' | 'output' | 'internal';
   connectableSource: boolean;
   connectableTarget: boolean;

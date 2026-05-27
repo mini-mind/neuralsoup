@@ -3,8 +3,12 @@ import type { GraphPoint } from './tools/canvasGeometry';
 
 export interface SharedCanvasCapabilities {
   canCreateNodeAtCanvasContext: boolean;
+  canCreateSignalAtCanvasContext: boolean;
   canAggregateSelection: boolean;
   canUngroupGroupNode: boolean;
+  canMoveNodeOutToParent: boolean;
+  canMoveSelectionIntoGroup: boolean;
+  canMoveSelectionOutToParent: boolean;
 }
 
 export interface SharedCanvasCallbacks {

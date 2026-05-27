@@ -22,12 +22,19 @@ import {
 import { findIntersectedNodeIds, findSceneNodeAtClientPoint } from '../tools/nodeHitTest';
 import type { GraphContextMenuState, GraphInteractionState } from './interactionSession';
 import type { SharedCanvasCallbacks, SharedCanvasCapabilities } from '../sharedCanvasCore';
+import {
+  resolveContextGestureLinkMode,
+  resolveNodeContextGestureTarget,
+  resolveSelectionContextMenuMode,
+  shouldReselectContextNode,
+} from './contextMenuPolicy';
 
 interface OrchestratorNode extends SceneNodeGeometry {
   proxy: boolean;
   movable: boolean;
   local: boolean;
   previewOnly: boolean;
+  rootExpandedProjection: boolean;
   connectableSource: boolean;
   ungroupable: boolean;
   contextMenuGroup: boolean;
@@ -63,7 +70,10 @@ interface GraphInteractionDependencies {
   >;
   scale: number;
   selectedNodeIds: string[];
-  capabilities: Pick<SharedCanvasCapabilities, 'canCreateNodeAtCanvasContext' | 'canAggregateSelection'>;
+  capabilities: Pick<
+    SharedCanvasCapabilities,
+    'canCreateNodeAtCanvasContext' | 'canCreateSignalAtCanvasContext' | 'canAggregateSelection' | 'canMoveSelectionOutToParent'
+  >;
 }
 
 export interface GraphInteractionOrchestratorResult {
@@ -217,33 +227,6 @@ export const useGraphInteractionOrchestrator = ({
     [getNodeById, resolveHitAreaFromPoint, sceneRef]
   );
 
-  const resolveNodeHitIncludingSources = useCallback(
-    (target: EventTarget | null, clientPoint: GraphPoint) => {
-      if (resolveHitAreaFromPoint(clientPoint) === 'group-body') {
-        return null;
-      }
-
-      const targetElement = target instanceof Element ? target : null;
-      if (targetElement?.closest<HTMLElement>('[data-topology-hit-area="group-body"]')) {
-        return null;
-      }
-      const domNodeId = targetElement?.closest<HTMLElement>('[data-topology-view-node-id]')?.dataset.topologyViewNodeId;
-      if (domNodeId) {
-        return getNodeById(domNodeId);
-      }
-
-      const hitNode = findSceneNodeAtClientPoint(
-        nodesRef.current,
-        clientPoint,
-        sceneRef.current?.getBoundingClientRect() ?? null,
-        scaleRef.current
-      );
-
-      return hitNode ? getNodeById(hitNode.id) : null;
-    },
-    [getNodeById, resolveHitAreaFromPoint, sceneRef]
-  );
-
   const beginCanvasContextGesture = useCallback(
     (startClient: GraphPoint) => {
       closeContextMenu();
@@ -257,6 +240,7 @@ export const useGraphInteractionOrchestrator = ({
         contextNodeIds: [],
         sourceNodeIds: [],
         sourceScenePoint: null,
+        singleNodeLeaf: false,
         moved: false,
       });
     },
@@ -268,40 +252,43 @@ export const useGraphInteractionOrchestrator = ({
       closeContextMenu();
       focusSurface();
       const sourceNodeIds = getNodeContextSourceNodeIds(node);
-      const selectionGesture = selectedNodeIds.length > 1 && selectedNodeIds.includes(node.id);
-      const singleGroupGesture = !selectionGesture && node.contextMenuGroup;
+      const contextTarget = resolveNodeContextGestureTarget({
+        selectedNodeIds,
+        nodeId: node.id,
+        canMoveSelectionOutToParent: capabilities.canMoveSelectionOutToParent,
+        contextMenuGroup: node.contextMenuGroup,
+      });
+      const contextNodeIds =
+        selectedNodeIds.length > 0 && selectedNodeIds.includes(node.id) ? [...selectedNodeIds] : [node.id];
 
-      if (!selectionGesture && !singleGroupGesture && sourceNodeIds.length > 0) {
-        const sourceScenePoint = getSourceScenePoint(sourceNodeIds);
-        if (sourceScenePoint) {
-          setInteractionState({
-            type: 'linking',
-            sourceNodeIds,
-            mode: 'single',
-            sourceScenePoint,
-            currentScenePoint: sourceScenePoint,
-            moved: false,
-          });
-          return;
-        }
+      if (
+        shouldReselectContextNode({
+          selectedNodeIds,
+          nodeId: node.id,
+          contextTarget,
+        })
+      ) {
+        callbacks.onNodesSelect([node.id]);
       }
 
       setInteractionState({
         type: 'context-gesture',
-        contextTarget: singleGroupGesture ? 'group' : 'selection',
+        contextTarget,
         startClient: { x: event.clientX, y: event.clientY },
         startScene: getScenePoint({ x: event.clientX, y: event.clientY }),
         startOffset: viewportRef.current,
-        contextNodeIds:
-          selectedNodeIds.length > 0 && selectedNodeIds.includes(node.id) ? [...selectedNodeIds] : [node.id],
+        contextNodeIds,
         sourceNodeIds,
         sourceScenePoint: getSourceScenePoint(sourceNodeIds),
+        singleNodeLeaf: node.local && !node.contextMenuGroup,
         moved: false,
       });
     },
     [
+      capabilities.canMoveSelectionOutToParent,
       closeContextMenu,
       focusSurface,
+      callbacks,
       getNodeContextSourceNodeIds,
       getScenePoint,
       getSourceScenePoint,
@@ -422,14 +409,26 @@ export const useGraphInteractionOrchestrator = ({
             kind: 'group',
             client: currentInteraction.startClient,
             scene: currentInteraction.startScene,
-            nodeIds: currentInteraction.contextNodeIds,
+            nodeIds: [currentInteraction.contextNodeIds[0]],
           });
-        } else if (currentInteraction.contextTarget === 'selection' && capabilities.canAggregateSelection) {
+        } else if (currentInteraction.contextTarget === 'selection') {
+          const selectionMode = resolveSelectionContextMenuMode({
+            contextNodeCount: currentInteraction.contextNodeIds.length,
+            singleNodeLeaf: currentInteraction.singleNodeLeaf,
+            canAggregateSelection: capabilities.canAggregateSelection,
+            canMoveSelectionOutToParent: capabilities.canMoveSelectionOutToParent,
+          });
+          if (selectionMode === 'none') {
+            setInteractionState(null);
+            return;
+          }
+
           setContextMenu({
             kind: 'selection',
             client: currentInteraction.startClient,
             scene: currentInteraction.startScene,
-            nodeIds: currentInteraction.sourceNodeIds,
+            nodeIds: currentInteraction.contextNodeIds,
+            selectionMode,
           });
         }
       }
@@ -455,6 +454,7 @@ export const useGraphInteractionOrchestrator = ({
       callbacks,
       capabilities.canAggregateSelection,
       capabilities.canCreateNodeAtCanvasContext,
+      capabilities.canMoveSelectionOutToParent,
       getNodeById,
       setInteractionState,
     ]
@@ -611,7 +611,7 @@ export const useGraphInteractionOrchestrator = ({
           setInteractionState({
             type: 'linking',
             sourceNodeIds: currentInteraction.sourceNodeIds,
-            mode: 'multi',
+            mode: resolveContextGestureLinkMode(currentInteraction.contextNodeIds.length),
             sourceScenePoint: currentInteraction.sourceScenePoint,
             currentScenePoint: getScenePoint({ x: event.clientX, y: event.clientY }),
             moved: true,
@@ -692,7 +692,7 @@ export const useGraphInteractionOrchestrator = ({
       if (currentInteraction?.type === 'linking') {
         const releaseClientPoint = { x: event.clientX, y: event.clientY };
         const releasedOnSourceNode = currentInteraction.sourceNodeIds.includes(
-          resolveNodeHitIncludingSources(event.target, releaseClientPoint)?.id ?? ''
+          resolveNodeHit(event.target, releaseClientPoint)?.id ?? ''
         );
         const targetNode =
           releasedOnSourceNode
@@ -752,7 +752,6 @@ export const useGraphInteractionOrchestrator = ({
     isActive,
     resolveHitAreaFromPoint,
     resolveNodeHit,
-    resolveNodeHitIncludingSources,
     sceneRef,
     selectedNodeIds,
     setInteractionState,

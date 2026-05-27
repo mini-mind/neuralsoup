@@ -641,3 +641,136 @@ export const createNeuronAndConnectInContainer = (agent: AgentIR, input: CreateN
   const result = tryCreateNeuronAndConnectInContainer(agent, input);
   return result.ok ? result.agent : agent;
 };
+
+export interface ReparentAgentNodeInput {
+  nodeId: string;
+  fromContainerId: string;
+  toContainerId: string;
+  nextPosition?: Position;
+}
+
+const isContainerAncestorOf = (
+  containersById: Map<string, BrainContainerNode>,
+  ancestorId: string,
+  targetContainerId: string
+): boolean => {
+  const target = containersById.get(targetContainerId);
+  if (!target) {
+    return false;
+  }
+
+  for (const child of target.children) {
+    if (child.scope !== 'container') {
+      continue;
+    }
+    if (child.nodeId === ancestorId) {
+      return true;
+    }
+    if (isContainerAncestorOf(containersById, ancestorId, child.nodeId)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+export const tryReparentAgentNode = (
+  agent: AgentIR,
+  { nodeId, fromContainerId, toContainerId, nextPosition }: ReparentAgentNodeInput
+): AgentGraphEditingResult => {
+  const fromContainer = agent.brain.containers.find((container) => container.id === fromContainerId);
+  if (!fromContainer) {
+    return rejectAgentGraphEdit([
+      createAgentGraphEditingIssue(
+        'missing-parent-container',
+        `Cannot move node "${nodeId}" from missing container "${fromContainerId}".`
+      ),
+    ]);
+  }
+
+  const toContainer = agent.brain.containers.find((container) => container.id === toContainerId);
+  if (!toContainer) {
+    return rejectAgentGraphEdit([
+      createAgentGraphEditingIssue(
+        'missing-target-container',
+        `Cannot move node "${nodeId}" into missing container "${toContainerId}".`
+      ),
+    ]);
+  }
+
+  const movingChild = fromContainer.children.find((child) => child.nodeId === nodeId) ?? null;
+  const preconditions: AgentGraphEditingIssue[] = [];
+  if (!movingChild) {
+    preconditions.push(
+      createAgentGraphEditingIssue(
+        'child-not-owned-by-parent',
+        `Cannot move node "${nodeId}" because it is not owned by "${fromContainerId}".`
+      )
+    );
+  }
+
+  if (fromContainerId === toContainerId) {
+    preconditions.push(
+      createAgentGraphEditingIssue(
+        'child-not-owned-by-parent',
+        `Cannot move node "${nodeId}" into the same container "${toContainerId}".`
+      )
+    );
+  }
+
+  if (toContainer.children.some((child) => child.nodeId === nodeId)) {
+    preconditions.push(
+      createAgentGraphEditingIssue(
+        'duplicate-node-id',
+        `Cannot move node "${nodeId}" into "${toContainerId}" because it already owns that child reference.`
+      )
+    );
+  }
+
+  if (movingChild?.scope === 'container') {
+    const containersById = new Map(agent.brain.containers.map((container) => [container.id, container]));
+    if (nodeId === toContainerId || isContainerAncestorOf(containersById, toContainerId, nodeId)) {
+      preconditions.push(
+        createAgentGraphEditingIssue(
+          'cycle-detected',
+          `Cannot move container "${nodeId}" into descendant container "${toContainerId}".`
+        )
+      );
+    }
+  }
+
+  if (preconditions.length > 0) {
+    return rejectAgentGraphEdit(preconditions);
+  }
+
+  return validateAgentGraphEdit(agent, () => {
+    let nextAgent: AgentIR = {
+      ...agent,
+      brain: {
+        ...agent.brain,
+        containers: updateBrainContainerById(
+          updateBrainContainerById(agent.brain.containers, fromContainerId, (container) => ({
+            ...container,
+            children: container.children.filter((child) => child.nodeId !== nodeId),
+          })),
+          toContainerId,
+          (container) => ({
+            ...container,
+            children: [...container.children, { ...(movingChild as NonNullable<typeof movingChild>) }],
+          })
+        ),
+      },
+    };
+
+    if (nextPosition) {
+      nextAgent = withLayoutNodePosition(nextAgent, nodeId, nextPosition);
+    }
+
+    return nextAgent;
+  });
+};
+
+export const reparentAgentNode = (agent: AgentIR, input: ReparentAgentNodeInput): AgentIR => {
+  const result = tryReparentAgentNode(agent, input);
+  return result.ok ? result.agent : agent;
+};

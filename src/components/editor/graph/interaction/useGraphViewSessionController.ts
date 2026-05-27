@@ -3,12 +3,14 @@ import type { GraphInteractionOrchestratorResult } from './useGraphInteractionOr
 import { useGraphInteractionOrchestrator } from './useGraphInteractionOrchestrator';
 import type { GraphPoint, GraphViewport, SceneNodeGeometry } from '../tools/canvasGeometry';
 import type { SharedCanvasCallbacks, SharedCanvasCapabilities } from '../sharedCanvasCore';
+import { getGraphContextMenuItemCount } from './contextMenuPolicy';
 
 interface GraphViewSessionControllerNode extends SceneNodeGeometry {
   proxy: boolean;
   movable: boolean;
   local: boolean;
   previewOnly: boolean;
+  rootExpandedProjection: boolean;
   connectableSource: boolean;
   ungroupable: boolean;
   contextMenuGroup: boolean;
@@ -46,7 +48,16 @@ interface GraphViewSessionControllerOptions {
   >;
   scale: number;
   selectedNodeIds: string[];
-  capabilities: Pick<SharedCanvasCapabilities, 'canCreateNodeAtCanvasContext' | 'canAggregateSelection'>;
+  capabilities: Pick<
+    SharedCanvasCapabilities,
+    | 'canCreateNodeAtCanvasContext'
+    | 'canCreateSignalAtCanvasContext'
+    | 'canAggregateSelection'
+    | 'canMoveSelectionOutToParent'
+    | 'canUngroupGroupNode'
+    | 'canMoveNodeOutToParent'
+    | 'canMoveSelectionIntoGroup'
+  >;
   isEditableOrInteractiveTarget: (target: EventTarget | null) => boolean;
 }
 
@@ -194,14 +205,18 @@ export const useGraphViewSessionController = ({
       contextMenu.kind === 'group' && contextMenu.nodeIds.length === 1
         ? nodes.find((node) => node.id === contextMenu.nodeIds[0]) ?? null
         : null;
-    const menuItemCount =
-      contextMenu.kind === 'group'
-        ? contextMenuNode?.ungroupable
-          ? 2
-          : 1
-        : contextMenu.kind === 'selection'
-          ? 1
-          : 2;
+    const menuItemCount = getGraphContextMenuItemCount({
+      kind: contextMenu.kind,
+      canCreateNodeAtCanvasContext: capabilities.canCreateNodeAtCanvasContext,
+      canCreateSignalAtCanvasContext: capabilities.canCreateSignalAtCanvasContext,
+      canAggregateSelection: capabilities.canAggregateSelection,
+      canMoveSelectionOutToParent: capabilities.canMoveSelectionOutToParent,
+      canUngroupGroupNode: capabilities.canUngroupGroupNode,
+      canMoveNodeOutToParent: capabilities.canMoveNodeOutToParent,
+      canMoveSelectionIntoGroup: capabilities.canMoveSelectionIntoGroup,
+      ungroupable: Boolean(contextMenuNode?.ungroupable),
+      selectionMode: contextMenu.kind === 'selection' ? contextMenu.selectionMode : 'none',
+    });
     const menuHeight = menuItemCount * CONTEXT_MENU_ITEM_HEIGHT + CONTEXT_MENU_VERTICAL_PADDING;
 
     return {
@@ -214,7 +229,7 @@ export const useGraphViewSessionController = ({
         Math.min(contextMenu.client.y - rect.top, rect.height - menuHeight - CONTEXT_MENU_MARGIN)
       ),
     };
-  }, [contextMenu, surfaceRef]);
+  }, [capabilities, contextMenu, nodes, surfaceRef]);
 
   const pendingLinkLine = useMemo(() => {
     if (interaction?.type !== 'linking') {
