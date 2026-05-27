@@ -36,6 +36,8 @@ interface OrchestratorNode extends SceneNodeGeometry {
   titleDragHandleOnly: boolean;
 }
 
+type NodeHitArea = 'node' | 'group-title' | 'group-body';
+
 interface GraphInteractionDependencies {
   isActive: boolean;
   surfaceRef: RefObject<HTMLDivElement>;
@@ -73,8 +75,8 @@ export interface GraphInteractionOrchestratorResult {
   handleCanvasWheel: (event: WheelEvent) => void;
   handleCanvasMouseDown: (event: ReactMouseEvent<HTMLDivElement>) => void;
   handleCanvasContextMenu: (event: ReactMouseEvent<HTMLDivElement>) => void;
-  handleNodeMouseDown: (event: ReactMouseEvent<HTMLDivElement>, nodeId: string) => void;
-  handleNodeContextMenu: (event: ReactMouseEvent<HTMLDivElement>) => void;
+  handleNodeMouseDown: (event: ReactMouseEvent<HTMLDivElement>, nodeId: string, _hitArea?: NodeHitArea) => void;
+  handleNodeContextMenu: (event: ReactMouseEvent<HTMLDivElement>, _nodeId: string, _hitArea?: NodeHitArea) => void;
 }
 
 type MovingInteraction = Extract<GraphInteractionState, { type: 'moving' }>;
@@ -138,9 +140,9 @@ export const useGraphInteractionOrchestrator = ({
     []
   );
 
-  const shouldTreatPointAsExpandedGroupBody = useCallback((clientPoint: GraphPoint) => {
+  const resolveHitAreaFromPoint = useCallback((clientPoint: GraphPoint): NodeHitArea | null => {
     if (typeof document === 'undefined' || typeof document.elementsFromPoint !== 'function') {
-      return false;
+      return null;
     }
 
     const stack = document.elementsFromPoint(clientPoint.x, clientPoint.y);
@@ -149,22 +151,15 @@ export const useGraphInteractionOrchestrator = ({
         continue;
       }
 
-      if (element.closest('[data-topology-group-title-handle="true"]')) {
-        return false;
-      }
-
-      const nodeElement = element.closest<HTMLElement>('[data-topology-view-node-id]');
-      const groupBodyElement = element.closest<HTMLElement>('[data-topology-group-body="true"]');
-      if (nodeElement && !groupBodyElement) {
-        return false;
-      }
-
-      if (groupBodyElement) {
-        return true;
+      const hitArea = element
+        .closest<HTMLElement>('[data-topology-hit-area]')
+        ?.dataset.topologyHitArea as NodeHitArea | undefined;
+      if (hitArea) {
+        return hitArea;
       }
     }
 
-    return false;
+    return null;
   }, []);
 
   const getSourceScenePoint = useCallback(
@@ -197,13 +192,12 @@ export const useGraphInteractionOrchestrator = ({
 
   const resolveNodeHit = useCallback(
     (target: EventTarget | null, clientPoint: GraphPoint) => {
-      if (shouldTreatPointAsExpandedGroupBody(clientPoint)) {
+      if (resolveHitAreaFromPoint(clientPoint) === 'group-body') {
         return null;
       }
 
       const targetElement = target instanceof Element ? target : null;
-      const groupBodyElement = targetElement?.closest<HTMLElement>('[data-topology-group-body="true"]');
-      if (groupBodyElement) {
+      if (targetElement?.closest<HTMLElement>('[data-topology-hit-area="group-body"]')) {
         return null;
       }
       const domNodeId = targetElement?.closest<HTMLElement>('[data-topology-view-node-id]')?.dataset.topologyViewNodeId;
@@ -220,18 +214,17 @@ export const useGraphInteractionOrchestrator = ({
 
       return hitNode ? getNodeById(hitNode.id) : null;
     },
-    [getNodeById, sceneRef, shouldTreatPointAsExpandedGroupBody]
+    [getNodeById, resolveHitAreaFromPoint, sceneRef]
   );
 
   const resolveNodeHitIncludingSources = useCallback(
     (target: EventTarget | null, clientPoint: GraphPoint) => {
-      if (shouldTreatPointAsExpandedGroupBody(clientPoint)) {
+      if (resolveHitAreaFromPoint(clientPoint) === 'group-body') {
         return null;
       }
 
       const targetElement = target instanceof Element ? target : null;
-      const groupBodyElement = targetElement?.closest<HTMLElement>('[data-topology-group-body="true"]');
-      if (groupBodyElement) {
+      if (targetElement?.closest<HTMLElement>('[data-topology-hit-area="group-body"]')) {
         return null;
       }
       const domNodeId = targetElement?.closest<HTMLElement>('[data-topology-view-node-id]')?.dataset.topologyViewNodeId;
@@ -248,7 +241,7 @@ export const useGraphInteractionOrchestrator = ({
 
       return hitNode ? getNodeById(hitNode.id) : null;
     },
-    [getNodeById, sceneRef, shouldTreatPointAsExpandedGroupBody]
+    [getNodeById, resolveHitAreaFromPoint, sceneRef]
   );
 
   const beginCanvasContextGesture = useCallback(
@@ -504,10 +497,7 @@ export const useGraphInteractionOrchestrator = ({
         }
 
         const pressedHandleOnly = pressedNode.titleDragHandleOnly;
-        const targetElement = event.target instanceof Element ? event.target : null;
-        const pressedOnHandle = Boolean(
-          targetElement?.closest('[data-topology-group-title-handle="true"]')
-        );
+        const pressedOnHandle = resolveHitAreaFromPoint({ x: event.clientX, y: event.clientY }) === 'group-title';
         if (pressedHandleOnly && !pressedOnHandle) {
           callbacks.onSelectionClear();
           callbacks.onSelectionBoxStart(currentInteraction.startScene);
@@ -760,6 +750,7 @@ export const useGraphInteractionOrchestrator = ({
     getMovingPositions,
     getScenePoint,
     isActive,
+    resolveHitAreaFromPoint,
     resolveNodeHit,
     resolveNodeHitIncludingSources,
     sceneRef,
@@ -851,7 +842,7 @@ export const useGraphInteractionOrchestrator = ({
   }, []);
 
   const handleNodeMouseDown = useCallback(
-    (event: ReactMouseEvent<HTMLDivElement>, nodeId: string) => {
+    (event: ReactMouseEvent<HTMLDivElement>, nodeId: string, _hitArea?: NodeHitArea) => {
       if (!isActive) {
         return;
       }
@@ -875,7 +866,7 @@ export const useGraphInteractionOrchestrator = ({
     [beginNodeContextGesture, beginNodePressing, getNodeById, isActive]
   );
 
-  const handleNodeContextMenu = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+  const handleNodeContextMenu = useCallback((event: ReactMouseEvent<HTMLDivElement>, _nodeId: string, _hitArea?: NodeHitArea) => {
     event.preventDefault();
     event.stopPropagation();
   }, []);

@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentIR, WorldRegistry } from '../../domain/brain';
 import { buildAgentGraphViewModel } from '../editor/graph/agentGraphViewModel';
-import { clampZoom } from '../editor/graph/tools/canvasGeometry';
 import { useGraphEditorCommands } from './useGraphEditorCommands';
 import {
   createDefaultCanvasSessionState,
   createEmptySelectionState,
-  useGraphEditorSessionState,
+  useGraphDraftPositionState,
+  useGraphFocusQueueState,
+  useGraphSelectionInspectorState,
+  useGraphViewportSessionState,
 } from './useGraphEditorSessionState';
+import { useScopedGraphCanvasSession } from './useScopedGraphCanvasSession';
 
 export interface DetailModalData {
   type: 'node' | 'link';
@@ -120,8 +123,6 @@ export interface GraphSelectionState {
   linkId: string | null;
 }
 
-export type GraphNodeDoubleClickAction = 'enter-scope' | 'edit' | null;
-
 export interface GraphSelectionOptions {
   additive?: boolean;
 }
@@ -146,9 +147,7 @@ export interface GraphDocumentChangeOptions {
 }
 
 const uniqueIds = (ids: string[]) => Array.from(new Set(ids));
-const arePointsEqual = (left: GraphPoint, right: GraphPoint) => left.x === right.x && left.y === right.y;
-const getDefaultNavigationPath = (agent: AgentIR): string[] =>
-  agent.brain.rootContainerId ? [agent.brain.rootContainerId] : [];
+const getDefaultNavigationPath = (_agent: AgentIR): string[] => [];
 
 const areStringArraysEqual = (left: string[], right: string[]) =>
   left.length === right.length && left.every((value, index) => value === right[index]);
@@ -169,25 +168,36 @@ export const useSNNTopologyState = ({
     setShowDetailModal,
     selectionRect,
     setSelectionRect,
+  } = useGraphSelectionInspectorState();
+  const {
     canvasSession,
     setCanvasSession,
     canvasViewport,
     setCanvasViewport,
     canvasScale,
     setCanvasScale,
-    draftNodePositions,
-    setDraftNodePositions,
+  } = useGraphViewportSessionState();
+  const { draftNodePositions, setDraftNodePositions } = useGraphDraftPositionState();
+  const {
     pendingFocusNodeId,
     setPendingFocusNodeId,
     pendingFocusLinkId,
     setPendingFocusLinkId,
-  } = useGraphEditorSessionState();
+  } = useGraphFocusQueueState();
   const scopeSessionRef = useRef<string | null>(null);
   const editorSessionTokenRef = useRef(graphSessionToken);
-  const activeCanvasScopeKeyRef = useRef<string | null>(null);
-  const viewportStateByScopeKeyRef = useRef<
-    Map<string, { session: GraphCanvasSessionState; metrics: GraphCanvasViewportMetrics | null }>
-  >(new Map());
+  const {
+    resetScopedCanvasSessions,
+    setScopedCanvasOffset,
+    setScopedCanvasScale,
+    setScopedCanvasSession,
+    syncCanvasViewportForScope,
+  } = useScopedGraphCanvasSession({
+    canvasSession,
+    setCanvasViewport,
+    setCanvasScale,
+    setCanvasSession,
+  });
   const setAgent = useCallback(
     (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => {
       onAgentChange?.(updater, options);
@@ -214,7 +224,6 @@ export const useSNNTopologyState = ({
     scopeKey,
     nodes,
     viewNodeByViewId,
-    visibleNodeByRefId,
     links,
     activeViewNodeIds,
   } = agentViewModel;
@@ -342,15 +351,23 @@ export const useSNNTopologyState = ({
     }
   }, [activeLink, activeNode, setShowDetailModal, showDetailModal]);
 
-  const clearTransientState = useCallback(() => {
+  const resetSelectionInspectorState = useCallback(() => {
     scopeSessionRef.current = null;
     setSelectionState(createEmptySelectionState());
     setSelectionRect(null);
     setShowDetailModal(null);
+  }, [setSelectionState, setShowDetailModal]);
+
+  const resetDraftAndFocusState = useCallback(() => {
     setDraftNodePositions({});
     setPendingFocusNodeId(null);
     setPendingFocusLinkId(null);
   }, [setPendingFocusLinkId]);
+
+  const resetEditorTransientState = useCallback(() => {
+    resetSelectionInspectorState();
+    resetDraftAndFocusState();
+  }, [resetDraftAndFocusState, resetSelectionInspectorState]);
 
   useEffect(() => {
     if (editorSessionTokenRef.current === graphSessionToken) {
@@ -358,12 +375,11 @@ export const useSNNTopologyState = ({
     }
 
     editorSessionTokenRef.current = graphSessionToken;
-    activeCanvasScopeKeyRef.current = null;
-    viewportStateByScopeKeyRef.current = new Map();
+    resetScopedCanvasSessions();
     setNavigationPath(getDefaultNavigationPath(agent));
-    clearTransientState();
+    resetEditorTransientState();
     setCanvasSession(createDefaultCanvasSessionState());
-  }, [agent, clearTransientState, graphSessionToken, setCanvasSession]);
+  }, [agent, graphSessionToken, resetEditorTransientState, resetScopedCanvasSessions, setCanvasSession]);
 
   useEffect(() => {
     if (hasValidNavigationPath) {
@@ -371,8 +387,8 @@ export const useSNNTopologyState = ({
     }
 
     setNavigationPath(getDefaultNavigationPath(agent));
-    clearTransientState();
-  }, [agent, clearTransientState, hasValidNavigationPath]);
+    resetEditorTransientState();
+  }, [agent, hasValidNavigationPath, resetEditorTransientState]);
 
   useEffect(() => {
     if (scopeSessionRef.current === scopeKey) {
@@ -383,18 +399,10 @@ export const useSNNTopologyState = ({
   }, [scopeKey]);
 
   useEffect(() => {
-    if (navigationPath.length > 0) {
-      return;
+    if (navigationPath.length === 0) {
+      scopeSessionRef.current = 'root';
     }
-
-    const defaultPath = getDefaultNavigationPath(agent);
-    if (defaultPath.length > 0) {
-      setNavigationPath(defaultPath);
-      return;
-    }
-
-    scopeSessionRef.current = 'root';
-  }, [agent, navigationPath.length]);
+  }, [navigationPath.length]);
 
   const navigateTo = useCallback(
     (nodeId: string) => {
@@ -409,9 +417,9 @@ export const useSNNTopologyState = ({
       }
 
       setNavigationPath(path);
-      clearTransientState();
+      resetEditorTransientState();
     },
-    [agentViewModel.indexes.pathById, clearTransientState, viewNodeByViewId]
+    [agentViewModel.indexes.pathById, resetEditorTransientState, viewNodeByViewId]
   );
 
   const navigateToBreadcrumb = useCallback(
@@ -427,9 +435,9 @@ export const useSNNTopologyState = ({
         setNavigationPath(path);
       }
 
-      clearTransientState();
+      resetEditorTransientState();
     },
-    [agent, agentViewModel.indexes.pathById, clearTransientState]
+    [agent, agentViewModel.indexes.pathById, resetEditorTransientState]
   );
 
   const selectNode = useCallback(
@@ -602,28 +610,25 @@ export const useSNNTopologyState = ({
     setDraftNodePositions({});
   }, []);
 
-  const getNodeDoubleClickAction = useCallback(
-    (nodeId: string): GraphNodeDoubleClickAction => {
-      const node = viewNodeByViewId.get(nodeId);
-      if (!node) {
-        return null;
-      }
-
-      if (node.kind === 'adapter') {
-        return node.adapterNavigable ? 'enter-scope' : null;
-      }
-
-      if (node.navigable) {
-        return 'enter-scope';
-      }
-
-      if (node.editable && !node.proxy && !node.previewOnly) {
-        return 'edit';
-      }
-
-      return null;
-    },
-    [viewNodeByViewId]
+  const commandSessionEffects = useMemo(
+    () => ({
+      clearSelection,
+      scheduleFocusNode: setPendingFocusNodeId,
+      scheduleFocusLink: setPendingFocusLinkId,
+      clearSelectionRect: cancelSelectionRect,
+      clearDraftNodePositions,
+      closeDetailModal,
+      dismissDetailModalIf,
+    }),
+    [
+      cancelSelectionRect,
+      clearDraftNodePositions,
+      clearSelection,
+      closeDetailModal,
+      dismissDetailModalIf,
+      setPendingFocusLinkId,
+      setPendingFocusNodeId,
+    ]
   );
 
   const {
@@ -649,18 +654,11 @@ export const useSNNTopologyState = ({
     indexes: agentViewModel.indexes,
     localLeafIds: agentViewModel.localLeafIds,
     viewNodeByViewId,
-    visibleNodeByRefId,
     links,
     selectionState,
     draftNodePositions,
     setDraftNodePositions,
-    clearSelection,
-    scheduleFocusNode: setPendingFocusNodeId,
-    scheduleFocusLink: setPendingFocusLinkId,
-    clearSelectionRect: cancelSelectionRect,
-    clearDraftNodePositions,
-    closeDetailModal,
-    dismissDetailModalIf,
+    sessionEffects: commandSessionEffects,
   });
 
   const enterScopeFromNode = useCallback((nodeId: string) => {
@@ -691,166 +689,6 @@ export const useSNNTopologyState = ({
       toggleGroupExpanded(nodeId);
     }
   }, [toggleGroupExpanded, viewNodeByViewId]);
-
-  const setCanvasOffset = useCallback((offset: GraphCanvasViewport) => {
-    const activeScopeKey = activeCanvasScopeKeyRef.current;
-    if (activeScopeKey) {
-      const currentRecord = viewportStateByScopeKeyRef.current.get(activeScopeKey);
-      viewportStateByScopeKeyRef.current.set(activeScopeKey, {
-        session: {
-          viewport: offset,
-          scale: currentRecord?.session.scale ?? canvasSession.scale,
-        },
-        metrics: currentRecord?.metrics ?? null,
-      });
-    }
-    setCanvasViewport(offset);
-  }, [canvasSession.scale, setCanvasViewport]);
-
-  const setCanvasScaleState = useCallback((nextScale: number) => {
-    const normalizedScale = clampZoom(nextScale);
-    const activeScopeKey = activeCanvasScopeKeyRef.current;
-    if (activeScopeKey) {
-      const currentRecord = viewportStateByScopeKeyRef.current.get(activeScopeKey);
-      viewportStateByScopeKeyRef.current.set(activeScopeKey, {
-        session: {
-          viewport: currentRecord?.session.viewport ?? canvasSession.viewport,
-          scale: normalizedScale,
-        },
-        metrics: currentRecord?.metrics ?? null,
-      });
-    }
-    setCanvasScale(normalizedScale);
-  }, [canvasSession.viewport, setCanvasScale]);
-
-  const setCanvasSessionState = useCallback((nextSession: GraphCanvasSessionState) => {
-    const normalizedSession: GraphCanvasSessionState = {
-      viewport: nextSession.viewport,
-      scale: clampZoom(nextSession.scale),
-    };
-    const activeScopeKey = activeCanvasScopeKeyRef.current;
-    if (activeScopeKey) {
-      const currentRecord = viewportStateByScopeKeyRef.current.get(activeScopeKey);
-      viewportStateByScopeKeyRef.current.set(activeScopeKey, {
-        session: normalizedSession,
-        metrics: currentRecord?.metrics ?? null,
-      });
-    }
-    setCanvasSession((currentSession) => {
-      if (
-        arePointsEqual(currentSession.viewport, normalizedSession.viewport) &&
-        currentSession.scale === normalizedSession.scale
-      ) {
-        return currentSession;
-      }
-
-      return normalizedSession;
-    });
-  }, [setCanvasSession]);
-
-  const syncCanvasViewportForScope = useCallback(
-    ({
-      scopeKey: nextScopeKey,
-      recommendedViewport,
-      metrics,
-      isActive,
-    }: {
-      scopeKey: string;
-      recommendedViewport: GraphCanvasViewport;
-      metrics: GraphCanvasViewportMetrics;
-      isActive: boolean;
-    }) => {
-      if (metrics.width <= 1 || metrics.height <= 1) {
-        return;
-      }
-
-      const viewportStateByScopeKey = viewportStateByScopeKeyRef.current;
-      const previousActiveScopeKey = activeCanvasScopeKeyRef.current;
-      const existingRecord = viewportStateByScopeKey.get(nextScopeKey) ?? null;
-      const recommendedSession: GraphCanvasSessionState = {
-        viewport: recommendedViewport,
-        scale: 1,
-      };
-
-      if (previousActiveScopeKey !== nextScopeKey) {
-        activeCanvasScopeKeyRef.current = nextScopeKey;
-        const nextSession = existingRecord?.session ?? recommendedSession;
-        viewportStateByScopeKey.set(nextScopeKey, {
-          session: nextSession,
-          metrics,
-        });
-        setCanvasSession((currentSession) =>
-          arePointsEqual(currentSession.viewport, nextSession.viewport) && currentSession.scale === nextSession.scale
-            ? currentSession
-            : nextSession
-        );
-        return;
-      }
-
-      if (!existingRecord) {
-        viewportStateByScopeKey.set(nextScopeKey, {
-          session: recommendedSession,
-          metrics,
-        });
-        setCanvasSession((currentSession) =>
-          arePointsEqual(currentSession.viewport, recommendedSession.viewport) &&
-          currentSession.scale === recommendedSession.scale
-            ? currentSession
-            : recommendedSession
-        );
-        return;
-      }
-
-      const previousMetrics = existingRecord.metrics;
-      if (
-        !previousMetrics ||
-        previousMetrics.width <= 1 ||
-        previousMetrics.height <= 1 ||
-        !isActive
-      ) {
-        viewportStateByScopeKey.set(nextScopeKey, {
-          session: existingRecord.session,
-          metrics,
-        });
-        return;
-      }
-
-      const deltaX =
-        (metrics.width - previousMetrics.width) / 2 +
-        (metrics.originX - previousMetrics.originX) * existingRecord.session.scale;
-      const deltaY =
-        (metrics.height - previousMetrics.height) / 2 +
-        (metrics.originY - previousMetrics.originY) * existingRecord.session.scale;
-      if (deltaX === 0 && deltaY === 0) {
-        viewportStateByScopeKey.set(nextScopeKey, {
-          session: existingRecord.session,
-          metrics,
-        });
-        return;
-      }
-
-      setCanvasSession((currentSession) => {
-        const baseSession =
-          arePointsEqual(currentSession.viewport, existingRecord.session.viewport) &&
-          currentSession.scale === existingRecord.session.scale
-            ? currentSession
-            : existingRecord.session;
-        const nextSession: GraphCanvasSessionState = {
-          viewport: {
-            x: baseSession.viewport.x + deltaX,
-            y: baseSession.viewport.y + deltaY,
-          },
-          scale: baseSession.scale,
-        };
-        viewportStateByScopeKey.set(nextScopeKey, {
-          session: nextSession,
-          metrics,
-        });
-        return nextSession;
-      });
-    },
-    [setCanvasSession]
-  );
 
   const activeNeuronParameters = useMemo(() => {
     if (!activeNode || activeNode.kind !== 'neuron') {
@@ -888,7 +726,6 @@ export const useSNNTopologyState = ({
     canvasViewport,
     canvasScale,
     viewNodeByViewId,
-    visibleNodeByRefId,
     activeViewNodeIds,
     activeNode,
     activeLink,
@@ -906,7 +743,6 @@ export const useSNNTopologyState = ({
     openLinkDetail,
     closeDetailModal,
     dismissDetailModalIf,
-    getNodeDoubleClickAction,
     enterScopeFromNode,
     toggleInlineExpansionForNode,
     connectSourceNodesToTarget,
@@ -920,9 +756,9 @@ export const useSNNTopologyState = ({
     aggregateSelectedNodes,
     ungroupNode,
     clearDraftNodePositions,
-    setCanvasOffset,
-    setCanvasSession: setCanvasSessionState,
-    setCanvasScale: setCanvasScaleState,
+    setCanvasOffset: setScopedCanvasOffset,
+    setCanvasSession: setScopedCanvasSession,
+    setCanvasScale: setScopedCanvasScale,
     syncCanvasViewportForScope,
     updateNodeLabelAndParams,
     updateLinkWeight,

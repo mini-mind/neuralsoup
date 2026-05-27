@@ -22,7 +22,7 @@ import {
   GRAPH_LAYOUT_ONLY_CHANGE,
   GRAPH_SEMANTIC_CHANGE,
 } from './graphDocumentChangePolicy';
-import type { GraphLinkUpdatePayload, GraphNodeUpdatePayload } from '../editor/graph/graphNodeUpdate';
+import { useGraphEntityDetailCommands } from './useGraphEntityDetailCommands';
 import type { GraphViewLink, GraphViewNode } from '../editor/graph/graphViewTypes';
 import type { AgentGraphViewIndexes, AgentGraphViewNodeRecord } from '../editor/graph/agentGraphViewModel';
 import { canGraphNodesConnect } from '../editor/graph/graphLinkPolicy';
@@ -51,41 +51,14 @@ const DEFAULT_CONNECTION_PARAMETER_OVERRIDES = {
   weight: 0.8,
   delayMs: 0,
 } as const;
-const KNOWN_NEURON_PARAM_KEYS: Array<keyof typeof DEFAULT_NEURON_PARAMETER_OVERRIDES> = [
-  'a',
-  'b',
-  'c',
-  'd',
-  'threshold',
-];
-
 const uniqueIds = (ids: string[]) => Array.from(new Set(ids));
-const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
-
-const toNumericRecord = (value: unknown): Record<string, number> => {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return {};
-  }
-
-  const record = value as Record<string, unknown>;
-  const numericRecord: Record<string, number> = {};
-  for (const [key, candidate] of Object.entries(record)) {
-    if (isFiniteNumber(candidate)) {
-      numericRecord[key] = candidate;
-    }
-  }
-  return numericRecord;
-};
 
 const hasNeuronModelId = (agent: AgentIR, modelId: string): boolean =>
   (agent.brain.neuronModels ?? []).some((model) => model.id === modelId);
 
 const hasSynapseModelId = (agent: AgentIR, modelId: string): boolean =>
   (agent.brain.synapseModels ?? []).some((model) => model.id === modelId);
-
-const resolveNeuronModelById = (agent: AgentIR, modelId: string) =>
-  (agent.brain.neuronModels ?? []).find((model) => model.id === modelId) ?? null;
 
 const resolveDefaultNeuronModelId = (agent: AgentIR): string | null => {
   const candidate = (agent.brain.neuronModels ?? []).find((model) => isNonEmptyString(model.id));
@@ -326,18 +299,19 @@ interface GraphEditorCommandDependencies {
   indexes: AgentGraphViewIndexes;
   localLeafIds: Set<string>;
   viewNodeByViewId: Map<string, GraphViewNode>;
-  visibleNodeByRefId: Map<string, GraphViewNode>;
   selectionState: GraphSelectionState;
   draftNodePositions: NodePositionDraftMap;
   links: GraphViewLink[];
   setDraftNodePositions: Dispatch<SetStateAction<NodePositionDraftMap>>;
-  clearSelection: () => void;
-  scheduleFocusNode: (nodeId: string | null) => void;
-  scheduleFocusLink: (linkId: string | null) => void;
-  clearSelectionRect: () => void;
-  clearDraftNodePositions: () => void;
-  closeDetailModal: () => void;
-  dismissDetailModalIf: (predicate: (detail: DetailModalData) => boolean) => void;
+  sessionEffects: {
+    clearSelection: () => void;
+    scheduleFocusNode: (nodeId: string | null) => void;
+    scheduleFocusLink: (linkId: string | null) => void;
+    clearSelectionRect: () => void;
+    clearDraftNodePositions: () => void;
+    closeDetailModal: () => void;
+    dismissDetailModalIf: (predicate: (detail: DetailModalData) => boolean) => void;
+  };
 }
 
 const resolveViewNode = (viewNodeByViewId: Map<string, GraphViewNode>, nodeId: string): GraphViewNode | null =>
@@ -352,20 +326,31 @@ export const useGraphEditorCommands = ({
   indexes,
   localLeafIds,
   viewNodeByViewId,
-  visibleNodeByRefId: _visibleNodeByRefId,
   selectionState,
   draftNodePositions,
   links,
   setDraftNodePositions,
-  clearSelection,
-  scheduleFocusNode,
-  scheduleFocusLink,
-  clearSelectionRect,
-  clearDraftNodePositions,
-  closeDetailModal,
-  dismissDetailModalIf,
+  sessionEffects,
 }: GraphEditorCommandDependencies) => {
   const graphStructureEditable = isStructuralGraphEditable(indexes.structuralPreflight);
+  const { updateNodeLabelAndParams, updateLinkWeight } = useGraphEntityDetailCommands({
+    graphStructureEditable,
+    setAgent,
+  });
+  const resolveStoredPositionForNodeUpdate = useCallback(
+    (update: GraphNodePositionUpdate): [string, Position] | null => {
+      const viewNode = viewNodeByViewId.get(update.nodeId);
+      if (!viewNode || viewNode.proxy) {
+        return null;
+      }
+
+      return [
+        viewNode.refNodeId,
+        toStoredPositionForViewNode(update, viewNode, viewNodeByViewId, currentScope),
+      ];
+    },
+    [currentScope, viewNodeByViewId]
+  );
 
   const connectSourceNodesToTarget = useCallback(
     (sourceNodeIds: string[], targetNodeId: string) => {
@@ -452,7 +437,7 @@ export const useGraphEditorCommands = ({
 
       if (nextConnections.length === 0) {
         if (resolvedLinkIds.length > 0) {
-          scheduleFocusLink(resolvedLinkIds.at(-1) ?? null);
+          sessionEffects.scheduleFocusLink(resolvedLinkIds.at(-1) ?? null);
         }
         return;
       }
@@ -487,7 +472,7 @@ export const useGraphEditorCommands = ({
         return;
       }
 
-      scheduleFocusLink(resolvedLinkIds.at(-1) ?? null);
+      sessionEffects.scheduleFocusLink(resolvedLinkIds.at(-1) ?? null);
     },
     [
       currentScope,
@@ -495,7 +480,7 @@ export const useGraphEditorCommands = ({
       indexes.linkById,
       indexes.nodeById,
       localLeafIds,
-      scheduleFocusLink,
+      sessionEffects.scheduleFocusLink,
       setAgent,
       viewNodeByViewId,
     ]
@@ -514,17 +499,18 @@ export const useGraphEditorCommands = ({
 
         const nextDrafts = { ...currentDrafts };
         for (const update of updates) {
-          const viewNode = viewNodeByViewId.get(update.nodeId);
-          if (!viewNode || viewNode.proxy) {
+          const resolvedPosition = resolveStoredPositionForNodeUpdate(update);
+          if (!resolvedPosition) {
             continue;
           }
 
-          nextDrafts[viewNode.refNodeId] = toStoredPositionForViewNode(update, viewNode, viewNodeByViewId, currentScope);
+          const [refNodeId, storedPosition] = resolvedPosition;
+          nextDrafts[refNodeId] = storedPosition;
         }
         return nextDrafts;
       });
     },
-    [currentScope, graphStructureEditable, setDraftNodePositions, viewNodeByViewId]
+    [graphStructureEditable, resolveStoredPositionForNodeUpdate, setDraftNodePositions]
   );
 
   const commitNodeDraftPositions = useCallback(
@@ -581,12 +567,13 @@ export const useGraphEditorCommands = ({
 
       const positions: NodePositionDraftMap = {};
       for (const update of updates) {
-        const viewNode = viewNodeByViewId.get(update.nodeId);
-        if (!viewNode || viewNode.proxy) {
+        const resolvedPosition = resolveStoredPositionForNodeUpdate(update);
+        if (!resolvedPosition) {
           continue;
         }
 
-        positions[viewNode.refNodeId] = toStoredPositionForViewNode(update, viewNode, viewNodeByViewId, currentScope);
+        const [refNodeId, storedPosition] = resolvedPosition;
+        positions[refNodeId] = storedPosition;
       }
 
       if (Object.keys(positions).length === 0) {
@@ -595,7 +582,7 @@ export const useGraphEditorCommands = ({
 
       commitNodeDraftPositions(positions);
     },
-    [commitNodeDraftPositions, currentScope, graphStructureEditable, setDraftNodePositions, viewNodeByViewId]
+    [commitNodeDraftPositions, graphStructureEditable, resolveStoredPositionForNodeUpdate, setDraftNodePositions]
   );
 
   const removeSelected = useCallback(() => {
@@ -603,8 +590,8 @@ export const useGraphEditorCommands = ({
       const removableLinkId = selectionState.linkId;
       const selectedLink = links.find((link) => link.id === removableLinkId);
       if (!selectedLink?.editable) {
-        clearSelection();
-        dismissDetailModalIf((detail) => detail.type === 'link' && detail.id === removableLinkId);
+        sessionEffects.clearSelection();
+        sessionEffects.dismissDetailModalIf((detail) => detail.type === 'link' && detail.id === removableLinkId);
         return;
       }
       if (!graphStructureEditable) {
@@ -627,8 +614,8 @@ export const useGraphEditorCommands = ({
         return;
       }
 
-      clearSelection();
-      dismissDetailModalIf((detail) => detail.type === 'link' && detail.id === removableLinkId);
+      sessionEffects.clearSelection();
+      sessionEffects.dismissDetailModalIf((detail) => detail.type === 'link' && detail.id === removableLinkId);
       return;
     }
 
@@ -717,11 +704,11 @@ export const useGraphEditorCommands = ({
       return;
     }
 
-    clearSelection();
-    dismissDetailModalIf((detail) => detail.type === 'node' && removableNodeIds.has(detail.id));
+    sessionEffects.clearSelection();
+    sessionEffects.dismissDetailModalIf((detail) => detail.type === 'node' && removableNodeIds.has(detail.id));
   }, [
-    clearSelection,
-    dismissDetailModalIf,
+    sessionEffects.clearSelection,
+    sessionEffects.dismissDetailModalIf,
     graphStructureEditable,
     indexes.nodeById,
     links,
@@ -794,10 +781,10 @@ export const useGraphEditorCommands = ({
       if (!createdNeuronId) {
         return null;
       }
-      scheduleFocusNode(createdNeuronId);
+      sessionEffects.scheduleFocusNode(createdNeuronId);
       return createdNeuronId;
     },
-    [currentChildren, currentContainerKind, currentScope, graphStructureEditable, navigationPath, scheduleFocusNode, setAgent]
+    [currentChildren, currentContainerKind, currentScope, graphStructureEditable, navigationPath, sessionEffects.scheduleFocusNode, setAgent]
   );
 
   const addNeuronGroupAt = useCallback(
@@ -850,10 +837,10 @@ export const useGraphEditorCommands = ({
       if (!createdGroupId) {
         return null;
       }
-      scheduleFocusNode(createdGroupId);
+      sessionEffects.scheduleFocusNode(createdGroupId);
       return createdGroupId;
     },
-    [currentChildren, currentContainerKind, currentScope, graphStructureEditable, navigationPath, scheduleFocusNode, setAgent]
+    [currentChildren, currentContainerKind, currentScope, graphStructureEditable, navigationPath, sessionEffects.scheduleFocusNode, setAgent]
   );
 
   const createNeuronAndConnectAt = useCallback(
@@ -999,8 +986,8 @@ export const useGraphEditorCommands = ({
       if (!createdNeuronId) {
         return;
       }
-      scheduleFocusNode(createdNeuronId);
-      scheduleFocusLink(createdLinkId ?? resolvedLinkIds.at(-1) ?? null);
+      sessionEffects.scheduleFocusNode(createdNeuronId);
+      sessionEffects.scheduleFocusLink(createdLinkId ?? resolvedLinkIds.at(-1) ?? null);
     },
     [
       currentChildren,
@@ -1010,8 +997,8 @@ export const useGraphEditorCommands = ({
       indexes.nodeById,
       localLeafIds,
       navigationPath,
-      scheduleFocusNode,
-      scheduleFocusLink,
+      sessionEffects.scheduleFocusNode,
+      sessionEffects.scheduleFocusLink,
       setAgent,
       viewNodeByViewId,
     ]
@@ -1086,20 +1073,20 @@ export const useGraphEditorCommands = ({
     if (!createdGroupId) {
       return;
     }
-    scheduleFocusNode(createdGroupId);
-    closeDetailModal();
-    clearSelectionRect();
-    clearDraftNodePositions();
+    sessionEffects.scheduleFocusNode(createdGroupId);
+    sessionEffects.closeDetailModal();
+    sessionEffects.clearSelectionRect();
+    sessionEffects.clearDraftNodePositions();
   }, [
-    clearDraftNodePositions,
-    clearSelectionRect,
-    closeDetailModal,
+    sessionEffects.clearDraftNodePositions,
+    sessionEffects.clearSelectionRect,
+    sessionEffects.closeDetailModal,
     currentChildren,
     currentContainerKind,
     currentScope,
     graphStructureEditable,
     navigationPath,
-    scheduleFocusNode,
+    sessionEffects.scheduleFocusNode,
     selectionState.nodeIds,
     setAgent,
     viewNodeByViewId,
@@ -1140,16 +1127,16 @@ export const useGraphEditorCommands = ({
       if (!committed) {
         return;
       }
-      clearSelection();
-      closeDetailModal();
-      clearSelectionRect();
-      clearDraftNodePositions();
+      sessionEffects.clearSelection();
+      sessionEffects.closeDetailModal();
+      sessionEffects.clearSelectionRect();
+      sessionEffects.clearDraftNodePositions();
     },
     [
-      clearDraftNodePositions,
-      clearSelection,
-      clearSelectionRect,
-      closeDetailModal,
+      sessionEffects.clearDraftNodePositions,
+      sessionEffects.clearSelection,
+      sessionEffects.clearSelectionRect,
+      sessionEffects.closeDetailModal,
       currentChildren,
       currentContainerKind,
       graphStructureEditable,
@@ -1180,164 +1167,11 @@ export const useGraphEditorCommands = ({
         },
         GRAPH_LAYOUT_ONLY_CHANGE
       );
-      clearSelection();
-      clearSelectionRect();
-      clearDraftNodePositions();
+      sessionEffects.clearSelection();
+      sessionEffects.clearSelectionRect();
+      sessionEffects.clearDraftNodePositions();
     },
-    [clearDraftNodePositions, clearSelection, clearSelectionRect, graphStructureEditable, setAgent, viewNodeByViewId]
-  );
-
-  const updateNodeLabelAndParams = useCallback(
-    (nodeId: string, payload: GraphNodeUpdatePayload) => {
-      if (!graphStructureEditable) {
-        return;
-      }
-
-      setAgent((current) => {
-        if (!isCurrentBrainStructurallyEditable(current)) {
-          return current;
-        }
-
-        const hasTargetNode = current.brain.neurons.some((neuron) => neuron.id === nodeId);
-        if (!hasTargetNode) {
-          return current;
-        }
-
-        const neuronModelIdProvided = payload.neuronModelId !== undefined;
-        const nextNeuronModelId = payload.neuronModelId?.trim();
-        if (neuronModelIdProvided && !nextNeuronModelId) {
-          return current;
-        }
-        if (nextNeuronModelId && !hasNeuronModelId(current, nextNeuronModelId)) {
-          return current;
-        }
-
-        const nextParameterOverrides = toNumericRecord(payload.parameterOverrides);
-        const parameterOverridesProvided = payload.parameterOverrides !== undefined;
-        const normalizedInitialState =
-          payload.initialState && isFiniteNumber(payload.initialState.v)
-            ? {
-                v: payload.initialState.v,
-                ...(isFiniteNumber(payload.initialState.u) ? { u: payload.initialState.u } : {}),
-              }
-            : undefined;
-
-        return {
-          ...current,
-          brain: {
-            ...current.brain,
-            neurons: current.brain.neurons.map((neuron) =>
-            neuron.id === nodeId
-              ? {
-                  ...neuron,
-                  ...(() => {
-                    const targetNeuronModelId = nextNeuronModelId ?? neuron.neuronModelId;
-                    const modelParams = resolveNeuronModelById(current, targetNeuronModelId)?.params ?? null;
-                    const effectiveParameterOverrides = parameterOverridesProvided
-                      ? nextParameterOverrides
-                      : toNumericRecord(neuron.parameterOverrides);
-                    const resolvedParameters = modelParams
-                      ? {
-                          ...modelParams,
-                          ...effectiveParameterOverrides,
-                        }
-                      : effectiveParameterOverrides;
-
-                    return {
-                      parameterOverrides: effectiveParameterOverrides,
-                      ...(resolvedParameters
-                        ? {
-                            params: Object.fromEntries(
-                              KNOWN_NEURON_PARAM_KEYS.flatMap((key) =>
-                                isFiniteNumber(resolvedParameters[key]) ? [[key, resolvedParameters[key]]] : []
-                              )
-                            ),
-                          }
-                        : {}),
-                    };
-                  })(),
-                  label: payload.label,
-                  ...(nextNeuronModelId ? { neuronModelId: nextNeuronModelId } : {}),
-                  ...(normalizedInitialState ? { initialState: normalizedInitialState } : {}),
-                }
-              : neuron
-            ),
-          },
-        };
-      }, GRAPH_SEMANTIC_CHANGE);
-    },
-    [graphStructureEditable, setAgent]
-  );
-
-  const updateLinkWeight = useCallback(
-    (linkId: string, payloadOrWeight: number | GraphLinkUpdatePayload) => {
-      if (!graphStructureEditable) {
-        return;
-      }
-
-      setAgent((current) => {
-        if (!isCurrentBrainStructurallyEditable(current)) {
-          return current;
-        }
-
-        const hasTargetLink = current.connections.some((link) => link.id === linkId);
-        if (!hasTargetLink) {
-          return current;
-        }
-
-        const payload: GraphLinkUpdatePayload =
-          typeof payloadOrWeight === 'number'
-            ? {
-                parameterOverrides: { weight: payloadOrWeight },
-              }
-            : payloadOrWeight;
-        const synapseModelIdProvided = payload.synapseModelId !== undefined;
-        const requestedSynapseModelId = payload.synapseModelId?.trim();
-        const targetSynapseModelId = requestedSynapseModelId ?? null;
-        if (synapseModelIdProvided && !requestedSynapseModelId) {
-          return current;
-        }
-        if (targetSynapseModelId && !hasSynapseModelId(current, targetSynapseModelId)) {
-          return current;
-        }
-
-        return {
-          ...current,
-          connections: current.connections.map((link) =>
-            link.id !== linkId
-              ? link
-              : (() => {
-                  const activeSynapseModelId = targetSynapseModelId ?? link.synapseModelId?.trim() ?? '';
-                  if (!activeSynapseModelId || !hasSynapseModelId(current, activeSynapseModelId)) {
-                    return link;
-                  }
-
-                  const incomingOverrides = toNumericRecord(payload.parameterOverrides);
-                  const normalizedIncomingOverrides: Record<string, number> = {};
-                  for (const [key, value] of Object.entries(incomingOverrides)) {
-                    if (key === 'weight' || key === 'delayMs') {
-                      normalizedIncomingOverrides[key] = value;
-                    } else {
-                      normalizedIncomingOverrides[key] = value;
-                    }
-                  }
-
-                  const mergedParameterOverrides: Record<string, number> = {
-                    ...toNumericRecord(link.parameterOverrides),
-                    ...normalizedIncomingOverrides,
-                  };
-
-                  return {
-                    ...link,
-                    synapseModelId: activeSynapseModelId,
-                    parameterOverrides: mergedParameterOverrides,
-                  };
-                })()
-          ),
-        };
-      }, GRAPH_SEMANTIC_CHANGE);
-    },
-    [graphStructureEditable, setAgent]
+    [sessionEffects.clearDraftNodePositions, sessionEffects.clearSelection, sessionEffects.clearSelectionRect, graphStructureEditable, setAgent, viewNodeByViewId]
   );
 
   return {

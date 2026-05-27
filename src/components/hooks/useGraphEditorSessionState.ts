@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { Position } from '../../domain/brain/shared';
 import type {
   GraphCanvasSessionState,
@@ -21,14 +21,10 @@ export const createDefaultCanvasSessionState = (): GraphCanvasSessionState => ({
   scale: 1,
 });
 
-export const useGraphEditorSessionState = () => {
+export const useGraphSelectionInspectorState = () => {
   const [selectionState, setSelectionState] = useState<GraphSelectionState>(createEmptySelectionState);
   const [showDetailModal, setShowDetailModal] = useState<DetailModalData | null>(null);
   const [selectionRect, setSelectionRect] = useState<GraphSelectionRect | null>(null);
-  const [canvasSession, setCanvasSession] = useState<GraphCanvasSessionState>(createDefaultCanvasSessionState);
-  const [draftNodePositions, setDraftNodePositions] = useState<NodePositionDraftMap>({});
-  const [pendingFocusNodeId, setPendingFocusNodeId] = useState<string | null>(null);
-  const [pendingFocusLinkId, setPendingFocusLinkId] = useState<string | null>(null);
 
   return {
     selectionState,
@@ -37,22 +33,52 @@ export const useGraphEditorSessionState = () => {
     setShowDetailModal,
     selectionRect,
     setSelectionRect,
-    canvasSession,
-    setCanvasSession,
-    canvasViewport: canvasSession.viewport,
-    setCanvasViewport: (nextViewport: GraphCanvasViewport) =>
+  };
+};
+
+export const useGraphViewportSessionState = () => {
+  const [canvasSession, setCanvasSession] = useState<GraphCanvasSessionState>(createDefaultCanvasSessionState);
+  const setCanvasViewport = useCallback(
+    (nextViewport: GraphCanvasViewport) =>
       setCanvasSession((current) => ({
         ...current,
         viewport: nextViewport,
       })),
-    canvasScale: canvasSession.scale,
-    setCanvasScale: (nextScale: number) =>
+    []
+  );
+  const setCanvasScale = useCallback(
+    (nextScale: number) =>
       setCanvasSession((current) => ({
         ...current,
         scale: nextScale,
       })),
+    []
+  );
+
+  return {
+    canvasSession,
+    setCanvasSession,
+    canvasViewport: canvasSession.viewport,
+    setCanvasViewport,
+    canvasScale: canvasSession.scale,
+    setCanvasScale,
+  };
+};
+
+export const useGraphDraftPositionState = () => {
+  const [draftNodePositions, setDraftNodePositions] = useState<NodePositionDraftMap>({});
+
+  return {
     draftNodePositions,
     setDraftNodePositions,
+  };
+};
+
+export const useGraphFocusQueueState = () => {
+  const [pendingFocusNodeId, setPendingFocusNodeId] = useState<string | null>(null);
+  const [pendingFocusLinkId, setPendingFocusLinkId] = useState<string | null>(null);
+
+  return {
     pendingFocusNodeId,
     setPendingFocusNodeId,
     pendingFocusLinkId,

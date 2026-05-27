@@ -191,6 +191,7 @@ const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
           : null
       }
       dataTestId="body-mapping-canvas"
+      sceneDataTestId="body-mapping-scene"
       onCanvasMouseDown={(event) => {
         setLinkContextSelection(null);
         setLinkContextPosition(null);
@@ -359,7 +360,7 @@ const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
           onMouseDown: (event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>) =>
             session.handleNodeMouseDown(event as React.MouseEvent<HTMLDivElement>, node.id),
           onContextMenu: (event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>) => {
-            session.handleNodeContextMenu(event as React.MouseEvent<HTMLDivElement>);
+            session.handleNodeContextMenu(event as React.MouseEvent<HTMLDivElement>, node.id);
             setLinkContextSelection({
               kind: 'node',
               direction: node.direction,

@@ -1074,26 +1074,12 @@ export const buildAgentGraphViewModel = ({
   }
 
   const viewNodeByViewId = new Map<string, GraphViewNode>();
-  const visibleNodeByRefId = new Map<string, GraphViewNode>();
   const renderNodeByRefId = new Map<string, GraphViewNode>();
   for (const node of nodes) {
     viewNodeByViewId.set(node.viewId, node);
     const existingRenderNode = renderNodeByRefId.get(node.refNodeId);
     if (!existingRenderNode || (isExpandedChildViewNode(node) && !isExpandedChildViewNode(existingRenderNode))) {
       renderNodeByRefId.set(node.refNodeId, node);
-    }
-    if (isExpandedChildViewNode(node)) {
-      continue;
-    }
-
-    const existing = visibleNodeByRefId.get(node.refNodeId);
-    if (!existing) {
-      visibleNodeByRefId.set(node.refNodeId, node);
-      continue;
-    }
-
-    if (isExpandedChildViewNode(existing) && !isExpandedChildViewNode(node)) {
-      visibleNodeByRefId.set(node.refNodeId, node);
     }
   }
   const localLeafIds = new Set(nodes.filter((node) => node.local && node.leaf && !node.proxy).map((node) => node.refNodeId));
@@ -1190,7 +1176,6 @@ export const buildAgentGraphViewModel = ({
     localLeafIds,
     nodes,
     viewNodeByViewId,
-    visibleNodeByRefId,
     links,
     activeViewNodeIds,
   };

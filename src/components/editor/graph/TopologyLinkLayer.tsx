@@ -10,6 +10,7 @@ export interface TopologyLinkSceneNode {
 
 export interface TopologyLinkLayerItem {
   id: string;
+  dataTestId?: string;
   fromNodeId: string;
   toNodeId: string;
   label?: string;
@@ -66,6 +67,7 @@ const TopologyLinkLayer: React.FC<TopologyLinkLayerProps> = ({
           <g
             key={link.id}
             className={`topology-link ${link.aggregate ? 'is-aggregate' : 'is-leaf'} ${link.selected ? 'is-selected' : ''}`}
+            data-testid={link.dataTestId}
             data-topology-link={link.inspectable ? 'true' : undefined}
             data-topology-link-id={link.inspectable ? link.id : undefined}
             data-topology-link-from-node-id={link.inspectable ? link.fromNodeId : undefined}

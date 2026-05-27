@@ -211,7 +211,7 @@ test('agent graph view expanded children expose separate viewId and refId indexe
   const expandedChild = viewModel.nodes.find((node) => node.viewId === 'expanded-group::neuron-1');
   assert.ok(expandedChild);
   assert.equal(viewModel.viewNodeByViewId.get('expanded-group::neuron-1'), expandedChild);
-  assert.equal(viewModel.visibleNodeByRefId.get('neuron-1'), undefined);
+  assert.equal(viewModel.viewNodeByViewId.get('neuron-1'), undefined);
 });
 
 test('agent graph view expanded children use viewId for active highlights', () => {

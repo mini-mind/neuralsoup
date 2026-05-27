@@ -30,6 +30,7 @@ interface TopologyCanvasSurfaceProps {
   onCanvasMouseDown?: (event: React.MouseEvent<HTMLDivElement>) => void;
   onSceneDoubleClick?: (event: React.MouseEvent<HTMLDivElement>) => void;
   dataTestId?: string;
+  sceneDataTestId?: string;
 }
 
 const TopologyCanvasSurface: React.FC<TopologyCanvasSurfaceProps> = ({
@@ -51,6 +52,7 @@ const TopologyCanvasSurface: React.FC<TopologyCanvasSurfaceProps> = ({
   onCanvasMouseDown,
   onSceneDoubleClick,
   dataTestId = 'topology-canvas',
+  sceneDataTestId = 'topology-scene',
 }) => {
   const normalizedSelectionRect = selectionRect ? normalizeRect(selectionRect) : null;
 
@@ -77,7 +79,7 @@ const TopologyCanvasSurface: React.FC<TopologyCanvasSurfaceProps> = ({
       <div
         ref={sceneRef}
         className="topology-scene"
-        data-testid="topology-scene"
+        data-testid={sceneDataTestId}
         style={{
           width: sceneWidth,
           height: sceneHeight,

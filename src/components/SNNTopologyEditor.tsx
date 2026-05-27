@@ -78,7 +78,6 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
     openNodeDetail,
     openLinkDetail,
     closeDetailModal,
-    getNodeDoubleClickAction,
     enterScopeFromNode,
     toggleInlineExpansionForNode,
     connectSourceNodesToTarget,
@@ -123,14 +122,6 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   };
 
   const selectedCount = selectedNodeIds.length + (selectedLinkId ? 1 : 0);
-  const getCanvasNodeDoubleClickAction = (nodeId: string): 'navigate' | 'edit' | null => {
-    const action = getNodeDoubleClickAction(nodeId);
-    if (action === 'enter-scope') {
-      return 'navigate';
-    }
-
-    return action;
-  };
 
   const canCreateNeuronHere = currentContainerKind === 'neuron-group';
   const canAggregateSelection = currentContainerKind === 'neuron-group' && selectedNodeIds.length > 1;
@@ -254,7 +245,6 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
         onOpenLinkDetail={openLinkDetail}
         onNavigateToNode={enterScopeFromNode}
         onOpenNodeDetail={openNodeDetail}
-        getNodeDoubleClickAction={getCanvasNodeDoubleClickAction}
         onCloseContextMenu={closeContextMenu}
         onAddNeuronAt={addNeuronAt}
         onAddNeuronGroupAt={addNeuronGroupAt}

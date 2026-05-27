@@ -97,7 +97,6 @@ export interface GraphViewModel<Node, Container> {
   localLeafIds: Set<string>;
   nodes: GraphViewNode[];
   viewNodeByViewId: Map<string, GraphViewNode>;
-  visibleNodeByRefId: Map<string, GraphViewNode>;
   links: GraphViewLink[];
   activeViewNodeIds: Set<string>;
 }

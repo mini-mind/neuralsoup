@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import type { GraphViewLink } from './graphViewTypes';
+import { getGraphNodeInteractionDescriptor, type GraphNodeHitArea } from './brainGraphInteractionGrammar';
 import type { GraphInteractionState, GraphContextMenuState } from './interaction/interactionSession';
 import type { GraphSceneProjection } from './graphSceneProjection';
 import { getNodeCenter } from './tools/canvasGeometry';
@@ -46,13 +47,12 @@ interface GraphTopologyCanvasProps {
   capabilities: SharedCanvasCapabilities;
   onCanvasContextMenu: (event: React.MouseEvent<HTMLDivElement>) => void;
   onCanvasMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
-  onNodeMouseDown: (event: React.MouseEvent<HTMLDivElement>, nodeId: string) => void;
-  onNodeContextMenu: (event: React.MouseEvent<HTMLDivElement>) => void;
+  onNodeMouseDown: (event: React.MouseEvent<HTMLDivElement>, nodeId: string, hitArea?: GraphNodeHitArea) => void;
+  onNodeContextMenu: (event: React.MouseEvent<HTMLDivElement>, nodeId: string, hitArea?: GraphNodeHitArea) => void;
   onSelectLink: (linkId: string) => void;
   onOpenLinkDetail: (linkId: string) => void;
   onNavigateToNode: (nodeRefId: string) => void;
   onOpenNodeDetail: (nodeRefId: string) => void;
-  getNodeDoubleClickAction: (nodeId: string) => 'navigate' | 'edit' | null;
   onCloseContextMenu: () => void;
   onAddNeuronAt: (x: number, y: number) => void;
   onAddNeuronGroupAt: (x: number, y: number) => void;
@@ -89,7 +89,6 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
   onOpenLinkDetail,
   onNavigateToNode,
   onOpenNodeDetail,
-  getNodeDoubleClickAction,
   onCloseContextMenu,
   onAddNeuronAt,
   onAddNeuronGroupAt,
@@ -302,6 +301,7 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
         sceneNodeMap={scene.map}
         links={links.map((link) => ({
           id: link.id,
+          dataTestId: `topology-link-${link.id}`,
           fromNodeId: link.fromNodeId,
           toNodeId: link.toNodeId,
           aggregate: link.aggregate,
@@ -346,6 +346,29 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
             canonicalOnly ? 'is-canonical-only' : '',
           ].join(' ');
 
+          const descriptor = getGraphNodeInteractionDescriptor(node);
+          const handleNodeDoubleClick = (event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>, hitArea: GraphNodeHitArea) => {
+            const intent = getGraphNodeInteractionDescriptor(node, hitArea).doubleClickIntent;
+            if (!intent) {
+              return;
+            }
+
+            event.stopPropagation();
+            if (intent === 'navigate') {
+              onNavigateToNode(node.viewId);
+              return;
+            }
+
+            if (intent === 'edit') {
+              onOpenNodeDetail(node.refNodeId);
+              return;
+            }
+
+            if (intent === 'toggle-expand') {
+              onToggleGroupExpanded(node.viewId);
+            }
+          };
+
           return {
             id: node.viewId,
             x: node.sceneX,
@@ -361,34 +384,19 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
               'data-topology-view-node-id': node.viewId,
               'data-topology-runtime-installed': node.runtimeInstalled ? 'true' : 'false',
               'data-topology-canonical-only': canonicalOnly ? 'true' : undefined,
+              'data-topology-hit-area': 'node',
             },
-            onMouseDown:
-              node.kind === 'neuron-group' && node.expanded
-                ? undefined
-                : (event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>) => onNodeMouseDown(event as React.MouseEvent<HTMLDivElement>, node.viewId),
-            onContextMenu:
-              node.kind === 'neuron-group' && node.expanded
-                ? undefined
-                : (event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>) => onNodeContextMenu(event as React.MouseEvent<HTMLDivElement>),
-            onDoubleClick: (event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>) => {
-              if (node.kind === 'neuron-group' && node.expanded) {
-                return;
-              }
-              const action = getNodeDoubleClickAction(node.viewId);
-              if (!action) {
-                return;
-              }
-
-              event.stopPropagation();
-              if (action === 'navigate') {
-                onNavigateToNode(node.viewId);
-                return;
-              }
-
-              if (action === 'edit') {
-                onOpenNodeDetail(node.refNodeId);
-              }
-            },
+            onMouseDown: descriptor.dispatchesNodePointer
+              ? (event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>) =>
+                  onNodeMouseDown(event as React.MouseEvent<HTMLDivElement>, node.viewId, 'node')
+              : undefined,
+            onContextMenu: descriptor.dispatchesNodePointer
+              ? (event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>) =>
+                  onNodeContextMenu(event as React.MouseEvent<HTMLDivElement>, node.viewId, 'node')
+              : undefined,
+            onDoubleClick: descriptor.dispatchesNodePointer
+              ? (event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>) => handleNodeDoubleClick(event, 'node')
+              : undefined,
             content: node.leaf ? <>
               <div className="topology-node-shape topology-node-dot" />
               {canonicalOnly ? <div className="topology-node-canonical-badge" data-testid={`topology-node-canonical-only-${node.id}`}>C</div> : null}
@@ -397,19 +405,26 @@ const GraphTopologyCanvas: React.FC<GraphTopologyCanvasProps> = ({
                 className="topology-node-shape"
                 data-testid={node.kind === 'neuron-group' && node.expanded ? `topology-node-body-${node.id}` : undefined}
                 data-topology-group-body={node.kind === 'neuron-group' && node.expanded ? 'true' : undefined}
+                data-topology-hit-area={node.kind === 'neuron-group' && node.expanded ? 'group-body' : 'node'}
               >
                 <div
                   className="topology-node-titlebar"
                   data-testid={node.kind === 'neuron-group' ? `topology-node-title-${node.id}` : undefined}
                   data-topology-group-title-handle={node.kind === 'neuron-group' && node.expanded ? 'true' : undefined}
-                  onMouseDown={node.kind === 'neuron-group' && node.expanded ? (event) => onNodeMouseDown(event, node.viewId) : undefined}
-                  onContextMenu={node.kind === 'neuron-group' && node.expanded ? onNodeContextMenu : undefined}
+                  data-topology-hit-area={node.kind === 'neuron-group' && node.expanded ? 'group-title' : undefined}
+                  onMouseDown={
+                    node.kind === 'neuron-group' && node.expanded
+                      ? (event) => onNodeMouseDown(event, node.viewId, 'group-title')
+                      : undefined
+                  }
+                  onContextMenu={
+                    node.kind === 'neuron-group' && node.expanded
+                      ? (event) => onNodeContextMenu(event, node.viewId, 'group-title')
+                      : undefined
+                  }
                   onDoubleClick={
                     node.kind === 'neuron-group' && node.expanded
-                      ? (event) => {
-                          event.stopPropagation();
-                          onToggleGroupExpanded(node.viewId);
-                        }
+                      ? (event) => handleNodeDoubleClick(event, 'group-title')
                       : undefined
                   }
                 >

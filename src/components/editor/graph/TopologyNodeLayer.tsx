@@ -28,7 +28,6 @@ const TopologyNodeLayer: React.FC<TopologyNodeLayerProps> = ({ nodes }) => {
     <>
       {nodes.map((node) => {
         const sharedProps = {
-          key: node.id,
           className: node.className,
           title: node.title,
           'aria-label': node.ariaLabel,
@@ -48,14 +47,14 @@ const TopologyNodeLayer: React.FC<TopologyNodeLayerProps> = ({ nodes }) => {
 
         if (node.asButton) {
           return (
-            <button type="button" {...sharedProps}>
+            <button key={node.id} type="button" {...sharedProps}>
               {node.content}
             </button>
           );
         }
 
         return (
-          <div {...sharedProps}>
+          <div key={node.id} {...sharedProps}>
             {node.content}
           </div>
         );

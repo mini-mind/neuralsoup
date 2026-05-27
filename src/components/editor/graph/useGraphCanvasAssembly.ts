@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { GraphViewNode } from './graphViewTypes';
+import { getGraphNodeInteractionDescriptor } from './brainGraphInteractionGrammar';
 import { projectGraphScene, type GraphSceneNode } from './graphSceneProjection';
 import { useGraphViewSessionController } from './interaction/useGraphViewSessionController';
 import type {
@@ -227,23 +228,26 @@ export const useGraphCanvasAssembly = ({
 
   const orchestratorNodes = useMemo(
     () =>
-      scene.list.map((node) => ({
-        id: node.viewId,
-        x: node.sceneX,
-        y: node.sceneY,
-        width: node.width,
-        height: node.height,
-        proxy: node.proxy,
-        movable: node.movable,
-        local: node.local,
-        previewOnly: node.previewOnly,
-        connectableSource: node.connectableSource,
-        ungroupable: node.kind === 'neuron-group' && node.local && !node.proxy && !node.expansionParentId,
-        contextMenuGroup: !node.leaf && node.local && !node.proxy && !node.expansionParentId,
-        expanded: node.expanded,
-        expansionParentId: node.expansionParentId,
-        titleDragHandleOnly: node.kind === 'neuron-group' && node.expanded && !node.expansionParentId,
-      })),
+      scene.list.map((node) => {
+        const descriptor = getGraphNodeInteractionDescriptor(node);
+        return {
+          id: node.viewId,
+          x: node.sceneX,
+          y: node.sceneY,
+          width: node.width,
+          height: node.height,
+          proxy: node.proxy,
+          movable: node.movable,
+          local: node.local,
+          previewOnly: node.previewOnly,
+          connectableSource: node.connectableSource,
+          ungroupable: node.kind === 'neuron-group' && node.local && !node.proxy && !node.expansionParentId,
+          contextMenuGroup: descriptor.contextMenuGroup,
+          expanded: node.expanded,
+          expansionParentId: node.expansionParentId,
+          titleDragHandleOnly: descriptor.titleDragHandleOnly,
+        };
+      }),
     [scene.list]
   );
 
