@@ -135,7 +135,7 @@ const SNNTopologyEditor: React.FC<SNNTopologyEditorProps> = ({
   const selectedCount = selectedNodeIds.length + (selectedLinkId ? 1 : 0);
 
   const canCreateNeuronHere = currentContainerKind === 'root' || currentContainerKind === 'neuron-group';
-  const canCreateSignalHere = currentScope === 'root';
+  const canCreateSignalHere = currentContainerKind === 'root' || currentContainerKind === 'neuron-group';
   const canAggregateSelection =
     (currentContainerKind === 'root' || currentContainerKind === 'neuron-group') && selectedNodeIds.length > 1;
   const canUngroupNodesHere = currentContainerKind === 'root' || currentContainerKind === 'neuron-group';

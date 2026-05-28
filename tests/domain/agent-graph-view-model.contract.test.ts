@@ -246,9 +246,9 @@ test('agent graph identity semantics keep expanded child as view projection whil
     worldRegistry: WORLD_REGISTRY,
   });
 
-  assert.equal(expandedScopeView.scopeKey, 'root-group');
+  assert.equal(expandedScopeView.scopeKey, 'root');
   assert.equal(enteredScopeView.scopeKey, 'root-group/expanded-group');
-  assert.deepEqual(expandedScopeView.breadcrumbs.map((item) => item.id), ['root', 'root-group']);
+  assert.deepEqual(expandedScopeView.breadcrumbs.map((item) => item.id), ['root']);
   assert.deepEqual(enteredScopeView.breadcrumbs.map((item) => item.id), ['root', 'root-group', 'expanded-group']);
   assert.equal(expandedScopeView.activeViewNodeIds.has('expanded-group::neuron-1'), true);
   assert.equal(enteredScopeView.activeViewNodeIds.has('neuron-1'), true);
@@ -311,10 +311,10 @@ test('agent graph expanded child local projection uses persisted canvas position
   const child2 = viewModel.nodes.find((node) => node.viewId === 'expanded-group::neuron-2');
   assert.ok(child1);
   assert.ok(child2);
-  assert.equal(child1.x, 390);
-  assert.equal(child1.y, 190);
-  assert.equal(child2.x, 810);
-  assert.equal(child2.y, 450);
+  assert.equal(child1.x, 130);
+  assert.equal(child1.y, 150);
+  assert.equal(child2.x, 550);
+  assert.equal(child2.y, 410);
 });
 
 test('agent graph root flattened scope exposes editable signal leaves and expanded brain groups', () => {
@@ -353,7 +353,6 @@ test('agent graph root flattened scope exposes editable signal leaves and expand
   const brainExpandedChild = rootView.nodes.find((node) => node.id === 'expanded-group');
   assert.ok(brainExpandedChild);
   assert.equal(brainExpandedChild.previewOnly, false);
-  assert.equal(brainExpandedChild.rootExpandedProjection, false);
   assert.equal(brainExpandedChild.movable, true);
   assert.equal(brainExpandedChild.navigable, true);
   assert.equal(brainExpandedChild.editable, false);
@@ -361,7 +360,6 @@ test('agent graph root flattened scope exposes editable signal leaves and expand
   const adapterExpandedChild = rootView.nodes.find((node) => node.id === 'vision-G-0');
   assert.ok(adapterExpandedChild);
   assert.equal(adapterExpandedChild.previewOnly, false);
-  assert.equal(adapterExpandedChild.rootExpandedProjection, false);
   assert.equal(adapterExpandedChild.connectableSource, true);
   assert.equal(adapterExpandedChild.connectableTarget, false);
 });
@@ -379,7 +377,7 @@ test('agent graph root brain child scope does not inject orphan adapter proxy no
   assert.equal(viewModel.nodes.some((node) => node.proxy), false);
 });
 
-test('agent graph root brain child scope projects boundary adapters without proxy nodes', () => {
+test('agent graph root scope projects direct signal-to-neuron links without proxy adapters', () => {
   const agent = createTestAgent();
   configureCanonicalBody(agent, {
     inputEndpointId: 'vision-inputs',
@@ -426,21 +424,12 @@ test('agent graph root brain child scope projects boundary adapters without prox
     worldRegistry: WORLD_REGISTRY,
   });
 
-  assert.equal(viewModel.nodes.some((node) => node.id === 'core-input-adapter'), true);
-  assert.equal(viewModel.nodes.some((node) => node.id === 'core-output-adapter'), true);
   assert.equal(viewModel.nodes.some((node) => node.proxy), false);
-  const boundaryLinks = viewModel.links.filter((link) => link.aggregate);
-  assert.equal(boundaryLinks.length, 2);
+  assert.equal(viewModel.links.some((link) => link.fromRefNodeId === 'vision-G-0' && link.toRefNodeId === 'expanded-group'), true);
   assert.equal(
-    boundaryLinks.some((link) => link.fromNodeId === 'core-input-adapter' && link.toNodeId === 'neuron-1'),
+    viewModel.links.some((link) => link.fromRefNodeId === 'expanded-group' && link.toRefNodeId === 'output-move-forward'),
     true
   );
-  assert.equal(
-    boundaryLinks.some((link) => link.fromNodeId === 'neuron-2' && link.toNodeId === 'core-output-adapter'),
-    true
-  );
-  assert.equal(boundaryLinks.every((link) => link.inspectable), true);
-  assert.equal(boundaryLinks.every((link) => link.editable), true);
 });
 
 test('agent graph root scope flattens canonical body endpoints even before any connection references them', () => {
@@ -534,6 +523,168 @@ test('agent graph root flattens signal children directly into the top level', ()
   assert.equal(rootView.nodes.find((node) => node.id === 'vision-G-0')?.label, 'vision-G-0');
 });
 
+test('agent graph root scope keeps aggregate links visible after grouping neurons under a child container', () => {
+  const agent = createTestAgent();
+  agent.brain.containers = [
+    {
+      id: 'root-group',
+      label: 'Root',
+      children: [
+        { scope: 'container', nodeId: 'group-1' },
+        { scope: 'brain', nodeId: 'neuron-2' },
+      ],
+    },
+    {
+      id: 'group-1',
+      label: 'Grouped',
+      children: [{ scope: 'brain', nodeId: 'neuron-1' }],
+    },
+  ];
+  agent.connections = [
+    {
+      id: 'group-link-1',
+      from: { scope: 'brain', nodeId: 'neuron-1' },
+      to: { scope: 'brain', nodeId: 'neuron-2' },
+      synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
+    },
+  ];
+  agent.layout = {
+    nodes: {
+      'group-1': { position: { x: 100, y: 120 } },
+      'neuron-1': { position: { x: 0, y: 0 } },
+      'neuron-2': { position: { x: 80, y: 0 } },
+    },
+  };
+
+  const viewModel = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
+  });
+
+  assert.equal(viewModel.links.some((link) => link.fromNodeId === 'group-1' && link.toNodeId === 'neuron-2'), true);
+
+  const childScopeView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [agent.brain.rootContainerId],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
+  });
+
+  assert.equal(childScopeView.links.some((link) => link.fromNodeId === 'group-1' && link.toNodeId === 'group-1'), false);
+});
+
+test('agent graph root scope projects grouped signal links onto the visible group node', () => {
+  const agent = createTestAgent();
+  configureCanonicalBody(agent, {
+    inputEndpointId: 'signal-input',
+    outputEndpointId: 'signal-output',
+    inputNodePrefix: 'sensor',
+    outputNodePrefix: 'effector',
+    visionCells: 1,
+    inputScale: 1,
+    outputDecayPerSecond: 4,
+  });
+  agent.brain.containers = [
+    {
+      id: 'root-group',
+      label: 'Root',
+      children: [
+        { scope: 'container', nodeId: 'group-1' },
+        { scope: 'brain', nodeId: 'neuron-2' },
+      ],
+    },
+    {
+      id: 'group-1',
+      label: 'Grouped',
+      children: [{ scope: 'signal', nodeId: 'sensor-R-0' }],
+    },
+  ];
+  agent.connections = [
+    {
+      id: 'signal-group-link',
+      from: { scope: 'bodyInput', nodeId: 'sensor-R-0' },
+      to: { scope: 'brain', nodeId: 'neuron-2' },
+      synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
+    },
+  ];
+
+  const rootView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
+  });
+
+  assert.equal(rootView.currentChildren.some((node) => node.refNodeId === 'sensor-R-0'), false);
+  assert.equal(rootView.links.some((link) => link.fromNodeId === 'group-1' && link.toNodeId === 'neuron-2'), true);
+});
+
+test('agent graph root scope hides grouped signal leaves from top level and keeps them under the group', () => {
+  const agent = createTestAgent();
+  configureCanonicalBody(agent, {
+    inputEndpointId: 'signal-input',
+    outputEndpointId: 'signal-output',
+    inputNodePrefix: 'sensor',
+    outputNodePrefix: 'effector',
+    visionCells: 1,
+    inputScale: 1,
+    outputDecayPerSecond: 4,
+  });
+  agent.brain.containers = [
+    {
+      id: 'root-group',
+      label: 'Root',
+      children: [
+        { scope: 'container', nodeId: 'group-1' },
+        { scope: 'brain', nodeId: 'neuron-2' },
+      ],
+    },
+    {
+      id: 'group-1',
+      label: 'Grouped',
+      children: [
+        { scope: 'brain', nodeId: 'neuron-1' },
+        { scope: 'signal', nodeId: 'sensor-R-0' },
+      ],
+    },
+  ];
+  agent.connections = [
+    {
+      id: 'connection-signal-1',
+      from: { scope: 'bodyInput', nodeId: 'sensor-R-0' },
+      to: { scope: 'brain', nodeId: 'neuron-1' },
+      synapseModelId: DEFAULT_SYNAPSE_MODEL_ID,
+    },
+  ];
+
+  const rootView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
+  });
+
+  assert.equal(rootView.currentChildren.some((node) => node.refNodeId === 'sensor-R-0'), false);
+
+  const childScopeView = buildAgentGraphViewModel({
+    agent,
+    navigationPath: [agent.brain.rootContainerId],
+    draftNodePositions: {},
+    runtimeActiveNodeIds: [],
+    worldRegistry: WORLD_REGISTRY,
+  });
+
+  assert.equal(childScopeView.currentChildren.some((node) => node.refNodeId === 'sensor-R-0'), false);
+  assert.equal(childScopeView.links.some((link) => link.fromNodeId === 'group-1' && link.toNodeId === 'group-1'), false);
+  assert.equal(childScopeView.links.length, 0);
+});
+
 test('agent graph root signals report installed counts from compiled runtime truth', () => {
   const agent = createTestAgent();
   configureCanonicalBody(agent, {
@@ -583,7 +734,7 @@ test('agent graph root signals report installed counts from compiled runtime tru
   assert.equal(canonicalOnlyInput.detail, 'input / canonical-only');
 });
 
-test('expanded core boundary adapters project links to concrete signal children instead of the adapter group', () => {
+test('expanded root groups project direct signal links to concrete child neurons', () => {
   const agent = createTestAgent();
   configureCanonicalBody(agent, {
     inputEndpointId: 'vision-inputs',
@@ -612,14 +763,6 @@ test('expanded core boundary adapters project links to concrete signal children 
   agent.layout = {
     nodes: {
       ...agent.layout?.nodes,
-      'core-input-adapter': {
-        position: { x: 40, y: 180 },
-        collapsed: false,
-      },
-      'core-output-adapter': {
-        position: { x: 520, y: 180 },
-        collapsed: false,
-      },
       'vision-R-0': { position: { x: 0, y: 0 } },
       'vision-G-0': { position: { x: 0, y: 24 } },
       'vision-B-0': { position: { x: 0, y: 48 } },
@@ -638,30 +781,23 @@ test('expanded core boundary adapters project links to concrete signal children 
     worldRegistry: WORLD_REGISTRY,
   });
 
-  assert.equal(viewModel.nodes.some((node) => node.viewId === 'core-input-adapter::vision-G-0'), true);
-  assert.equal(viewModel.nodes.some((node) => node.viewId === 'core-output-adapter::output-move-forward'), true);
-  assert.equal(viewModel.links.some((link) => link.fromNodeId === 'core-input-adapter'), false);
-  assert.equal(viewModel.links.some((link) => link.toNodeId === 'core-output-adapter'), false);
+  assert.equal(viewModel.nodes.some((node) => node.viewId === 'expanded-group::neuron-1'), true);
+  assert.equal(viewModel.nodes.some((node) => node.viewId === 'expanded-group::neuron-2'), true);
+  assert.equal(viewModel.links.some((link) => link.fromRefNodeId === 'vision-G-0' && link.toRefNodeId === 'expanded-group'), true);
   assert.equal(
-    viewModel.links.some(
-      (link) =>
-        link.fromNodeId === 'core-input-adapter::vision-G-0' && link.toNodeId === 'expanded-group::neuron-1'
-    ),
+    viewModel.links.some((link) => link.fromRefNodeId === 'expanded-group' && link.toRefNodeId === 'output-move-forward'),
     true
   );
-  assert.equal(
-    viewModel.links.some(
-      (link) =>
-        link.fromNodeId === 'expanded-group::neuron-2' && link.toNodeId === 'core-output-adapter::output-move-forward'
-    ),
-    true
+  const directInputLeafLink = viewModel.links.find(
+    (link) => link.aggregate && link.fromRefNodeId === 'vision-G-0' && link.toRefNodeId === 'expanded-group'
   );
-  const directInputLeafLink = viewModel.links.find((link) => link.id === 'body-input-to-neuron');
-  const directOutputLeafLink = viewModel.links.find((link) => link.id === 'neuron-to-body-output');
+  const directOutputLeafLink = viewModel.links.find(
+    (link) => link.aggregate && link.fromRefNodeId === 'expanded-group' && link.toRefNodeId === 'output-move-forward'
+  );
   assert.ok(directInputLeafLink);
   assert.ok(directOutputLeafLink);
-  assert.equal(directInputLeafLink.aggregate, false);
-  assert.equal(directOutputLeafLink.aggregate, false);
+  assert.equal(directInputLeafLink.aggregate, true);
+  assert.equal(directOutputLeafLink.aggregate, true);
   assert.deepEqual(directInputLeafLink.leafLinkIds, ['body-input-to-neuron']);
   assert.deepEqual(directOutputLeafLink.leafLinkIds, ['neuron-to-body-output']);
   assert.equal(directInputLeafLink.inspectable, true);
@@ -670,7 +806,7 @@ test('expanded core boundary adapters project links to concrete signal children 
   assert.equal(directOutputLeafLink.editable, true);
 });
 
-test('agent graph aggregate links sum resolved synapse weights instead of non-canonical top-level connection.weight', () => {
+test('agent graph aggregate links sum resolved synapse weights for direct root signal fan-in', () => {
   const agent = createTestAgent();
   configureCanonicalBody(agent, {
     inputEndpointId: 'vision-inputs',
@@ -729,13 +865,13 @@ test('agent graph aggregate links sum resolved synapse weights instead of non-ca
   });
 
   const aggregateInputLink = viewModel.links.find(
-    (link) => link.aggregate && link.fromNodeId === 'core-input-adapter' && link.toNodeId === 'expanded-group'
+    (link) => link.aggregate && link.fromNodeId === 'vision-R-0' && link.toNodeId === 'expanded-group'
   );
   assert.ok(aggregateInputLink);
-  assert.equal(aggregateInputLink.count, 2);
-  assert.equal(aggregateInputLink.weight, 7);
+  assert.equal(aggregateInputLink.count, 1);
+  assert.equal(aggregateInputLink.weight, 4);
   assert.notEqual(aggregateInputLink.weight, 300);
-  assert.deepEqual(new Set(aggregateInputLink.leafLinkIds), new Set(['body-input-a', 'body-input-b']));
+  assert.deepEqual(new Set(aggregateInputLink.leafLinkIds), new Set(['body-input-a']));
   assert.equal(aggregateInputLink.inspectable, true);
   assert.equal(aggregateInputLink.editable, true);
 });
@@ -831,7 +967,7 @@ test('agent graph projects the canonical root even when root is not the first co
     rootScopeView.nodes
       .filter((node) => node.parentId === agent.brain.rootContainerId)
       .map((node) => node.refNodeId),
-    ['expanded-group']
+    []
   );
 });
 
@@ -928,7 +1064,7 @@ test('agent graph view and body preview share the same canonical endpoint expans
       .sort(),
     [...preview.output.endpointNodeIds].sort()
   );
-  assert.equal(inputScopeView.nodes.some((node) => node.id === 'core-input-adapter'), true);
+  assert.equal(inputScopeView.nodes.some((node) => node.id === 'core-input-adapter'), false);
 });
 
 test('agent graph view marks canonical-only body endpoints that are not installed in compiled runtime', () => {

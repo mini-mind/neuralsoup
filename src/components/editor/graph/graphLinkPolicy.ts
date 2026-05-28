@@ -1,11 +1,10 @@
 export interface GraphLinkPolicyNode {
   refNodeId: string;
-  kind: 'adapter' | 'neuron-group' | 'neuron' | 'signal';
+  kind: 'neuron-group' | 'neuron' | 'signal';
   leaf: boolean;
   proxy: boolean;
   local: boolean;
   previewOnly?: boolean;
-  rootExpandedProjection?: boolean;
   direction: 'input' | 'output' | 'internal';
 }
 
@@ -21,7 +20,7 @@ export const getGraphLinkCapabilities = (
   const interactiveLeaf =
     node.leaf &&
     node.local &&
-    (currentScope === 'child' || currentScope === 'root' || node.rootExpandedProjection === true) &&
+    (currentScope === 'child' || currentScope === 'root') &&
     node.previewOnly !== true;
   if (!interactiveLeaf) {
     return {

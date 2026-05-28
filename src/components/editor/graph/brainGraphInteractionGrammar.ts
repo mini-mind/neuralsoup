@@ -15,10 +15,6 @@ const isExpandedRootGroup = (node: GraphViewNode) =>
   node.kind === 'neuron-group' && node.expanded && !node.expansionParentId;
 
 const getDefaultDoubleClickIntent = (node: GraphViewNode): GraphNodeDoubleClickIntent => {
-  if (node.kind === 'adapter') {
-    return node.adapterNavigable || node.expanded ? 'navigate' : null;
-  }
-
   if (node.navigable) {
     return 'navigate';
   }

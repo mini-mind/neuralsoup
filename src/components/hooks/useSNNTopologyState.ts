@@ -148,7 +148,8 @@ export interface GraphDocumentChangeOptions {
 }
 
 const uniqueIds = (ids: string[]) => Array.from(new Set(ids));
-const getDefaultNavigationPath = (_agent: AgentIR): string[] => [];
+const getDefaultNavigationPath = (agent: AgentIR): string[] =>
+  agent.brain.rootContainerId ? [agent.brain.rootContainerId] : [];
 
 const areStringArraysEqual = (left: string[], right: string[]) =>
   left.length === right.length && left.every((value, index) => value === right[index]);
@@ -703,13 +704,6 @@ export const useSNNTopologyState = ({
       return;
     }
 
-    if (node.kind === 'adapter') {
-      if (node.adapterNavigable) {
-        navigateTo(nodeId);
-      }
-      return;
-    }
-
     if (node.navigable) {
       navigateTo(nodeId);
     }
@@ -721,7 +715,7 @@ export const useSNNTopologyState = ({
       return;
     }
 
-    if ((node.kind === 'neuron-group' || node.kind === 'adapter') && node.local && !node.proxy && !node.previewOnly) {
+    if (node.kind === 'neuron-group' && node.local && !node.proxy && !node.previewOnly) {
       toggleGroupExpanded(nodeId);
     }
   }, [toggleGroupExpanded, viewNodeByViewId]);

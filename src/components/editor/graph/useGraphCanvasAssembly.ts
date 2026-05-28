@@ -219,7 +219,6 @@ export const useGraphCanvasAssembly = ({
           movable: node.movable,
           local: node.local,
           previewOnly: node.previewOnly,
-          rootExpandedProjection: node.rootExpandedProjection,
           connectableSource: node.connectableSource,
           ungroupable: node.kind === 'neuron-group' && node.local && !node.proxy && !node.expansionParentId,
           contextMenuGroup: descriptor.contextMenuGroup,

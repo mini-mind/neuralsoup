@@ -189,7 +189,7 @@ export interface BrainNeuronNode {
 }
 
 export interface BrainContainerChildRef {
-  scope: 'brain' | 'container';
+  scope: 'brain' | 'signal' | 'container';
   nodeId: string;
 }
 

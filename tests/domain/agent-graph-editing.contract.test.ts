@@ -20,9 +20,22 @@ const createEditingAgent = (): AgentIR => ({
     updatedAt: '2026-01-01T00:00:00.000Z',
   },
   body: {
-    inputEndpoints: [],
+    inputEndpoints: [
+      {
+        id: 'input-endpoint-1',
+        source: 'vision.R.0',
+        scale: 1,
+      },
+    ],
     outputEndpoints: [],
-    mappings: [],
+    mappings: [
+      {
+        id: 'mapping-input-signal-1',
+        kind: 'input',
+        endpointId: 'input-endpoint-1',
+        nodeId: 'input-signal-1',
+      },
+    ],
   },
   brain: {
     neuronModels: [
@@ -123,6 +136,89 @@ test('tryAggregateAgentNodesIntoGroup returns an updated agent on the happy path
   assert.deepEqual(result.agent.layout?.nodes['group-1']?.position, { x: 120, y: 80 });
   assert.deepEqual(result.agent.layout?.nodes['neuron-1']?.position, { x: 0, y: 0 });
   assert.deepEqual(result.agent.layout?.nodes['neuron-2']?.position, { x: 80, y: 60 });
+});
+
+test('tryAggregateAgentNodesIntoGroup can persist signal children inside the created group', () => {
+  const agent = createEditingAgent();
+  agent.brain.containers[0] = {
+    ...agent.brain.containers[0]!,
+    children: [
+      { scope: 'brain', nodeId: 'neuron-1' },
+      { scope: 'brain', nodeId: 'neuron-2' },
+      { scope: 'signal', nodeId: 'input-signal-1' },
+      { scope: 'brain', nodeId: 'neuron-3' },
+    ],
+  };
+  agent.connections = [
+    {
+      id: 'signal-link-1',
+      from: { scope: 'bodyInput', nodeId: 'input-signal-1' },
+      to: { scope: 'brain', nodeId: 'neuron-1' },
+      synapseModelId: 'static_current',
+    },
+  ];
+  agent.layout ??= { nodes: {} };
+  agent.layout.nodes['input-signal-1'] = { position: { x: 200, y: 140 } };
+
+  const result = tryAggregateAgentNodesIntoGroup(agent, {
+    parentContainerId: 'root-group',
+    selectedNodeIds: ['neuron-1', 'input-signal-1'],
+    nextGroupId: 'group-signal',
+    nextGroupLabel: '信号组',
+    nextGroupPosition: { x: 120, y: 80 },
+    childPositionsById: {
+      'neuron-1': { x: 0, y: 0 },
+      'input-signal-1': { x: 80, y: 60 },
+    },
+    signalNodeIds: ['input-signal-1'],
+  });
+
+  if (!result.ok) {
+    assert.fail(result.issues.map((issue) => issue.message).join(' | '));
+  }
+  assert.equal(result.ok, true);
+
+  const group = result.agent.brain.containers.find((container) => container.id === 'group-signal');
+  assert.ok(group);
+  assert.deepEqual(group.children, [
+    { scope: 'brain', nodeId: 'neuron-1' },
+    { scope: 'signal', nodeId: 'input-signal-1' },
+  ]);
+  assert.deepEqual(result.agent.layout?.nodes['input-signal-1']?.position, { x: 80, y: 60 });
+});
+
+test('tryAggregateAgentNodesIntoGroup accepts root-level signal selections that are not yet owned by the parent container', () => {
+  const agent = createEditingAgent();
+  const result = tryAggregateAgentNodesIntoGroup(agent, {
+    parentContainerId: 'root-group',
+    selectedNodeIds: ['neuron-1', 'input-signal-1'],
+    nextGroupId: 'group-signal',
+    nextGroupLabel: '信号组',
+    nextGroupPosition: { x: 120, y: 80 },
+    childPositionsById: {
+      'neuron-1': { x: 0, y: 0 },
+      'input-signal-1': { x: 80, y: 60 },
+    },
+    signalNodeIds: ['input-signal-1'],
+  });
+
+  if (!result.ok) {
+    assert.fail(result.issues.map((issue) => issue.message).join(' | '));
+  }
+
+  const root = result.agent.brain.containers.find((container) => container.id === 'root-group');
+  const group = result.agent.brain.containers.find((container) => container.id === 'group-signal');
+  assert.ok(root);
+  assert.ok(group);
+  assert.deepEqual(root.children, [
+    { scope: 'container', nodeId: 'group-signal' },
+    { scope: 'brain', nodeId: 'neuron-2' },
+    { scope: 'brain', nodeId: 'neuron-3' },
+  ]);
+  assert.deepEqual(group.children, [
+    { scope: 'brain', nodeId: 'neuron-1' },
+    { scope: 'signal', nodeId: 'input-signal-1' },
+  ]);
 });
 
 test('ungroupAgentContainer restores grouped children into parent scope and reprojects absolute positions', () => {

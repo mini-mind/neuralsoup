@@ -116,7 +116,6 @@ const BodyTopologyCanvas: React.FC<BodyTopologyCanvasProps> = ({
       movable: false,
       local: true,
       previewOnly: true,
-      rootExpandedProjection: false,
       connectableSource: false,
       ungroupable: false,
       contextMenuGroup: false,

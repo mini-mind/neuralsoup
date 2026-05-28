@@ -6,7 +6,7 @@ import type {
   AgentIR,
   BodyIRMutationAction,
 } from '../../domain/brain';
-import { mutateBodyIR, preflightBrainStructure } from '../../domain/brain';
+import { collectAgentSignalNodeIds, mutateBodyIR, preflightBrainStructure } from '../../domain/brain';
 import type { Position } from '../../domain/brain/shared';
 import {
   AGENT_GRAPH_CHILD_SCOPE_OFFSET,
@@ -99,7 +99,8 @@ const isAcceptedGraphEdit = (result: AgentGraphEditingResult): result is Extract
   result.ok;
 
 const isStructuralGraphEditable = (preflight: BrainStructuralPreflight) => preflight.ok;
-const isCurrentBrainStructurallyEditable = (agent: AgentIR) => preflightBrainStructure(agent.brain).ok;
+const isCurrentBrainStructurallyEditable = (agent: AgentIR) =>
+  preflightBrainStructure(agent.brain, collectAgentSignalNodeIds(agent)).ok;
 const matchesResolvedPortId = (actualPortId: string | undefined, expectedPortId: string) =>
   (actualPortId ?? expectedPortId) === expectedPortId;
 
@@ -196,6 +197,20 @@ const updateBrainContainerById = (
 ): BrainContainerNode[] =>
   containers.map((container) => (container.id === containerId ? updater(container) : container));
 
+const appendChildToContainer = (
+  containers: BrainContainerNode[],
+  containerId: string,
+  child: BrainContainerNode['children'][number]
+): BrainContainerNode[] =>
+  updateBrainContainerById(containers, containerId, (container) =>
+    container.children.some((candidate) => candidate.nodeId === child.nodeId)
+      ? container
+      : {
+          ...container,
+          children: [...container.children, child],
+        }
+  );
+
 const resolveCurrentBrainContainerId = (agent: AgentIR, navigationPath: string[]): string | null => {
   if (navigationPath.length === 0) {
     return agent.brain.rootContainerId;
@@ -205,7 +220,7 @@ const resolveCurrentBrainContainerId = (agent: AgentIR, navigationPath: string[]
   return agent.brain.containers.some((container) => container.id === currentNodeId) ? currentNodeId : null;
 };
 
-const isBrainCanvasEditableScope = (currentContainerKind: 'root' | 'adapter' | 'neuron-group') =>
+const isBrainCanvasEditableScope = (currentContainerKind: 'root' | 'neuron-group') =>
   currentContainerKind === 'root' || currentContainerKind === 'neuron-group';
 
 const getAllSignalNodeIds = (agent: AgentIR) => [
@@ -254,6 +269,11 @@ const collectLeafRecordIds = (
       const nextNode = indexes.nodeById.get(child.nodeId);
       if (nextNode) {
         visit(nextNode);
+        continue;
+      }
+
+      if (child.scope === 'signal') {
+        leafNodeIds.add(child.nodeId);
       }
     }
   };
@@ -314,10 +334,30 @@ const collectNeuronIdsInContainers = (
   return neuronIds;
 };
 
+const collectSignalIdsInContainers = (
+  containersById: Map<string, BrainContainerNode>,
+  containerIds: Set<string>
+): Set<string> => {
+  const signalIds = new Set<string>();
+  for (const containerId of containerIds) {
+    const container = containersById.get(containerId);
+    if (!container) {
+      continue;
+    }
+
+    for (const child of container.children) {
+      if (child.scope === 'signal') {
+        signalIds.add(child.nodeId);
+      }
+    }
+  }
+  return signalIds;
+};
+
 interface GraphEditorCommandDependencies {
   setAgent: (updater: (current: AgentIR) => AgentIR, options?: GraphDocumentChangeOptions) => void;
   currentScope: 'root' | 'child';
-  currentContainerKind: 'root' | 'adapter' | 'neuron-group';
+  currentContainerKind: 'root' | 'neuron-group';
   currentChildren: AgentGraphViewNodeRecord[];
   navigationPath: string[];
   indexes: AgentGraphViewIndexes;
@@ -701,6 +741,7 @@ export const useGraphEditorCommands = ({
         ...removableLeafNodeIds,
         ...collectNeuronIdsInContainers(containersById, expandedRemovableContainerIds),
       ]);
+      const expandedRemovableSignalIds = collectSignalIdsInContainers(containersById, expandedRemovableContainerIds);
       const nextLayout: AgentIR['layout'] = current.layout
         ? {
             ...current.layout,
@@ -708,6 +749,7 @@ export const useGraphEditorCommands = ({
               Object.entries(current.layout.nodes).filter(
                 ([nodeId]) =>
                   !expandedRemovableNeuronIds.has(nodeId) &&
+                  !expandedRemovableSignalIds.has(nodeId) &&
                   !expandedRemovableContainerIds.has(nodeId) &&
                   !removableNodeIds.has(nodeId)
               )
@@ -761,6 +803,7 @@ export const useGraphEditorCommands = ({
               children: container.children.filter(
                 (child) =>
                   !expandedRemovableNeuronIds.has(child.nodeId) &&
+                  !expandedRemovableSignalIds.has(child.nodeId) &&
                   !expandedRemovableContainerIds.has(child.nodeId)
               ),
             })),
@@ -769,6 +812,8 @@ export const useGraphEditorCommands = ({
           (link) =>
             !expandedRemovableNeuronIds.has(link.from.nodeId) &&
             !expandedRemovableNeuronIds.has(link.to.nodeId) &&
+            !expandedRemovableSignalIds.has(link.from.nodeId) &&
+            !expandedRemovableSignalIds.has(link.to.nodeId) &&
             !removableNodeIds.has(link.from.nodeId) &&
             !removableNodeIds.has(link.to.nodeId)
         ),
@@ -947,7 +992,6 @@ export const useGraphEditorCommands = ({
         movable: true,
         local: true,
         previewOnly: false,
-        rootExpandedProjection: false,
         direction: 'internal',
         connectableSource: true,
         connectableTarget: true,
@@ -957,7 +1001,6 @@ export const useGraphEditorCommands = ({
         expansionOffsetY: 0,
         runtimeInstalled: true,
         runtimeInstalledLeafCount: 1,
-        adapterNavigable: false,
       };
 
       const uniqueSourceNodeIds = uniqueIds(sourceNodeIds);
@@ -1121,6 +1164,13 @@ export const useGraphEditorCommands = ({
           {
             ...current,
             body: nextBody,
+            brain: {
+              ...current.brain,
+              containers: appendChildToContainer(current.brain.containers, current.brain.rootContainerId, {
+                scope: 'signal',
+                nodeId: nextNodeId,
+              }),
+            },
           },
           nextNodeId,
           (layoutNode) => ({
@@ -1180,6 +1230,13 @@ export const useGraphEditorCommands = ({
           {
             ...current,
             body: nextBody,
+            brain: {
+              ...current.brain,
+              containers: appendChildToContainer(current.brain.containers, current.brain.rootContainerId, {
+                scope: 'signal',
+                nodeId: nextNodeId,
+              }),
+            },
           },
           nextNodeId,
           (layoutNode) => ({
@@ -1240,6 +1297,7 @@ export const useGraphEditorCommands = ({
       }
 
       const nextGroupId = `group-${getNextNumericId(getAllBrainNodeIds(current), 'group-')}`;
+      const currentSignalNodeIds = collectAgentSignalNodeIds(current);
       const result = tryAggregateAgentNodesIntoGroup(current, {
         parentContainerId: currentContainerId,
         selectedNodeIds: selectedChildren.map((child) => child.refNodeId),
@@ -1260,6 +1318,7 @@ export const useGraphEditorCommands = ({
             ];
           })
         ),
+        signalNodeIds: currentSignalNodeIds,
       });
       if (!isAcceptedGraphEdit(result)) {
         return current;
@@ -1443,7 +1502,8 @@ export const useGraphEditorCommands = ({
       }
 
       const currentContainerId = navigationPath[navigationPath.length - 1] ?? null;
-      if (!currentContainerId) {
+      const resolvedCurrentContainerId = currentContainerId ?? indexes.structuralPreflight.rootContainer?.id ?? null;
+      if (!resolvedCurrentContainerId) {
         return;
       }
 
@@ -1480,9 +1540,10 @@ export const useGraphEditorCommands = ({
               : undefined;
           const result = tryReparentAgentNode(nextAgent, {
             nodeId: selectedRefNodeId,
-            fromContainerId: currentContainerId,
+            fromContainerId: resolvedCurrentContainerId,
             toContainerId: targetGroup.refNodeId,
             nextPosition,
+            signalNodeIds: collectAgentSignalNodeIds(nextAgent),
           });
           if (!isAcceptedGraphEdit(result)) {
             return current;

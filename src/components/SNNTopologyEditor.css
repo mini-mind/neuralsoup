@@ -141,7 +141,6 @@
   stroke: #afa;
   stroke-width: 2;
   stroke-linecap: round;
-  stroke-dasharray: 2 10;
   animation: topology-link-flow 1.15s linear infinite;
   opacity: 0.82;
 }
@@ -168,18 +167,8 @@
   opacity: 1;
 }
 
-.topology-link.is-aggregate .topology-link-stroke {
-  stroke-dasharray: 10 6;
-}
-
-.topology-link.is-aggregate .topology-link-flow {
-  stroke-dasharray: 3 13;
-  animation-duration: 1.4s;
-}
-
 .topology-link-preview {
   stroke: #afa;
-  stroke-dasharray: 8 5;
 }
 
 .topology-node {

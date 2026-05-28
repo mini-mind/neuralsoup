@@ -11,7 +11,7 @@ export interface GraphViewNode {
   refNodeId: string;
   rootContainer: boolean;
   label: string;
-  kind: 'adapter' | 'neuron-group' | 'neuron' | 'signal';
+  kind: 'neuron-group' | 'neuron' | 'signal';
   x: number;
   y: number;
   width: number;
@@ -25,7 +25,6 @@ export interface GraphViewNode {
   movable: boolean;
   local: boolean;
   previewOnly: boolean;
-  rootExpandedProjection: boolean;
   direction: 'input' | 'output' | 'internal';
   connectableSource: boolean;
   connectableTarget: boolean;
@@ -35,7 +34,6 @@ export interface GraphViewNode {
   expansionOffsetY: number;
   runtimeInstalled: boolean;
   runtimeInstalledLeafCount: number;
-  adapterNavigable: boolean;
 }
 
 export interface GraphViewLink {
@@ -93,7 +91,7 @@ export interface GraphViewModel<Node, Container> {
   currentContainer: Container;
   currentChildren: Node[];
   currentScope: 'root' | 'child';
-  currentContainerKind: 'root' | 'adapter' | 'neuron-group';
+  currentContainerKind: 'root' | 'neuron-group';
   scopeKey: string;
   localLeafIds: Set<string>;
   nodes: GraphViewNode[];

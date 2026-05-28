@@ -16,7 +16,7 @@ import type {
   SynapseModelIR,
 } from './agent-ir';
 import { validateAgentIRModelCatalog } from './agent-ir';
-import { resolveAgentBodyEndpointResolution } from './agent-body-rules';
+import { collectAgentSignalNodeIds, resolveAgentBodyEndpointResolution } from './agent-body-rules';
 import type { AgentProgram, AgentProgramConnection, AgentProgramNeuronNode } from './agent-program';
 import type { IzhikevichNeuronParameters } from './shared';
 import type { WorldRegistry } from './world-registry';
@@ -106,7 +106,9 @@ const buildBrainStructureIssues = (agent: AgentIR): AgentValidationIssue[] => {
   const issues: AgentValidationIssue[] = [];
   const neuronIds = new Set<string>();
   const containerIds = new Set<string>();
+  const signalNodeIds = collectAgentSignalNodeIds(agent);
   const neuronOwners = new Map<string, string[]>();
+  const signalOwners = new Map<string, string[]>();
   const containerOwners = new Map<string, string[]>();
 
   for (const neuron of agent.brain.neurons) {
@@ -155,6 +157,21 @@ const buildBrainStructureIssues = (agent: AgentIR): AgentValidationIssue[] => {
         continue;
       }
 
+      if (child.scope === 'signal') {
+        if (!signalNodeIds.has(child.nodeId)) {
+          issues.push({
+            code: 'missing-brain-node',
+            message: `Brain container "${container.id}" references missing signal "${child.nodeId}".`,
+          });
+          continue;
+        }
+
+        const owners = signalOwners.get(child.nodeId) ?? [];
+        owners.push(container.id);
+        signalOwners.set(child.nodeId, owners);
+        continue;
+      }
+
       if (!containerIds.has(child.nodeId)) {
         issues.push({
           code: 'missing-brain-node',
@@ -183,6 +200,16 @@ const buildBrainStructureIssues = (agent: AgentIR): AgentValidationIssue[] => {
       issues.push({
         code: 'invalid-brain-structure',
         message: `Brain neuron "${neuronId}" is attached to multiple containers: ${owners.join(', ')}.`,
+      });
+    }
+  }
+
+  for (const signalNodeId of signalNodeIds) {
+    const owners = signalOwners.get(signalNodeId) ?? [];
+    if (owners.length > 1) {
+      issues.push({
+        code: 'invalid-brain-structure',
+        message: `Signal "${signalNodeId}" is attached to multiple containers: ${owners.join(', ')}.`,
       });
     }
   }

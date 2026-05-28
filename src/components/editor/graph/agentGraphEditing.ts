@@ -1,3 +1,4 @@
+import { collectAgentSignalNodeIds } from '../../../domain/brain';
 import type { AgentIR, BrainContainerNode, Position } from '../../../domain/brain';
 
 const updateBrainContainerById = (
@@ -106,7 +107,9 @@ const collectBrainStructureIssues = (agent: AgentIR): AgentGraphEditingIssue[] =
   const issues: AgentGraphEditingIssue[] = [];
   const neuronIds = new Set<string>();
   const containerIds = new Set<string>();
+  const signalNodeIds = collectAgentSignalNodeIds(agent);
   const neuronOwners = new Map<string, string[]>();
+  const signalOwners = new Map<string, string[]>();
   const containerOwners = new Map<string, string[]>();
   const containersById = new Map<string, BrainContainerNode>();
 
@@ -171,6 +174,23 @@ const collectBrainStructureIssues = (agent: AgentIR): AgentGraphEditingIssue[] =
         continue;
       }
 
+      if (child.scope === 'signal') {
+        if (!signalNodeIds.has(child.nodeId)) {
+          issues.push(
+            createAgentGraphEditingIssue(
+              'missing-node-reference',
+              `Brain container "${container.id}" references missing signal "${child.nodeId}".`
+            )
+          );
+          continue;
+        }
+
+        const owners = signalOwners.get(child.nodeId) ?? [];
+        owners.push(container.id);
+        signalOwners.set(child.nodeId, owners);
+        continue;
+      }
+
       if (!containerIds.has(child.nodeId)) {
         issues.push(
           createAgentGraphEditingIssue(
@@ -204,6 +224,18 @@ const collectBrainStructureIssues = (agent: AgentIR): AgentGraphEditingIssue[] =
         createAgentGraphEditingIssue(
           'multiple-owners',
           `Brain neuron "${neuronId}" is attached to multiple containers: ${owners.join(', ')}.`
+        )
+      );
+    }
+  }
+
+  for (const signalNodeId of signalNodeIds) {
+    const owners = signalOwners.get(signalNodeId) ?? [];
+    if (owners.length > 1) {
+      issues.push(
+        createAgentGraphEditingIssue(
+          'multiple-owners',
+          `Signal "${signalNodeId}" is attached to multiple containers: ${owners.join(', ')}.`
         )
       );
     }
@@ -319,7 +351,13 @@ export interface AggregateAgentNodesInput {
   nextGroupLabel: string;
   nextGroupPosition: Position;
   childPositionsById: Record<string, Position>;
+  signalNodeIds?: Iterable<string>;
 }
+
+const createChildRefForAggregateSelection = (nodeId: string, signalNodeIds: Set<string>) =>
+  signalNodeIds.has(nodeId)
+    ? ({ scope: 'signal' as const, nodeId })
+    : ({ scope: 'brain' as const, nodeId });
 
 export const tryAggregateAgentNodesIntoGroup = (
   agent: AgentIR,
@@ -330,6 +368,7 @@ export const tryAggregateAgentNodesIntoGroup = (
     nextGroupLabel,
     nextGroupPosition,
     childPositionsById,
+    signalNodeIds = [],
   }: AggregateAgentNodesInput
 ): AgentGraphEditingResult => {
   const parentContainer = agent.brain.containers.find((container) => container.id === parentContainerId);
@@ -351,7 +390,10 @@ export const tryAggregateAgentNodesIntoGroup = (
   }
 
   const parentChildIds = new Set(parentContainer.children.map((child) => child.nodeId));
-  const missingSelectedNodeId = selectedNodeIdsUnique.find((nodeId) => !parentChildIds.has(nodeId));
+  const signalNodeIdSet = new Set(signalNodeIds);
+  const missingSelectedNodeId = selectedNodeIdsUnique.find(
+    (nodeId) => !parentChildIds.has(nodeId) && !signalNodeIdSet.has(nodeId)
+  );
   if (missingSelectedNodeId) {
     preconditions.push(
       createAgentGraphEditingIssue(
@@ -372,7 +414,9 @@ export const tryAggregateAgentNodesIntoGroup = (
 
   const selectedNodeIdSet = new Set(selectedNodeIdsUnique);
   return validateAgentGraphEdit(agent, () => {
-    const selectedChildren = parentContainer.children.filter((child) => selectedNodeIdSet.has(child.nodeId));
+    const selectedChildren = selectedNodeIdsUnique
+      .map((nodeId) => parentContainer.children.find((child) => child.nodeId === nodeId) ?? createChildRefForAggregateSelection(nodeId, signalNodeIdSet))
+      .filter((child): child is BrainContainerNode['children'][number] => child != null);
     const nextParentChildren: BrainContainerNode['children'] = [];
     let inserted = false;
     for (const child of parentContainer.children) {
@@ -399,7 +443,13 @@ export const tryAggregateAgentNodesIntoGroup = (
           {
             id: nextGroupId,
             label: nextGroupLabel,
-            children: selectedChildren.map((child) => ({ ...child })),
+            children: selectedChildren.map((child) => ({
+              ...(child.scope === 'brain' || child.scope === 'container'
+                ? child
+                : signalNodeIdSet.has(child.nodeId)
+                  ? { scope: 'signal' as const, nodeId: child.nodeId }
+                  : child),
+            })),
           },
         ],
       },
@@ -647,6 +697,7 @@ export interface ReparentAgentNodeInput {
   fromContainerId: string;
   toContainerId: string;
   nextPosition?: Position;
+  signalNodeIds?: Iterable<string>;
 }
 
 const isContainerAncestorOf = (
@@ -676,7 +727,7 @@ const isContainerAncestorOf = (
 
 export const tryReparentAgentNode = (
   agent: AgentIR,
-  { nodeId, fromContainerId, toContainerId, nextPosition }: ReparentAgentNodeInput
+  { nodeId, fromContainerId, toContainerId, nextPosition, signalNodeIds = [] }: ReparentAgentNodeInput
 ): AgentGraphEditingResult => {
   const fromContainer = agent.brain.containers.find((container) => container.id === fromContainerId);
   if (!fromContainer) {
@@ -698,7 +749,10 @@ export const tryReparentAgentNode = (
     ]);
   }
 
-  const movingChild = fromContainer.children.find((child) => child.nodeId === nodeId) ?? null;
+  const signalNodeIdSet = new Set(signalNodeIds);
+  const movingChild =
+    fromContainer.children.find((child) => child.nodeId === nodeId) ??
+    (signalNodeIdSet.has(nodeId) ? { scope: 'signal' as const, nodeId } : null);
   const preconditions: AgentGraphEditingIssue[] = [];
   if (!movingChild) {
     preconditions.push(

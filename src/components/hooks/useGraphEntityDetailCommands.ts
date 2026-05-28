@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { mutateBodyIR, type AgentIR } from '../../domain/brain';
+import { collectAgentSignalNodeIds, mutateBodyIR, type AgentIR } from '../../domain/brain';
 import { preflightBrainStructure } from '../../domain/brain';
 import type { GraphLinkUpdatePayload, GraphNodeUpdatePayload } from '../editor/graph/graphNodeUpdate';
 import { GRAPH_SEMANTIC_CHANGE } from './graphDocumentChangePolicy';
@@ -48,7 +48,8 @@ const hasSynapseModelId = (agent: AgentIR, modelId: string): boolean =>
 const resolveNeuronModelById = (agent: AgentIR, modelId: string) =>
   (agent.brain.neuronModels ?? []).find((model) => model.id === modelId) ?? null;
 
-const isCurrentBrainStructurallyEditable = (agent: AgentIR) => preflightBrainStructure(agent.brain).ok;
+const isCurrentBrainStructurallyEditable = (agent: AgentIR) =>
+  preflightBrainStructure(agent.brain, collectAgentSignalNodeIds(agent)).ok;
 
 interface UseGraphEntityDetailCommandsOptions {
   graphStructureEditable: boolean;

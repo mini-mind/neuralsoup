@@ -33,6 +33,7 @@ export interface BrainStructuralPreflight {
 
 const CHILD_TARGET_SCOPE_LABEL: Record<BrainContainerChildRef['scope'], string> = {
   brain: 'neuron',
+  signal: 'signal',
   container: 'container',
 };
 
@@ -48,11 +49,15 @@ const getIssueKey = (issue: BrainStructuralIssue) =>
     issue.childScope ?? '',
   ].join('|');
 
-export const preflightBrainStructure = (brain: BrainIR): BrainStructuralPreflight => {
+export const preflightBrainStructure = (
+  brain: BrainIR,
+  signalNodeIdsInput: Iterable<string> = []
+): BrainStructuralPreflight => {
   const issues: BrainStructuralIssue[] = [];
   const seenIssueKeys = new Set<string>();
   const neuronById = new Map<string, BrainNeuronNode>();
   const containerById = new Map<string, BrainContainerNode>();
+  const signalNodeIds = new Set(signalNodeIdsInput);
   const ownerContainerIdByNodeId = new Map<string, string>();
   const childRefsByContainerId = new Map<string, BrainContainerChildRef[]>();
   const validContainerChildIdsByContainerId = new Map<string, string[]>();
@@ -112,7 +117,11 @@ export const preflightBrainStructure = (brain: BrainIR): BrainStructuralPrefligh
 
     for (const childRef of container.children) {
       const targetExists =
-        childRef.scope === 'brain' ? neuronById.has(childRef.nodeId) : containerById.has(childRef.nodeId);
+        childRef.scope === 'brain'
+          ? neuronById.has(childRef.nodeId)
+          : childRef.scope === 'signal'
+            ? signalNodeIds.has(childRef.nodeId)
+            : containerById.has(childRef.nodeId);
       if (!targetExists) {
         pushIssue({
           code: 'missing-child-ref',

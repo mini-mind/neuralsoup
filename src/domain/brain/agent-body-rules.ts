@@ -98,6 +98,14 @@ const collectMappedOutputNodeIds = (body: BodyIR): string[] =>
     .filter((mapping): mapping is BodyOutputMappingIR => mapping.kind === 'output')
     .map((mapping) => mapping.nodeId);
 
+export const collectAgentSignalNodeIds = (agent: AgentIR): Set<string> =>
+  new Set([
+    ...collectMappedInputNodeIds(agent.body),
+    ...collectMappedOutputNodeIds(agent.body),
+    ...collectEndpointNodeIdsFromConnections(agent, 'bodyInput'),
+    ...collectEndpointNodeIdsFromConnections(agent, 'bodyOutput'),
+  ]);
+
 const parseBodyInputSource = (nodeId: string, binding: WorldInputBinding | null, scale: number): BodyInputNodeRuntime | null => {
   if (!binding) {
     return null;

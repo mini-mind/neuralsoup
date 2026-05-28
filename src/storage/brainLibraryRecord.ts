@@ -140,7 +140,7 @@ const isCanonicalAgentShape = (agent: unknown): boolean => {
           (child) =>
             isObject(child) &&
             hasOnlyKeys(child, ['scope', 'nodeId']) &&
-            (child.scope === 'brain' || child.scope === 'container') &&
+            (child.scope === 'brain' || child.scope === 'signal' || child.scope === 'container') &&
             typeof child.nodeId === 'string'
         )
     )

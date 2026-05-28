@@ -34,7 +34,6 @@ interface OrchestratorNode extends SceneNodeGeometry {
   movable: boolean;
   local: boolean;
   previewOnly: boolean;
-  rootExpandedProjection: boolean;
   connectableSource: boolean;
   ungroupable: boolean;
   contextMenuGroup: boolean;
